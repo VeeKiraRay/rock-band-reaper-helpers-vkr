@@ -12,6 +12,28 @@ RB3_MIN_PITCH    = 36   -- C1
 RB3_MAX_PITCH    = 84   -- C5
 RB3_PHRASE_PITCH = 105  -- phrase/overdrive marker pitch
 
+-- Diatonic harmony support
+HARM_SCALE = {
+    major = {0, 2, 4, 5, 7, 9, 11},
+    minor = {0, 2, 3, 5, 7, 8, 10},
+}
+
+HARM_NOTE_NAMES = {'C','C#','D','D#','E','F','F#','G','G#','A','A#','B'}
+
+HARM_MODES = {
+    { label = 'Copy as-is',                    diatonic = false, offset =  0 },
+    { label = 'Fixed minor 3rd above (+3 st)', diatonic = false, offset =  3 },
+    { label = 'Fixed major 3rd above (+4 st)', diatonic = false, offset =  4 },
+    { label = 'Fixed minor 3rd below (-3 st)', diatonic = false, offset = -3 },
+    { label = 'Fixed major 3rd below (-4 st)', diatonic = false, offset = -4 },
+    { label = 'Diatonic 3rd above',            diatonic = true,  dir    =  1 },
+    { label = 'Diatonic 3rd below',            diatonic = true,  dir    = -1 },
+    { label = 'Fixed 4th above (+5 st)',        diatonic = false, offset =  5 },
+    { label = 'Fixed 5th above (+7 st)',        diatonic = false, offset =  7 },
+    { label = 'Fixed 4th below (-5 st)',        diatonic = false, offset = -5 },
+    { label = 'Fixed 5th below (-7 st)',        diatonic = false, offset = -7 },
+}
+
 -- Lyric text events that Clear and Assign both preserve (special game events).
 LYRIC_IGNORE = {
     ['[tambourine_start]'] = true, ['[tambourine_end]'] = true,
@@ -88,6 +110,39 @@ S = {
 
     status            = 'Ready.',
     last_result       = nil,
+
+    -- Harmonies tab — track indices not persisted
+    harm_src_idx        = 0,
+    harm_dst1_idx       = 0,
+    harm_dst2_idx       = 0,
+    harm_dst3_idx       = 0,
+
+    -- Persisted
+    harm_dst1_enabled   = true,
+    harm_dst2_enabled   = false,
+    harm_dst3_enabled   = false,
+    harm_dst1_mode      = 0,
+    harm_dst2_mode      = 0,
+    harm_dst3_mode      = 0,
+    harm_copy_phrases   = true,
+    harm_key_root       = 9,   -- A (common rock key)
+    harm_key_quality    = 0,   -- 0 = major, 1 = minor
+
+    -- Persisted — lyric suffix options per destination
+    harm_dst1_lyric_unpitched = false,
+    harm_dst1_lyric_hidden    = false,
+    harm_dst2_lyric_unpitched = false,
+    harm_dst2_lyric_hidden    = false,
+    harm_dst3_lyric_unpitched = false,
+    harm_dst3_lyric_hidden    = false,
+
+    -- Transient — not persisted
+    harm_confirm_full   = false,
+
+    -- Cached track lists (session-only; rebuilt by RefreshTrackLists)
+    all_track_list   = nil,
+    midi_track_list  = nil,
+    audio_track_list = nil,
 }
 
 function ResetDetection()
@@ -441,4 +496,75 @@ TIPS = {
         "Violations are grouped by phrase position.\n\n" ..
         "Operates on the whole take regardless of time selection.\n" ..
         "Read-only — does not modify the project.",
+
+    harm_src =
+        "MIDI source track to copy vocal notes from.\n\n" ..
+        "The first MIDI item on this track is used. Typically 'PART VOCALS'.",
+
+    harm_dst1 = "First destination track for the harmony copy.",
+    harm_dst2 = "Second destination track for the harmony copy.",
+    harm_dst3 = "Third destination track for the harmony copy.",
+
+    harm_dst_enabled =
+        "Enable or disable this destination row.\n\n" ..
+        "At least one destination must be enabled to apply harmonies.",
+
+    harm_dst_mode =
+        "Pitch interval applied when copying notes to this destination.\n\n" ..
+        "Diatonic modes use the key set in the Key section and apply the\n" ..
+        "correct interval for each individual note (e.g. +3 or +4 st depending\n" ..
+        "on the scale degree). Fixed modes add the same semitone offset to every note.\n\n" ..
+        "The 4th and 5th are included but will not fit most songs.",
+
+    harm_key =
+        "Song key used for 'Diatonic 3rd' modes.\n\n" ..
+        "Only relevant when at least one destination is set to a diatonic mode.\n" ..
+        "Look up the key on Tunebat (tunebat.com) or check a chord chart,\n" ..
+        "then verify by ear before applying.",
+
+    harm_key_quality =
+        "Major or natural minor quality for the key.",
+
+    harm_copy_phrases =
+        "Also copy phrase marker and overdrive notes (outside the C1-C5 vocal range)\n" ..
+        "from the source to each enabled destination.\n\n" ..
+        "Existing out-of-range notes in the destination are cleared before copying.",
+
+    harm_confirm_full =
+        "No time selection is active. Check this box to confirm processing the entire\n" ..
+        "source MIDI item. Make a time selection to limit scope.",
+
+    track_refresh =
+        "Re-scan all tracks and rebuild the filtered track dropdowns.\n\n" ..
+        "Audio source shows only tracks with audio items.\n" ..
+        "MIDI destination, Reference MIDI, and Harmony source show only\n" ..
+        "tracks with MIDI items.\n\n" ..
+        "Click after adding audio or MIDI items to a track that wasn't\n" ..
+        "previously visible in a dropdown. Refresh also runs automatically\n" ..
+        "on startup and project switch.",
+
+    harm_lyric_unpitched =
+        "Add '#' to the end of each copied lyric on this destination.\n\n" ..
+        "In Rock Band, '#' marks the syllable as unpitched — the game accepts\n" ..
+        "any pitch for that note. Use this for screamed or growled harmonies\n" ..
+        "where exact pitch is not expected from the singer.\n\n" ..
+        "If the source lyric already ends with '#', it is not duplicated.\n" ..
+        "When both options are checked, '#' is added before '$'.",
+
+    harm_lyric_hidden =
+        "Add '$' to the end of each copied lyric on this destination.\n\n" ..
+        "In Rock Band, '$' makes the lyric invisible on screen. The game\n" ..
+        "displays two distinct lyric lines at a time. If one harmony track\n" ..
+        "sings the same words as the lead and another sings different words,\n" ..
+        "hide the duplicate track's lyrics so the second display slot is free\n" ..
+        "for the track with distinct lyrics.\n\n" ..
+        "If the source lyric already ends with '$', it is not duplicated.\n" ..
+        "When both options are checked, '#' is added before '$'.",
+
+    harm_apply =
+        "Copy vocal notes from the source track to all enabled destinations,\n" ..
+        "applying the chosen pitch interval to each.\n\n" ..
+        "Destination notes in the vocal range (C1-C5) are cleared before inserting.\n" ..
+        "If 'Copy phrase markers' is on, out-of-range notes are also replaced.\n\n" ..
+        "Scope: active time selection, or full source item if confirmed.",
 }

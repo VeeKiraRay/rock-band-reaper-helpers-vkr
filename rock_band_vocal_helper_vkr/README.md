@@ -35,6 +35,7 @@ The script window has a persistent track-selector row at the top and a status/re
 | **Pitch** tab          | Pitch source for Apply pitch changes: Built-in detection (YIN) or Reference MIDI |
 | **Lyrics** tab         | Select a lyrics file, assign or clear lyric events                               |
 | **Pitch slide** tab    | Scan existing notes for pitch slides (glides, scoops, bends)                     |
+| **Harmonies** tab      | Copy lead vocal notes to up to three harmony tracks with pitch interval options  |
 | **General** tab        | Save / Load project settings                                                     |
 | Status panel           | Below the tab bar — result of the last action                                    |
 
@@ -279,15 +280,104 @@ The scan also uses the **YIN threshold**, **Min frequency**, and **Max frequency
 
 ---
 
+## Harmonies tab
+
+![Harmonies section](../assets/harmonies.jpg)
+
+The **Harmonies** tab copies lead vocal notes from a source MIDI track to up to three destination tracks, transposing each by a chosen pitch interval. Lyrics from the source are copied at the same time. Use this to build Rock Band-style harmony parts (HARM1, HARM2, HARM3) from a completed lead vocal (PART VOCALS) without manual copy-and-paste.
+
+### Setting up tracks
+
+The script auto-selects tracks by name on startup and on project switch:
+
+| Role          | Auto-selected track name                                     |
+| ------------- | ------------------------------------------------------------ |
+| Source        | `PART VOCALS` (first MIDI item found); falls back to `HARM1` |
+| Destination 1 | `HARM1`                                                      |
+| Destination 2 | `HARM2`                                                      |
+| Destination 3 | `HARM3`                                                      |
+
+All four dropdowns can be changed manually. Destination tracks do not need to contain a MIDI item — the script will report an error if one is missing when you click Apply.
+
+### Destination rows
+
+Each destination row (Destination 1, 2, 3) has three controls:
+
+- **Enabled checkbox** — enable or disable that destination. Disabled rows are greyed out. At least one destination must be enabled to apply.
+- **Track dropdown** — the MIDI track to write harmony notes into.
+- **Mode dropdown** — the pitch interval applied to copied notes (see [Interval modes](#interval-modes) below).
+
+Below the mode dropdown, two per-destination checkboxes control lyric suffixes:
+
+| Checkbox                 | Suffix added | Effect in Rock Band                                                                                                                                                                            |
+| ------------------------ | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Unpitched lyrics (#)** | `#`          | The game accepts any pitch for that syllable. Use for screamed or growled harmonies where exact pitch is not expected.                                                                         |
+| **Hidden lyrics ($)**    | `$`          | The lyric is invisible on screen. Rock Band displays two distinct lyric lines at once; hide the duplicate track's lyrics so the second display slot is free for a track with different lyrics. |
+
+If a source lyric already ends with `#` or `$`, the suffix is not duplicated. When both checkboxes are on, `#` is appended before `$`.
+
+### Interval modes
+
+| Mode                  | Semitone offset | Notes                                                                                  |
+| --------------------- | --------------- | -------------------------------------------------------------------------------------- |
+| Copy as-is            | 0               | Exact copy at the same pitch.                                                          |
+| Fixed minor 3rd above | +3              | Same offset applied to every note.                                                     |
+| Fixed major 3rd above | +4              | Same offset applied to every note.                                                     |
+| Fixed minor 3rd below | −3              | Same offset applied to every note.                                                     |
+| Fixed major 3rd below | −4              | Same offset applied to every note.                                                     |
+| Diatonic 3rd above    | varies          | Interval depends on the scale degree — +3 or +4 st per note. Requires a Key selection. |
+| Diatonic 3rd below    | varies          | Same as above, downward. Requires a Key selection.                                     |
+| Fixed 4th above       | +5              | Will not fit most songs without clipping the vocal range.                              |
+| Fixed 5th above       | +7              | Will not fit most songs without clipping the vocal range.                              |
+| Fixed 4th below       | −5              | Will not fit most songs without clipping the vocal range.                              |
+| Fixed 5th below       | −7              | Will not fit most songs without clipping the vocal range.                              |
+
+Before writing any MIDI, the script checks that every transposed note would land within the RB3 vocal range (C1–C5). If any note would go out of range the action is aborted with a clear error identifying the note and destination — no MIDI is modified.
+
+### Key section
+
+The **Key** controls are active only when at least one destination uses a Diatonic mode. Pick the root note and quality (Major or Minor) that match the song.
+
+**Detecting the key from MIDI:** Click **Detect from MIDI** to analyse the pitch histogram of the source MIDI item using the Krumhansl-Schmuckler algorithm. The result (most likely key + confidence percentage + runner-up) appears below the buttons. The key selector is not changed automatically — verify the suggestion, then set it manually.
+
+**Detecting the key from audio:** Click **Detect from audio** to run YIN pitch detection at 100 ms intervals across the full audio item (the track selected on the General tab), build a pitch histogram from those readings, and report the most likely key. Uses the same YIN settings as the Pitch tab. May take a few seconds on long tracks.
+
+Neither detect button changes the key selector — they only display a suggestion.
+
+### Copy phrase markers
+
+The **Copy phrase markers & overdrive** checkbox copies notes outside the vocal pitch range (C1–C5) — phrase-boundary markers and overdrive notes — from the source to each enabled destination. Existing out-of-range notes in the destination are cleared within the scope before inserting.
+
+### Scope and applying
+
+If a time selection is active, only notes that start within it are processed. Without a time selection, an orange warning appears and a **Process full item** confirm checkbox must be checked before the Apply button becomes active. Setting a time selection automatically unchecks the confirm box.
+
+Click **Apply Harmonies** to write the notes. The action:
+
+1. Clears all vocal-range notes from each enabled destination within the scope.
+2. Clears all lyric text events from each destination within the scope (preserving special game events such as `[tambourine_start]`).
+3. If **Copy phrase markers** is on, also clears out-of-range notes from each destination within the scope.
+4. Inserts the transposed notes, phrase notes, and lyrics into each destination.
+
+The whole operation is a single undo entry — Ctrl+Z or the **Undo** button next to Apply will revert all destinations at once.
+
+The result panel reports per-destination counts:
+
+```
+Destination 1 [Diatonic 3rd above]: cleared 42 notes / 38 lyrics, inserted 42 vocal + 6 phrase (38 lyrics)
+```
+
+---
+
 ## General tab
 
 Settings are saved per-project using REAPER's project state. Click **Save** to store the current Detection and Pitch settings. Click **Load** to restore them.
 
 Settings are loaded automatically when the script opens (if a save exists for the current project) and when you switch REAPER project tabs.
 
-**What is saved:** all Detection sliders, Pitch source selection and all pitch settings (including YIN parameters), Velocity, Slide Scan settings.
+**What is saved:** all Detection sliders, Pitch source selection and all pitch settings (including YIN parameters), Velocity, Slide Scan settings, Harmonies destination enabled/mode/lyric-suffix options, key selection, and Copy phrase markers.
 
-**What is not saved:** track selections. If your project follows the naming convention (`VOCALS AUDIO`, `PART VOCALS`) the script will re-select the right tracks automatically.
+**What is not saved:** track selections. If your project follows the naming convention (`VOCALS AUDIO`, `PART VOCALS`, `HARM1–3`) the script will re-select the right tracks automatically. The Harmonies key-detection results and the full-item confirm checkbox are also session-only and reset on each open.
 
 ---
 
@@ -379,4 +469,6 @@ These are intentional trade-offs or REAPER API constraints, not bugs. Documented
 
 6. **Track selections are not persisted across sessions.** Track indices are positional and would be brittle to save. Smart defaults (matching `VOCALS AUDIO` / `PART VOCALS` track names) cover the common case; otherwise re-pick on each open.
 
-7. **YIN samples a fixed window at 30% into the note.** Works well for sustained vowels but may land on a consonant for very fast syllables. The 30% offset is a heuristic that avoids the attack transient while staying inside the note.
+7. **Harmony mode indices are positional.** The interval mode for each destination is saved as an index into the mode list. If the list order changes between script versions, saved modes may map to different intervals. Check destination mode settings after a script update.
+
+8. **YIN samples a fixed window at 30% into the note.** Works well for sustained vowels but may land on a consonant for very fast syllables. The 30% offset is a heuristic that avoids the attack transient while staying inside the note.

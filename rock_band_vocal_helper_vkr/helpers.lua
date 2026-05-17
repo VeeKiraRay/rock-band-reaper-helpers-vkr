@@ -51,6 +51,58 @@ function SetDefaultTracks()
             break
         end
     end
+
+    -- Harmony source: prefer 'PART VOCALS', fall back to 'HARM1'
+    local harm_src_found = false
+    for i = 0, n - 1 do
+        local tr = r.GetTrack(0, i)
+        local _, tname = r.GetTrackName(tr)
+        if tname == 'PART VOCALS' and TrackHasMIDI(tr) then
+            S.harm_src_idx = i
+            harm_src_found = true
+            break
+        end
+    end
+    if not harm_src_found then
+        for i = 0, n - 1 do
+            local tr = r.GetTrack(0, i)
+            local _, tname = r.GetTrackName(tr)
+            if tname == 'HARM1' and TrackHasMIDI(tr) then
+                S.harm_src_idx = i
+                break
+            end
+        end
+    end
+
+    -- Harmony destinations: name-only match (tracks may start empty)
+    for _, pair in ipairs({
+        { field = 'harm_dst1_idx', name = 'HARM1' },
+        { field = 'harm_dst2_idx', name = 'HARM2' },
+        { field = 'harm_dst3_idx', name = 'HARM3' },
+    }) do
+        for i = 0, n - 1 do
+            local tr = r.GetTrack(0, i)
+            local _, tname = r.GetTrackName(tr)
+            if tname == pair.name then S[pair.field] = i; break end
+        end
+    end
+end
+
+function RefreshTrackLists()
+    local n = r.CountTracks(0)
+    local all, midi, audio = {}, {}, {}
+    for i = 0, n - 1 do
+        local tr = r.GetTrack(0, i)
+        local _, tname = r.GetTrackName(tr)
+        if tname == '' then tname = ('Track %d'):format(i + 1) end
+        local entry = { idx = i, label = ('%d: %s'):format(i + 1, tname) }
+        all[#all + 1] = entry
+        if TrackHasMIDI(tr)  then midi[#midi   + 1] = entry end
+        if TrackHasAudio(tr) then audio[#audio + 1] = entry end
+    end
+    S.all_track_list   = all
+    S.midi_track_list  = midi
+    S.audio_track_list = audio
 end
 
 function AutoDetectLyricsFile()
