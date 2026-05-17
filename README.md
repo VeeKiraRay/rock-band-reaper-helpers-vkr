@@ -1,4 +1,4 @@
-# Vocal MIDI Generator
+# Rock Band Vocal Helper
 
 **Generate timing-aligned MIDI notes from a vocal stem, with lyric assignment built in.** A REAPER ReaScript that analyses a vocal audio track and generates MIDI notes aligned to the syllables and phrases it detects, then assigns lyrics to those notes.
 
@@ -21,8 +21,8 @@ The script checks both on startup: if ReaImGui is missing it shows an install pr
 
 ## Installation
 
-1. Download `vocal_midi_generator_vkr.lua` and place it anywhere REAPER can find scripts (e.g. your REAPER Scripts folder).
-2. In REAPER: **Actions → Show action list → Load ReaScript** and select the file.
+1. Download the released package and place it anywhere REAPER can find scripts (e.g. your REAPER Scripts folder).
+2. In REAPER: **Actions → Show action list → Load ReaScript** and select the `rock_band_vocal_helper_vkr.lua` or `rock_band_vocal_genera_vkr.lua`.
 3. Optionally assign the action to a toolbar button or keyboard shortcut.
 
 ---
