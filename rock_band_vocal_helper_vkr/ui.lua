@@ -311,6 +311,56 @@ function Loop()
                 end
                 Tooltip(TIPS.apply_pitch)
 
+                ---- Snap to Key Scale ----
+                r.ImGui_Spacing(ctx)
+                r.ImGui_Separator(ctx)
+                r.ImGui_Spacing(ctx)
+                r.ImGui_Text(ctx, 'Snap to Key Scale')
+                r.ImGui_Spacing(ctx)
+
+                r.ImGui_Text(ctx, 'Key')
+                Tooltip(TIPS.snap_key_root)
+                r.ImGui_SameLine(ctx)
+                r.ImGui_SetNextItemWidth(ctx, 80)
+                if r.ImGui_BeginCombo(ctx, '##snap_kr', HARM_NOTE_NAMES[S.snap_key_root + 1]) then
+                    for i, name in ipairs(HARM_NOTE_NAMES) do
+                        local is_sel = (i - 1 == S.snap_key_root)
+                        if r.ImGui_Selectable(ctx, name, is_sel) then S.snap_key_root = i - 1 end
+                        if is_sel then r.ImGui_SetItemDefaultFocus(ctx) end
+                    end
+                    r.ImGui_EndCombo(ctx)
+                end
+                Tooltip(TIPS.snap_key_root)
+                r.ImGui_SameLine(ctx)
+                if r.ImGui_RadioButton(ctx, 'Major##skq', S.snap_key_quality == 0) then
+                    S.snap_key_quality = 0
+                end
+                r.ImGui_SameLine(ctx)
+                if r.ImGui_RadioButton(ctx, 'Minor##skq', S.snap_key_quality == 1) then
+                    S.snap_key_quality = 1
+                end
+
+                local _, new_sac = r.ImGui_Checkbox(ctx,
+                    'Avoid matching neighbor (within phrase)##sac', S.snap_avoid_collision)
+                S.snap_avoid_collision = new_sac
+                Tooltip(TIPS.snap_avoid_collision)
+
+                r.ImGui_Spacing(ctx)
+                local snap_label = sel_s and 'Snap to Key (time sel)' or 'Snap to Key (full item)'
+                local bw_snap = r.ImGui_CalcTextSize(ctx, snap_label) + _bp
+                if r.ImGui_Button(ctx, snap_label, bw_snap, 24) then
+                    if not sel_s then
+                        local res = r.ShowMessageBox(
+                            'No time selection is active.\n\nAll notes in the full MIDI item will be snapped to the key.\n\nContinue?',
+                            'Snap to Key', 1)
+                        if res == 1 then SnapToKeyAction() end
+                    else
+                        SnapToKeyAction()
+                    end
+                end
+                Tooltip(TIPS.snap_apply)
+
+
                 local undo_str = r.Undo_CanUndo2(0) or ''
                 local can_undo = undo_str ~= ''
                 r.ImGui_SameLine(ctx)

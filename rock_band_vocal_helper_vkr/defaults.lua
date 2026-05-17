@@ -136,6 +136,11 @@ S = {
     harm_dst3_lyric_unpitched = false,
     harm_dst3_lyric_hidden    = false,
 
+    -- Snap to Key — persisted
+    snap_key_root        = 9,    -- A (common rock key)
+    snap_key_quality     = 0,    -- 0 = major, 1 = minor
+    snap_avoid_collision = false,
+
     -- Transient — not persisted
     harm_confirm_full   = false,
 
@@ -567,4 +572,24 @@ TIPS = {
         "Destination notes in the vocal range (C1-C5) are cleared before inserting.\n" ..
         "If 'Copy phrase markers' is on, out-of-range notes are also replaced.\n\n" ..
         "Scope: active time selection, or full source item if confirmed.",
+
+    snap_key_root =
+        "Root note of the key to snap notes to.",
+
+    snap_key_quality =
+        "Major or minor scale for the snap operation.",
+
+    snap_avoid_collision =
+        "After snapping, if a note lands on the same pitch as its neighbor\n" ..
+        "within the same phrase, try the next closest scale degree instead.\n" ..
+        "Notes across phrase boundaries are not compared.",
+
+    snap_apply =
+        "Snap vocal notes to the nearest pitch in the selected key scale.\n\n" ..
+        "Each note shifts by the fewest semitones to land on a scale degree.\n" ..
+        "Phrase markers (pitch 105) are preserved unchanged.\n" ..
+        "Lyrics are also preserved.\n\n" ..
+        "Scope:\n" ..
+        " - With time selection: only notes within the selection are snapped.\n" ..
+        " - Without time selection: all notes on the MIDI item (requires confirmation).",
 }
