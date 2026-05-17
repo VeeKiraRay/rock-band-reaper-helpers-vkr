@@ -15,6 +15,21 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate filtered release notes
+        id: notes
+        run: |
+          NOTES=$(git log $(git describe --tags --abbrev=0 HEAD^)..HEAD \
+            --pretty=format:"- %s" \
+            | grep -v -i "^- documentation:" \
+            | grep -v -i "^- doc:" \
+            | grep -v -i "^- refactor:" \
+            | grep -v -i "^- chore:")
+          echo "notes<<EOF" >> $GITHUB_OUTPUT
+          echo "$NOTES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Create zip archive
         run: |
@@ -29,4 +44,4 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: rb_helper_scripts_vkr.zip
-          generate_release_notes: true
+          gbody: ${{ steps.notes.outputs.notes }}
