@@ -1591,13 +1591,6 @@ function HarmoniesAction()
 
     local range_start, range_end, has_sel = GetTimeSelection()
     if not range_start then
-        if not S.harm_confirm_full then
-            S.status = 'No time selection — check "Process full item" to confirm.'
-            S.last_result =
-                'Make a time selection to limit scope, or check the\n' ..
-                '"Process full item" checkbox below Apply Harmonies.'
-            return
-        end
         local src_item, _ = FindFirstMIDIItem(trks.src)
         if not src_item then
             S.status = 'Error'; S.last_result = 'No MIDI item on source track.'; return

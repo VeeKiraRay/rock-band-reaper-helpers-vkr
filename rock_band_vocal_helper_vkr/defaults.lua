@@ -145,9 +145,6 @@ S = {
     phrase_sim_threshold = 80,
     phrase_same_key      = true,
 
-    -- Transient — not persisted
-    harm_confirm_full   = false,
-
     -- Cached track lists (session-only; rebuilt by RefreshTrackLists)
     all_track_list   = nil,
     midi_track_list  = nil,
@@ -538,10 +535,6 @@ TIPS = {
         "Also copy phrase marker and overdrive notes (outside the C1-C5 vocal range)\n" ..
         "from the source to each enabled destination.\n\n" ..
         "Existing out-of-range notes in the destination are cleared before copying.",
-
-    harm_confirm_full =
-        "No time selection is active. Check this box to confirm processing the entire\n" ..
-        "source MIDI item. Make a time selection to limit scope.",
 
     track_refresh =
         "Re-scan all tracks and rebuild the filtered track dropdowns.\n\n" ..

@@ -42,7 +42,6 @@ function Loop()
         S.harm_dst1_idx     = 0
         S.harm_dst2_idx     = 0
         S.harm_dst3_idx     = 0
-        S.harm_confirm_full = false
         S.all_track_list    = nil
         S.midi_track_list   = nil
         S.audio_track_list  = nil
@@ -61,7 +60,6 @@ function Loop()
     local midi_tracks  = S.midi_track_list
     local audio_tracks = S.audio_track_list
     local sel_s, sel_e = GetTimeSelection()
-    if sel_s then S.harm_confirm_full = false end
 
     r.ImGui_SetNextWindowSize(ctx, 580, 1060, r.ImGui_Cond_FirstUseEver())
     local visible, open = r.ImGui_Begin(ctx, 'Rock Band Vocal Helper', true)
@@ -206,16 +204,6 @@ function Loop()
                 end
                 Tooltip(TIPS.generate_replace)
 
-                local undo_str = r.Undo_CanUndo2(0) or ''
-                local can_undo = undo_str ~= ''
-                r.ImGui_SameLine(ctx)
-                if not can_undo then r.ImGui_BeginDisabled(ctx) end
-                if r.ImGui_Button(ctx, 'Undo', bw_und, 24) then
-                    r.Undo_DoUndo2(0)
-                end
-                if not can_undo then r.ImGui_EndDisabled(ctx) end
-                if can_undo then Tooltip('Undo: ' .. undo_str) end
-
                 r.ImGui_EndTabItem(ctx)
             end
 
@@ -359,17 +347,6 @@ function Loop()
                     end
                 end
                 Tooltip(TIPS.snap_apply)
-
-
-                local undo_str = r.Undo_CanUndo2(0) or ''
-                local can_undo = undo_str ~= ''
-                r.ImGui_SameLine(ctx)
-                if not can_undo then r.ImGui_BeginDisabled(ctx) end
-                if r.ImGui_Button(ctx, 'Undo', bw_und, 24) then
-                    r.Undo_DoUndo2(0)
-                end
-                if not can_undo then r.ImGui_EndDisabled(ctx) end
-                if can_undo then Tooltip('Undo: ' .. undo_str) end
 
                 r.ImGui_EndTabItem(ctx)
             end
@@ -620,37 +597,20 @@ function Loop()
 
                 r.ImGui_Spacing(ctx)
 
-                ---- No-time-selection warning ----
-                local apply_ok = true
-                if not sel_s then
-                    r.ImGui_TextColored(ctx, 0xFF8800FF, 'No time selection active.')
-                    r.ImGui_TextColored(ctx, 0xFF8800FF, 'The full source MIDI item will be processed.')
-                    local _, new_cf = r.ImGui_Checkbox(ctx,
-                        'Process full item (no time selection)##harm_cf', S.harm_confirm_full)
-                    S.harm_confirm_full = new_cf
-                    Tooltip(TIPS.harm_confirm_full)
-                    apply_ok = S.harm_confirm_full
-                end
-
                 r.ImGui_Spacing(ctx)
 
                 ---- Apply button ----
-                if not apply_ok then r.ImGui_BeginDisabled(ctx) end
                 if r.ImGui_Button(ctx, 'Apply Harmonies', bw_harm, 24) then
-                    HarmoniesAction()
+                    if not sel_s then
+                        local res = r.ShowMessageBox(
+                            'No time selection is active.\n\nAll notes in the full source MIDI item will be processed.\n\nContinue?',
+                            'Apply Harmonies', 1)
+                        if res == 1 then HarmoniesAction() end
+                    else
+                        HarmoniesAction()
+                    end
                 end
-                if not apply_ok then r.ImGui_EndDisabled(ctx) end
                 Tooltip(TIPS.harm_apply)
-
-                local undo_str = r.Undo_CanUndo2(0) or ''
-                local can_undo = undo_str ~= ''
-                r.ImGui_SameLine(ctx)
-                if not can_undo then r.ImGui_BeginDisabled(ctx) end
-                if r.ImGui_Button(ctx, 'Undo', bw_und, 24) then
-                    r.Undo_DoUndo2(0)
-                end
-                if not can_undo then r.ImGui_EndDisabled(ctx) end
-                if can_undo then Tooltip('Undo: ' .. undo_str) end
 
                 r.ImGui_EndTabItem(ctx)
             end
@@ -700,6 +660,17 @@ function Loop()
         ----------------------------------------------------------------
         r.ImGui_Spacing(ctx)
         r.ImGui_Text(ctx, S.status)
+        r.ImGui_SameLine(ctx)
+        local undo_str = r.Undo_CanUndo2(0) or ''
+        local can_undo = undo_str ~= ''
+        local avail_x = r.ImGui_GetContentRegionAvail(ctx)
+        if avail_x > bw_und + 4 then
+            r.ImGui_SetCursorPosX(ctx, r.ImGui_GetCursorPosX(ctx) + (avail_x - bw_und))
+        end
+        if not can_undo then r.ImGui_BeginDisabled(ctx) end
+        if r.ImGui_Button(ctx, 'Undo', bw_und, 24) then r.Undo_DoUndo2(0) end
+        if not can_undo then r.ImGui_EndDisabled(ctx) end
+        if can_undo then Tooltip('Undo: ' .. undo_str) end
         if S.last_result then
             r.ImGui_Separator(ctx)
             for line in S.last_result:gmatch('([^\n]*)\n?') do
