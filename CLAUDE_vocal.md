@@ -393,6 +393,36 @@ Pure Lua computation works fine in coroutines — `GateAndSplit`, `ApplyMinOffse
 2. Incremental state machine in Loop — `S.pending_op` advances one step per frame, no coroutines needed.
 3. Background thread via external tool — not practical in standard REAPER Lua.
 
+### Automatic key detection for diatonic harmony (attempted, removed)
+
+**Goal.** Detect the song key from the vocal MIDI pitch histogram and/or the vocal audio stem, so diatonic harmony mode could suggest the correct major/minor key without the user having to look it up manually.
+
+**What was built.**
+- `DetectKeyFromHistogram(hist)` — Krumhansl-Schmuckler (K-S) algorithm. Computes Pearson correlation of a 12-element pitch-class histogram against 24 key profiles (12 major + 12 minor, each rotated across all 12 roots). Reports the highest-scoring key and the runner-up.
+- `DetectKeyMIDIAction()` — builds a duration-weighted pitch-class histogram (weighted by PPQ note length) from all vocal-range notes in the source MIDI item, runs K-S, displays result without auto-setting the key selector.
+- `DetectKeyAudioAction()` — samples the audio track with YIN at 100ms intervals across the time selection or the first 20 seconds, builds a pitch-class histogram, runs K-S, displays result.
+
+**Why it was removed.** Tested against Tunebat (Spotify analysis) on 4 songs — only 1 match:
+
+| Song | Tunebat | MIDI detect | Audio detect |
+|---|---|---|---|
+| Dove Cameron – Too Much | C# major | A# minor | A# major |
+| Poets of the Fall – Carnival of Rust | F minor | F minor ✓ | F minor ✓ |
+| Jonna Tervomaa – Suljettu Sydän | A minor | G major | G major |
+| Indica – Ikuinen virta | B major | D# minor | D# minor |
+
+Songs 1 and 4 are a relative-key confusion (A# minor is the relative minor of C# major; G# minor is the relative minor of B major) — the algorithm found the right pitch cluster but guessed the wrong tonic. Song 3 is a genuine failure, likely because Finnish pop/folk uses Dorian or Phrygian modal harmony that the classical K-S profiles misclassify entirely.
+
+Root cause: K-S profiles were designed for classical music where melodies cover all 7 scale degrees fairly evenly. Vocal melodies in pop/rock concentrate on 3–4 notes, starving the correlation. Relative major/minor pairs share all 7 pitch classes; their only distinguishing signal is emphasis, which is too subtle in a sparse melody.
+
+**Practical recommendation for users.** Look up the key on [Tunebat](https://tunebat.com) (search by song/artist), check a chord chart, or identify the root by ear. Tunebat itself can also make the relative-key mistake on sparse melodies, so verify by ear before applying diatonic harmonies.
+
+**Possible improvements if ever revisited.**
+- Present results as a paired label ("B major / G# minor") — relative-key confusion is so common that showing both is more honest than picking one.
+- Implement a Temperley–Marvin key-finding algorithm, which weights notes by metrical position rather than raw duration — handles modal melody better than K-S.
+- Use chord detection on the full backing mix instead of pitch detection on the vocal stem — backing track harmony is a much stronger key signal than a sparse melody line.
+- Neural approaches (Essentia, Librosa) trained on pop/rock rather than classical music would likely outperform K-S here.
+
 ---
 
 ## Glossary
