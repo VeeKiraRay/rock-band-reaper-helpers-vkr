@@ -667,6 +667,28 @@ function Loop()
                     ValidatePhrases()
                 end
                 Tooltip(TIPS.validate_phrases)
+                r.ImGui_Spacing(ctx)
+                r.ImGui_Separator(ctx)
+                r.ImGui_Spacing(ctx)
+                r.ImGui_Text(ctx, 'Phrase Similarity Check')
+                r.ImGui_Spacing(ctx)
+
+                local _
+                _, S.phrase_sim_threshold = r.ImGui_SliderInt(ctx,
+                    'Similarity threshold (%)', S.phrase_sim_threshold, 50, 100)
+                SliderTooltip(TIPS.phrase_sim_threshold)
+
+                _, S.phrase_same_key = r.ImGui_Checkbox(ctx,
+                    'Same key only (ignore transposition)##psk', S.phrase_same_key)
+                Tooltip(TIPS.phrase_same_key)
+
+                r.ImGui_Spacing(ctx)
+                local bw_psc = r.ImGui_CalcTextSize(ctx, 'Check Phrase Similarity') + _bp
+                if r.ImGui_Button(ctx, 'Check Phrase Similarity', bw_psc, 24) then
+                    PhraseSimilarityAction()
+                end
+                Tooltip(TIPS.phrase_sim_check)
+
                 r.ImGui_EndTabItem(ctx)
             end
 

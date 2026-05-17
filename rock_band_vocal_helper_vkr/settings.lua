@@ -14,7 +14,7 @@ local function SerializeSettings()
             'sl_mn=%d;sl_ms=%d;sl_sk=%d;sl_st=%d;sl_wn=%d;' ..
             'hd1e=%d;hd2e=%d;hd3e=%d;hd1m=%d;hd2m=%d;hd3m=%d;hcp=%d;hkr=%d;hkq=%d;' ..
             'hd1lu=%d;hd2lu=%d;hd3lu=%d;hd1lh=%d;hd2lh=%d;hd3lh=%d;' ..
-            'skr=%d;skq=%d;sac=%d')
+            'skr=%d;skq=%d;sac=%d;pst=%d;psk=%d')
         :format(S.rms_threshold, S.lpf_cutoff_hz, S.split_ratio,
                 S.min_offset_ms, S.min_note_ms, S.window_ms,
                 S.pitch_mode, math.floor(S.pitch + 0.5), S.ref_search_ms,
@@ -43,7 +43,9 @@ local function SerializeSettings()
                 bool_to_num(S.harm_dst3_lyric_hidden),
                 math.floor(S.snap_key_root),
                 math.floor(S.snap_key_quality),
-                bool_to_num(S.snap_avoid_collision))
+                bool_to_num(S.snap_avoid_collision),
+                math.floor(S.phrase_sim_threshold),
+                bool_to_num(S.phrase_same_key))
 end
 
 local function DeserializeSettings(str)
@@ -93,6 +95,8 @@ local function DeserializeSettings(str)
     if tmp.skr     then S.snap_key_root            = math.floor(tmp.skr + 0.5) end
     if tmp.skq     then S.snap_key_quality         = math.floor(tmp.skq + 0.5) end
     if tmp.sac     then S.snap_avoid_collision     = num_to_bool(tmp.sac)       end
+    if tmp.pst     then S.phrase_sim_threshold     = math.floor(tmp.pst + 0.5) end
+    if tmp.psk     then S.phrase_same_key          = num_to_bool(tmp.psk)       end
 end
 
 function SaveSettings()

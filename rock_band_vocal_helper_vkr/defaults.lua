@@ -141,6 +141,10 @@ S = {
     snap_key_quality     = 0,    -- 0 = major, 1 = minor
     snap_avoid_collision = false,
 
+    -- Phrase similarity — persisted
+    phrase_sim_threshold = 80,
+    phrase_same_key      = true,
+
     -- Transient — not persisted
     harm_confirm_full   = false,
 
@@ -592,4 +596,30 @@ TIPS = {
         "Scope:\n" ..
         " - With time selection: only notes within the selection are snapped.\n" ..
         " - Without time selection: all notes on the MIDI item (requires confirmation).",
+
+    phrase_sim_threshold =
+        "Minimum melodic similarity (0-100%%) to group two phrases together.\n\n" ..
+        "The main use case: you copied a phrase to multiple sections and may have\n" ..
+        "accidentally changed a note in one occurrence, or intentionally varied it\n" ..
+        "(e.g. a different starting note). The check groups similar phrases and flags\n" ..
+        "notes that differ from the group consensus, so you can decide whether each\n" ..
+        "difference is a mistake or an intentional variation.\n\n" ..
+        "80%% is a reasonable starting point. Lower it if you want to catch phrases\n" ..
+        "with more variation; raise it to focus only on near-identical copies.",
+
+    phrase_same_key =
+        "When on, compares actual note pitches — two phrases must be note-for-note\n" ..
+        "the same to score high similarity. Best for catching copy errors in\n" ..
+        "sections that repeat in the same key.\n\n" ..
+        "When off, compares melodic contour (interval shape) instead. This makes\n" ..
+        "the check transposition-insensitive, so the same melody in a different\n" ..
+        "key still scores high — useful if your song modulates between sections.",
+
+    phrase_sim_check =
+        "Compare all phrases by their melodic contour and group similar ones.\n\n" ..
+        "Uses phrase markers (pitch 105) to segment the song. For each group\n" ..
+        "of similar phrases, flags any note that differs from the group consensus.\n\n" ..
+        "Useful for spotting mistakes in repeated sections (e.g., same verse twice\n" ..
+        "where one note is wrong in the second occurrence).\n\n" ..
+        "Read-only — does not modify the project.",
 }
