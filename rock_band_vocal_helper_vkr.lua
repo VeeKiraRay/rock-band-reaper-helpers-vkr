@@ -107,6 +107,9 @@ dofile(_mdir .. 'helpers.lua')
 dofile(_mdir .. 'pipeline.lua')
 dofile(_mdir .. 'autotune.lua')
 dofile(_mdir .. 'actions.lua')
+dofile(_mdir .. 'actions_lyrics.lua')
+dofile(_mdir .. 'actions_validation.lua')
+dofile(_mdir .. 'actions_harmonies.lua')
 dofile(_mdir .. 'ui.lua')  -- also calls r.defer(Loop) at end
 
 -- Startup initialisation (runs after all modules are loaded)

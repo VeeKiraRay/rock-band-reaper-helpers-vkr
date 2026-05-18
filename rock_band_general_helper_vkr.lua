@@ -51,6 +51,7 @@ dofile(_mdir .. 'helpers.lua')
 dofile(_mdir .. 'venue.lua')
 dofile(_mdir .. 'tempomap.lua')
 dofile(_mdir .. 'actions.lua')
+dofile(_mdir .. 'actions_tempomap.lua')
 dofile(_mdir .. 'ui.lua')  -- also calls r.defer(Loop) at end
 
 -- Startup initialisation (runs after all modules are loaded)

@@ -1,26 +1,36 @@
 -- UI loop
 -- Requires: S, TIPS, r, ctx (globals)
--- Requires: all action functions, GetTimeSelection, GetTrackList, Tooltip,
---           SliderTooltip, SectionHeader, TrackCombo (globals)
+-- Requires: all action functions, GetTimeSelection, RefreshTrackLists, Tooltip,
+--           SliderTooltip, SectionHeader (globals)
 -- Note: r.defer(Loop) is called at the end of this file.
 
--- Local variant of TrackCombo that supports sel_idx = -1 (a "(none)" entry).
--- The lib's TrackCombo always expects a non-negative index; the general helper
--- uses -1 to mean "no track configured", so we shadow it here.
-local function TrackCombo(label, sel_idx, tracks)
-    local preview = (sel_idx >= 0 and sel_idx < #tracks)
-        and tracks[sel_idx + 1].label or (sel_idx < 0 and '(none)' or '<no tracks>')
+-- Local variant of TrackCombo: matches by REAPER track index (t.idx), supports
+-- reaper_idx = -1 as "(none)". Shadowing the lib's TrackCombo which uses array
+-- indices and has no "(none)" entry.
+local function TrackCombo(label, reaper_idx, tracks)
+    local preview = reaper_idx < 0 and '(none)' or '<no tracks>'
+    if reaper_idx >= 0 then
+        for _, t in ipairs(tracks) do
+            if t.idx == reaper_idx then preview = t.label; break end
+        end
+        if preview == '<no tracks>' and S.all_track_list then
+            for _, t in ipairs(S.all_track_list) do
+                if t.idx == reaper_idx then preview = t.label; break end
+            end
+        end
+    end
+    local new_idx = reaper_idx
     if r.ImGui_BeginCombo(ctx, label, preview) then
-        if r.ImGui_Selectable(ctx, '(none)', sel_idx < 0) then sel_idx = -1 end
-        if sel_idx < 0 then r.ImGui_SetItemDefaultFocus(ctx) end
-        for i, t in ipairs(tracks) do
-            local is_sel = (i - 1 == sel_idx)
-            if r.ImGui_Selectable(ctx, t.label, is_sel) then sel_idx = i - 1 end
+        if r.ImGui_Selectable(ctx, '(none)', reaper_idx < 0) then new_idx = -1 end
+        if reaper_idx < 0 then r.ImGui_SetItemDefaultFocus(ctx) end
+        for _, t in ipairs(tracks) do
+            local is_sel = (t.idx == reaper_idx)
+            if r.ImGui_Selectable(ctx, t.label, is_sel) then new_idx = t.idx end
             if is_sel then r.ImGui_SetItemDefaultFocus(ctx) end
         end
         r.ImGui_EndCombo(ctx)
     end
-    return sel_idx
+    return new_idx
 end
 
 local _active_proj = r.EnumProjects(-1, '')
@@ -29,7 +39,9 @@ local function Loop()
     local proj = r.EnumProjects(-1, '')
     if proj ~= _active_proj then
         _active_proj = proj
-        S.last_result = nil
+        S.last_result      = nil
+        S.all_track_list   = nil
+        S.audio_track_list = nil
         S.tm_kick_idx     = -1
         S.tm_snare_idx    = -1
         S.tm_kit_idx      = -1
@@ -41,12 +53,14 @@ local function Loop()
     end
 
     local sel_s, sel_e = GetTimeSelection()
-    local tracks       = GetTrackList()
+    if not S.all_track_list then RefreshTrackLists() end
+    local audio_tracks = S.audio_track_list
 
     r.ImGui_SetNextWindowSize(ctx, 540, 620, r.ImGui_Cond_FirstUseEver())
     local visible, open = r.ImGui_Begin(ctx, 'Rock Band General Helper', true)
     if visible then
-        local _bp = 40
+        local _bp  = 40
+        local bw_und = r.ImGui_CalcTextSize(ctx, 'Undo') + _bp
 
         if r.ImGui_BeginTabBar(ctx, '##tabs') then
 
@@ -86,6 +100,13 @@ local function Loop()
                     end
                 end
                 Tooltip(TIPS.load)
+                r.ImGui_SameLine(ctx)
+                local bw_ref = r.ImGui_CalcTextSize(ctx, 'Refresh tracks') + _bp
+                if r.ImGui_Button(ctx, 'Refresh tracks', bw_ref, 24) then
+                    RefreshTrackLists()
+                    S.status = 'Track lists refreshed.'
+                end
+                Tooltip(TIPS.track_refresh)
 
                 r.ImGui_EndTabItem(ctx)
             end
@@ -103,25 +124,25 @@ local function Loop()
                 r.ImGui_Text(ctx, 'KICK track ')
                 r.ImGui_SameLine(ctx)
                 r.ImGui_SetNextItemWidth(ctx, 200)
-                S.tm_kick_idx = TrackCombo('##tm_kick', S.tm_kick_idx, tracks)
+                S.tm_kick_idx = TrackCombo('##tm_kick', S.tm_kick_idx, audio_tracks)
                 Tooltip(TIPS.kick_track)
 
                 r.ImGui_Text(ctx, 'SNARE track')
                 r.ImGui_SameLine(ctx)
                 r.ImGui_SetNextItemWidth(ctx, 200)
-                S.tm_snare_idx = TrackCombo('##tm_snare', S.tm_snare_idx, tracks)
+                S.tm_snare_idx = TrackCombo('##tm_snare', S.tm_snare_idx, audio_tracks)
                 Tooltip(TIPS.snare_track)
 
                 r.ImGui_Text(ctx, 'KIT track  ')
                 r.ImGui_SameLine(ctx)
                 r.ImGui_SetNextItemWidth(ctx, 200)
-                S.tm_kit_idx = TrackCombo('##tm_kit', S.tm_kit_idx, tracks)
+                S.tm_kit_idx = TrackCombo('##tm_kit', S.tm_kit_idx, audio_tracks)
                 Tooltip(TIPS.kit_track)
 
                 r.ImGui_Text(ctx, 'Fallback   ')
                 r.ImGui_SameLine(ctx)
                 r.ImGui_SetNextItemWidth(ctx, 200)
-                S.tm_fallback_idx = TrackCombo('##tm_fallback', S.tm_fallback_idx, tracks)
+                S.tm_fallback_idx = TrackCombo('##tm_fallback', S.tm_fallback_idx, audio_tracks)
                 Tooltip(TIPS.fallback_track)
 
                 r.ImGui_Spacing(ctx)
@@ -224,6 +245,17 @@ local function Loop()
         end
         r.ImGui_Spacing(ctx)
         r.ImGui_Text(ctx, S.status)
+        r.ImGui_SameLine(ctx)
+        local undo_str = r.Undo_CanUndo2(0) or ''
+        local can_undo = undo_str ~= ''
+        local avail_x  = r.ImGui_GetContentRegionAvail(ctx)
+        if avail_x > bw_und + 4 then
+            r.ImGui_SetCursorPosX(ctx, r.ImGui_GetCursorPosX(ctx) + (avail_x - bw_und))
+        end
+        if not can_undo then r.ImGui_BeginDisabled(ctx) end
+        if r.ImGui_Button(ctx, 'Undo', bw_und, 24) then r.Undo_DoUndo2(0) end
+        if not can_undo then r.ImGui_EndDisabled(ctx) end
+        if can_undo then Tooltip('Undo: ' .. undo_str) end
         if S.last_result then
             r.ImGui_Separator(ctx)
             for line in S.last_result:gmatch('([^\n]*)\n?') do

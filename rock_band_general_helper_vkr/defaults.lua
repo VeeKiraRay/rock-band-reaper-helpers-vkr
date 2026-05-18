@@ -95,14 +95,18 @@ S = {
     tm_snare_idx          = -1,
     tm_kit_idx            = -1,
     tm_fallback_idx       = -1,
+    -- Cached filtered track lists (not persisted — rebuilt by RefreshTrackLists)
+    all_track_list        = nil,
+    audio_track_list      = nil,
 }
 
 ----------------------------------------------------------------------
 -- Tooltip text
 ----------------------------------------------------------------------
 TIPS = {
-    save        = "Save current settings to this project.",
-    load        = "Load previously saved settings from this project.",
+    save          = "Save current settings to this project.",
+    load          = "Load previously saved settings from this project.",
+    track_refresh = "Refresh the track lists to include any newly added or renamed tracks.",
 
     -- General tab
     align_all_audio = "Align every single-item audio track in the project to the SONG AUDIO start position.\n\n" ..

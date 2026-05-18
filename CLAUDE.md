@@ -136,6 +136,21 @@ if is_busy then r.ImGui_BeginDisabled(ctx) end
 if is_busy then r.ImGui_EndDisabled(ctx) end
 ```
 
+### UI consistency across scripts
+
+When a UI change is generic — a shared widget pattern, a status-bar affordance, a track-selector behaviour — it must be applied to **every script and every tab** that is affected, not just the one where it was first added.
+
+Before closing work on a UI change, ask:
+- Does this pattern appear in the other helper(s)? If so, port it there too in the same task.
+- Does it apply to all tabs within a script, or only the one currently being edited?
+
+**Examples of changes that must be kept in sync across all helpers:**
+- Bottom-panel undo button (added to vocal helper → must also appear in general helper, and any future helper).
+- Track-selector pre-filtering (audio-only / MIDI-only lists, `RefreshTrackLists`, "Refresh tracks" button).
+- Any new status-bar widget, keyboard shortcut, or window-level affordance.
+
+If a sync to another script is out of scope for the current task, leave a TODO comment in the code and note it in the PR description — do not silently skip it.
+
 ### Time selection as scope
 Actions respect time selection when active; fall back to whole-item or whole-track defaults otherwise. This is the primary iteration mechanism — work one section at a time.
 
@@ -147,6 +162,29 @@ Each script implements `SetDefaultTracks` (or equivalent): runs at startup and o
 
 ### Settings save/load
 `SetProjExtState` / `GetProjExtState` under a script-specific section key. Format: semicolon-separated `key=value`. `DeserializeSettings` parses each field independently — missing fields keep their current value. Track indices are **not** saved (positional, brittle across sessions).
+
+### File size and feature placement
+
+Before appending a new feature to an existing file, ask:
+
+- **Does it fit the file's existing scope?** `actions.lua` holds the detection pipeline and pitch logic. A lyrics utility doesn't belong there just because it's "also an action".
+- **Is it self-contained?** A feature whose helpers, local functions, and public actions are only used with each other is a good candidate for its own file.
+- **Good split candidates:** a complete tab's worth of actions, a self-contained algorithm, a new domain (harmonies, validation, lyrics) with no dependency on detection internals.
+
+**Size guidelines:**
+
+| File length      | Signal                                               |
+|------------------|------------------------------------------------------|
+| up to ~400 lines | Fine — no action needed                              |
+| ~400–600 lines   | Consider: would a new feature fit better elsewhere?  |
+| ~600–800 lines   | Actively evaluate splitting before adding more code  |
+| 800+ lines       | Split is overdue; do it before the next feature      |
+
+These are guidelines, not hard stops. Tightly coupled code that must share local helpers is better kept together even if it crosses 600 lines. But a file that is long *because it accumulated unrelated features* should be split — the coupling was coincidental, not structural.
+
+**Why this matters:** reading a 1000-line file to make a 5-line edit loads unnecessary context and makes targeted changes expensive. Smaller, focused files are cheaper to reason about, cheaper to read, and cheaper to modify.
+
+**After splitting:** update the script-specific CLAUDE file (module table, section order, load order) and add the new `dofile` line to the entry point.
 
 ---
 

@@ -66,6 +66,30 @@ function GetMeasureStartTime(measure_num, num, denom)
     return r.TimeMap2_beatsToTime(0, qn_pos)
 end
 
+local function TrackHasAudio(track)
+    for i = 0, r.CountTrackMediaItems(track) - 1 do
+        local item = r.GetTrackMediaItem(track, i)
+        local take = r.GetActiveTake(item)
+        if take and not r.TakeIsMIDI(take) then return true end
+    end
+    return false
+end
+
+function RefreshTrackLists()
+    local n = r.CountTracks(0)
+    local all, audio = {}, {}
+    for i = 0, n - 1 do
+        local tr = r.GetTrack(0, i)
+        local _, tname = r.GetTrackName(tr)
+        if tname == '' then tname = ('Track %d'):format(i + 1) end
+        local entry = { idx = i, label = ('%d: %s'):format(i + 1, tname) }
+        all[#all + 1] = entry
+        if TrackHasAudio(tr) then audio[#audio + 1] = entry end
+    end
+    S.all_track_list   = all
+    S.audio_track_list = audio
+end
+
 -- Return a list of audio (non-MIDI) items on a track.
 function GetAudioItems(track)
     local result = {}

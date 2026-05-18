@@ -39,13 +39,15 @@ Three tabs, each self-contained:
 | `rock_band_general_helper_vkr/helpers.lua` | `FindTrackByName`, `SetDefaultTempoTracks`, `GetTempoContextBefore`, `GetMeasureStartTime`, `GetAudioItems` |
 | `rock_band_general_helper_vkr/venue.lua` | `ListVenueEvents` (global); `FindVenueTrack`, `ReadVenueTextEvents`, `BuildCameraGaps`, `GapStats` (local) |
 | `rock_band_general_helper_vkr/tempomap.lua` | `ComputeTempoRMSContour`, `DetectOnsets`, `EstimateBPM`, `GuessTimeSig`, `GetSourcesForRange`, `FitBeatGrid` |
-| `rock_band_general_helper_vkr/actions.lua` | `ShowTempoContext`, `AlignAudioTracks`, `AlignAllAudio`, `AlignCountIn`, `EstimateInitialBPM`, `ClearGeneratedTempoMarkers`, `GenerateTempoMap`; `CountInBeatSlots` (local) |
+| `rock_band_general_helper_vkr/actions.lua` | `AlignAudioTracks`, `AlignAllAudio`, `AlignCountIn`; `CountInBeatSlots` (local) |
+| `rock_band_general_helper_vkr/actions_tempomap.lua` | `ShowTempoContext`, `EstimateInitialBPM`, `ClearGeneratedTempoMarkers`, `GenerateTempoMap`; `BPM_MIN`, `BPM_MAX` (locals) |
 | `rock_band_general_helper_vkr/ui.lua` | local `TrackCombo` variant (supports `sel_idx=-1`), `Loop`, `r.defer(Loop)` |
 
 **Local-only functions:**
 - `settings.lua`: `SerializeSettings`, `DeserializeSettings`
 - `venue.lua`: `FindVenueTrack`, `ReadVenueTextEvents`, `BuildCameraGaps`, `GapStats`
 - `actions.lua`: `CountInBeatSlots`
+- `actions_tempomap.lua`: `BPM_MIN`, `BPM_MAX` (module-level locals)
 - `ui.lua`: `TrackCombo` (local override for -1 support), `Loop`
 
 **Load order:**
@@ -61,7 +63,9 @@ helpers.lua                    → FindTrackByName, SetDefaultTempoTracks, GetTe
                                   GetMeasureStartTime, GetAudioItems
 venue.lua                      → ListVenueEvents
 tempomap.lua                   → ComputeTempoRMSContour, DetectOnsets, EstimateBPM, …
-actions.lua                    → all action functions
+actions.lua                    → AlignAudioTracks, AlignAllAudio, AlignCountIn
+actions_tempomap.lua           → ShowTempoContext, EstimateInitialBPM,
+                                  ClearGeneratedTempoMarkers, GenerateTempoMap
 ui.lua                         → Loop (also calls r.defer(Loop))
 [entry point startup]          → LoadSettings(), SetDefaultTempoTracks()
 ```

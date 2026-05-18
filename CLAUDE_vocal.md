@@ -99,10 +99,20 @@ autotune.lua:
 
 actions.lua:
   14. Track resolution (local)    ResolveTracks, ResolveApplyPitchTracks
-  15. Lyrics helpers (local)      ParseLyricsFile, ClearLyricEvents, ClassifySlide
-  16. Actions                     Preview, Generate, RunAutoTune, RunAutoTuneYIN,
+  15. Actions                     Preview, Generate, RunAutoTune, RunAutoTuneYIN,
                                   ApplyPitchChangesAction, ScanPitchSlidesAction,
-                                  ValidatePhrases, ClearLyricsAction, AssignLyricsAction
+                                  SnapToKeyAction
+
+actions_lyrics.lua:
+  16. Lyrics helpers (local)      ParseLyricsFile, ClearLyricEvents
+  17. Lyrics actions              ClearLyricsInRange (global), ClearLyricsAction,
+                                  AssignLyricsAction
+
+actions_validation.lua:
+  18. Validation actions          ValidatePhrases, PhraseSimilarityAction
+
+actions_harmonies.lua:
+  19. Harmonies actions           HarmoniesAction
 
 ui.lua:
   17. UI                          Loop
@@ -121,12 +131,18 @@ ui.lua:
 | `rock_band_vocal_helper_vkr/helpers.lua`  | `IsOnGrid`, `SetDefaultTracks`, `AutoDetectLyricsFile`; `TrackHasAudio`, `TrackHasMIDI` (local)                                                                          |
 | `rock_band_vocal_helper_vkr/pipeline.lua` | `ResolveAnalysisRange`, `ResolveApplyPitchTarget`, `RunDetection`, `AssignPitches`, `ApplyPitchRange`, `FindNearestRefPitch`, `FormatResult`                             |
 | `rock_band_vocal_helper_vkr/autotune.lua` | `AutoTune`, `AutoTuneYIN`, `ApplyAutoTuneResult`, format helpers                                                                                                         |
-| `rock_band_vocal_helper_vkr/actions.lua`  | `Preview`, `Generate`, `RunAutoTune`, `RunAutoTuneYIN`, `ApplyPitchChangesAction`, `ScanPitchSlidesAction`, `ValidatePhrases`, `ClearLyricsAction`, `AssignLyricsAction` |
-| `rock_band_vocal_helper_vkr/ui.lua`       | `Loop`, `r.defer(Loop)`                                                                                                                                                  |
+| `rock_band_vocal_helper_vkr/actions.lua`             | `Preview`, `Generate`, `RunAutoTune`, `RunAutoTuneYIN`, `ApplyPitchChangesAction`, `ScanPitchSlidesAction`, `SnapToKeyAction` |
+| `rock_band_vocal_helper_vkr/actions_lyrics.lua`      | `ClearLyricsInRange` (global), `ClearLyricsAction`, `AssignLyricsAction`; `ParseLyricsFile`, `ClearLyricEvents` (local)       |
+| `rock_band_vocal_helper_vkr/actions_validation.lua`  | `ValidatePhrases`, `PhraseSimilarityAction`; `EditDistance` (local)                                                           |
+| `rock_band_vocal_helper_vkr/actions_harmonies.lua`   | `HarmoniesAction`; `ApplyLyricSuffix`, `DiatonicThirdOffset`, `ResolveHarmTracks` (local)                                    |
+| `rock_band_vocal_helper_vkr/ui.lua`                  | `Loop`, `r.defer(Loop)`                                                                                                       |
 
 **Local-only functions:**
 
-- `actions.lua`: `ResolveTracks`, `ResolveApplyPitchTracks`, `ParseLyricsFile`, `ClearLyricEvents`, `ClassifySlide`
+- `actions.lua`: `ResolveTracks`, `ResolveApplyPitchTracks`, `ClassifySlide`, `NearestScalePitch`, `NextScalePitch`
+- `actions_lyrics.lua`: `ParseLyricsFile`, `ClearLyricEvents`
+- `actions_validation.lua`: `EditDistance`
+- `actions_harmonies.lua`: `ApplyLyricSuffix`, `DiatonicThirdOffset`, `ResolveHarmTracks`
 - `helpers.lua`: `TrackHasAudio`, `TrackHasMIDI`
 - `settings.lua`: `bool_to_num`, `num_to_bool`, `SerializeSettings`, `DeserializeSettings`
 - `autotune.lua`: `ScoreNotes`, `FineCandidates`, `EvaluateParams`
@@ -143,7 +159,11 @@ settings.lua                   → SaveSettings, LoadSettings
 helpers.lua                    → IsOnGrid, SetDefaultTracks, AutoDetectLyricsFile
 pipeline.lua                   → RunDetection, AssignPitches, FormatResult
 autotune.lua                   → AutoTune, AutoTuneYIN
-actions.lua                    → all action functions
+actions.lua                    → Preview, Generate, RunAutoTune, RunAutoTuneYIN,
+                                  ApplyPitchChangesAction, ScanPitchSlidesAction, SnapToKeyAction
+actions_lyrics.lua             → ClearLyricsInRange, ClearLyricsAction, AssignLyricsAction
+actions_validation.lua         → ValidatePhrases, PhraseSimilarityAction
+actions_harmonies.lua          → HarmoniesAction
 ui.lua                         → Loop (also calls r.defer(Loop))
 [entry point startup]          → LoadSettings(), SetDefaultTracks(), AutoDetectLyricsFile()
 ```
