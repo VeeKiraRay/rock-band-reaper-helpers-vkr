@@ -28,16 +28,17 @@ Designed for authoring Rock Band-style vocal charts — it defaults to the RB3 v
 
 The script window has a persistent track-selector row at the top and a status/result panel at the bottom. Everything in between is organised into five tabs:
 
-| Area                   | Description                                                                      |
-| ---------------------- | -------------------------------------------------------------------------------- |
-| Track selectors        | Above the tab bar — Audio source, MIDI destination; always visible               |
-| **Note Placement** tab | Detection sliders, Default pitch, velocity, Dry run / Generate buttons           |
-| **Pitch** tab          | Pitch source for Apply pitch changes: Built-in detection (YIN) or Reference MIDI |
-| **Lyrics** tab         | Select a lyrics file, assign or clear lyric events                               |
-| **Pitch slide** tab    | Scan existing notes for pitch slides (glides, scoops, bends)                     |
-| **Harmonies** tab      | Copy lead vocal notes to up to three harmony tracks with pitch interval options  |
-| **General** tab        | Save / Load project settings                                                     |
-| Status panel           | Below the tab bar — result of the last action                                    |
+| Area                   | Description                                                                                         |
+| ---------------------- | --------------------------------------------------------------------------------------------------- |
+| Track selectors        | Above the tab bar — Audio source, MIDI destination; always visible                                  |
+| **Note Placement** tab | Detection sliders, Default pitch, velocity, Dry run / Generate buttons                              |
+| **Pitch** tab          | Pitch source for Apply pitch changes: Built-in detection (YIN) or Reference MIDI; Snap to Key Scale |
+| **Lyrics** tab         | Select a lyrics file, assign or clear lyric events                                                  |
+| **Pitch slide** tab    | Scan existing notes for pitch slides (glides, scoops, bends)                                        |
+| **Harmonies** tab      | Copy lead vocal notes to up to three harmony tracks with pitch interval options                     |
+| **Validation** tab     | Validate phrase markers; check phrase similarity to catch copy errors                               |
+| **General** tab        | Save / Load project settings                                                                        |
+| Status / Undo          | Below the tab bar — result of the last action, and the Undo button                                  |
 
 ---
 
@@ -185,6 +186,18 @@ Two optional checkbox+slider pairs clamp or octave-shift pitches into a target r
 - You want to re-pitch notes after changing the Pitch source settings without re-running detection.
 
 The button is always active. Both pitch sources are meaningful for re-pitching existing notes.
+
+### Snap to Key Scale
+
+**Snap to Key Scale** shifts every vocal note in scope to the nearest pitch in a chosen key, moving each note by the fewest semitones needed to land on a scale degree. On a tie (a note equidistant between two scale degrees), the lower pitch wins.
+
+Set the **Key** (root note) and **Scale** (Major or Minor) to match the song — look these up on Tunebat or a chord chart and verify by ear.
+
+**Scope:** with an active time selection, only notes within the selection are snapped. This is useful for songs with key changes or chromatic passages where you want to snap one section at a time. Without a time selection, clicking **Snap to Key (full item)** shows a confirmation dialog before processing the whole MIDI item.
+
+**Avoid matching neighbor (within phrase)** — after snapping, if two adjacent notes within the same phrase land on the same pitch (but had different pitches before snapping), the note that moved more semitones is redirected to the next-closest scale degree instead. Notes on either side of a phrase boundary are not compared — a phrase-ending note and the following phrase-opening note may legitimately share a scale degree.
+
+Phrase markers (pitch 105) are never moved or deleted. Per-note velocity and lyrics are preserved through the operation.
 
 ---
 
@@ -350,7 +363,7 @@ The **Copy phrase markers & overdrive** checkbox copies notes outside the vocal 
 
 ### Scope and applying
 
-If a time selection is active, only notes that start within it are processed. Without a time selection, an orange warning appears and a **Process full item** confirm checkbox must be checked before the Apply button becomes active. Setting a time selection automatically unchecks the confirm box.
+If a time selection is active, only notes that start within it are processed. Without a time selection, clicking **Apply Harmonies** shows a confirmation dialog before proceeding.
 
 Click **Apply Harmonies** to write the notes. The action:
 
@@ -359,7 +372,7 @@ Click **Apply Harmonies** to write the notes. The action:
 3. If **Copy phrase markers** is on, also clears out-of-range notes from each destination within the scope.
 4. Inserts the transposed notes, phrase notes, and lyrics into each destination.
 
-The whole operation is a single undo entry — Ctrl+Z or the **Undo** button next to Apply will revert all destinations at once.
+The whole operation is a single undo entry — Ctrl+Z or the **Undo** button at the bottom of the window will revert all destinations at once.
 
 The result panel reports per-destination counts:
 
@@ -369,21 +382,66 @@ Destination 1 [Diatonic 3rd above]: cleared 42 notes / 38 lyrics, inserted 42 vo
 
 ---
 
+## Validation tab
+
+### Validate phrases
+
+Checks all phrases (regions bounded by pitch-105 marker notes) for common authoring issues. Reports per phrase:
+
+1. First vocal note has a capitalized lyric
+2. Phrase marker start is on a 64th-note grid boundary
+3. Phrase marker end is on a 64th-note grid boundary
+4. Gap to the next phrase is at least 4 × 64th note
+5. First vocal note starts at least 2 × 64th notes after phrase start
+6. Last vocal note ends at least 1 × 64th note before phrase end
+
+Operates on the whole take regardless of time selection. Read-only — does not modify the project.
+
+### Phrase Similarity Check
+
+Compares all phrases by their melodic content and groups those that are similar enough to be the same melody. Use this to catch copy errors in repeated sections — for example, a verse used twice where one note was accidentally changed in the second occurrence, or an intentional variation you want to compare against the other occurrences.
+
+| Setting                  | Description                                                                                                                                                                                                                                                     |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Similarity threshold** | Minimum similarity (50–100%) for two phrases to be grouped. 80% is a reasonable starting point. Lower it to catch more distant matches; raise it to focus on near-identical copies.                                                                             |
+| **Same key only**        | When on (default), compares actual note pitches — phrases must be note-for-note the same to score high. When off, compares melodic contour (the shape of rises and falls) regardless of transposition, so the same melody in a different key still scores high. |
+
+Click **Check Phrase Similarity** to run the analysis. The result panel shows each group of similar phrases with their minimum pairwise similarity, and flags any notes that differ from the group consensus:
+
+```
+Compared 12 phrases at 80% threshold — same key (pitch).
+
+Group 1: 3 phrases (92% min similarity)
+  m4   C4 D4 E4 F4 G4
+  m12  C4 D4 E4 F4 G4
+  m20  C4 D4 E4 G4 G4  <- outlier: note 4: F4→G4 (+2 st)
+
+Group 2: 2 phrases (100% min similarity) — no outliers
+  m8
+  m16
+```
+
+Phrases with no outliers show a one-line summary. Only notes that differ from the group's majority-vote consensus are flagged, along with the deviation in semitones. The check is read-only — you decide whether each flagged difference is a mistake or an intentional variation.
+
+The check requires at least two phrase markers on the MIDI track and at least two notes per phrase to produce a comparison. Phrases with fewer than two notes are skipped.
+
+---
+
 ## General tab
 
 Settings are saved per-project using REAPER's project state. Click **Save** to store the current Detection and Pitch settings. Click **Load** to restore them.
 
 Settings are loaded automatically when the script opens (if a save exists for the current project) and when you switch REAPER project tabs.
 
-**What is saved:** all Detection sliders, Pitch source selection and all pitch settings (including YIN parameters), Velocity, Slide Scan settings, Harmonies destination enabled/mode/lyric-suffix options, key selection, and Copy phrase markers.
+**What is saved:** all Detection sliders, Pitch source selection and all pitch settings (including YIN parameters), Velocity, Slide Scan settings, Harmonies destination enabled/mode/lyric-suffix options, Harmonies key selection, Copy phrase markers, Snap to Key Scale settings (key, scale, avoid-collision), and Phrase Similarity threshold and mode.
 
-**What is not saved:** track selections. If your project follows the naming convention (`VOCALS AUDIO`, `PART VOCALS`, `HARM1–3`) the script will re-select the right tracks automatically. The Harmonies key-detection results and the full-item confirm checkbox are also session-only and reset on each open.
+**What is not saved:** track selections. If your project follows the naming convention (`VOCALS AUDIO`, `PART VOCALS`, `HARM1–3`) the script will re-select the right tracks automatically. The Harmonies key-detection results are session-only and reset on each open.
 
 ---
 
 ## Undo
 
-The **Undo** button directly calls REAPER's undo. It exists because the ImGui window captures keyboard focus, so REAPER's own Ctrl+Z shortcut does not fire while the script window is active. The button is disabled when there is nothing to undo, and the tooltip shows the label of the operation that will be undone.
+The **Undo** button sits in the status bar at the bottom of the window, always visible regardless of which tab is active. It directly calls REAPER's undo and exists because the ImGui window captures keyboard focus, so REAPER's own Ctrl+Z shortcut does not fire while the script window is active. The button is disabled when there is nothing to undo, and the tooltip shows the label of the operation that will be undone.
 
 ---
 
