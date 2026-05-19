@@ -119,7 +119,7 @@ local function Loop()
                 local bw_ali   = r.ImGui_CalcTextSize(ctx, 'Align audio')             + _bp
                 local bw_ebpm  = r.ImGui_CalcTextSize(ctx, 'Estimate initial BPM')    + _bp
                 local bw_gen   = r.ImGui_CalcTextSize(ctx, 'Generate tempo map')      + _bp
-                local bw_clrtm = r.ImGui_CalcTextSize(ctx, 'Clear generated markers') + _bp
+                local bw_clrtm = r.ImGui_CalcTextSize(ctx, 'Clear markers') + _bp
 
                 r.ImGui_Text(ctx, 'KICK track ')
                 r.ImGui_SameLine(ctx)
@@ -133,17 +133,73 @@ local function Loop()
                 S.tm_snare_idx = TrackCombo('##tm_snare', S.tm_snare_idx, audio_tracks)
                 Tooltip(TIPS.snare_track)
 
-                r.ImGui_Text(ctx, 'KIT track  ')
+                r.ImGui_Text(ctx, 'FULL KIT   ')
                 r.ImGui_SameLine(ctx)
                 r.ImGui_SetNextItemWidth(ctx, 200)
                 S.tm_kit_idx = TrackCombo('##tm_kit', S.tm_kit_idx, audio_tracks)
                 Tooltip(TIPS.kit_track)
 
-                r.ImGui_Text(ctx, 'Fallback   ')
-                r.ImGui_SameLine(ctx)
-                r.ImGui_SetNextItemWidth(ctx, 200)
-                S.tm_fallback_idx = TrackCombo('##tm_fallback', S.tm_fallback_idx, audio_tracks)
-                Tooltip(TIPS.fallback_track)
+                local slider_w = 200
+
+                SectionHeader('Drum sources')
+                r.ImGui_SetNextItemWidth(ctx, slider_w)
+                _, S.tm_rms_threshold = r.ImGui_SliderDouble(
+                    ctx, 'RMS threshold', S.tm_rms_threshold, 0.001, 0.5, '%.3f')
+                SliderTooltip(TIPS.tm_rms_threshold)
+
+                r.ImGui_SetNextItemWidth(ctx, slider_w)
+                _, S.tm_rms_window_ms = r.ImGui_SliderInt(
+                    ctx, 'RMS window (ms)', S.tm_rms_window_ms, 5, 30)
+                SliderTooltip(TIPS.tm_rms_window_ms)
+
+                SectionHeader('Analysis')
+                r.ImGui_SetNextItemWidth(ctx, slider_w)
+                _, S.tm_search_window_ms = r.ImGui_SliderInt(
+                    ctx, 'Search window (ms)', S.tm_search_window_ms, 20, 300)
+                SliderTooltip(TIPS.tm_search_window_ms)
+
+                r.ImGui_SetNextItemWidth(ctx, slider_w)
+                _, S.tm_drift_threshold_ms = r.ImGui_SliderInt(
+                    ctx, 'Drift threshold (ms)', S.tm_drift_threshold_ms, 5, 100)
+                SliderTooltip(TIPS.tm_drift_threshold_ms)
+
+                r.ImGui_SetNextItemWidth(ctx, slider_w)
+                _, S.tm_bpm_failsafe = r.ImGui_SliderDouble(
+                    ctx, 'BPM failsafe', S.tm_bpm_failsafe, 2.0, 30.0, '%.1f')
+                SliderTooltip(TIPS.tm_bpm_failsafe)
+
+                r.ImGui_SetNextItemWidth(ctx, slider_w)
+                _, S.tm_first_measure = r.ImGui_SliderInt(
+                    ctx, 'First measure', S.tm_first_measure, 1, 8)
+                SliderTooltip(TIPS.tm_first_measure)
+
+                r.ImGui_SetNextItemWidth(ctx, slider_w)
+                local ts_ch, ts_new = r.ImGui_InputText(ctx, 'Time sig (empty=inherit)', S.tm_timesig_text)
+                Tooltip(TIPS.tm_timesig_num)
+                if ts_ch then
+                    S.tm_timesig_text = ts_new
+                    local text = ts_new:match('^%s*(.-)%s*$')
+                    if text == '' then
+                        S.tm_timesig_num   = 0
+                        S.tm_timesig_denom = 4
+                    else
+                        local n, d = text:match('^(%d+)%s*/%s*(%d+)$')
+                        if n then
+                            S.tm_timesig_num   = tonumber(n) or 0
+                            S.tm_timesig_denom = tonumber(d) or 4
+                        else
+                            local n_only = text:match('^(%d+)$')
+                            if n_only then
+                                S.tm_timesig_num   = tonumber(n_only) or 0
+                                S.tm_timesig_denom = 4
+                            end
+                        end
+                    end
+                end
+
+                _, S.tm_override_failsafe = r.ImGui_Checkbox(
+                    ctx, 'Override BPM limit', S.tm_override_failsafe)
+                Tooltip(TIPS.tm_override_failsafe)
 
                 r.ImGui_Spacing(ctx)
 
@@ -167,52 +223,10 @@ local function Loop()
                 end
                 Tooltip(TIPS.gen_tempo)
 
-                if r.ImGui_Button(ctx, 'Clear generated markers', bw_clrtm, 24) then
+                if r.ImGui_Button(ctx, 'Clear markers', bw_clrtm, 24) then
                     ClearGeneratedTempoMarkers()
                 end
                 Tooltip(TIPS.clear_tempo)
-
-                r.ImGui_Spacing(ctx)
-
-                local slider_w = 200
-                r.ImGui_SetNextItemWidth(ctx, slider_w)
-                _, S.tm_rms_threshold = r.ImGui_SliderDouble(
-                    ctx, 'RMS threshold', S.tm_rms_threshold, 0.001, 0.5, '%.3f')
-                SliderTooltip(TIPS.tm_rms_threshold)
-
-                r.ImGui_SetNextItemWidth(ctx, slider_w)
-                _, S.tm_rms_window_ms = r.ImGui_SliderInt(
-                    ctx, 'RMS window (ms)', S.tm_rms_window_ms, 5, 30)
-                SliderTooltip(TIPS.tm_rms_window_ms)
-
-                r.ImGui_SetNextItemWidth(ctx, slider_w)
-                _, S.tm_search_window_ms = r.ImGui_SliderInt(
-                    ctx, 'Search window (ms)', S.tm_search_window_ms, 20, 300)
-                SliderTooltip(TIPS.tm_search_window_ms)
-
-                r.ImGui_SetNextItemWidth(ctx, slider_w)
-                _, S.tm_drift_threshold_ms = r.ImGui_SliderInt(
-                    ctx, 'Drift threshold (ms)', S.tm_drift_threshold_ms, 5, 100)
-                SliderTooltip(TIPS.tm_drift_threshold_ms)
-
-                r.ImGui_SetNextItemWidth(ctx, slider_w)
-                _, S.tm_bpm_failsafe = r.ImGui_SliderDouble(
-                    ctx, 'BPM failsafe', S.tm_bpm_failsafe, 2.0, 30.0, '%.1f')
-                SliderTooltip(TIPS.tm_bpm_failsafe)
-
-                r.ImGui_SetNextItemWidth(ctx, slider_w)
-                _, S.tm_first_measure = r.ImGui_SliderInt(
-                    ctx, 'First measure', S.tm_first_measure, 1, 8)
-                SliderTooltip(TIPS.tm_first_measure)
-
-                r.ImGui_SetNextItemWidth(ctx, slider_w)
-                _, S.tm_timesig_num = r.ImGui_SliderInt(
-                    ctx, 'Time sig num (0=inherit)', S.tm_timesig_num, 0, 12)
-                SliderTooltip(TIPS.tm_timesig_num)
-
-                _, S.tm_override_failsafe = r.ImGui_Checkbox(
-                    ctx, 'Override BPM limit', S.tm_override_failsafe)
-                Tooltip(TIPS.tm_override_failsafe)
 
                 r.ImGui_EndTabItem(ctx)
             end

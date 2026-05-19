@@ -84,12 +84,18 @@ S = {
     -- Tempo map settings (persisted)
     tm_rms_threshold      = 0.15,
     tm_rms_window_ms      = 10,
+    tm_fb_rms_threshold   = 0.10,
+    tm_fb_rms_window_ms   = 10,
+    tm_fb_use_flux        = false,  -- apply onset-flux transform to fallback source
     tm_search_window_ms   = 100,
     tm_drift_threshold_ms = 30,
     tm_bpm_failsafe       = 10.0,
     tm_first_measure      = 3,
     tm_timesig_num        = 0,
+    tm_timesig_denom      = 4,
+    tm_timesig_text       = '',   -- UI buffer; '' = inherit
     tm_override_failsafe  = false,
+    tm_autotune_density   = 0,    -- expected onsets/measure for auto-tune density guard (0 = disabled)
     -- Tempo map track indices (not persisted — set by SetDefaultTempoTracks; -1 = none)
     tm_kick_idx           = -1,
     tm_snare_idx          = -1,
@@ -157,12 +163,30 @@ TIPS = {
                   "forward, inserting a marker only where the detected downbeat deviates from\n" ..
                   "the expected position by more than the drift threshold.\n\n" ..
                   "Respects time selection if active.",
+    autotune_threshold = "Find the highest RMS threshold that still detects onsets near\n" ..
+                         "the tempo markers currently placed in the project.\n\n" ..
+                         "Place at least 2 markers manually at downbeat positions first.\n" ..
+                         "With a time selection: only markers in that range are used.\n" ..
+                         "Without: all markers in the audio item span are used.\n\n" ..
+                         "Updates the Drum or Fallback threshold automatically based on\n" ..
+                         "which source has signal in the selected range.\n" ..
+                         "Read-only — no project changes are made.",
 
     -- Tempo map — sliders
     tm_rms_threshold      = "Audio level above which a drum hit onset is detected.\n" ..
                             "Lower = more sensitive; higher = ignore quiet hits.",
     tm_rms_window_ms      = "RMS analysis window in milliseconds.\n" ..
                             "Short (5–15 ms) gives sharp onset times for drums.",
+    tm_fb_rms_threshold   = "RMS onset threshold for the fallback source (guitar / keys).\n" ..
+                            "Guitar sustain is uneven — usually needs a lower value than drums.\n" ..
+                            "Lower = more sensitive; higher = ignore quiet hits.",
+    tm_fb_rms_window_ms   = "RMS analysis window in milliseconds for the fallback source.\n" ..
+                            "Short (5–15 ms) gives sharp onset times.",
+    tm_fb_use_flux        = "Apply onset-flux mode to the Fallback source (guitar / keys).\n\n" ..
+                            "Replaces raw RMS with the positive energy-rise per window.\n" ..
+                            "Sustained notes produce 0 (no false onsets); only true attacks spike.\n\n" ..
+                            "Also applies to the local-peak search used during tempo map generation.\n" ..
+                            "When enabled, the RMS threshold below is the minimum energy-rise, not amplitude.",
     tm_search_window_ms   = "How far either side of the expected downbeat position to search\n" ..
                             "for an onset (in ms).\n" ..
                             "Wider = more tolerant of tempo drift; narrower = stricter.",
@@ -177,9 +201,16 @@ TIPS = {
                             "generated (and where the beat grid anchor is placed).\n\n" ..
                             "Align your drum audio so the first true downbeat lands on this\n" ..
                             "measure before running Generate.",
-    tm_timesig_num        = "Time signature numerator override.\n\n" ..
-                            "0 = inherit from the project tempo marker that precedes the\n" ..
-                            "analysis range.  Set to 3 for 3/4, 4 for 4/4, etc.",
+    tm_timesig_num        = "Time signature override.\n\n" ..
+                            "Empty  =  inherit from the project tempo marker.\n" ..
+                            "One number (e.g. 3)  =  override numerator only; denominator stays 4.\n" ..
+                            "Two numbers (e.g. 6/8 or 4 / 4)  =  override both.",
     tm_override_failsafe  = "Bypass the BPM failsafe check.\n" ..
                             "Enable for songs with intentional large tempo changes.",
+    tm_autotune_density   = "Expected number of detectable onsets per measure in the analysis range.\n\n" ..
+                            "Set to the approximate count of note hits per measure in your audio.\n" ..
+                            "Example: 4 for one note per beat in 4/4; 8 for eighth notes.\n\n" ..
+                            "At 0: no density check.\n" ..
+                            "When set: thresholds producing more than 2x this count are excluded,\n" ..
+                            "preventing auto-tune from landing on an excessively noisy threshold.",
 }

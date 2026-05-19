@@ -18,8 +18,6 @@ function SetDefaultTempoTracks()
         ['KICK AUDIO']   = 'tm_kick_idx',
         ['SNARE AUDIO']  = 'tm_snare_idx',
         ['KIT AUDIO']    = 'tm_kit_idx',
-        ['GUITAR AUDIO'] = 'tm_fallback_idx',
-        ['KEYS AUDIO']   = 'tm_fallback_idx',   -- only wins if GUITAR AUDIO not found first
     }
     for i = 0, r.CountTracks(0) - 1 do
         local tr = r.GetTrack(0, i)

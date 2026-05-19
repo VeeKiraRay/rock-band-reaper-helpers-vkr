@@ -93,6 +93,51 @@ function DetectOnsets(ci, threshold, min_gap_s)
     return onsets
 end
 
+-- Convert a raw RMS contour to a positive onset-flux contour.
+-- flux[i] = max(0, rms[i] - rms[i-1]). Sustained notes produce 0; only true
+-- energy rises (attacks) produce spikes. Better for guitar/keys than raw RMS.
+function RmsToOnsetFlux(ci)
+    local rms  = ci.contour
+    local flux = {}
+    flux[1] = 0
+    for i = 2, #rms do
+        flux[i] = math.max(0, rms[i] - rms[i-1])
+    end
+    return { contour = flux, t_start = ci.t_start, t_step = ci.t_step }
+end
+
+-- Find the local peak within search_window_s of expected_t and refine to the onset
+-- (start of attack). Returns (onset_t, peak_rms) or (nil, 0) if no window in range.
+-- onset_t is the first window after the trough preceding the peak (≈ true note start);
+-- peak_rms is the peak amplitude, used for minimum-signal gating by the caller.
+-- Falls back to peak position when no trough exists (sustained note, onset before window).
+function FindLocalPeak(ci, expected_t, search_window_s)
+    local best_v = 0
+    local i_lo = math.max(1, math.floor((expected_t - search_window_s - ci.t_start) / ci.t_step) + 1)
+    local i_hi = math.min(#ci.contour, math.ceil((expected_t + search_window_s - ci.t_start) / ci.t_step) + 1)
+    local peak_i = nil
+    for i = i_lo, i_hi do
+        if ci.contour[i] > best_v then
+            best_v = ci.contour[i]
+            peak_i = i
+        end
+    end
+    if not peak_i then return nil, 0 end
+
+    -- Walk back from peak to find the trough (last window below 20% of peak).
+    -- onset_i is the window just after the trough = start of the attack.
+    local ONSET_FRAC = 0.20
+    local onset_i = peak_i  -- default: no trough found, use peak position
+    for i = peak_i - 1, i_lo, -1 do
+        if ci.contour[i] <= best_v * ONSET_FRAC then
+            onset_i = i + 1
+            break
+        end
+    end
+
+    return ci.t_start + (onset_i - 1) * ci.t_step, best_v
+end
+
 -- IOI histogram BPM estimator. Votes for bpm, bpm/2, and bpm×2 so kick patterns
 -- spaced over 1, 2, or half a beat all converge on the same peak bin.
 function EstimateBPM(onsets)
@@ -176,8 +221,9 @@ end
 
 -- Build an ordered list of {onsets, name} for every configured source track
 -- that has an audio item overlapping [t_s, t_e]. Priority: kick → snare → kit → fallback.
-function GetSourcesForRange(t_s, t_e, window_s)
-    local priority = {
+-- Pass priority_override to restrict to a subset of sources (e.g. drum-only).
+function GetSourcesForRange(t_s, t_e, priority_override)
+    local priority = priority_override or {
         'tm_kick_idx', 'tm_snare_idx', 'tm_kit_idx', 'tm_fallback_idx',
     }
     local sources = {}
@@ -195,9 +241,13 @@ function GetSourcesForRange(t_s, t_e, window_s)
                     if ip <= t_e and ie >= t_s then item = it; break end
                 end
                 if item then
-                    local ci = ComputeTempoRMSContour(item, t_s, t_e, window_s)
+                    local is_fb = (field == 'tm_fallback_idx')
+                    local thr   = is_fb and S.tm_fb_rms_threshold or S.tm_rms_threshold
+                    local win_s = is_fb and (S.tm_fb_rms_window_ms / 1000.0) or (S.tm_rms_window_ms / 1000.0)
+                    local ci = ComputeTempoRMSContour(item, t_s, t_e, win_s)
                     if ci then
-                        local onsets = DetectOnsets(ci, S.tm_rms_threshold, 0.05)
+                        if is_fb and S.tm_fb_use_flux then ci = RmsToOnsetFlux(ci) end
+                        local onsets = DetectOnsets(ci, thr, 0.05)
                         if #onsets > 0 then
                             sources[#sources + 1] = {onsets = onsets, name = name}
                         end
@@ -212,12 +262,12 @@ end
 -- Walk forward from anchor_t in measure-sized steps, searching for the nearest onset
 -- within search_window_s of each expected downbeat. Returns an array of entries with
 -- {expected_t, detected_t, deviation_s, bpm, source}.
-function FitBeatGrid(anchor_t, t_end, beat_dur, num, sources, search_window_s)
+function FitBeatGrid(anchor_t, t_end, beat_dur, measure_qn, sources, search_window_s)
     local grid = {}
     local t = anchor_t
-    local min_advance = beat_dur * (num - 0.5)
+    local min_advance = beat_dur * (measure_qn - 0.5)
     while true do
-        local next_exp = t + num * beat_dur
+        local next_exp = t + measure_qn * beat_dur
         if next_exp > t_end + search_window_s then break end
         local best_t, best_src = nil, nil
         for _, src in ipairs(sources) do
@@ -234,7 +284,7 @@ function FitBeatGrid(anchor_t, t_end, beat_dur, num, sources, search_window_s)
             end
             if best_t then break end
         end
-        local step_dur = ((best_t or next_exp) - t) / num
+        local step_dur = ((best_t or next_exp) - t) / measure_qn
         grid[#grid + 1] = {
             expected_t  = next_exp,
             detected_t  = best_t,
