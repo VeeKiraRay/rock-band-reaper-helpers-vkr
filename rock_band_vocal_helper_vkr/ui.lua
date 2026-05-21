@@ -227,17 +227,23 @@ function Loop()
                 r.ImGui_Separator(ctx)
 
                 -- Current pitch display (highlighted)
-                local arrow = ''
+                local arrow       = ''
+                local arrow_color = 0x888888FF
                 if S.tuner_pitch and S.tuner_prev_pitch then
-                    if     S.tuner_pitch > S.tuner_prev_pitch then arrow = ' \xe2\x86\x91'
-                    elseif S.tuner_pitch < S.tuner_prev_pitch then arrow = ' \xe2\x86\x93'
-                    else                                           arrow = ' ='
+                    if     S.tuner_pitch > S.tuner_prev_pitch then arrow = '\xe2\x96\xb2'; arrow_color = 0x55FF55FF
+                    elseif S.tuner_pitch < S.tuner_prev_pitch then arrow = '\xe2\x96\xbc'; arrow_color = 0xFF5555FF
+                    else                                           arrow = '=';             arrow_color = 0x888888FF
                     end
                 end
-                local pitch_disp = (S.tuner_pitch_name or '\xe2\x80\x94') .. arrow
                 r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Text(), 0xFFFFFFFF)
-                r.ImGui_Text(ctx, pitch_disp)
+                r.ImGui_Text(ctx, S.tuner_pitch_name or '\xe2\x80\x94')
                 r.ImGui_PopStyleColor(ctx)
+                if arrow ~= '' then
+                    r.ImGui_SameLine(ctx)
+                    r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Text(), arrow_color)
+                    r.ImGui_Text(ctx, arrow)
+                    r.ImGui_PopStyleColor(ctx)
+                end
                 if S.tuner_pitch_hz then
                     r.ImGui_SameLine(ctx)
                     r.ImGui_Text(ctx, ('%.1f Hz'):format(S.tuner_pitch_hz))
