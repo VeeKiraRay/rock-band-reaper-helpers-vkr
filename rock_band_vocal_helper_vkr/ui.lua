@@ -2,6 +2,7 @@
 
 local _browse_tooltip_suppressed = false
 local _active_proj = r.EnumProjects(-1, '')
+local _active_tab  = ''
 
 -- TrackCombo variant that stores and matches by REAPER track index (.idx field)
 -- rather than list position, so selections survive filter list rebuilds.
@@ -116,12 +117,14 @@ function Loop()
         -- Tab bar
         ----------------------------------------------------------------
         S.tuner_tab_active = false   -- reset; set true below if Tuner tab is active
+        local _new_tab = ''
         if r.ImGui_BeginTabBar(ctx, 'MainTabs') then
 
             ------------------------------------------------------------
             -- Tab: General
             ------------------------------------------------------------
             if r.ImGui_BeginTabItem(ctx, 'General') then
+                _new_tab = 'General'
                 r.ImGui_Spacing(ctx)
                 r.ImGui_Text(ctx, 'Settings')
                 if r.ImGui_Button(ctx, 'Save', 90, 24) then
@@ -155,6 +158,7 @@ function Loop()
             ------------------------------------------------------------
             if r.ImGui_BeginTabItem(ctx, 'Tuner') then
                 S.tuner_tab_active = true
+                _new_tab = 'Tuner'
 
                 r.ImGui_Spacing(ctx)
                 SectionHeader('YIN Detection', 'Reset##yin_tur', ResetYIN, TIPS.reset_yin)
@@ -263,6 +267,7 @@ function Loop()
             -- Tab: Note Placement
             ------------------------------------------------------------
             if r.ImGui_BeginTabItem(ctx, 'Note Placement') then
+                _new_tab = 'Note Placement'
                 r.ImGui_Spacing(ctx)
                 SectionHeader('Note Placement', 'Reset##det', ResetDetection, TIPS.reset_detection)
 
@@ -333,6 +338,7 @@ function Loop()
             -- Tab: Pitch
             ------------------------------------------------------------
             if r.ImGui_BeginTabItem(ctx, 'Pitch') then
+                _new_tab = 'Pitch'
                 r.ImGui_Spacing(ctx)
                 SectionHeader('Pitch', 'Reset##pitch', ResetPitch, TIPS.reset_pitch)
 
@@ -477,6 +483,7 @@ function Loop()
             -- Tab: Lyrics
             ------------------------------------------------------------
             if r.ImGui_BeginTabItem(ctx, 'Lyrics') then
+                _new_tab = 'Lyrics'
                 r.ImGui_Spacing(ctx)
 
                 local lyric_basename = S.lyrics_path ~= ''
@@ -556,6 +563,7 @@ function Loop()
             -- Tab: Pitch slide
             ------------------------------------------------------------
             if r.ImGui_BeginTabItem(ctx, 'Pitch slide') then
+                _new_tab = 'Pitch slide'
                 r.ImGui_Spacing(ctx)
                 SectionHeader('Slide Scan', 'Reset##slides', ResetSlides, TIPS.reset_slides)
                 _, S.slide_min_note_ms = r.ImGui_SliderInt(ctx, 'Min note length (ms)##sld', S.slide_min_note_ms, 20, 500)
@@ -606,6 +614,7 @@ function Loop()
             -- Tab: Harmonies
             ------------------------------------------------------------
             if r.ImGui_BeginTabItem(ctx, 'Harmonies') then
+                _new_tab = 'Harmonies'
                 r.ImGui_Spacing(ctx)
 
                 ---- Source ----
@@ -741,6 +750,7 @@ function Loop()
             -- Tab: Validation
             ------------------------------------------------------------
             if r.ImGui_BeginTabItem(ctx, 'Validation') then
+                _new_tab = 'Validation'
                 r.ImGui_Spacing(ctx)
                 r.ImGui_Text(ctx, 'Phrase validation')
                 r.ImGui_Spacing(ctx)
@@ -775,6 +785,11 @@ function Loop()
             end
 
             r.ImGui_EndTabBar(ctx)
+        end
+
+        if _new_tab ~= _active_tab then
+            if _active_tab ~= '' then S.last_result = nil; S.status = '' end
+            _active_tab = _new_tab
         end
 
         ----------------------------------------------------------------

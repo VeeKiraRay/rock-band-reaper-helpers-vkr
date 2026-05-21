@@ -34,6 +34,7 @@ local function TrackCombo(label, reaper_idx, tracks)
 end
 
 local _active_proj = r.EnumProjects(-1, '')
+local _active_tab  = ''
 
 local function Loop()
     local proj = r.EnumProjects(-1, '')
@@ -61,6 +62,7 @@ local function Loop()
     if visible then
         local _bp  = 40
         local bw_und = r.ImGui_CalcTextSize(ctx, 'Undo') + _bp
+        local _new_tab = ''
 
         if r.ImGui_BeginTabBar(ctx, '##tabs') then
 
@@ -68,6 +70,7 @@ local function Loop()
             -- General tab
             ------------------------------------------------------------
             if r.ImGui_BeginTabItem(ctx, 'General') then
+                _new_tab = 'General'
                 local bw_aall = r.ImGui_CalcTextSize(ctx, 'Align all audio') + _bp
                 local bw_acin = r.ImGui_CalcTextSize(ctx, 'Align count-in')  + _bp
 
@@ -115,6 +118,7 @@ local function Loop()
             -- Tempo Map tab
             ------------------------------------------------------------
             if r.ImGui_BeginTabItem(ctx, 'Tempo Map') then
+                _new_tab = 'Tempo Map'
                 local bw_ctx   = r.ImGui_CalcTextSize(ctx, 'Show context')           + _bp
                 local bw_ali   = r.ImGui_CalcTextSize(ctx, 'Align audio')             + _bp
                 local bw_ebpm  = r.ImGui_CalcTextSize(ctx, 'Estimate initial BPM')    + _bp
@@ -235,6 +239,7 @@ local function Loop()
             -- Venue tab
             ------------------------------------------------------------
             if r.ImGui_BeginTabItem(ctx, 'Venue') then
+                _new_tab = 'Venue'
                 local bw_lv = r.ImGui_CalcTextSize(ctx, 'List venue events') + _bp
 
                 if r.ImGui_Button(ctx, 'List venue events', bw_lv, 24) then
@@ -246,6 +251,11 @@ local function Loop()
             end
 
             r.ImGui_EndTabBar(ctx)
+        end
+
+        if _new_tab ~= _active_tab then
+            if _active_tab ~= '' then S.last_result = nil; S.status = '' end
+            _active_tab = _new_tab
         end
 
         ----------------------------------------------------------------
