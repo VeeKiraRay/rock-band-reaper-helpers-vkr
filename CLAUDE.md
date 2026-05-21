@@ -199,6 +199,7 @@ These are guidelines, not hard stops. Tightly coupled code that must share local
 - Use `noSort=false` on `MIDI_InsertNote` / `MIDI_InsertTextSysexEvt` — no `MIDI_Sort` needed and it avoids breaking undo detection.
 - `format_timestr_pos(tpos, '', 1)` → measures/beats string e.g. `"90.1.00"`. Parse leading integer for the measure number.
 - Audio accessor: always free with `DestroyAudioAccessor`. Leaking holds file handles open indefinitely.
+- `CreateTakeAudioAccessor` returns an **item-relative** accessor. `GetAudioAccessorSamples` on such an accessor expects time in seconds from the **start of the take's source media**, not project time. Always convert: `t_off = project_time - item_pos` (where `item_pos = GetMediaItemInfo_Value(item, 'D_POSITION')`). Every function in `lib/reaper_dsp.lua` that reads a take accessor already does this (`DetectPitchYIN`, `SampleYINAt`, `ComputeRMSContour`). Any new audio analysis function must do the same — omitting this reads zeros for items not placed at project time 0, which is always the case for stems (they start at measure 3+). MIDI items are unaffected (their `item_pos` is always 0).
 
 ---
 

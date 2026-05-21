@@ -131,6 +131,7 @@ ui.lua:
 | `rock_band_vocal_helper_vkr/helpers.lua`  | `IsOnGrid`, `SetDefaultTracks`, `AutoDetectLyricsFile`; `TrackHasAudio`, `TrackHasMIDI` (local)                                                                          |
 | `rock_band_vocal_helper_vkr/pipeline.lua` | `ResolveAnalysisRange`, `ResolveApplyPitchTarget`, `RunDetection`, `AssignPitches`, `ApplyPitchRange`, `FindNearestRefPitch`, `FormatResult`                             |
 | `rock_band_vocal_helper_vkr/autotune.lua` | `AutoTune`, `AutoTuneYIN`, `ApplyAutoTuneResult`, format helpers                                                                                                         |
+| `rock_band_vocal_helper_vkr/tuner.lua`    | `StartTuner`, `StopTuner`, `RunTuner`; `FindItemAtPos`, `OpenContextForItem` (local)                                                                                    |
 | `rock_band_vocal_helper_vkr/actions.lua`             | `Preview`, `Generate`, `RunAutoTune`, `RunAutoTuneYIN`, `ApplyPitchChangesAction`, `ScanPitchSlidesAction`, `SnapToKeyAction` |
 | `rock_band_vocal_helper_vkr/actions_lyrics.lua`      | `ClearLyricsInRange` (global), `ClearLyricsAction`, `AssignLyricsAction`; `ParseLyricsFile`, `ClearLyricEvents` (local)       |
 | `rock_band_vocal_helper_vkr/actions_validation.lua`  | `ValidatePhrases`, `PhraseSimilarityAction`; `EditDistance` (local)                                                           |
@@ -146,6 +147,7 @@ ui.lua:
 - `helpers.lua`: `TrackHasAudio`, `TrackHasMIDI`
 - `settings.lua`: `bool_to_num`, `num_to_bool`, `SerializeSettings`, `DeserializeSettings`
 - `autotune.lua`: `ScoreNotes`, `FineCandidates`, `EvaluateParams`
+- `tuner.lua`: `FindItemAtPos`, `OpenContextForItem`
 
 **Load order:**
 
@@ -159,6 +161,7 @@ settings.lua                   → SaveSettings, LoadSettings
 helpers.lua                    → IsOnGrid, SetDefaultTracks, AutoDetectLyricsFile
 pipeline.lua                   → RunDetection, AssignPitches, FormatResult
 autotune.lua                   → AutoTune, AutoTuneYIN
+tuner.lua                      → StartTuner, StopTuner, RunTuner
 actions.lua                    → Preview, Generate, RunAutoTune, RunAutoTuneYIN,
                                   ApplyPitchChangesAction, ScanPitchSlidesAction, SnapToKeyAction
 actions_lyrics.lua             → ClearLyricsInRange, ClearLyricsAction, AssignLyricsAction
@@ -224,6 +227,35 @@ Uses current YIN threshold and frequency range from the Pitch tab.
 ### Pitch range constraints
 
 Two checkbox+slider pairs (min/max). Out-of-range pitches are octave-shifted toward the range first (±12 at a time, up to 16 attempts). Clamp to the nearer endpoint only when the range is narrower than 12 semitones. The `range_adjusted` count appears in the result panel when non-zero.
+
+### Pitch Tuner (Tuner tab)
+
+Read-only — never modifies the project. Polls `SampleYINAt` at the current playhead position every 100 ms and displays the detected pitch.
+
+**Display:**
+- **Current pitch** — note name (`A4`) + direction indicator (`↑ ↓ =` relative to `S.tuner_prev_pitch`), nominal Hz, project timestamp. Arrow only shown when a previous pitch exists. Shows `—` before any detection.
+- **History strip** — last 10 detected note names, newest on the left, dimmed. Updates only when a new pitch is added; silent/gap samples are not added to history.
+- **Quiet indicator** — "Quiet — no pitch detected" written to `S.status` (same field as auto-stop messages). Grace period: 1.5 s when playing (`GetPlayState() & 1 ~= 0`); instant when stopped/scrubbing. Cleared from `S.status` when quiet_since becomes nil (pitch detected), but only if nothing else has since overwritten it. Controlled by `S.tuner_quiet_since`.
+- **State indicator** — "Tuner: Active" (green) / "Tuner: Stopped" (grey) shown inline below the Start/Stop button. Tuner writes `S.status` for quiet state and auto-stop/error messages; active/stopped state is inline only and never touches `S.status`.
+
+**Position handling:**
+- When playing: reads `GetPlayPosition2()`.
+- When stopped/scrubbing: reads `GetCursorPosition()` so manual playhead drags are detected.
+- When position hasn't changed since last scan: skip detection silently (no status message written).
+
+**Silence and gap detection (before YIN):**
+- `FindItemAtPos` returns nil → `S.tuner_quiet_since` set — suppresses false readings in gaps between items.
+- `QuickRMS(yctx, play_pos, win_s)` < `S.tuner_rms_threshold` → `S.tuner_quiet_since` set — suppresses spurious low-frequency YIN results on near-silence. `QuickRMS` converts `play_pos` to item-relative time (`math.max(0, play_pos - yctx.item_pos)`) before calling `GetAudioAccessorSamples`.
+
+**Min RMS level slider:** `S.tuner_rms_threshold` (default 0.005, range 0.001–0.1). Exposed in the YIN Detection section. Persisted via settings.
+
+**Auto-stop:** Timer (`tuner_last_detect_t`) resets on every successful pitch detection. If 60 s pass without any new pitch while the playhead is stationary, `StopTuner` is called automatically with a reason written to `S.status`.
+
+**Tab-navigation stop:** `S.tuner_tab_active` is set `false` before the tab bar each frame and `true` inside the Tuner `BeginTabItem` block. `RunTuner()` checks the previous frame's value at the top of `Loop` — one frame after the user leaves the tab, the tuner stops.
+
+**YIN and pitch range settings** — shared with the Pitch and Pitch slide tabs (`S.yin_*`, `S.min_pitch`, `S.max_pitch`). Changes on the Tuner tab are immediately reflected elsewhere and vice versa.
+
+**State fields:** `S.tuner_pitch`, `S.tuner_prev_pitch`, `S.tuner_pitch_name`, `S.tuner_pitch_hz`, `S.tuner_pitch_ts`, `S.tuner_quiet_since`, `S.tuner_history` — session-only, not saved. `S.tuner_rms_threshold` — persisted.
 
 ### Lyrics section
 

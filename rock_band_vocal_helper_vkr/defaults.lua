@@ -60,10 +60,11 @@ DEFAULTS = {
     max_pitch_enabled = false,
     max_pitch         = 72,
 
-    yin_threshold     = 0.15,
-    yin_min_freq      = 80,
-    yin_max_freq      = 1000,
-    yin_window_ms     = 30,
+    yin_threshold         = 0.15,
+    yin_min_freq          = 80,
+    yin_max_freq          = 1000,
+    yin_window_ms         = 30,
+    tuner_rms_threshold   = 0.005,
 
     velocity          = 100,
 
@@ -95,10 +96,11 @@ S = {
     max_pitch_enabled = DEFAULTS.max_pitch_enabled,
     max_pitch         = DEFAULTS.max_pitch,
 
-    yin_threshold     = DEFAULTS.yin_threshold,
-    yin_min_freq      = DEFAULTS.yin_min_freq,
-    yin_max_freq      = DEFAULTS.yin_max_freq,
-    yin_window_ms     = DEFAULTS.yin_window_ms,
+    yin_threshold         = DEFAULTS.yin_threshold,
+    yin_min_freq          = DEFAULTS.yin_min_freq,
+    yin_max_freq          = DEFAULTS.yin_max_freq,
+    yin_window_ms         = DEFAULTS.yin_window_ms,
+    tuner_rms_threshold   = DEFAULTS.tuner_rms_threshold,
 
     velocity          = DEFAULTS.velocity,
 
@@ -149,6 +151,23 @@ S = {
     all_track_list   = nil,
     midi_track_list  = nil,
     audio_track_list = nil,
+
+    -- Pitch Tuner (session-only, not persisted)
+    tuner_active         = false,
+    tuner_tab_active = false,   -- updated each frame inside General BeginTabItem
+    tuner_yctx           = nil,     -- YIN context; open while active
+    tuner_audio_item     = nil,     -- item the context is currently open on
+    tuner_last_t         = 0,       -- r.time_precise() of last detection run
+    tuner_last_play_pos  = nil,
+    tuner_pos_stable_t   = nil,     -- time when position stopped changing
+    tuner_last_detect_t  = 0,       -- time of last successful pitch detection (drives auto-stop)
+    tuner_pitch          = nil,     -- last detected MIDI note number
+    tuner_pitch_name     = nil,     -- e.g. "A4"
+    tuner_pitch_hz       = nil,     -- nominal Hz for the detected note
+    tuner_pitch_ts       = nil,     -- project time of last detection
+    tuner_history        = {},      -- up to 10 recent note names, [1] = newest
+    tuner_prev_pitch     = nil,     -- MIDI note of detection before the current one
+    tuner_quiet_since    = nil,     -- r.time_precise() when silence began; nil when pitch is detected
 }
 
 function ResetDetection()
@@ -187,10 +206,11 @@ function ResetSlides()
 end
 
 function ResetYIN()
-    S.yin_threshold = DEFAULTS.yin_threshold
-    S.yin_min_freq  = DEFAULTS.yin_min_freq
-    S.yin_max_freq  = DEFAULTS.yin_max_freq
-    S.yin_window_ms = DEFAULTS.yin_window_ms
+    S.yin_threshold       = DEFAULTS.yin_threshold
+    S.yin_min_freq        = DEFAULTS.yin_min_freq
+    S.yin_max_freq        = DEFAULTS.yin_max_freq
+    S.yin_window_ms       = DEFAULTS.yin_window_ms
+    S.tuner_rms_threshold = DEFAULTS.tuner_rms_threshold
 end
 
 ----------------------------------------------------------------------
@@ -303,6 +323,14 @@ TIPS = {
         "LONGER -> more stable estimate; requires a note at least this long.\n" ..
         "SHORTER -> works on short notes but may be noisier.\n\n" ..
         "30 ms is a good default for most vocals.",
+
+    tuner_rms_threshold =
+        "Minimum audio level (0..1) required before pitch detection runs in the tuner.\n\n" ..
+        "LOWER -> more sensitive; may detect pitch in very quiet passages or\n" ..
+        "AI stem-separation artifacts.\n\n" ..
+        "HIGHER -> only detects pitch when audio is clearly present; useful\n" ..
+        "for filtering out quiet noise between words or from noisy stems.\n\n" ..
+        "0.005 is a good default for clean vocal stems.",
 
     pitch =
         "Pitch assigned to all notes by Generate and Dry run.\n\n" ..
@@ -615,4 +643,14 @@ TIPS = {
         "Useful for spotting mistakes in repeated sections (e.g., same verse twice\n" ..
         "where one note is wrong in the second occurrence).\n\n" ..
         "Read-only — does not modify the project.",
+
+    -- Pitch Tuner
+    tuner_toggle =
+        "Start or stop the live pitch detector.\n\n" ..
+        "Reads audio from the selected source track at the current playhead\n" ..
+        "position every 100 ms, using YIN pitch detection.\n\n" ..
+        "Scanning the same position multiple times is skipped — the display\n" ..
+        "and history only update when the playhead moves.\n\n" ..
+        "Auto-stops if you navigate away from the Tuner tab, or if no new\n" ..
+        "pitch has been detected for 60 seconds.",
 }

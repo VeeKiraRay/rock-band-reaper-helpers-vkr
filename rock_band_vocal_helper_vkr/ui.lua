@@ -46,6 +46,14 @@ function Loop()
         S.midi_track_list   = nil
         S.audio_track_list  = nil
         S.last_result = nil
+        if S.tuner_active then StopTuner('Pitch tuner stopped: project switched.') end
+        S.tuner_pitch       = nil
+        S.tuner_prev_pitch  = nil
+        S.tuner_pitch_name  = nil
+        S.tuner_pitch_hz    = nil
+        S.tuner_pitch_ts    = nil
+        S.tuner_quiet_since = nil
+        S.tuner_history     = {}
         RefreshTrackLists()
         local loaded = LoadSettings()
         S.status = loaded and 'Project switched: loaded saved settings.'
@@ -53,6 +61,9 @@ function Loop()
         SetDefaultTracks()
         AutoDetectLyricsFile()
     end
+
+    -- Run the pitch tuner poll before any UI rendering.
+    RunTuner()
 
     -- Build cached filtered lists on first frame if not yet populated.
     if not S.all_track_list then RefreshTrackLists() end
@@ -99,10 +110,12 @@ function Loop()
         local bw_las  = r.ImGui_CalcTextSize(ctx, 'Assign lyrics')      + _bp
         local bw_ref  = r.ImGui_CalcTextSize(ctx, 'Refresh tracks')     + _bp
         local bw_harm = r.ImGui_CalcTextSize(ctx, 'Apply Harmonies')    + _bp
+        local bw_tur  = r.ImGui_CalcTextSize(ctx, 'Stop Tuner')         + _bp
 
         ----------------------------------------------------------------
         -- Tab bar
         ----------------------------------------------------------------
+        S.tuner_tab_active = false   -- reset; set true below if Tuner tab is active
         if r.ImGui_BeginTabBar(ctx, 'MainTabs') then
 
             ------------------------------------------------------------
@@ -133,6 +146,115 @@ function Loop()
                     S.status = 'Track lists refreshed.'
                 end
                 Tooltip(TIPS.track_refresh)
+
+                r.ImGui_EndTabItem(ctx)
+            end
+
+            ------------------------------------------------------------
+            -- Tab: Tuner
+            ------------------------------------------------------------
+            if r.ImGui_BeginTabItem(ctx, 'Tuner') then
+                S.tuner_tab_active = true
+
+                r.ImGui_Spacing(ctx)
+                SectionHeader('YIN Detection', 'Reset##yin_tur', ResetYIN, TIPS.reset_yin)
+                local _
+                _, S.yin_threshold = r.ImGui_SliderDouble(ctx, 'YIN threshold##tur',
+                    S.yin_threshold, 0.01, 0.5, '%.3f')
+                SliderTooltip(TIPS.yin_threshold)
+                _, S.yin_min_freq = r.ImGui_SliderInt(ctx, 'Min frequency (Hz)##tur',
+                    S.yin_min_freq, 40, 400)
+                SliderTooltip(TIPS.yin_min_freq)
+                _, S.yin_max_freq = r.ImGui_SliderInt(ctx, 'Max frequency (Hz)##tur',
+                    S.yin_max_freq, 200, 2000)
+                SliderTooltip(TIPS.yin_max_freq)
+                if S.yin_min_freq >= S.yin_max_freq then S.yin_max_freq = S.yin_min_freq + 1 end
+                _, S.yin_window_ms = r.ImGui_SliderInt(ctx, 'Window (ms)##tur',
+                    S.yin_window_ms, 10, 100)
+                SliderTooltip(TIPS.yin_window_ms)
+                _, S.tuner_rms_threshold = r.ImGui_SliderDouble(ctx, 'Min RMS level##tur',
+                    S.tuner_rms_threshold, 0.001, 0.1, '%.4f')
+                SliderTooltip(TIPS.tuner_rms_threshold)
+
+                r.ImGui_Spacing(ctx)
+                r.ImGui_Separator(ctx)
+                SectionHeader('Pitch Range')
+                local cb_changed_tur
+                cb_changed_tur, S.min_pitch_enabled = r.ImGui_Checkbox(ctx, '##minpe_tur', S.min_pitch_enabled)
+                Tooltip(TIPS.min_pitch_enabled)
+                r.ImGui_SameLine(ctx)
+                if not S.min_pitch_enabled then r.ImGui_BeginDisabled(ctx) end
+                local minfmt_tur = ('%%d  (%s)'):format(PitchName(S.min_pitch))
+                _, S.min_pitch = r.ImGui_SliderInt(ctx, 'Min pitch##tur', S.min_pitch, RB3_MIN_PITCH, RB3_MAX_PITCH, minfmt_tur)
+                SliderTooltip(TIPS.min_pitch)
+                if not S.min_pitch_enabled then r.ImGui_EndDisabled(ctx) end
+
+                cb_changed_tur, S.max_pitch_enabled = r.ImGui_Checkbox(ctx, '##maxpe_tur', S.max_pitch_enabled)
+                Tooltip(TIPS.max_pitch_enabled)
+                r.ImGui_SameLine(ctx)
+                if not S.max_pitch_enabled then r.ImGui_BeginDisabled(ctx) end
+                local maxfmt_tur = ('%%d  (%s)'):format(PitchName(S.max_pitch))
+                _, S.max_pitch = r.ImGui_SliderInt(ctx, 'Max pitch##tur', S.max_pitch, RB3_MIN_PITCH, RB3_MAX_PITCH, maxfmt_tur)
+                SliderTooltip(TIPS.max_pitch)
+                if not S.max_pitch_enabled then r.ImGui_EndDisabled(ctx) end
+
+                if S.min_pitch_enabled and S.max_pitch_enabled and S.min_pitch > S.max_pitch then
+                    S.max_pitch = S.min_pitch
+                end
+
+                r.ImGui_Spacing(ctx)
+                r.ImGui_Separator(ctx)
+                SectionHeader('Pitch Tuner')
+
+                if S.tuner_active then
+                    if r.ImGui_Button(ctx, 'Stop Tuner', bw_tur, 24) then StopTuner() end
+                else
+                    if r.ImGui_Button(ctx, 'Start Tuner', bw_tur, 24) then StartTuner() end
+                end
+                Tooltip(TIPS.tuner_toggle)
+
+                r.ImGui_Spacing(ctx)
+                local state_color = S.tuner_active and 0x88FF88FF or 0x888888FF
+                local state_label = S.tuner_active and 'Tuner: Active' or 'Tuner: Stopped'
+                r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Text(), state_color)
+                r.ImGui_Text(ctx, state_label)
+                r.ImGui_PopStyleColor(ctx)
+
+                r.ImGui_Separator(ctx)
+
+                -- Current pitch display (highlighted)
+                local arrow = ''
+                if S.tuner_pitch and S.tuner_prev_pitch then
+                    if     S.tuner_pitch > S.tuner_prev_pitch then arrow = ' \xe2\x86\x91'
+                    elseif S.tuner_pitch < S.tuner_prev_pitch then arrow = ' \xe2\x86\x93'
+                    else                                           arrow = ' ='
+                    end
+                end
+                local pitch_disp = (S.tuner_pitch_name or '\xe2\x80\x94') .. arrow
+                r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Text(), 0xFFFFFFFF)
+                r.ImGui_Text(ctx, pitch_disp)
+                r.ImGui_PopStyleColor(ctx)
+                if S.tuner_pitch_hz then
+                    r.ImGui_SameLine(ctx)
+                    r.ImGui_Text(ctx, ('%.1f Hz'):format(S.tuner_pitch_hz))
+                    r.ImGui_SameLine(ctx)
+                    r.ImGui_Text(ctx, 'at ' .. r.format_timestr_pos(S.tuner_pitch_ts, '', 0))
+                end
+
+                -- History strip (dimmed, newest on left)
+                if #S.tuner_history > 0 then
+                    r.ImGui_Spacing(ctx)
+                    r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Text(), 0xAAAAAAFF)
+                    r.ImGui_Text(ctx, table.concat(S.tuner_history, '  '))
+                    r.ImGui_PopStyleColor(ctx)
+                end
+
+                local quiet_delay = (r.GetPlayState() & 1 ~= 0) and 1.5 or 0.0
+                if S.tuner_quiet_since and r.time_precise() - S.tuner_quiet_since > quiet_delay then
+                    S.status = 'Quiet \xe2\x80\x94 no pitch detected'
+                elseif S.status == 'Quiet \xe2\x80\x94 no pitch detected' then
+                    S.status = ''
+                end
 
                 r.ImGui_EndTabItem(ctx)
             end

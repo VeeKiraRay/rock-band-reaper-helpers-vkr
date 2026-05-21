@@ -26,18 +26,19 @@ Designed for authoring Rock Band-style vocal charts — it defaults to the RB3 v
 
 ![Main window](../assets/full_window.jpg)
 
-The script window has a persistent track-selector row at the top and a status/result panel at the bottom. Everything in between is organised into five tabs:
+The script window has a persistent track-selector row at the top and a status/result panel at the bottom. Everything in between is organised into tabs:
 
 | Area                   | Description                                                                                         |
 | ---------------------- | --------------------------------------------------------------------------------------------------- |
 | Track selectors        | Above the tab bar — Audio source, MIDI destination; always visible                                  |
+| **General** tab        | Save / Load project settings; Refresh tracks                                                        |
+| **Tuner** tab          | Live pitch detector — reads audio at the playhead and shows the current note, Hz, and history       |
 | **Note Placement** tab | Detection sliders, Default pitch, velocity, Dry run / Generate buttons                              |
 | **Pitch** tab          | Pitch source for Apply pitch changes: Built-in detection (YIN) or Reference MIDI; Snap to Key Scale |
 | **Lyrics** tab         | Select a lyrics file, assign or clear lyric events                                                  |
 | **Pitch slide** tab    | Scan existing notes for pitch slides (glides, scoops, bends)                                        |
 | **Harmonies** tab      | Copy lead vocal notes to up to three harmony tracks with pitch interval options                     |
 | **Validation** tab     | Validate phrase markers; check phrase similarity to catch copy errors                               |
-| **General** tab        | Save / Load project settings                                                                        |
 | Status / Undo          | Below the tab bar — result of the last action, and the Undo button                                  |
 
 ---
@@ -424,6 +425,51 @@ Group 2: 2 phrases (100% min similarity) — no outliers
 Phrases with no outliers show a one-line summary. Only notes that differ from the group's majority-vote consensus are flagged, along with the deviation in semitones. The check is read-only — you decide whether each flagged difference is a mistake or an intentional variation.
 
 The check requires at least two phrase markers on the MIDI track and at least two notes per phrase to produce a comparison. Phrases with fewer than two notes are skipped.
+
+---
+
+## Tuner tab
+
+The **Tuner** tab is a live pitch detector. While active it reads audio from the selected source track at the current playhead position every 100 ms and displays the detected note.
+
+### Starting and stopping
+
+Click **Start Tuner** to begin. The button label changes to **Stop Tuner**. The tuner also stops automatically in two situations:
+
+- You navigate away from the Tuner tab.
+- No new pitch has been detected for 60 seconds while the playhead is stationary (e.g. you stopped playback and stepped away).
+
+### Display
+
+| Element               | Description                                                                                                                                                                                                              |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Current pitch**     | Note name with a direction indicator — `↑` (higher than last detection), `↓` (lower), or `=` (same) — followed by frequency in Hz and project timestamp. Stays visible after you stop.                                  |
+| **History strip**     | The last 10 detected notes, newest on the left, dimmed. Only real pitches appear — silence is not logged.                                                                                                                |
+| **Quiet indicator**   | "Quiet — no pitch detected" appears in the status bar at the bottom of the window when audio is silent or not clearly pitched. When playing, it waits 1.5 seconds before appearing so brief syllable gaps and breaths do not trigger it. When the playhead is stopped it appears instantly. |
+
+The Tuner tab shows its own **state indicator** ("Tuner: Active" in green, "Tuner: Stopped" in grey) directly below the Start/Stop button — you do not need to watch the bottom status bar while tuning. The status bar is only used for auto-stop and error messages.
+
+> **Tip:** The display and history stay visible after you stop. Use this as a quick reference — play a few bars, stop, read the results, then jump to the MIDI editor.
+
+### Scrubbing
+
+Dragging the playhead while playback is stopped is also detected — the tuner reads the edit cursor position, so clicking anywhere on the timeline immediately samples that point. The "Quiet — no pitch detected" message in the status bar also appears immediately when you scrub to a silent spot (no 1.5 s delay), giving instant feedback when stepping through the timeline manually.
+
+### YIN Detection settings
+
+These are the same settings used by the Pitch tab's Built-in detection mode. Adjusting them here changes the behaviour of both the tuner and Apply pitch changes.
+
+| Slider                | Range         | Default | Notes                                                                                           |
+| --------------------- | ------------- | ------- | ----------------------------------------------------------------------------------------------- |
+| **YIN threshold**     | 0.01 – 0.5    | 0.15    | Confidence gate. Lower = stricter (more `—` on ambiguous audio). Higher = more detections but more risk of wrong results on noise. |
+| **Min frequency (Hz)**| 40 – 400      | 80 Hz   | Set just below the lowest note in the vocal. Narrows the search range and reduces octave errors. |
+| **Max frequency (Hz)**| 200 – 2000    | 1000 Hz | Set just above the highest note.                                                                |
+| **Window (ms)**       | 10 – 100      | 30 ms   | Analysis window per sample. YIN needs at least one pitch cycle — at 80 Hz that is ~12 ms minimum. Longer windows are more stable; shorter windows track faster. |
+| **Min RMS level**     | 0.001 – 0.1   | 0.005   | Minimum signal level before pitch detection runs. Raise if silent gaps frequently trigger spurious detections; lower if very quiet passages are being ignored. Saved with project settings. |
+
+### Pitch Range constraints
+
+The same Min pitch / Max pitch checkbox+slider pairs from the Pitch tab. When enabled, detected pitches outside the range are octave-shifted back in before display. Useful for voices where YIN occasionally lands an octave too low or high.
 
 ---
 
