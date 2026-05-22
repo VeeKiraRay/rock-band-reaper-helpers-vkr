@@ -20,17 +20,19 @@
 
 The window is organized into three tabs plus a status panel at the bottom.
 
-| Tab           | Purpose                                                                                      |
-| ------------- | -------------------------------------------------------------------------------------------- |
-| **General**   | Audio alignment utilities (align all audio, count-in clips) and settings save/load           |
-| **Tempo Map** | Detect BPM from drum audio and generate REAPER tempo markers measure-by-measure              |
-| **Venue**     | Validate and list all text events on the VENUE track                                         |
+| Tab           | Purpose                                                                            |
+| ------------- | ---------------------------------------------------------------------------------- |
+| **General**   | Audio alignment utilities (align all audio, count-in clips) and settings save/load |
+| **Tempo Map** | Detect BPM from drum audio and generate REAPER tempo markers measure-by-measure    |
+| **Venue**     | Validate and list all text events on the VENUE track                               |
 
 The bottom of the window always shows the active time selection (or "No time selection") and the result panel from the last action.
 
 ---
 
 ## General tab
+
+![General tab](../assets/g_general.jpg)
 
 ### Audio alignment
 
@@ -47,11 +49,11 @@ Moves every single-item audio track in the project to start at the same position
 
 Positions **COUNT IN** clips at the standard count-in beat slots derived from the project's root tempo marker time signature:
 
-| Time sig   | Slots                                                             |
-| ---------- | ----------------------------------------------------------------- |
-| 4/4        | m1 beats 1, 3  →  m2 beats 1, 2, 3, 4  (6 clips)                |
-| 3/4        | m1 beat 1      →  m2 beats 1, 2, 3      (4 clips)                |
-| Other even | m1 beat 1 + midpoint  →  m2 all beats                            |
+| Time sig   | Slots                                         |
+| ---------- | --------------------------------------------- |
+| 4/4        | m1 beats 1, 3 → m2 beats 1, 2, 3, 4 (6 clips) |
+| 3/4        | m1 beat 1 → m2 beats 1, 2, 3 (4 clips)        |
+| Other even | m1 beat 1 + midpoint → m2 all beats           |
 
 Clips beyond the 6-slot cap are left untouched and listed in the result. Fully undoable.
 
@@ -65,34 +67,9 @@ Clips beyond the 6-slot cap are left untouched and listed in the result. Fully u
 
 ---
 
-## Venue
-
-### What it does
-
-**List venue events** reads the VENUE track (found by name) and audits all MIDI text events against the Rock Band Network specification. It reports:
-
-- **Unknown events** — text events not in the RBN spec. These will cause issues at compile time.
-- **Consecutive camera repeats** — the same directed or coop camera cut used back to back.
-- **Directed cut spacing** — directed cuts that are too close together (directed cuts require a minimum gap between them per RBN guidelines).
-- **Event frequency count** — how many times each event is used across the whole track, sorted by frequency.
-
-### Track naming
-
-The script looks for a track named `VENUE` (case-insensitive). No dropdown is needed — it finds the track automatically.
-
-### Validated event categories
-
-The VENUE spec includes three categories of events:
-
-| Category            | Examples                                                           |
-| ------------------- | ------------------------------------------------------------------ |
-| **Camera cuts**     | `[coop_all_near]`, `[directed_drums]`, `[directed_vocals_cls]`, …  |
-| **Post-processing** | `[bloom.pp]`, `[film_b+w.pp]`, `[video_trails.pp]`, …              |
-| **Lighting**        | `[lighting (verse)]`, `[lighting (frenzy)]`, `[lighting (bre)]`, … |
-
----
-
 ## Tempo Map
+
+![General tab](../assets/tempo_map.jpg)
 
 ### Overview
 
@@ -108,12 +85,12 @@ The typical workflow:
 
 ### Track selection
 
-| Dropdown        | Track it expects              | Role                                                                        |
-| --------------- | ----------------------------- | --------------------------------------------------------------------------- |
-| **KICK track**  | `KICK AUDIO`                  | Primary onset source — kick has the sharpest transient                      |
-| **SNARE track** | `SNARE AUDIO`                 | Used per-window when kick has no onset above threshold                      |
-| **KIT track**   | `KIT AUDIO`                   | Fallback when both kick and snare are quiet in a window                     |
-| **Fallback**    | `GUITAR AUDIO` or `KEYS AUDIO`| Last resort when all drum sources are quiet                                 |
+| Dropdown        | Track it expects               | Role                                                    |
+| --------------- | ------------------------------ | ------------------------------------------------------- |
+| **KICK track**  | `KICK AUDIO`                   | Primary onset source — kick has the sharpest transient  |
+| **SNARE track** | `SNARE AUDIO`                  | Used per-window when kick has no onset above threshold  |
+| **KIT track**   | `KIT AUDIO`                    | Fallback when both kick and snare are quiet in a window |
+| **Fallback**    | `GUITAR AUDIO` or `KEYS AUDIO` | Last resort when all drum sources are quiet             |
 
 The script uses **per-window priority**: for each measure window it tries kick first, then snare, then kit, then the fallback track. The highest-priority source that has a detectable onset in that window is used for that measure. This allows the generator to track the beat through intros, transitions, and quiet passages where kick or snare may be absent.
 
@@ -182,6 +159,35 @@ Deletes all REAPER tempo markers except the root marker at index 0 (the one REAP
 **Override BPM limit** — checkbox that bypasses the failsafe entirely. Use for songs with intentional large tempo swings.
 
 > **Tip:** All sliders support Ctrl+click to type an exact value.
+
+---
+
+## Venue
+
+![General tab](../assets/venue.jpg)
+
+### What it does
+
+**List venue events** reads the VENUE track (found by name) and audits all MIDI text events against the Rock Band Network specification. It reports:
+
+- **Unknown events** — text events not in the RBN spec. These will cause issues at compile time.
+- **Consecutive camera repeats** — the same directed or coop camera cut used back to back.
+- **Directed cut spacing** — directed cuts that are too close together (directed cuts require a minimum gap between them per RBN guidelines).
+- **Event frequency count** — how many times each event is used across the whole track, sorted by frequency.
+
+### Track naming
+
+The script looks for a track named `VENUE` (case-insensitive). No dropdown is needed — it finds the track automatically.
+
+### Validated event categories
+
+The VENUE spec includes three categories of events:
+
+| Category            | Examples                                                           |
+| ------------------- | ------------------------------------------------------------------ |
+| **Camera cuts**     | `[coop_all_near]`, `[directed_drums]`, `[directed_vocals_cls]`, …  |
+| **Post-processing** | `[bloom.pp]`, `[film_b+w.pp]`, `[video_trails.pp]`, …              |
+| **Lighting**        | `[lighting (verse)]`, `[lighting (frenzy)]`, `[lighting (bre)]`, … |
 
 ---
 
