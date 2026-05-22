@@ -38,7 +38,8 @@ jobs:
             rock_band_vocal_helper_vkr.lua \
             lib/ \
             rock_band_general_helper_vkr/ \
-            rock_band_vocal_helper_vkr/
+            rock_band_vocal_helper_vkr/ \
+            -x "*/README.md"
 
       - name: Upload zip to release
         uses: softprops/action-gh-release@v2
