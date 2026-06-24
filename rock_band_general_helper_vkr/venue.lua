@@ -63,6 +63,41 @@ local function GapStats(gaps)
     return { count = #gaps, avg = total / #gaps, slowest = slowest, fastest = fastest }
 end
 
+-- Read and categorize all VENUE text events for the Preview sub-tab.
+-- Returns: { camera={}, lighting={}, postproc={}, track_end=<seconds> }
+--      or: nil, err_string
+function GetVenueEventsForPreview()
+    local track = FindVenueTrack()
+    if not track then return nil, 'No VENUE track found.' end
+
+    local events, err = ReadVenueTextEvents(track)
+    if not events then return nil, err end
+
+    local track_end = 0
+    for i = 0, r.CountTrackMediaItems(track) - 1 do
+        local item = r.GetTrackMediaItem(track, i)
+        local tk   = r.GetActiveTake(item)
+        if tk and r.TakeIsMIDI(tk) then
+            local e = r.GetMediaItemInfo_Value(item, 'D_POSITION')
+                    + r.GetMediaItemInfo_Value(item, 'D_LENGTH')
+            if e > track_end then track_end = e end
+        end
+    end
+
+    local cam, lt, pp = {}, {}, {}
+    for _, ev in ipairs(events) do
+        if ev.msg:find('^%[coop_') or ev.msg:find('^%[directed_') then
+            cam[#cam + 1] = ev
+        elseif ev.msg:find('^%[lighting') then
+            lt[#lt + 1] = ev
+        elseif ev.msg:find('%.pp%]$') then
+            pp[#pp + 1] = ev
+        end
+    end
+
+    return { camera = cam, lighting = lt, postproc = pp, track_end = track_end }
+end
+
 function ListVenueEvents()
     local track = FindVenueTrack()
     if not track then
@@ -103,18 +138,18 @@ function ListVenueEvents()
 
     ---- Track name validation (type 3) ----
     if #track_name_events == 0 then
-        lines[#lines + 1] = 'ERROR: Track name event missing — expected Track Name "VENUE" at 1.1.00.'
+        lines[#lines + 1] = 'ERROR: Track name event missing - expected Track Name "VENUE" at 1.1.00.'
     elseif #track_name_events > 1 then
-        lines[#lines + 1] = ('ERROR: Track name event duplicated (%d found — expected exactly one at 1.1.00):'):format(#track_name_events)
+        lines[#lines + 1] = ('ERROR: Track name event duplicated (%d found - expected exactly one at 1.1.00):'):format(#track_name_events)
         for _, ev in ipairs(track_name_events) do
             lines[#lines + 1] = ('  %s  "%s"'):format(FormatTime(ev.t), ev.msg)
         end
     else
         local tn = track_name_events[1]
         if tn.ppq ~= 0 then
-            lines[#lines + 1] = ('ERROR: Track name "%s" is not at 1.1.00 — found at %s.'):format(tn.msg, FormatTime(tn.t))
+            lines[#lines + 1] = ('ERROR: Track name "%s" is not at 1.1.00 - found at %s.'):format(tn.msg, FormatTime(tn.t))
         elseif tn.msg ~= 'VENUE' then
-            lines[#lines + 1] = ('ERROR: Track name is "%s" — expected "VENUE".'):format(tn.msg)
+            lines[#lines + 1] = ('ERROR: Track name is "%s" - expected "VENUE".'):format(tn.msg)
         else
             lines[#lines + 1] = 'Track name: "VENUE" at 1.1.00.  OK'
         end
@@ -191,7 +226,7 @@ function ListVenueEvents()
     if #gap_warnings == 0 then
         lines[#lines + 1] = 'No directed cut spacing issues found.'
     else
-        lines[#lines + 1] = ('Directed cuts — next camera event within 2s, double-check (%d):'):format(#gap_warnings)
+        lines[#lines + 1] = ('Directed cuts - next camera event within 2s, double-check (%d):'):format(#gap_warnings)
         for _, w in ipairs(gap_warnings) do
             lines[#lines + 1] = ('  %s  %s  →  next in %.2fs  (%s)'):format(
                 FormatTime(w.ev.t), w.ev.msg, w.gap, w.next_msg)
@@ -209,9 +244,9 @@ function ListVenueEvents()
         else
             lines[#lines + 1] = ('  Count:    %d'):format(st.count)
             lines[#lines + 1] = ('  Average:  %.2fs'):format(st.avg)
-            lines[#lines + 1] = ('  Slowest:  %.2fs  —  %s  (%s)'):format(
+            lines[#lines + 1] = ('  Slowest:  %.2fs  -  %s  (%s)'):format(
                 st.slowest.gap, FormatTime(st.slowest.t), st.slowest.from)
-            lines[#lines + 1] = ('  Fastest:  %.2fs  —  %s  (%s)'):format(
+            lines[#lines + 1] = ('  Fastest:  %.2fs  -  %s  (%s)'):format(
                 st.fastest.gap, FormatTime(st.fastest.t), st.fastest.from)
         end
         lines[#lines + 1] = ''

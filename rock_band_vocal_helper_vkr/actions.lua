@@ -1,7 +1,9 @@
--- Action functions (Preview, Generate, Auto-tune, Apply pitch, Slide scan, Snap to Key)
+-- Action functions (Preview, Generate, Auto-tune, Apply pitch, Draft Snap)
+-- ScanPitchSlidesAction → actions_slides.lua
+-- SnapToKeyAction        → actions_snap_key.lua
 
 ----------------------------------------------------------------------
--- Track resolution helpers (local — only called within this file)
+-- Track resolution helpers (local - only called within this file)
 ----------------------------------------------------------------------
 local function ResolveTracks()
     local tracks = GetTrackList()
@@ -71,6 +73,10 @@ function Preview()
     local res, err = RunDetection(range_info)
     if not res then S.status = 'Error'; S.last_result = err; return end
 
+    if S.snap_enabled then
+        res.notes = SnapOnsets(res.notes, res.contour_info, S.snap_window_ms)
+    end
+
     local with_pitch, ps_or_err = AssignPitches(res.notes, trks.ref, range_info.item, MODE_SINGLE)
     if not with_pitch then
         S.status = 'Error'; S.last_result = ps_or_err; return
@@ -112,7 +118,7 @@ function Generate(replace)
                     if trimmed_start > 0.001 then parts[#parts+1] = ('%.2fs trimmed from start'):format(trimmed_start) end
                     clamp_warning = 'Note: audio range clamped to MIDI item bounds (' ..
                         table.concat(parts, ', ') .. ').\n' ..
-                        ('Audio: %s — %s   MIDI item: %s — %s')
+                        ('Audio: %s - %s   MIDI item: %s - %s')
                             :format(FormatTime(orig_start), FormatTime(orig_end),
                                     FormatTime(pos),        FormatTime(iend))
                     midi_item = it
@@ -134,6 +140,10 @@ function Generate(replace)
     local res, err = RunDetection(range_info)
     if not res then S.status = 'Error'; S.last_result = err; return end
 
+    if S.snap_enabled then
+        res.notes = SnapOnsets(res.notes, res.contour_info, S.snap_window_ms)
+    end
+
     local with_pitch, ps_or_err = AssignPitches(res.notes, trks.ref, range_info.item, MODE_SINGLE)
     if not with_pitch then S.status = 'Error'; S.last_result = ps_or_err; return end
 
@@ -142,8 +152,8 @@ function Generate(replace)
     r.Undo_BeginBlock2(0)
     r.MarkTrackItemsDirty(trks.midi, midi_item)
     if replace then
-        cleared = ClearAllNotesInRange(midi_take,
-            range_info.range_start, range_info.range_end)
+        cleared = ClearNotesInRange(midi_take,
+            range_info.range_start, range_info.range_end, RB3_MIN_PITCH, RB3_MAX_PITCH)
     else
         local pitch_set = { [S.pitch] = true }
         for _, n in ipairs(with_pitch) do pitch_set[n.pitch] = true end
@@ -337,7 +347,7 @@ function ApplyPitchChangesAction()
 
     if #existing == 0 then
         S.status = 'No notes in range.'
-        S.last_result = ('Range: %s — %s%s\nNothing to update.'):format(
+        S.last_result = ('Range: %s - %s%s\nNothing to update.'):format(
             FormatTime(target.range_start), FormatTime(target.range_end),
             target.has_selection and ' [time selection]' or ' [whole MIDI item]')
         return
@@ -385,7 +395,7 @@ function ApplyPitchChangesAction()
     local lines = {
         ('Apply pitch changes: %d notes processed, %d pitches changed')
             :format(#existing, changed),
-        ('Range: %s — %s  (%.3fs)%s'):format(
+        ('Range: %s - %s  (%.3fs)%s'):format(
             FormatTime(target.range_start), FormatTime(target.range_end),
             target.range_end - target.range_start,
             target.has_selection and ' [time selection]' or ' [whole MIDI item]'),
@@ -407,511 +417,91 @@ function ApplyPitchChangesAction()
 end
 
 ----------------------------------------------------------------------
--- Pitch slide scan
+-- Draft snap: read existing notes from MIDI destination, snap their
+-- boundaries to the nearest energy onset/offset, assign pitches.
 ----------------------------------------------------------------------
--- Classify the shape of a pitch trajectory from a list of pitch segments.
--- segs: list of {pc, median_midi, ...}, 2 or more entries, adjacent entries
--- always have different pitch classes (guaranteed by the merge step).
--- Returns one of: 'Slide up', 'Slide down', 'Scoop', 'Bend', 'Complex slide'.
-local function ClassifySlide(segs)
-    local dirs = {}
-    for i = 2, #segs do
-        local diff = segs[i].median_midi - segs[i - 1].median_midi
-        dirs[#dirs + 1] = diff > 0 and 1 or -1
+function SnapDraft()
+    local trks, terr = ResolveTracks()
+    if not trks then S.status = terr; S.last_result = nil; return end
+
+    local range_info, rerr = ResolveAnalysisRange(trks.audio)
+    if not range_info then
+        S.status = 'Error'; S.last_result = rerr; return
     end
 
-    local all_up, all_down = true, true
-    for _, d in ipairs(dirs) do
-        if d < 0 then all_up   = false end
-        if d > 0 then all_down = false end
-    end
-    if all_up   then return 'Slide up'   end
-    if all_down then return 'Slide down' end
-
-    local first, last = dirs[1], dirs[#dirs]
-    if first < 0 and last > 0 then return 'Scoop' end
-    if first > 0 and last < 0 then return 'Bend'  end
-    return 'Complex slide'
-end
-
-function ScanPitchSlidesAction()
-    local tracks = GetTrackList()
-    if #tracks == 0 then S.status = 'No tracks in project.'; S.last_result = nil; return end
-    if S.audio_idx >= #tracks or S.midi_idx >= #tracks then
-        S.status = 'Track selection out of range.'; S.last_result = nil; return
+    local midi_target, merr = ResolveApplyPitchTarget(trks.midi)
+    if not midi_target then
+        S.status = 'Error'; S.last_result = merr; return
     end
 
-    local audio_track = r.GetTrack(0, tracks[S.audio_idx + 1].idx)
-    local midi_track  = r.GetTrack(0, tracks[S.midi_idx  + 1].idx)
-
-    -- Find first audio item on the source track
-    local audio_item
-    for i = 0, r.CountTrackMediaItems(audio_track) - 1 do
-        local item = r.GetTrackMediaItem(audio_track, i)
-        local take = r.GetActiveTake(item)
-        if take and not r.TakeIsMIDI(take) then audio_item = item; break end
-    end
-    if not audio_item then
-        S.status = 'Error'
-        S.last_result = 'No audio item found on the source track.'
-        return
-    end
-
-    -- Find MIDI item and establish scan range (respects time selection)
-    local sel_start, sel_end = GetTimeSelection()
-
-    if not sel_start then
-        local proceed = r.ShowMessageBox(
-            'No time selection is active.\n\n' ..
-            'Scan pitch slides will process the entire destination MIDI item.\n' ..
-            'On a full song this can take 20 seconds or more, and the UI\n' ..
-            'will be unresponsive until the scan completes.\n\n' ..
-            'Save your project first in case of an unexpected crash.\n\n' ..
-            'Press OK to continue, or Cancel to set a time selection first.',
-            'Scan pitch slides — no time selection', 1)
-        if proceed ~= 1 then return end
-    end
-
-    local midi_item, midi_take, range_start, range_end, has_sel
-
-    if sel_start then
-        for i = 0, r.CountTrackMediaItems(midi_track) - 1 do
-            local item = r.GetTrackMediaItem(midi_track, i)
-            local take = r.GetActiveTake(item)
-            if take and r.TakeIsMIDI(take) then
-                local pos = r.GetMediaItemInfo_Value(item, 'D_POSITION')
-                local len = r.GetMediaItemInfo_Value(item, 'D_LENGTH')
-                if pos < sel_end and pos + len > sel_start then
-                    midi_item = item; midi_take = take
-                    range_start = sel_start; range_end = sel_end
-                    has_sel = true; break
-                end
-            end
-        end
-    end
-    if not midi_item then
-        midi_item, midi_take = FindFirstMIDIItem(midi_track)
-        if not midi_item then
-            S.status = 'Error'
-            S.last_result = 'No MIDI item found on the destination track.'
-            return
-        end
-        range_start = r.GetMediaItemInfo_Value(midi_item, 'D_POSITION')
-        range_end   = range_start + r.GetMediaItemInfo_Value(midi_item, 'D_LENGTH')
-        has_sel = false
-    end
-
-    -- Build PPQ -> lyric lookup from type-5 text events
-    local lyric_at = {}
-    local _, _, _, n_text = r.MIDI_CountEvts(midi_take)
-    for i = 0, n_text - 1 do
-        local ok, _, _, ppq, typ, msg = r.MIDI_GetTextSysexEvt(midi_take, i)
-        if ok and typ == 5 then lyric_at[ppq] = msg end
-    end
-
-    -- Read notes in range (RB3 vocal pitch range only)
-    local _, n_notes = r.MIDI_CountEvts(midi_take)
-    local notes = {}
+    -- Read draft notes (vocal range only), preserving pitch and velocity
+    local draft = {}
+    local _, n_notes = r.MIDI_CountEvts(midi_target.take)
     for i = 0, n_notes - 1 do
-        local ok, _, _, sppq, eppq, _, pitch = r.MIDI_GetNote(midi_take, i)
-        if ok then
-            local s_t = r.MIDI_GetProjTimeFromPPQPos(midi_take, sppq)
-            local e_t = r.MIDI_GetProjTimeFromPPQPos(midi_take, eppq)
-            if s_t >= range_start - 0.001 and s_t < range_end + 0.001
-            and pitch >= RB3_MIN_PITCH and pitch <= RB3_MAX_PITCH then
-                notes[#notes + 1] = {
-                    s = s_t, e = e_t, pitch = pitch, lyric = lyric_at[sppq],
+        local ok, sel, mute, sppq, eppq, chan, p, vel = r.MIDI_GetNote(midi_target.take, i)
+        if ok and p >= RB3_MIN_PITCH and p <= RB3_MAX_PITCH then
+            local s_t = r.MIDI_GetProjTimeFromPPQPos(midi_target.take, sppq)
+            local e_t = r.MIDI_GetProjTimeFromPPQPos(midi_target.take, eppq)
+            if s_t >= midi_target.range_start - 0.001 and s_t < midi_target.range_end + 0.001 then
+                draft[#draft + 1] = {
+                    s = s_t, e = e_t,
+                    pitch = p, vel = vel, sel = sel, mute = mute, chan = chan,
                 }
             end
         end
     end
 
-    if #notes == 0 then
-        S.status = 'No notes in range.'
-        S.last_result = ('Range: %s - %s%s\nNo notes to scan.'):format(
-            FormatTime(range_start), FormatTime(range_end),
-            has_sel and ' [time selection]' or ' [whole MIDI item]')
+    if #draft == 0 then
+        S.status = 'No notes to snap.'
+        S.last_result =
+            'No vocal notes found in range on the destination MIDI item.\n' ..
+            'Draw rough notes first, then click Snap draft notes.'
         return
     end
 
-    local yctx, yerr = OpenYINContext(audio_item)
-    if not yctx then S.status = 'Error'; S.last_result = yerr; return end
-
-    local slide_results = {}
-    local n_scanned, n_too_short, n_stable = 0, 0, 0
-
-    for _, note in ipairs(notes) do
-        local dur = note.e - note.s
-        if dur < S.slide_min_note_ms * 0.001 then
-            n_too_short = n_too_short + 1
-        else
-            n_scanned = n_scanned + 1
-            local slide_win_s  = S.slide_win_ms  * 0.001
-            local slide_step_s = S.slide_step_ms * 0.001
-            local slide_skip_s = S.slide_skip_ms * 0.001
-
-            -- Collect YIN samples every slide_step_s, skipping note edges
-            local scan_s = note.s + slide_skip_s
-            local scan_e = note.e - slide_skip_s
-            local raw = {}
-            local t = scan_s
-            while t + slide_win_s <= scan_e do
-                local p = SampleYINAt(yctx, t, slide_win_s)
-                raw[#raw + 1] = {
-                    t = t, midi = p, pc = p and (p % 12) or nil,
-                }
-                t = t + slide_step_s
-            end
-
-            -- Group consecutive valid samples by pitch class
-            local segs = {}
-            local cur
-            for _, sp in ipairs(raw) do
-                if sp.pc then
-                    if not cur or cur.pc ~= sp.pc then
-                        cur = {
-                            pc = sp.pc, midi_list = { sp.midi },
-                            t_start = sp.t, t_end = sp.t + slide_win_s,
-                        }
-                        segs[#segs + 1] = cur
-                    else
-                        cur.midi_list[#cur.midi_list + 1] = sp.midi
-                        cur.t_end = sp.t + slide_win_s
-                    end
-                else
-                    cur = nil  -- gap resets the current segment
-                end
-            end
-
-            -- Compute median MIDI note and duration per segment
-            for _, seg in ipairs(segs) do
-                table.sort(seg.midi_list)
-                seg.median_midi = seg.midi_list[math.floor(#seg.midi_list / 2) + 1]
-                seg.duration = seg.t_end - seg.t_start
-            end
-
-            -- Filter: discard segments shorter than slide_min_seg_s
-            local filtered = {}
-            for _, seg in ipairs(segs) do
-                if seg.duration >= S.slide_min_seg_ms * 0.001 then
-                    filtered[#filtered + 1] = seg
-                end
-            end
-
-            -- Merge adjacent segments that share a pitch class (after gap filtering)
-            local merged = {}
-            for _, seg in ipairs(filtered) do
-                if #merged > 0 and merged[#merged].pc == seg.pc then
-                    local last = merged[#merged]
-                    for _, v in ipairs(seg.midi_list) do
-                        last.midi_list[#last.midi_list + 1] = v
-                    end
-                    last.t_end    = seg.t_end
-                    last.duration = last.t_end - last.t_start
-                    table.sort(last.midi_list)
-                    last.median_midi =
-                        last.midi_list[math.floor(#last.midi_list / 2) + 1]
-                else
-                    merged[#merged + 1] = {
-                        pc         = seg.pc,
-                        midi_list  = seg.midi_list,
-                        t_start    = seg.t_start,
-                        t_end      = seg.t_end,
-                        duration   = seg.duration,
-                        median_midi = seg.median_midi,
-                    }
-                end
-            end
-
-            if #merged < 2 then
-                n_stable = n_stable + 1
-            else
-                local shape  = ClassifySlide(merged)
-                local from_p = merged[1].median_midi
-                local to_p   = merged[#merged].median_midi
-
-                -- Show the actual turning point, not just the middle index.
-                -- Scoop: deepest dip among inner segments.
-                -- Bend:  highest peak among inner segments.
-                -- Slide up/down and Complex slide: no mid_p (no single
-                -- representative point; Complex label conveys the complexity).
-                local mid_p, mid_dur = nil, nil
-                if shape == 'Scoop' and #merged >= 3 then
-                    local min_midi = math.huge
-                    for j = 2, #merged - 1 do
-                        if merged[j].median_midi < min_midi then
-                            min_midi = merged[j].median_midi
-                            mid_dur  = merged[j].duration
-                        end
-                    end
-                    mid_p = min_midi
-                elseif shape == 'Bend' and #merged >= 3 then
-                    local max_midi = -math.huge
-                    for j = 2, #merged - 1 do
-                        if merged[j].median_midi > max_midi then
-                            max_midi = merged[j].median_midi
-                            mid_dur  = merged[j].duration
-                        end
-                    end
-                    mid_p = max_midi
-                end
-
-                slide_results[#slide_results + 1] = {
-                    time       = note.s,
-                    note_dur   = note.e - note.s,
-                    note_pitch = note.pitch,
-                    lyric      = note.lyric,
-                    shape      = shape,
-                    from_p     = from_p,
-                    from_dur   = merged[1].duration,
-                    to_p       = to_p,
-                    to_dur     = merged[#merged].duration,
-                    mid_p      = mid_p,
-                    mid_dur    = mid_dur,
-                }
-            end
-        end
+    local contour_info, cerr = ComputeRMSContour(
+        range_info.item, range_info.range_start, range_info.range_end,
+        S.window_ms / 1000, S.lpf_cutoff_hz)
+    if not contour_info then
+        S.status = 'Error'; S.last_result = cerr; return
     end
 
-    CloseYINContext(yctx)
-
-    -- Format result lines
-    local lines = {
-        ('Range: %s - %s%s'):format(
-            FormatTime(range_start), FormatTime(range_end),
-            has_sel and ' [time selection]' or ' [whole MIDI item]'),
-        ('%d notes  |  %d scanned  |  %d too short (<%dms)  |  %d stable')
-            :format(#notes, n_scanned, n_too_short, S.slide_min_note_ms, n_stable),
-    }
-
-    if #slide_results == 0 then
-        lines[#lines + 1] = ''
-        lines[#lines + 1] = 'No pitch slides detected.'
-    else
-        lines[#lines + 1] = ('%d slide%s detected:')
-            :format(#slide_results, #slide_results == 1 and '' or 's')
-        lines[#lines + 1] = ''
-        for _, res in ipairs(slide_results) do
-            local note_name = PitchName(res.note_pitch)
-            local lyric_tag = res.lyric
-                and ('(%s "%s") '):format(note_name, res.lyric)
-                or  ('(%s) '):format(note_name)
-            local nd = res.note_dur
-            local function pct(d)
-                return math.max(1, math.floor(d / nd * 100 + 0.5))
-            end
-            local pitch_str
-            if res.mid_p then
-                pitch_str = ('%s (%d%%) -> %s (%d%%) -> %s (%d%%)'):format(
-                    PitchName(res.from_p), pct(res.from_dur),
-                    PitchName(res.mid_p),  pct(res.mid_dur),
-                    PitchName(res.to_p),   pct(res.to_dur))
-            else
-                pitch_str = ('%s (%d%%) -> %s (%d%%)'):format(
-                    PitchName(res.from_p), pct(res.from_dur),
-                    PitchName(res.to_p),   pct(res.to_dur))
-            end
-            lines[#lines + 1] = ('%-26s  %s%-16s  %s'):format(
-                FormatTime(res.time), lyric_tag, res.shape, pitch_str)
-        end
-    end
-
-    S.status = ('%d pitch slide%s detected'):format(
-        #slide_results, #slide_results == 1 and '' or 's')
-    S.last_result = table.concat(lines, '\n')
-end
-
-----------------------------------------------------------------------
--- Snap to Key Scale
-----------------------------------------------------------------------
-
--- Returns snapped_pitch (int) and semitone distance (int >= 0).
--- Ties (equidistant up/down) snap downward (lower pitch wins) so that a note
--- "between" two scale degrees consistently rounds to the lower one.
-local function NearestScalePitch(pitch, root, quality)
-    local scale = quality == 1 and HARM_SCALE.minor or HARM_SCALE.major
-    local pc = pitch % 12
-    local best_pitch, best_dist = pitch, 999
-    for _, interval in ipairs(scale) do
-        local spc = (root + interval) % 12
-        local up   = (spc - pc + 12) % 12
-        local down = (pc - spc + 12) % 12
-        local dist, offset = (up < down) and up or down, (up < down) and up or -down
-        local candidate = pitch + offset
-        if dist < best_dist or (dist == best_dist and candidate < best_pitch) then
-            best_dist, best_pitch = dist, candidate
-        end
-    end
-    return best_pitch, best_dist
-end
-
--- Returns the next-best scale pitch, excluding the given pitch class.
--- Used by the collision-avoidance post-pass.
-local function NextScalePitch(pitch, root, quality, exclude_pc)
-    local scale = quality == 1 and HARM_SCALE.minor or HARM_SCALE.major
-    local pc = pitch % 12
-    local best_pitch, best_dist = pitch, 999
-    for _, interval in ipairs(scale) do
-        local spc = (root + interval) % 12
-        if spc ~= exclude_pc then
-            local up   = (spc - pc + 12) % 12
-            local down = (pc - spc + 12) % 12
-            local dist, offset = (up < down) and up or down, (up < down) and up or -down
-            local candidate = pitch + offset
-            if dist < best_dist or (dist == best_dist and candidate < best_pitch) then
-                best_dist, best_pitch = dist, candidate
-            end
-        end
-    end
-    return best_pitch, best_dist
-end
-
-function SnapToKeyAction()
-    local tracks = GetTrackList()
-    if #tracks == 0 or S.midi_idx >= #tracks then
-        S.status = 'Error'; S.last_result = 'Invalid MIDI destination track.'; return
-    end
-    local midi_track = r.GetTrack(0, tracks[S.midi_idx + 1].idx)
-    local midi_item, midi_take = FindFirstMIDIItem(midi_track)
-    if not midi_take then
-        S.status = 'Error'
-        S.last_result = 'No MIDI item found on the destination track.'
-        return
-    end
-
-    local ts, te = GetTimeSelection()
-    local range_start, range_end, has_sel
-    if ts then
-        range_start, range_end, has_sel = ts, te, true
-    else
-        range_start = r.GetMediaItemInfo_Value(midi_item, 'D_POSITION')
-        range_end   = range_start + r.GetMediaItemInfo_Value(midi_item, 'D_LENGTH')
-        has_sel = false
-    end
-
-    local root    = S.snap_key_root
-    local quality = S.snap_key_quality
-
-    local _, n_notes, _, n_text = r.MIDI_CountEvts(midi_take)
-
-    local lyric_at = {}
-    for i = 0, n_text - 1 do
-        local ok, _, _, ppq, typ, msg = r.MIDI_GetTextSysexEvt(midi_take, i)
-        if ok and typ == 5 and not LYRIC_IGNORE[msg] then lyric_at[ppq] = msg end
-    end
-
-    -- Read phrase marker times (whole take) for collision-avoidance boundary check
-    local marker_times = {}
-    local notes = {}
-    for i = 0, n_notes - 1 do
-        local ok, sel, mute, sppq, eppq, chan, p, vel = r.MIDI_GetNote(midi_take, i)
-        if ok then
-            if p == RB3_PHRASE_PITCH then
-                marker_times[#marker_times + 1] = r.MIDI_GetProjTimeFromPPQPos(midi_take, sppq)
-            elseif p >= RB3_MIN_PITCH and p <= RB3_MAX_PITCH then
-                local s_t = r.MIDI_GetProjTimeFromPPQPos(midi_take, sppq)
-                if s_t >= range_start - 0.001 and s_t < range_end + 0.001 then
-                    notes[#notes + 1] = {
-                        s = s_t, e = r.MIDI_GetProjTimeFromPPQPos(midi_take, eppq),
-                        pitch = p, vel = vel, sel = sel, mute = mute, chan = chan,
-                        lyric = lyric_at[sppq],
-                    }
-                end
-            end
-        end
-    end
-    table.sort(marker_times)
-
-    if #notes == 0 then
-        S.status = 'No notes in range.'
-        S.last_result = ('Range: %s \xe2\x80\x94 %s%s\nNo vocal notes found.'):format(
-            FormatTime(range_start), FormatTime(range_end),
-            has_sel and ' [time selection]' or ' [whole MIDI item]')
-        return
-    end
-
+    -- Snap boundaries; pitch and velocity come from the draft notes unchanged
+    local snapped_boundaries = SnapOnsets(draft, contour_info, S.draft_snap_window_ms)
     local snapped = {}
-    local moved, max_move = 0, 0
-    for _, n in ipairs(notes) do
-        local new_pitch, dist = NearestScalePitch(n.pitch, root, quality)
-        while new_pitch < RB3_MIN_PITCH do new_pitch = new_pitch + 12 end
-        while new_pitch > RB3_MAX_PITCH do new_pitch = new_pitch - 12 end
-        if new_pitch ~= n.pitch then moved = moved + 1 end
-        if dist > max_move then max_move = dist end
+    for i, n in ipairs(draft) do
         snapped[#snapped + 1] = {
-            s = n.s, e = n.e, pitch = new_pitch,
-            vel = n.vel, sel = n.sel, mute = n.mute, chan = n.chan,
-            lyric = n.lyric,
+            s     = snapped_boundaries[i].s,
+            e     = snapped_boundaries[i].e,
+            pitch = n.pitch,
+            vel   = n.vel,
+            sel   = n.sel,
+            mute  = n.mute,
+            chan  = n.chan,
         }
     end
 
-    -- Phrase-aware collision avoidance: if two adjacent same-phrase notes snap to
-    -- the same pitch but were originally different, redirect whichever note moved
-    -- more to the next closest scale degree (adjusting the note that caused the
-    -- collision rather than always blindly adjusting the later one).
-    local collisions_fixed = 0
-    if S.snap_avoid_collision then
-        local displacements = {}
-        for i = 1, #snapped do
-            displacements[i] = math.abs(snapped[i].pitch - notes[i].pitch)
-        end
-        local function cross_phrase_boundary(i)
-            local t_a, t_b = notes[i - 1].s, notes[i].s
-            for _, mt in ipairs(marker_times) do
-                if mt > t_a and mt <= t_b then return true end
-            end
-            return false
-        end
-        for i = 2, #snapped do
-            if not cross_phrase_boundary(i)
-            and snapped[i].pitch == snapped[i - 1].pitch
-            and notes[i].pitch   ~= notes[i - 1].pitch then
-                -- Adjust whichever note moved more; use i on a tie.
-                local adj = (displacements[i] >= displacements[i - 1]) and i or (i - 1)
-                local alt = NextScalePitch(notes[adj].pitch, root, quality, snapped[adj].pitch % 12)
-                while alt < RB3_MIN_PITCH do alt = alt + 12 end
-                while alt > RB3_MAX_PITCH do alt = alt - 12 end
-                if alt ~= snapped[adj].pitch then
-                    snapped[adj].pitch = alt
-                    displacements[adj] = math.abs(alt - notes[adj].pitch)
-                    collisions_fixed = collisions_fixed + 1
-                end
-            end
-        end
-    end
-
+    local cleared
     r.PreventUIRefresh(1)
     r.Undo_BeginBlock2(0)
-    r.MarkTrackItemsDirty(midi_track, midi_item)
-    ClearAllNotesInRange(midi_take, range_start, range_end)
-    ClearLyricsInRange(midi_take, range_start, range_end)
+    r.MarkTrackItemsDirty(trks.midi, midi_target.item)
+    cleared = ClearNotesInRange(midi_target.take,
+        midi_target.range_start, midi_target.range_end, RB3_MIN_PITCH, RB3_MAX_PITCH)
     for _, n in ipairs(snapped) do
-        local sppq = r.MIDI_GetPPQPosFromProjTime(midi_take, n.s)
-        local eppq = r.MIDI_GetPPQPosFromProjTime(midi_take, n.e)
-        r.MIDI_InsertNote(midi_take, n.sel, n.mute, sppq, eppq, n.chan, n.pitch, n.vel, false)
-        if n.lyric then
-            r.MIDI_InsertTextSysexEvt(midi_take, false, false, sppq, 5, n.lyric)
-        end
+        local sppq = r.MIDI_GetPPQPosFromProjTime(midi_target.take, n.s)
+        local eppq = r.MIDI_GetPPQPosFromProjTime(midi_target.take, n.e)
+        r.MIDI_InsertNote(midi_target.take, n.sel, n.mute, sppq, eppq, n.chan, n.pitch, n.vel, false)
     end
     r.Undo_EndBlock2(0,
-        ('Vocal Helper VKR: Snap to key \xe2\x80\x94 %d note%s moved')
-            :format(moved, moved == 1 and '' or 's'), -1)
+        ('Vocal Helper: snap draft notes (%d)'):format(#snapped), -1)
     r.PreventUIRefresh(-1)
+    r.UpdateArrange()
 
-    local key_name = HARM_NOTE_NAMES[root + 1] .. (quality == 1 and ' minor' or ' major')
-    local lines = {
-        ('Snap to key: %s'):format(key_name),
+    S.status = ('Snap draft: %d notes.'):format(#snapped)
+    S.last_result = table.concat({
+        ('Snap draft notes: %d in, %d out'):format(#draft, #snapped),
         ('Range: %s \xe2\x80\x94 %s%s'):format(
-            FormatTime(range_start), FormatTime(range_end),
-            has_sel and ' [time selection]' or ' [whole MIDI item]'),
-        ('Notes: %d total, %d snapped, %d already in key')
-            :format(#notes, moved, #notes - moved),
-        ('Max move: %d semitone%s'):format(max_move, max_move == 1 and '' or 's'),
-    }
-    if S.snap_avoid_collision and collisions_fixed > 0 then
-        lines[#lines + 1] = ('Collision avoidance: %d note%s redirected to next scale degree')
-            :format(collisions_fixed, collisions_fixed == 1 and '' or 's')
-    end
-    S.status = ('Snap to key: %d note%s snapped.'):format(moved, moved == 1 and '' or 's')
-    S.last_result = table.concat(lines, '\n')
+            FormatTime(midi_target.range_start), FormatTime(midi_target.range_end),
+            midi_target.has_selection and ' [time selection]' or ' [whole MIDI item]'),
+    }, '\n')
 end

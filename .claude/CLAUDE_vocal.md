@@ -13,8 +13,8 @@ Read `CLAUDE.md` first for shared architecture, conventions, and Lua specifics.
 3. Optionally make a time selection to limit work to one section.
 4. Tune detection sliders — RMS threshold, low-pass cutoff, peak-split ratio, min offset, min note length, RMS window.
 5. Use **Dry run** to preview note counts without writing anything.
-6. Use **Generate notes (append)** to write notes into the destination MIDI item.
-7. Iterate. Re-running Generate over the same range clears existing notes at the affected pitches first — no duplicates stack.
+6. Use **Generate (append)** to add notes to the destination MIDI item, or **Generate (replace)** to clear all existing vocal-range notes in the range first — cleaner when you want a fresh result.
+7. Iterate. Re-running Generate (append) over the same range clears existing notes at the affected pitches first — no duplicates stack.
 
 **Specialized actions:**
 
@@ -74,7 +74,9 @@ defaults.lua:
   2.  DEFAULTS table              single source of truth for defaults
   3.  S table                     live state; S.lyrics_path is session-only (not saved)
   4.  ResetXxx() functions        per-section resets from DEFAULTS
-  5.  TIPS table                  all tooltip text
+
+tips.lua:
+  5.  TIPS table                  all tooltip text (global, no local)
 
 settings.lua:
   6.  Settings                    SerializeSettings, DeserializeSettings (local)
@@ -94,14 +96,13 @@ pipeline.lua:
   12. Result formatting           FormatResult, FormatAutoTuneResult, FormatAutoTuneYINResult
 
 autotune.lua:
-  13. Auto-tune                   FineCandidates, EvaluateParams, AutoTune,
+  13. Auto-tune                   FineCandidates, EvaluateParams (local), AutoTune,
                                   ApplyAutoTuneResult, ScoreNotes, AutoTuneYIN
 
 actions.lua:
   14. Track resolution (local)    ResolveTracks, ResolveApplyPitchTracks
   15. Actions                     Preview, Generate, RunAutoTune, RunAutoTuneYIN,
-                                  ApplyPitchChangesAction, ScanPitchSlidesAction,
-                                  SnapToKeyAction
+                                  ApplyPitchChangesAction, SnapDraft
 
 actions_lyrics.lua:
   16. Lyrics helpers (local)      ParseLyricsFile, ClearLyricEvents
@@ -114,39 +115,58 @@ actions_validation.lua:
 actions_harmonies.lua:
   19. Harmonies actions           HarmoniesAction
 
+actions_slides.lua:
+  20. Slide scan action           ScanPitchSlidesAction; ClassifySlide (local)
+
+actions_snap_key.lua:
+  21. Snap to key action          SnapToKeyAction, NearestScalePitch; NextScalePitch (local)
+
+ui_slides.lua:
+  22. Pitch slide tab             DrawPitchSlideTab(ctx)
+
+ui_harmonies.lua:
+  23. Harmonies tab               DrawHarmoniesTab(ctx)
+
 ui.lua:
-  17. UI                          Loop
-  18. r.defer(Loop)               start
+  24. UI                          Loop, FilteredTrackCombo (global)
+  25. r.defer(Loop)               start
 ```
 
 ---
 
 ## Module contents
 
-| File                                    | Contents                                                                                                                                                                 |
-| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `rock_band_vocal_helper_vkr.lua`          | Entry point: ReaImGui check, path derivation, dofile calls, startup                                                                                                      |
-| `rock_band_vocal_helper_vkr/defaults.lua` | `DEFAULTS`, `S`, `TIPS`, `ResetXxx()`, constants (`MODE_*`, `RB3_*`, `LYRIC_IGNORE`)                                                                                     |
-| `rock_band_vocal_helper_vkr/settings.lua` | `SaveSettings`, `LoadSettings`                                                                                                                                           |
-| `rock_band_vocal_helper_vkr/helpers.lua`  | `IsOnGrid`, `SetDefaultTracks`, `AutoDetectLyricsFile`; `TrackHasAudio`, `TrackHasMIDI` (local)                                                                          |
-| `rock_band_vocal_helper_vkr/pipeline.lua` | `ResolveAnalysisRange`, `ResolveApplyPitchTarget`, `RunDetection`, `AssignPitches`, `ApplyPitchRange`, `FindNearestRefPitch`, `FormatResult`                             |
-| `rock_band_vocal_helper_vkr/autotune.lua` | `AutoTune`, `AutoTuneYIN`, `ApplyAutoTuneResult`, format helpers                                                                                                         |
-| `rock_band_vocal_helper_vkr/tuner.lua`    | `StartTuner`, `StopTuner`, `RunTuner`; `FindItemAtPos`, `OpenContextForItem` (local)                                                                                    |
-| `rock_band_vocal_helper_vkr/actions.lua`             | `Preview`, `Generate`, `RunAutoTune`, `RunAutoTuneYIN`, `ApplyPitchChangesAction`, `ScanPitchSlidesAction`, `SnapToKeyAction` |
-| `rock_band_vocal_helper_vkr/actions_lyrics.lua`      | `ClearLyricsInRange` (global), `ClearLyricsAction`, `AssignLyricsAction`; `ParseLyricsFile`, `ClearLyricEvents` (local)       |
-| `rock_band_vocal_helper_vkr/actions_validation.lua`  | `ValidatePhrases`, `PhraseSimilarityAction`; `EditDistance` (local)                                                           |
-| `rock_band_vocal_helper_vkr/actions_harmonies.lua`   | `HarmoniesAction`; `ApplyLyricSuffix`, `DiatonicThirdOffset`, `ResolveHarmTracks` (local)                                    |
-| `rock_band_vocal_helper_vkr/ui.lua`                  | `Loop`, `r.defer(Loop)`                                                                                                       |
+| File                                                | Contents                                                                                                                                     |
+| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `rock_band_vocal_helper_vkr.lua`                    | Entry point: ReaImGui check, path derivation, dofile calls, startup                                                                          |
+| `rock_band_vocal_helper_vkr/defaults.lua`           | `DEFAULTS`, `S`, `ResetXxx()`, constants (`MODE_*`, `RB3_*`, `LYRIC_IGNORE`)                                                                |
+| `rock_band_vocal_helper_vkr/tips.lua`               | `TIPS` (global) — all tooltip strings                                                                                                        |
+| `rock_band_vocal_helper_vkr/settings.lua`           | `SaveSettings`, `LoadSettings`                                                                                                               |
+| `rock_band_vocal_helper_vkr/helpers.lua`            | `IsOnGrid`, `SetDefaultTracks`, `AutoDetectLyricsFile`; `TrackHasAudio`, `TrackHasMIDI` (local)                                              |
+| `rock_band_vocal_helper_vkr/pipeline.lua`           | `ResolveAnalysisRange`, `ResolveApplyPitchTarget`, `RunDetection`, `AssignPitches`, `ApplyPitchRange`, `FindNearestRefPitch`, `FormatResult` |
+| `rock_band_vocal_helper_vkr/autotune.lua`           | `AutoTune`, `AutoTuneYIN`, `ApplyAutoTuneResult`, format helpers                                                                             |
+| `rock_band_vocal_helper_vkr/tuner.lua`              | `StartTuner`, `StopTuner`, `RunTuner`; `FindItemAtPos`, `OpenContextForItem` (local)                                                         |
+| `rock_band_vocal_helper_vkr/actions.lua`            | `Preview`, `Generate`, `RunAutoTune`, `RunAutoTuneYIN`, `ApplyPitchChangesAction`, `SnapDraft`; `ResolveTracks`, `ResolveApplyPitchTracks` (local) |
+| `rock_band_vocal_helper_vkr/actions_lyrics.lua`     | `ClearLyricsInRange` (global), `ClearLyricsAction`, `AssignLyricsAction`; `ParseLyricsFile`, `ClearLyricEvents` (local)                      |
+| `rock_band_vocal_helper_vkr/actions_validation.lua` | `ValidatePhrases`, `PhraseSimilarityAction`, `EditDistance`; `(no local helpers)`                                                            |
+| `rock_band_vocal_helper_vkr/actions_harmonies.lua`  | `HarmoniesAction`, `DiatonicThirdOffset`; `ApplyLyricSuffix`, `ResolveHarmTracks` (local)                                                   |
+| `rock_band_vocal_helper_vkr/actions_slides.lua`     | `ScanPitchSlidesAction`; `ClassifySlide` (local)                                                                                             |
+| `rock_band_vocal_helper_vkr/actions_snap_key.lua`   | `SnapToKeyAction`, `NearestScalePitch`; `NextScalePitch` (local)                                                                             |
+| `rock_band_vocal_helper_vkr/ui_slides.lua`          | `DrawPitchSlideTab(ctx)`                                                                                                                     |
+| `rock_band_vocal_helper_vkr/ui_harmonies.lua`       | `DrawHarmoniesTab(ctx)`                                                                                                                      |
+| `rock_band_vocal_helper_vkr/ui.lua`                 | `FilteredTrackCombo` (global), `Loop`, `r.defer(Loop)`                                                                                       |
 
 **Local-only functions:**
 
-- `actions.lua`: `ResolveTracks`, `ResolveApplyPitchTracks`, `ClassifySlide`, `NearestScalePitch`, `NextScalePitch`
+- `actions.lua`: `ResolveTracks`, `ResolveApplyPitchTracks`
 - `actions_lyrics.lua`: `ParseLyricsFile`, `ClearLyricEvents`
-- `actions_validation.lua`: `EditDistance`
-- `actions_harmonies.lua`: `ApplyLyricSuffix`, `DiatonicThirdOffset`, `ResolveHarmTracks`
+- `actions_validation.lua`: (none — `EditDistance` promoted to global for testability)
+- `actions_harmonies.lua`: `ApplyLyricSuffix`, `ResolveHarmTracks`
+- `actions_slides.lua`: `ClassifySlide`
+- `actions_snap_key.lua`: `NextScalePitch`
 - `helpers.lua`: `TrackHasAudio`, `TrackHasMIDI`
 - `settings.lua`: `bool_to_num`, `num_to_bool`, `SerializeSettings`, `DeserializeSettings`
-- `autotune.lua`: `ScoreNotes`, `FineCandidates`, `EvaluateParams`
+- `autotune.lua`: `FineCandidates`, `EvaluateParams`
 - `tuner.lua`: `FindItemAtPos`, `OpenContextForItem`
 
 **Load order:**
@@ -156,24 +176,61 @@ lib/reaper_imgui_helpers.lua   → PitchName, Tooltip, TrackCombo, SectionHeader
                                   FormatTime, GetTimeSelection
 lib/reaper_dsp.lua             → audio analysis, YIN
 lib/reaper_midi_helpers.lua    → MIDI read/write helpers
-defaults.lua                   → S, DEFAULTS, TIPS, constants
+defaults.lua                   → S, DEFAULTS, constants
+tips.lua                       → TIPS
 settings.lua                   → SaveSettings, LoadSettings
 helpers.lua                    → IsOnGrid, SetDefaultTracks, AutoDetectLyricsFile
 pipeline.lua                   → RunDetection, AssignPitches, FormatResult
 autotune.lua                   → AutoTune, AutoTuneYIN
 tuner.lua                      → StartTuner, StopTuner, RunTuner
 actions.lua                    → Preview, Generate, RunAutoTune, RunAutoTuneYIN,
-                                  ApplyPitchChangesAction, ScanPitchSlidesAction, SnapToKeyAction
+                                  ApplyPitchChangesAction, SnapDraft
 actions_lyrics.lua             → ClearLyricsInRange, ClearLyricsAction, AssignLyricsAction
 actions_validation.lua         → ValidatePhrases, PhraseSimilarityAction
 actions_harmonies.lua          → HarmoniesAction
-ui.lua                         → Loop (also calls r.defer(Loop))
+actions_slides.lua             → ScanPitchSlidesAction
+actions_snap_key.lua           → SnapToKeyAction
+ui_slides.lua                  → DrawPitchSlideTab
+ui_harmonies.lua               → DrawHarmoniesTab
+ui.lua                         → FilteredTrackCombo, Loop (also calls r.defer(Loop))
 [entry point startup]          → LoadSettings(), SetDefaultTracks(), AutoDetectLyricsFile()
 ```
 
 ---
 
 ## Public-facing concepts
+
+### Pitch Tuner (Tuner tab)
+
+Read-only — never modifies the project. Polls `SampleYINAt` at the current playhead position every 100 ms and displays the detected pitch.
+
+**Display:**
+
+- **Current pitch** — note name (`A4`) + direction indicator (green `▲` / red `▼` / grey `=`, relative to `S.tuner_prev_pitch`), nominal Hz, project timestamp. Arrow only shown when a previous pitch exists. Shows `—` before any detection.
+- **History strip** — last 10 detected note names, newest on the left, dimmed. Updates only when a new pitch is added; silent/gap samples are not added to history.
+- **Quiet indicator** — "Quiet — no pitch detected" written to `S.status` (same field as auto-stop messages). Grace period: 1.5 s when playing (`GetPlayState() & 1 ~= 0`); instant when stopped/scrubbing. Cleared from `S.status` when quiet_since becomes nil (pitch detected), but only if nothing else has since overwritten it. Controlled by `S.tuner_quiet_since`.
+- **State indicator** — "Tuner: Active" (green) / "Tuner: Stopped" (grey) shown inline below the Start/Stop button. Tuner writes `S.status` for quiet state and auto-stop/error messages; active/stopped state is inline only and never touches `S.status`.
+
+**Position handling:**
+
+- When playing: reads `GetPlayPosition2()`.
+- When stopped/scrubbing: reads `GetCursorPosition()` so manual playhead drags are detected.
+- When position hasn't changed since last scan: skip detection silently (no status message written).
+
+**Silence and gap detection (before YIN):**
+
+- `FindItemAtPos` returns nil → `S.tuner_quiet_since` set — suppresses false readings in gaps between items.
+- `QuickRMS(yctx, play_pos, win_s)` < `S.tuner_rms_threshold` → `S.tuner_quiet_since` set — suppresses spurious low-frequency YIN results on near-silence. `QuickRMS` converts `play_pos` to item-relative time (`math.max(0, play_pos - yctx.item_pos)`) before calling `GetAudioAccessorSamples`.
+
+**Min RMS level slider:** `S.tuner_rms_threshold` (default 0.005, range 0.001–0.1). Exposed in the YIN Detection section. Persisted via settings.
+
+**Auto-stop:** Timer (`tuner_last_detect_t`) resets on every successful pitch detection. If 60 s pass without any new pitch while the playhead is stationary, `StopTuner` is called automatically with a reason written to `S.status`.
+
+**Tab-navigation stop:** `S.tuner_tab_active` is set `false` before the tab bar each frame and `true` inside the Tuner `BeginTabItem` block. `RunTuner()` checks the previous frame's value at the top of `Loop` — one frame after the user leaves the tab, the tuner stops.
+
+**YIN and pitch range settings** — shared with the Pitch and Pitch slide tabs (`S.yin_*`, `S.min_pitch`, `S.max_pitch`). Changes on the Tuner tab are immediately reflected elsewhere and vice versa.
+
+**State fields:** `S.tuner_pitch`, `S.tuner_prev_pitch`, `S.tuner_pitch_name`, `S.tuner_pitch_hz`, `S.tuner_pitch_ts`, `S.tuner_quiet_since`, `S.tuner_history` — session-only, not saved. `S.tuner_rms_threshold` — persisted.
 
 ### Note Placement parameters
 
@@ -186,6 +243,15 @@ ui.lua                         → Loop (also calls r.defer(Loop))
 | **Min note length**         | 10 – 500 ms       | 60 ms   | Discards sub-threshold notes.                                                                                               |
 | **RMS window**              | 5 – 100 ms        | 25 ms   | Analysis resolution. Trade-off between precision and speed. **Not modified by Auto-tune.**                                  |
 | **Default pitch**           | RB3_MIN – RB3_MAX | 60 (C4) | Pitch assigned by Generate and Dry run. Also the fallback for Reference MIDI and Built-in detection when no pitch is found. |
+
+### Draft Snap (Note Placement tab → Draft Snap sub-tab)
+
+An alternative workflow when you already have roughly-placed notes with the right count but imprecise boundaries. Instead of running detection from audio, you draw notes by hand at approximately the right positions, then click **Snap draft** to lock each boundary to the nearest energy onset in the audio.
+
+- Setting: `draft_snap_window_ms` (default 100 ms, persisted as `dsw`). How far from each note boundary to search for a sharper energy transition.
+- Action: `SnapDraft()` in `actions.lua`. Reads existing notes from the MIDI destination, moves each start/end to the nearest energy onset within the window, then runs `AssignPitches` using the configured pitch source.
+- Scope: active time selection, or full MIDI item if no selection.
+- Complement to the automatic onset-snap in Auto Detection (which fires immediately after `GateAndSplit`). Draft Snap is for manual workflows; Auto Detection snap is automatic after RMS detection.
 
 ### Pitch sources (Pitch tab — used by Apply pitch changes)
 
@@ -228,34 +294,19 @@ Uses current YIN threshold and frequency range from the Pitch tab.
 
 Two checkbox+slider pairs (min/max). Out-of-range pitches are octave-shifted toward the range first (±12 at a time, up to 16 attempts). Clamp to the nearer endpoint only when the range is narrower than 12 semitones. The `range_adjusted` count appears in the result panel when non-zero.
 
-### Pitch Tuner (Tuner tab)
+### Snap to Key Scale (Pitch tab)
 
-Read-only — never modifies the project. Polls `SampleYINAt` at the current playhead position every 100 ms and displays the detected pitch.
+Shifts each vocal note to the nearest pitch in a chosen major or minor scale. Phrase markers (pitch 105) are preserved unchanged; lyrics survive because only pitch is changed (not position or length).
 
-**Display:**
-- **Current pitch** — note name (`A4`) + direction indicator (`↑ ↓ =` relative to `S.tuner_prev_pitch`), nominal Hz, project timestamp. Arrow only shown when a previous pitch exists. Shows `—` before any detection.
-- **History strip** — last 10 detected note names, newest on the left, dimmed. Updates only when a new pitch is added; silent/gap samples are not added to history.
-- **Quiet indicator** — "Quiet — no pitch detected" written to `S.status` (same field as auto-stop messages). Grace period: 1.5 s when playing (`GetPlayState() & 1 ~= 0`); instant when stopped/scrubbing. Cleared from `S.status` when quiet_since becomes nil (pitch detected), but only if nothing else has since overwritten it. Controlled by `S.tuner_quiet_since`.
-- **State indicator** — "Tuner: Active" (green) / "Tuner: Stopped" (grey) shown inline below the Start/Stop button. Tuner writes `S.status` for quiet state and auto-stop/error messages; active/stopped state is inline only and never touches `S.status`.
+| Setting             | Default | What it does                                                                                                                                                                                                                        |
+| ------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Key root**        | A       | Root note of the target scale (`snap_key_root`, persisted as `skr`)                                                                                                                                                                 |
+| **Quality**         | Major   | `snap_key_quality`: 0 = major, 1 = minor (persisted as `skq`)                                                                                                                                                                       |
+| **Avoid collision** | Off     | `snap_avoid_collision`: after snapping, if a note lands on the same pitch as its neighbour within the same phrase, try the next closest scale degree instead. Notes across phrase boundaries are not compared. (Persisted as `sac`) |
 
-**Position handling:**
-- When playing: reads `GetPlayPosition2()`.
-- When stopped/scrubbing: reads `GetCursorPosition()` so manual playhead drags are detected.
-- When position hasn't changed since last scan: skip detection silently (no status message written).
+Action: `SnapToKeyAction()` in `actions.lua`. Local helpers `NearestScalePitch` and `NextScalePitch` do the lookup. Uses `HARM_SCALE` from `defaults.lua` for the scale degree table.
 
-**Silence and gap detection (before YIN):**
-- `FindItemAtPos` returns nil → `S.tuner_quiet_since` set — suppresses false readings in gaps between items.
-- `QuickRMS(yctx, play_pos, win_s)` < `S.tuner_rms_threshold` → `S.tuner_quiet_since` set — suppresses spurious low-frequency YIN results on near-silence. `QuickRMS` converts `play_pos` to item-relative time (`math.max(0, play_pos - yctx.item_pos)`) before calling `GetAudioAccessorSamples`.
-
-**Min RMS level slider:** `S.tuner_rms_threshold` (default 0.005, range 0.001–0.1). Exposed in the YIN Detection section. Persisted via settings.
-
-**Auto-stop:** Timer (`tuner_last_detect_t`) resets on every successful pitch detection. If 60 s pass without any new pitch while the playhead is stationary, `StopTuner` is called automatically with a reason written to `S.status`.
-
-**Tab-navigation stop:** `S.tuner_tab_active` is set `false` before the tab bar each frame and `true` inside the Tuner `BeginTabItem` block. `RunTuner()` checks the previous frame's value at the top of `Loop` — one frame after the user leaves the tab, the tuner stops.
-
-**YIN and pitch range settings** — shared with the Pitch and Pitch slide tabs (`S.yin_*`, `S.min_pitch`, `S.max_pitch`). Changes on the Tuner tab are immediately reflected elsewhere and vice versa.
-
-**State fields:** `S.tuner_pitch`, `S.tuner_prev_pitch`, `S.tuner_pitch_name`, `S.tuner_pitch_hz`, `S.tuner_pitch_ts`, `S.tuner_quiet_since`, `S.tuner_history` — session-only, not saved. `S.tuner_rms_threshold` — persisted.
+Scope: active time selection, or full MIDI item after confirmation.
 
 ### Lyrics section
 
@@ -278,6 +329,72 @@ local LYRIC_IGNORE = {
     ['[clap_start]']       = true, ['[clap_end]']       = true,
 }
 ```
+
+### Harmonies tab
+
+Copies vocal notes from a source MIDI track to up to three destination tracks, applying a pitch interval to each. Existing vocal-range notes (C1–C5) in each destination are cleared before inserting.
+
+**Destinations.** Three rows (`harm_dst1/2/3`), each with:
+
+- Enable checkbox (`harm_dst1/2/3_enabled`, persisted as `hd1e/hd2e/hd3e`)
+- Mode dropdown (`harm_dst1/2/3_mode`, persisted as `hd1m/hd2m/hd3m`)
+- Lyric suffix: **Unpitched** appends `#` (`harm_dst1/2/3_lyric_unpitched`, persisted), **Hidden** appends `$` (`harm_dst1/2/3_lyric_hidden`, persisted). Both can be active — `#` is inserted before `$`. Duplicates not added if the source lyric already ends with the suffix.
+
+**Modes** (indices into `HARM_MODES` in `defaults.lua`):
+
+| Index | Label                 | Description                            |
+| ----- | --------------------- | -------------------------------------- |
+| 0     | Copy as-is            | No pitch change                        |
+| 1     | Fixed minor 3rd above | +3 st                                  |
+| 2     | Fixed major 3rd above | +4 st                                  |
+| 3     | Fixed minor 3rd below | −3 st                                  |
+| 4     | Fixed major 3rd below | −4 st                                  |
+| 5     | Diatonic 3rd above    | +3 or +4 st per note, respecting scale |
+| 6     | Diatonic 3rd below    | −3 or −4 st per note, respecting scale |
+| 7     | Fixed 4th above       | +5 st                                  |
+| 8     | Fixed 5th above       | +7 st                                  |
+| 9     | Fixed 4th below       | −5 st                                  |
+| 10    | Fixed 5th below       | −7 st                                  |
+
+**Diatonic modes** require the key settings: `harm_key_root` (0–11, default A=9, persisted as `hkr`) and `harm_key_quality` (0=major, 1=minor, persisted as `hkq`). Implemented by `DiatonicThirdOffset(note, root, quality, dir)` in `actions_harmonies.lua` using `HARM_SCALE`.
+
+**Copy phrase markers** (`harm_copy_phrases`, persisted as `hcp`). When on, also copies phrase marker and overdrive notes (outside C1–C5) to each enabled destination. Out-of-range notes in the destination are cleared first.
+
+**Scope:** active time selection, or full source item after confirmation.
+
+**Action:** `HarmoniesAction()` in `actions_harmonies.lua`. Local helpers: `ResolveHarmTracks` (finds source/destination MIDI items), `ApplyLyricSuffix` (adds `#`/`$` to copied lyrics), `DiatonicThirdOffset`.
+
+**Track indices** (`harm_src_idx`, `harm_dst1/2/3_idx`) are session-only — not persisted.
+
+### Validation tab
+
+Two read-only advisory checks. Neither modifies the project; both write results to `S.last_result`.
+
+#### Validate phrases
+
+`ValidatePhrases()` in `actions_validation.lua`. Checks every phrase-marker region (pairs of pitch-105 notes) for six common authoring issues:
+
+| #   | Check                | Rule                                                                   |
+| --- | -------------------- | ---------------------------------------------------------------------- |
+| 1   | Lyric capitalization | First vocal note after the phrase marker must have an uppercase lyric  |
+| 2   | Phrase start on grid | Phrase marker start must land on a 64th-note (or coarser) boundary     |
+| 3   | Phrase end on grid   | Phrase marker end must land on a 64th-note boundary                    |
+| 4   | Gap to next phrase   | Gap between this phrase end and the next phrase start must be ≥ 4×64th |
+| 5   | First note lead      | First vocal note must start ≥ 2×64th notes after the phrase start      |
+| 6   | Last note tail       | Last vocal note must end ≥ 1×64th note before the phrase end           |
+
+Violations are grouped by phrase position. Operates on the whole take regardless of time selection.
+
+#### Phrase Similarity Check
+
+`PhraseSimilarityAction()` in `actions_validation.lua`. Groups phrases by melodic similarity and flags notes that differ from the group consensus — useful for spotting copy mistakes in repeated sections.
+
+| Setting                  | Default | What it does                                                                                                                                               |
+| ------------------------ | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Similarity threshold** | 80 %    | `phrase_sim_threshold` (persisted as `pst`). Minimum similarity to group two phrases together.                                                             |
+| **Same key**             | On      | `phrase_same_key` (persisted as `psk`). When on, compares actual pitches; when off, compares melodic contour (interval shape) — transposition-insensitive. |
+
+Local helper: `EditDistance` (Wagner–Fischer algorithm on pitch sequences or interval sequences depending on `phrase_same_key`).
 
 ### Save / Load
 
@@ -321,6 +438,10 @@ Separate button, separate flow. `ResolveApplyPitchTarget` allows partially-overl
 `S.lyrics_path` is not written to `SerializeSettings`. File paths are machine-specific and stale paths cause confusing "file not found" errors more often than persistence saves a click. Auto-detect plus Browse cover both workflows.
 
 ### 8. Lyric functions always operate on the whole take
+
+### 9. MODE_SINGLE is dead code — keep but don't expose
+
+`MODE_SINGLE = 0` is defined in `defaults.lua` and handled in `settings.lua` deserialization (legacy load path downgrades it to `MODE_YIN`). The UI only exposes Built-in detection (YIN) and Reference MIDI — there is no radio button for single-pitch mode. Do not remove the constant (would break old save files) and do not expose it in new UI.
 
 Assign lyrics ignores time selection and operates on the full MIDI take. If Assign respected a time selection, it would read from the beginning of the lyrics file but write only to notes in the selection — every word after the selection start would land on the wrong note. The RB3 vocal range filter and `LYRIC_IGNORE` table protect all non-lyric content.
 
@@ -401,7 +522,13 @@ Assign lyrics ignores time selection and operates on the full MIDI take. If Assi
 - [ ] Lyrics — Count mismatch warning appears when notes ≠ lyrics.
 - [ ] Lyrics — Phrase capitalization check reports violations with timestamps.
 - [ ] Lyrics — Assign is greyed out when no file selected; active after auto-detect or browse.
-- [ ] Tab bar: 5 tabs; switching doesn't clear `S.status` / `S.last_result`.
+- [ ] Tab bar: 8 tabs (General, Tuner, Note Placement, Pitch, Lyrics, Pitch slide, Harmonies, Validation); switching doesn't clear `S.status` / `S.last_result`.
+- [ ] Generate (replace): clears all existing vocal-range notes in the range, then inserts fresh detections; result panel says "Replaced".
+- [ ] Draft Snap: rough hand-drawn notes snap to audio onsets; pitches assigned from configured pitch source.
+- [ ] Snap to Key Scale: notes shift to nearest scale degree; phrase markers preserved; avoid-collision pushes duplicates to next scale degree.
+- [ ] Harmonies: Apply copies notes to enabled destinations with correct pitch interval; diatonic mode respects key selection; lyric suffixes appended; phrase markers copied when checked.
+- [ ] Validate phrases: runs without error; flags violations grouped by phrase position; no project modification.
+- [ ] Phrase Similarity: groups similar phrases; flags differing notes; same-key vs contour mode both work.
 - [ ] Scan pitch slides: shows warning when no time selection; result in global panel.
 - [ ] YIN threshold changed on Pitch slide tab is visible on Pitch tab (same `S.yin_*` state).
 - [ ] Save → modify slide sliders → reload project → values restored.
@@ -411,69 +538,23 @@ Assign lyrics ignores time selection and operates on the full MIDI take. If Assi
 
 ## Things on the radar
 
-- **Coroutine-based progress bar.** Blocked: `GetAudioAccessorSamples` and `new_array` return nil in coroutines. See "Attempted approaches" for viable paths forward.
-- **Multi-item audio support.** Only the first (or overlapping) item is analyzed. Multi-item gluing is the user's responsibility.
-- **Reference MIDI auto-alignment.** Cross-correlating detected onsets with reference onsets to find a global offset before per-note matching.
-- **Local-peak-aware splitting.** Replace global-peak split with per-syllable local peaks for phrases with very uneven dynamics.
-- **Persist track selections.** Use `GetTrackGUID`. Smart defaults partially cover standard project layouts.
-- **Lyrics syllable hint (opt-in).** Flag tokens with 3+ vowel groups as likely multi-syllable. Opt-in checkbox (default off). Works best for Spanish/Italian/English; unreliable for French; irrelevant for CJK. Strip trailing silent `e` before counting. Only warn at 3+ groups to reduce false positives.
-- **Validation tab.** Future home for read-only advisory checks.
+See [`_future_ideas/`](_future_ideas/) for deferred work:
+
+- [Coroutine-based progress bar](_future_ideas/vocal_coroutine_progress.md) — live progress during slow operations; blocked by REAPER coroutine restrictions on `new_array` / `GetAudioAccessorSamples`
+- [Multi-item audio support](_future_ideas/vocal_multi_item_audio.md) — analyze tracks with multiple audio items
+- [Reference MIDI auto-alignment](_future_ideas/vocal_midi_auto_alignment.md) — cross-correlate onsets to find a global MIDI offset
+- [Local-peak-aware splitting](_future_ideas/vocal_local_peak_splitting.md) — per-syllable peaks for phrases with uneven dynamics
+- [Persist track selections](_future_ideas/vocal_persist_tracks.md) — use `GetTrackGUID` for stable cross-session track refs
+- [Lyrics syllable hint](_future_ideas/vocal_lyrics_syllable_hint.md) — opt-in warning for likely multi-syllable tokens
 
 ---
 
 ## Attempted approaches and what we learned
 
-### Coroutine-based progress bar (attempted in v2.0, reverted)
+See [`_future_ideas/`](_future_ideas/) for full context:
 
-**Goal.** Live progress bar and Cancel button during slow operations without freezing ImGui.
-
-**What was built.** Actions created `coroutine.create(...)` over their slow body. Loop resumed once per frame, reading `(pct, label)` yield values to update a ProgressBar.
-
-**Why it was reverted.** REAPER's C-extension APIs do not work inside a Lua coroutine:
-
-- `reaper.new_array(n)` returns `nil` in a coroutine.
-- `GetAudioAccessorSamples` returns `nil` with a nil buffer.
-- Crash: `attempt to compare nil with number` in `ComputeRMSContour`.
-
-Pure Lua computation works fine in coroutines — `GateAndSplit`, `ApplyMinOffset`, non-YIN `AssignPitches` all worked. The restriction is specifically `new_array` / `GetAudioAccessorSamples` called from `OpenYINContext` / `DetectPitchYIN`.
-
-**Secondary bug found.** `ImGui_BeginDisabled`/`ImGui_EndDisabled` must be balanced within a single frame. A button click mid-frame changing `S.busy` broke the paired `EndDisabled`. Fix: snapshot `local is_busy = S.busy` once before any guard. This fix is in v1.9 (see the shared `BeginDisabled` convention in `CLAUDE.md`).
-
-**Viable paths forward:**
-
-1. Pre-compute contour synchronously, then enter a coroutine for GateAndSplit + YIN pitch assignment (pure Lua). No progress bar for audio analysis, but that part is fast.
-2. Incremental state machine in Loop — `S.pending_op` advances one step per frame, no coroutines needed.
-3. Background thread via external tool — not practical in standard REAPER Lua.
-
-### Automatic key detection for diatonic harmony (attempted, removed)
-
-**Goal.** Detect the song key from the vocal MIDI pitch histogram and/or the vocal audio stem, so diatonic harmony mode could suggest the correct major/minor key without the user having to look it up manually.
-
-**What was built.**
-- `DetectKeyFromHistogram(hist)` — Krumhansl-Schmuckler (K-S) algorithm. Computes Pearson correlation of a 12-element pitch-class histogram against 24 key profiles (12 major + 12 minor, each rotated across all 12 roots). Reports the highest-scoring key and the runner-up.
-- `DetectKeyMIDIAction()` — builds a duration-weighted pitch-class histogram (weighted by PPQ note length) from all vocal-range notes in the source MIDI item, runs K-S, displays result without auto-setting the key selector.
-- `DetectKeyAudioAction()` — samples the audio track with YIN at 100ms intervals across the time selection or the first 20 seconds, builds a pitch-class histogram, runs K-S, displays result.
-
-**Why it was removed.** Tested against Tunebat (Spotify analysis) on 4 songs — only 1 match:
-
-| Song | Tunebat | MIDI detect | Audio detect |
-|---|---|---|---|
-| Dove Cameron – Too Much | C# major | A# minor | A# major |
-| Poets of the Fall – Carnival of Rust | F minor | F minor ✓ | F minor ✓ |
-| Jonna Tervomaa – Suljettu Sydän | A minor | G major | G major |
-| Indica – Ikuinen virta | B major | D# minor | D# minor |
-
-Songs 1 and 4 are a relative-key confusion (A# minor is the relative minor of C# major; G# minor is the relative minor of B major) — the algorithm found the right pitch cluster but guessed the wrong tonic. Song 3 is a genuine failure, likely because Finnish pop/folk uses Dorian or Phrygian modal harmony that the classical K-S profiles misclassify entirely.
-
-Root cause: K-S profiles were designed for classical music where melodies cover all 7 scale degrees fairly evenly. Vocal melodies in pop/rock concentrate on 3–4 notes, starving the correlation. Relative major/minor pairs share all 7 pitch classes; their only distinguishing signal is emphasis, which is too subtle in a sparse melody.
-
-**Practical recommendation for users.** Look up the key on [Tunebat](https://tunebat.com) (search by song/artist), check a chord chart, or identify the root by ear. Tunebat itself can also make the relative-key mistake on sparse melodies, so verify by ear before applying diatonic harmonies.
-
-**Possible improvements if ever revisited.**
-- Present results as a paired label ("B major / G# minor") — relative-key confusion is so common that showing both is more honest than picking one.
-- Implement a Temperley–Marvin key-finding algorithm, which weights notes by metrical position rather than raw duration — handles modal melody better than K-S.
-- Use chord detection on the full backing mix instead of pitch detection on the vocal stem — backing track harmony is a much stronger key signal than a sparse melody line.
-- Neural approaches (Essentia, Librosa) trained on pop/rock rather than classical music would likely outperform K-S here.
+- [Coroutine-based progress bar](_future_ideas/vocal_coroutine_progress.md) — attempted in v2.0, reverted; `new_array` / `GetAudioAccessorSamples` return nil in coroutines (REAPER restriction)
+- [Automatic key detection](_future_ideas/vocal_key_detection.md) — K-S algorithm built and removed; only 1/4 accuracy on test songs; possible improvements documented
 
 ---
 

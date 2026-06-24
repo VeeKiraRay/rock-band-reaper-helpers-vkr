@@ -29,7 +29,12 @@ local function OpenContextForItem(item)
         CloseYINContext(S.tuner_yctx)
         S.tuner_yctx = nil
     end
-    local ctx, err = OpenYINContext(item)
+    local ctx, err = OpenYINContext(item, {
+        threshold = S.yin_threshold,
+        min_freq  = S.yin_min_freq,
+        max_freq  = S.yin_max_freq,
+        window_ms = S.yin_window_ms,
+    })
     if not ctx then return nil, err end
     S.tuner_yctx       = ctx
     S.tuner_audio_item = item
@@ -43,7 +48,7 @@ function StartTuner()
     end
     local tr = r.GetTrack(0, S.audio_idx)
     if not tr then
-        S.status = 'Error: source track not found — refresh tracks.'
+        S.status = 'Error: source track not found - refresh tracks.'
         return
     end
     local play_pos = r.GetPlayPosition2()
@@ -114,7 +119,7 @@ function RunTuner()
         elseif now - S.tuner_last_detect_t >= TUNER_IDLE_STOP_S then
             StopTuner('Pitch tuner stopped: no new pitch detected for 60 seconds.')
         end
-        return  -- position unchanged — skip detection
+        return  -- position unchanged - skip detection
     end
 
     S.tuner_pos_stable_t  = nil

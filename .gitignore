@@ -1,0 +1,27 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# REAPER
+*.RPP-bak
+
+# Editor
+*.lua~
+
+# Resources — distributed separately; asset files are not versioned.
+# Folder stubs (.gitkeep) and INSTALLATION_GUIDE.md are tracked so the
+# expected structure is visible in the repo without the actual assets.
+resources/**/*.ogg
+resources/**/*.wav
+resources/**/*.jpg
+resources/**/*.jpeg
+resources/**/*.png
+!resources/img/drum.png
+resources/**/*.rbtheme
+
+_external_docs/*
+_future_ideas/*
+_raw_assets/*
+_old_stuff/*
+.continue/*
+

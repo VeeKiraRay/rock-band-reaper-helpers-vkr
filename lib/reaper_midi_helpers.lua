@@ -1,5 +1,5 @@
 -- MIDI reading, clearing, and insertion helpers (shared library)
--- Requires globals: r (reaper), RB3_MIN_PITCH, RB3_MAX_PITCH
+-- Requires globals: r (reaper)
 
 ----------------------------------------------------------------------
 function FindMIDIItem(track, range_start, range_end)
@@ -82,12 +82,12 @@ end
 
 -- Read all vocal-range notes for auto-tune: pitch-agnostic, deduplicates
 -- stacked notes (keeps the lowest pitch when notes share a start time).
-function ReadAutoTuneRefNotes(midi_take, range_start, range_end)
+function ReadAutoTuneRefNotes(midi_take, range_start, range_end, min_pitch, max_pitch)
     local raw = {}
     local _, n_notes = r.MIDI_CountEvts(midi_take)
     for i = 0, n_notes - 1 do
         local ok, _, _, sppq, eppq, _, p = r.MIDI_GetNote(midi_take, i)
-        if ok and p >= RB3_MIN_PITCH and p <= RB3_MAX_PITCH then
+        if ok and p >= min_pitch and p <= max_pitch then
             local s_t = r.MIDI_GetProjTimeFromPPQPos(midi_take, sppq)
             local e_t = r.MIDI_GetProjTimeFromPPQPos(midi_take, eppq)
             if s_t < range_end and e_t > range_start then
@@ -120,7 +120,7 @@ function ClearNotesAtPitchesInRange(midi_take, pitch_set, range_start, range_end
     local removed = 0
     for i = n_notes - 1, 0, -1 do
         local ok, _, _, sppq, eppq, _, p = r.MIDI_GetNote(midi_take, i)
-        if ok and pitch_set[p] and p >= RB3_MIN_PITCH and p <= RB3_MAX_PITCH then
+        if ok and pitch_set[p] then
             local s_t = r.MIDI_GetProjTimeFromPPQPos(midi_take, sppq)
             local e_t = r.MIDI_GetProjTimeFromPPQPos(midi_take, eppq)
             if s_t < range_end and e_t > range_start then
@@ -132,12 +132,12 @@ function ClearNotesAtPitchesInRange(midi_take, pitch_set, range_start, range_end
     return removed
 end
 
-function ClearAllNotesInRange(midi_take, range_start, range_end)
+function ClearNotesInRange(midi_take, range_start, range_end, min_pitch, max_pitch)
     local _, n_notes = r.MIDI_CountEvts(midi_take)
     local removed = 0
     for i = n_notes - 1, 0, -1 do
         local ok, _, _, sppq, eppq, _, p = r.MIDI_GetNote(midi_take, i)
-        if ok and p >= RB3_MIN_PITCH and p <= RB3_MAX_PITCH then
+        if ok and p >= min_pitch and p <= max_pitch then
             local s_t = r.MIDI_GetProjTimeFromPPQPos(midi_take, sppq)
             local e_t = r.MIDI_GetProjTimeFromPPQPos(midi_take, eppq)
             if s_t < range_end and e_t > range_start then
@@ -147,6 +147,24 @@ function ClearAllNotesInRange(midi_take, range_start, range_end)
         end
     end
     return removed
+end
+
+----------------------------------------------------------------------
+-- Read all notes in a PPQ range from a take (no pitch filtering).
+-- Returns array of {rel_s, rel_e, pitch} sorted by rel_s,
+-- where rel_s/rel_e are PPQ offsets from start_ppq.
+----------------------------------------------------------------------
+function ReadMIDIPatternFromTake(take, start_ppq, end_ppq)
+    local notes = {}
+    local _, n = r.MIDI_CountEvts(take)
+    for i = 0, n - 1 do
+        local ok, _, _, sppq, eppq, _, p = r.MIDI_GetNote(take, i)
+        if ok and sppq >= start_ppq and sppq < end_ppq then
+            notes[#notes + 1] = { rel_s = sppq - start_ppq, rel_e = eppq - start_ppq, pitch = p }
+        end
+    end
+    table.sort(notes, function(a, b) return a.rel_s < b.rel_s end)
+    return notes
 end
 
 ----------------------------------------------------------------------

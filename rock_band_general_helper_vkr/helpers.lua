@@ -29,6 +29,23 @@ function SetDefaultTempoTracks()
     end
 end
 
+-- Scan track names and pre-select MIDI converter target tracks.
+-- Only sets a field when it is still -1 (not yet assigned).
+function SetDefaultMIDITracks()
+    local name_to_field = {
+        ['PART DRUMS']  = 'mc_drum_tgt_idx',
+        ['PART GUITAR'] = 'mc_gtr_tgt_idx',
+    }
+    for i = 0, r.CountTracks(0) - 1 do
+        local tr = r.GetTrack(0, i)
+        local _, name = r.GetTrackName(tr)
+        local field = name_to_field[name]
+        if field and S[field] == -1 then
+            S[field] = i
+        end
+    end
+end
+
 -- Return bpm, timesig_num, timesig_denom, marker_timepos for the tempo marker
 -- that is in effect at project time t.  Falls back to the first marker if all
 -- markers are after t.
@@ -73,9 +90,18 @@ local function TrackHasAudio(track)
     return false
 end
 
+local function TrackHasMIDI(track)
+    for i = 0, r.CountTrackMediaItems(track) - 1 do
+        local item = r.GetTrackMediaItem(track, i)
+        local take = r.GetActiveTake(item)
+        if take and r.TakeIsMIDI(take) then return true end
+    end
+    return false
+end
+
 function RefreshTrackLists()
     local n = r.CountTracks(0)
-    local all, audio = {}, {}
+    local all, audio, midi = {}, {}, {}
     for i = 0, n - 1 do
         local tr = r.GetTrack(0, i)
         local _, tname = r.GetTrackName(tr)
@@ -83,9 +109,42 @@ function RefreshTrackLists()
         local entry = { idx = i, label = ('%d: %s'):format(i + 1, tname) }
         all[#all + 1] = entry
         if TrackHasAudio(tr) then audio[#audio + 1] = entry end
+        if TrackHasMIDI(tr)  then midi[#midi + 1]  = entry end
     end
     S.all_track_list   = all
     S.audio_track_list = audio
+    S.midi_track_list  = midi
+end
+
+-- Scan track names and pre-select Pro Keys and 5-Lane Keys difficulty tracks.
+-- Only sets a field when it is still -1 (not yet assigned).
+function SetDefaultDifficultyTracks()
+    local name_to_field = {
+        ['PART REAL_KEYS_X'] = 'diff_pk_x_idx',
+        ['PART REAL_KEYS_H'] = 'diff_pk_h_idx',
+        ['PART REAL_KEYS_M'] = 'diff_pk_m_idx',
+        ['PART REAL_KEYS_E'] = 'diff_pk_e_idx',
+        ['PART KEYS']        = 'diff_5k_idx',
+    }
+    for i = 0, r.CountTracks(0) - 1 do
+        local tr = r.GetTrack(0, i)
+        local _, name = r.GetTrackName(tr)
+        local field = name_to_field[name]
+        if field and S[field] == -1 then
+            S[field] = i
+        end
+    end
+end
+
+-- Wrap an action function in pcall. On error: balance PreventUIRefresh and
+-- report via S.status / S.last_result so the script stays alive.
+function RunAction(fn)
+    local ok, err = pcall(fn)
+    if not ok then
+        r.PreventUIRefresh(-1)
+        S.status = 'Error'
+        S.last_result = tostring(err)
+    end
 end
 
 -- Return a list of audio (non-MIDI) items on a track.

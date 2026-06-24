@@ -105,6 +105,23 @@ function RefreshTrackLists()
     S.audio_track_list = audio
 end
 
+-- Wrap an action function in pcall. On error: balance PreventUIRefresh, close
+-- any open action YIN context, and report via S.status / S.last_result so the
+-- script stays alive instead of crashing the defer loop.
+function RunAction(fn)
+    local ok, err = pcall(fn)
+    if not ok then
+        r.PreventUIRefresh(-1)
+        if S.action_yctx then
+            local ctx_to_close = S.action_yctx
+            S.action_yctx = nil
+            CloseYINContext(ctx_to_close)
+        end
+        S.status = 'Error'
+        S.last_result = tostring(err)
+    end
+end
+
 function AutoDetectLyricsFile()
     local proj_path = r.GetProjectPath('')
     if not proj_path or proj_path == '' then return false end

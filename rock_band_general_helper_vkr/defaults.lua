@@ -61,7 +61,7 @@ do
         '[lighting (bre)]', '[lighting (intro)]', '[lighting (blackout_spot)]',
         '[photo_negative.pp]','[photocopy.pp]','[posterize.pp]',
         '[ProFilm_a.pp]','[ProFilm_b.pp]','[ProFilm_mirror_a.pp]',
-        '[ProFilm_psychedelic_blue_red.pp]','[sucky_tv.pp]','[space_woosh.pp]',
+        '[ProFilm_psychedelic_blue_red.pp]','[shitty_tv.pp]','[space_woosh.pp]',
         '[video_a.pp]','[video_bw.pp]','[video_security.pp]','[video_trails.pp]',
     }
     for _, v in ipairs(_list) do VENUE_VALID[v] = true end
@@ -96,14 +96,104 @@ S = {
     tm_timesig_text       = '',   -- UI buffer; '' = inherit
     tm_override_failsafe  = false,
     tm_autotune_density   = 0,    -- expected onsets/measure for auto-tune density guard (0 = disabled)
-    -- Tempo map track indices (not persisted — set by SetDefaultTempoTracks; -1 = none)
+    -- Tempo map track indices (not persisted - set by SetDefaultTempoTracks; -1 = none)
     tm_kick_idx           = -1,
     tm_snare_idx          = -1,
     tm_kit_idx            = -1,
     tm_fallback_idx       = -1,
-    -- Cached filtered track lists (not persisted — rebuilt by RefreshTrackLists)
+    -- MIDI converter: drums (persisted except track indices)
+    mc_drum_src_idx       = -1,
+    mc_drum_tgt_idx       = -1,
+    mc_ghost_thresh       = 20,    -- velocity <= this = ghost note, skip
+    mc_crash_to_green     = true,  -- false=crash→yellow(98), true=crash→green(100)
+    mc_pro_drums          = true,  -- insert cymbal marker notes (110-112)
+    mc_drum_preview       = false, -- true=preview only, false=auto-insert
+    -- MIDI converter: keys (persisted except track indices)
+    mc_keys_src_idx       = -1,
+    mc_keys_rh_tgt_idx    = -1,
+    mc_keys_lh_tgt_idx    = -1,
+    mc_keys_mode          = 0,     -- 0=hand split, 1=pro keys, 2=5-key (stub)
+    mc_keys_pk_src_idx    = -1,    -- Expert Pro Keys source for animation copy
+    mc_keys_split_by_ch   = true,  -- true=channel-based (ch1=RH), false=pitch threshold
+    mc_keys_split_pitch   = 60,    -- pitch threshold for hand split (default C4/middle C)
+    mc_keys_preview       = false,
+    -- MIDI converter: piano→Pro Keys range (persisted except track index)
+    mc_pk_conv_tgt_idx    = -1,     -- Piano→PK target track
+    mc_pk_insert_shifts   = false,  -- auto-insert lane shift markers
+    -- MIDI converter: piano→5-Lane Keys (persisted except track index)
+    mc_5k_tgt_idx         = -1,     -- 5-Lane Keys target track
+    mc_5k_phrase_gap_ms   = 200,    -- silence gap (ms) that resets window root
+    mc_5k_max_chord       = 3,      -- max simultaneous gems per chord (2 or 3)
+    -- MIDI converter: guitar (persisted except track indices)
+    mc_gtr_src_idx        = -1,
+    mc_gtr_tgt_idx        = -1,
+    mc_gtr_wrap_gap_ms    = 200,  -- rest gap (ms) shown as phrase boundary in report
+    mc_gtr_max_chord      = 3,    -- max simultaneous gems per chord (2 or 3)
+    mc_gtr_allow_14       = true, -- allow 1-4 chord stretches (spread >= 3)
+    mc_gtr_workflow       = 0,    -- 0 = Preview, 1 = Auto-insert
+    -- Tab Input guide (format/ordered/mode persisted; input buffers are ephemeral)
+    mc_gtr_tab_format     = 0,    -- 0 = horizontal, 1 = vertical
+    mc_gtr_tab_ordered    = true, -- true = sequence mode, false = palette mode
+    mc_gtr_tab_input_h    = '',   -- horizontal textarea content
+    mc_gtr_tab_input_v    = '',   -- vertical textarea content
+    tab_input_mode        = 0,    -- 0 = Guitar/Bass, 1 = Keys/Pro Keys, 2 = Vocal
+    pk_tab_animation      = false, -- true = full C2-C4 range, skip lane window scoring
+    -- MIDI alignment (persisted except track index)
+    ma_midi_src_idx       = -1,
+    ma_mode               = 0,  -- 0 = move only, 1 = move + stretch
+    -- MIDI length sync (not persisted - track index only)
+    ms_ref_idx            = -1,
+    -- Pattern Replace (session-only - not persisted)
+    mr_midi_src_idx       = -1,
+    mr_search_notes       = nil,   -- array of {rel_s, rel_e, pitch} or nil
+    mr_search_label       = '',
+    mr_search_dur_ppq     = 0,
+    mr_search_step_ppq    = 0,     -- 1 measure in PPQ; scan stride for DoMIDIPatternReplace
+    mr_replace_notes      = nil,
+    mr_replace_label      = '',
+    mr_replace_dur_ppq    = 0,
+    -- Pro Keys difficulty (not persisted - auto-detected by name)
+    diff_pk_x_idx         = -1,
+    diff_pk_h_idx         = -1,
+    diff_pk_m_idx         = -1,
+    diff_pk_e_idx         = -1,
+    -- 5-Lane Keys difficulty (not persisted - auto-detected by name)
+    diff_5k_idx           = -1,
+    -- Cached filtered track lists (not persisted - rebuilt by RefreshTrackLists)
     all_track_list        = nil,
     audio_track_list      = nil,
+    midi_track_list       = nil,
+    -- Venue themes (venue_themes persisted by name only; idx/table re-resolved at Venue tab open)
+    venue_theme_idx       = 0,    -- 0 = no theme; 1..n indexes venue_themes
+    venue_themes          = nil,  -- lazy-loaded from resources/themes/ folder; NOT persisted
+    venue_theme_name      = '',   -- persisted: empty = no theme, else stem filename
+    venue_keyframe_align  = 0,    -- 0=section start, 1=closest beat, 2=downbeat; 3-7=instrument-aware
+    venue_kf_inst_subdiv  = 0,    -- 0=every beat, 1=every half beat (instrument modes 3-7 only)
+    venue_cam_pacing        = 0,    -- 0=theme default, 1=minimal, 2=slow, 3=medium, 4=fast, 5=crazy, 6=custom
+    venue_cam_pacing_custom = 16,   -- custom camera interval in 16ths; only used when venue_cam_pacing==6
+    venue_cam_pacing_jitter = true,  -- include ±20% randomisation in camera cut intervals
+    -- Section gen mode
+    venue_sections          = nil,  -- array from ReadEventSections; NOT persisted (refreshed on demand)
+    venue_sec_idx           = 1,    -- selected section index (1-based); NOT persisted
+    venue_sec_configs       = {},   -- per-section configs keyed by SectionKey; persisted via vsec_v1
+    venue_sec_mode          = 0,    -- 0 = Custom, 1 = Template
+    venue_sec_tmpl_idx      = 0,    -- 1-based index into S.venue_themes; 0 = none
+    venue_sec_tmpl_name     = '',   -- persisted theme stem name (mirrors venue_theme_name pattern)
+    venue_preview_scale     = 1,    -- tooltip sprite display scale: 1 = 213×120 px, 2 = 426×240 px
+    venue_preview_animate   = true, -- tooltip sprite animation: false = show middle frame only
+    venue_preview_tab_scale = 1,    -- Preview sub-tab inline sprite scale (independent of tooltip scale)
+    venue_preview_combo     = 0,    -- 0=Bass+Guitar, 1=Bass+Keys, 2=Guitar+Keys
+    venue_preview_show_mode = 0,    -- 0=current only, 1=surrounding events
+    -- Manual gen (not persisted - session state only)
+    venue_mg_coop        = '',   -- full event e.g. '[coop_all_behind]'
+    venue_mg_directed    = '',   -- bare name e.g. 'directed_all'
+    venue_mg_lighting    = '',   -- bare name e.g. 'loop_warm'
+    venue_mg_postproc    = '',   -- name with ext e.g. 'bloom.pp'
+    venue_mg_special     = '',   -- full event e.g. '[bonusfx]'
+    venue_mg_kf_rate     = 2,    -- keyframe rate in beats (1-8)
+    venue_mg_remove_type = 0,    -- 0=Camera 1=Lighting 2=PostProc 3=Special 4=All
+    -- UI visibility (persisted)
+    show_wip_tabs           = false, -- show Tempo Map, Drums, Keys, Guitar tabs
 }
 
 ----------------------------------------------------------------------
@@ -118,7 +208,7 @@ TIPS = {
     align_all_audio = "Align every single-item audio track in the project to the SONG AUDIO start position.\n\n" ..
                       "Tracks with zero audio items (MIDI tracks, empty tracks) are silently skipped.\n" ..
                       "Tracks with multiple audio items are skipped and listed in the result.\n" ..
-                      "COUNT IN is always excluded — use Align count-in for that track.\n\n" ..
+                      "COUNT IN is always excluded - use Align count-in for that track.\n\n" ..
                       "Fully undoable.",
     align_count_in  = "Position COUNT IN clips at the standard count-in beat slots.\n\n" ..
                       "Reads the time signature from the project root tempo marker.\n" ..
@@ -127,11 +217,95 @@ TIPS = {
                       "Other even time sigs use m1 beat 1 + midpoint, m2 all beats.\n\n" ..
                       "Clips beyond 6 are left untouched and reported.\n" ..
                       "Fully undoable.",
-    list_venue  = "Find the VENUE track (by name) and read all its text events.\n\n" ..
-                  "Reports: unknown events, consecutive camera repeats, directed cut spacing,\n" ..
-                  "and a frequency count of every event used.",
+    list_venue      = "Find the VENUE track (by name) and read all its text events.\n\n" ..
+                      "Reports: unknown events, consecutive camera repeats, directed cut spacing,\n" ..
+                      "and a frequency count of every event used.",
+    venue_sections  = "Read [prc_*] section markers from the EVENTS track and list the\n" ..
+                      "detected song sections with their time ranges.\n\n" ..
+                      "Letter-suffix events ([prc_verse_1a], [prc_verse_1b], ...) are grouped\n" ..
+                      "into a single section. Plain-number ([prc_verse_1]) and bare\n" ..
+                      "([prc_verse]) events are each their own standalone section.",
+    venue_generate  = "Generate random camera and lighting events on the VENUE track.\n\n" ..
+                      "Camera events are filtered by instrument availability: if a PART track is\n" ..
+                      "absent from the project or muted, camera shots featuring that instrument\n" ..
+                      "are removed from the pool before randomising.\n\n" ..
+                      "Replaces all existing text events in the generation range.\n\n" ..
+                      "Respects time selection: if a range is selected, only that range is\n" ..
+                      "regenerated and events outside it are preserved.",
+    venue_keyframe_align = "Where the [first]/[next] keyframe sequence for manual lighting begins.\n\n" ..
+                           "Section start: exactly at the [prc_*] section event (default).\n" ..
+                           "Closest beat:  snapped to the nearest beat boundary.\n" ..
+                           "Downbeat:      [first] at section start; [next] from the next measure boundary.\n\n" ..
+                           "Instrument modes ignore the theme's keyframe_rate and emit [next]\n" ..
+                           "only at beats (or half-beats) where notes actually exist:\n" ..
+                           "  Guitar notes - reads PART GUITAR (pitches 96-100)\n" ..
+                           "  Bass notes   - reads PART BASS   (pitches 96-100)\n" ..
+                           "  Keys notes   - reads PART KEYS   (pitches 96-100)\n" ..
+                           "  Drum kicks   - reads PART DRUMS  (pitch 96 only)\n" ..
+                           "  Drum snare   - reads PART DRUMS  (pitch 97 only)",
 
-    -- Tempo map — track dropdowns
+    venue_kf_inst_subdiv = "Subdivision grid for instrument-aware keyframe alignment.\n\n" ..
+                           "Every beat:      check each beat boundary (max 4 [next] per measure in 4/4).\n" ..
+                           "Every half beat: check each 8th-note boundary (max 8 [next] per measure in 4/4).\n\n" ..
+                           "Grid positions with no qualifying notes are skipped; no [next] is emitted.",
+
+    venue_theme     = "Select a venue theme to guide lighting and camera generation.\n\n" ..
+                      "Themes define per-section lighting presets, postproc effects,\n" ..
+                      "and camera pacing. Lighting and postproc events are randomly picked\n" ..
+                      "from each section's allowed pool; directed cuts fire at section\n" ..
+                      "starts when specified.\n\n" ..
+                      "Requires [prc_*] section markers on the EVENTS track.\n" ..
+                      "Falls back to the theme's default preset if no sections are detected.\n\n" ..
+                      "Drop .rbtheme files into the resources/themes/ folder to add custom themes.",
+
+    venue_cam_pacing = "Override the camera cut pacing for the entire song.\n\n" ..
+                       "Theme default: use the pacing defined in the selected theme\n" ..
+                       "(falls back to Slow \xe2\x80\x94 24 16ths \xe2\x80\x94 when no theme is selected).\n\n" ..
+                       "Any other value overrides both the theme's global camera_pacing\n" ..
+                       "and any per-section camera_pacing overrides defined in the theme.\n\n" ..
+                       "At or above 150 BPM all intervals scale by \xc3\x971.5 to avoid\n" ..
+                       "camera cuts becoming too rapid at fast tempos.\n\n" ..
+                       "4/4 reference: 16 \xc3\x9716ths = 1 measure (Medium), 24 = 1.5 measures\n" ..
+                       "(Slow), 32 = 2 measures (Minimal).",
+
+    venue_cam_pacing_jitter = "When checked, camera cut intervals are randomised within \xc2\xb120% of\n" ..
+                              "the selected pacing value, giving a more natural feel.\n\n" ..
+                              "When unchecked, all camera cuts land at the exact interval with\n" ..
+                              "no randomisation — use this for metrically precise authoring.",
+
+    venue_cam_pacing_custom = "Custom camera cut interval in 16th notes (2\xe2\x80\x93128).\n\n" ..
+                              "At or above 150 BPM this value is scaled by \xc3\x971.5,\n" ..
+                              "same as the named presets.\n\n" ..
+                              "Ctrl+click to type an exact value.",
+
+    -- Section-by-section editor
+    venue_sec_section  = "Select a detected [prc_*] section to configure.\n\n" ..
+                         "Click Refresh to re-read sections from the EVENTS track.",
+    venue_sec_lighting = "Lighting preset for this section.\n\n" ..
+                         "Manual presets (verse, chorus, manual_cool, manual_warm, dischord,\n" ..
+                         "stomp) require [first]/[next] keyframe events - set Keyframe rate\n" ..
+                         "to control the spacing.\n\n" ..
+                         "Auto presets (loop_*, harmony, frenzy, silhouettes, etc.) need no\n" ..
+                         "keyframes. Leave blank to skip lighting for this section.",
+    venue_sec_postproc = "Post-process effect (.pp file) for this section.\n\n" ..
+                         "Leave blank to skip.",
+    venue_sec_kr       = "Keyframe rate in beats: how often [first]/[next] events are placed.\n\n" ..
+                         "Only used when the chosen lighting preset is a manual type\n" ..
+                         "(verse, chorus, manual_cool, manual_warm, dischord, stomp).\n\n" ..
+                         "Ctrl+click to type an exact value.",
+    venue_sec_lt_blend = "Place the lighting event this many beats BEFORE the section start.\n\n" ..
+                         "Useful for smooth lighting transitions into the section.\n" ..
+                         "Clamped to the item start if it would reach before the beginning.\n\n" ..
+                         "Ctrl+click to type an exact value.",
+    venue_sec_pp_blend = "Place the post-process event this many beats BEFORE the section start.\n\n" ..
+                         "Clamped to the item start if it would reach before the beginning.\n\n" ..
+                         "Ctrl+click to type an exact value.",
+    venue_sec_dircut   = "Insert a forced directed camera cut at the section start.\n\n" ..
+                         "Select a directed event name, or leave blank for no forced cut.\n" ..
+                         "Random directed cuts are suppressed in section generation mode.",
+    venue_sec_bonusfx  = "Insert a [bonusfx] event at the section start.",
+
+    -- Tempo map - track dropdowns
     kick_track     = "Audio track containing the isolated kick drum stem (KICK AUDIO).\n" ..
                      "Primary source for downbeat detection.",
     snare_track    = "Audio track containing the isolated snare drum stem (SNARE AUDIO).\n" ..
@@ -142,7 +316,7 @@ TIPS = {
                      "Tried per-window only when all drum sources are quiet.\n" ..
                      "Auto-detects GUITAR AUDIO, then KEYS AUDIO.",
 
-    -- Tempo map — action buttons
+    -- Tempo map - action buttons
     show_ctx    = "Read the tempo marker that applies at the time-selection start (or project\n" ..
                   "start if no selection) and show the BPM, time signature, and calculated\n" ..
                   "start time of the first generated measure.\n\n" ..
@@ -153,7 +327,7 @@ TIPS = {
                   "Tracks that are already aligned are reported without changes.",
     est_bpm     = "Detect onsets from the kick/snare audio and estimate the average BPM\n" ..
                   "and likely time signature.\n\n" ..
-                  "Read-only — nothing is written to the project.",
+                  "Read-only - nothing is written to the project.",
     clear_tempo = "Delete REAPER tempo markers except the root marker at index 0.\n\n" ..
                   "With a time selection: deletes only markers within the selection.\n" ..
                   "Without a time selection: deletes all markers except the root.\n\n" ..
@@ -170,18 +344,23 @@ TIPS = {
                          "Without: all markers in the audio item span are used.\n\n" ..
                          "Updates the Drum or Fallback threshold automatically based on\n" ..
                          "which source has signal in the selected range.\n" ..
-                         "Read-only — no project changes are made.",
+                         "Read-only - no project changes are made.",
+    convert_6_4_to_3_4 = "Convert all 6/4 tempo markers to 3/4. BPMs are unchanged;\n" ..
+                          "MIDI note positions are unaffected (PPQ is independent of time signature).\n\n" ..
+                          "With a time selection: only markers within the selection are converted.\n" ..
+                          "Without a time selection: converts all 6/4 markers in the project.\n\n" ..
+                          "Fully undoable.",
 
-    -- Tempo map — sliders
+    -- Tempo map - sliders
     tm_rms_threshold      = "Audio level above which a drum hit onset is detected.\n" ..
                             "Lower = more sensitive; higher = ignore quiet hits.",
     tm_rms_window_ms      = "RMS analysis window in milliseconds.\n" ..
-                            "Short (5–15 ms) gives sharp onset times for drums.",
+                            "Short (5-15 ms) gives sharp onset times for drums.",
     tm_fb_rms_threshold   = "RMS onset threshold for the fallback source (guitar / keys).\n" ..
-                            "Guitar sustain is uneven — usually needs a lower value than drums.\n" ..
+                            "Guitar sustain is uneven - usually needs a lower value than drums.\n" ..
                             "Lower = more sensitive; higher = ignore quiet hits.",
     tm_fb_rms_window_ms   = "RMS analysis window in milliseconds for the fallback source.\n" ..
-                            "Short (5–15 ms) gives sharp onset times.",
+                            "Short (5-15 ms) gives sharp onset times.",
     tm_fb_use_flux        = "Apply onset-flux mode to the Fallback source (guitar / keys).\n\n" ..
                             "Replaces raw RMS with the positive energy-rise per window.\n" ..
                             "Sustained notes produce 0 (no false onsets); only true attacks spike.\n\n" ..
@@ -213,4 +392,272 @@ TIPS = {
                             "At 0: no density check.\n" ..
                             "When set: thresholds producing more than 2x this count are excluded,\n" ..
                             "preventing auto-tune from landing on an excessively noisy threshold.",
+
+    -- MIDI converter - Drums tab
+    mc_drum_src    = "MIDI track containing the source drum notation.\n" ..
+                     "Typically a Guitar Pro or DAW MIDI export.\n" ..
+                     "Should use General MIDI drum pitch numbers (channel 10 convention).",
+    mc_drum_tgt    = "Target MIDI track where Rock Band drum notes will be written.\n" ..
+                     "Must have an existing MIDI item (e.g. the PART DRUMS track).",
+    mc_ghost_thresh = "Notes at or below this velocity are treated as ghost notes and skipped.\n" ..
+                      "0 = keep all notes.  Typical ghost threshold: 20-40.",
+    mc_crash_color = "Choose which lane crash cymbal notes map to.\n\n" ..
+                     "Green (default): crash → note 100. No tom marker added - green notes\n" ..
+                     "display as cymbal in Pro Drums by default.\n" ..
+                     "Yellow: crash → note 98. Use when you need crash on the same lane as hi-hat,\n" ..
+                     "e.g. for double-crash hits or sections where green is occupied by toms.\n\n" ..
+                     "Ride cymbals always map to Blue (99).",
+    mc_pro_drums   = "Insert tom marker notes (110=Yellow, 111=Blue, 112=Green).\n\n" ..
+                     "Required for Rock Band 3 Pro Drums mode. In-game, yellow/blue/green gem\n" ..
+                     "notes display as cymbals by default. Adding a same-length tom marker note\n" ..
+                     "alongside a gem switches its display to a tom pad.\n" ..
+                     "Disable if you are authoring standard (non-pro) drums only.",
+    mc_drum_preview = "Preview: show lane counts without writing to the project.\n" ..
+                      "Auto-insert: analyse and insert notes in one step (fully undoable).",
+
+    -- MIDI converter - Keys tab
+    mc_keys_src     = "MIDI track containing the source piano notation.\n" ..
+                      "Guitar Pro exports typically use channel 1 for right hand and\n" ..
+                      "channel 2 for left hand.",
+    mc_keys_rh_tgt  = "Target track that will receive right-hand notes after the split.\n" ..
+                      "Set to (none) to skip writing the right hand.",
+    mc_keys_lh_tgt  = "Target track that will receive left-hand notes after the split.\n" ..
+                      "Set to (none) to skip writing the left hand.",
+    mc_keys_split   = "How to determine which notes belong to each hand.\n\n" ..
+                      "Channel-based: right hand = MIDI channel 1, left hand = channel 2.\n" ..
+                      "  Guitar Pro and most notation software exports use this convention.\n\n" ..
+                      "Pitch threshold: notes at or above the threshold pitch = right hand;\n" ..
+                      "  notes below = left hand.  Use when channels are not separated.",
+    mc_keys_split_pitch = "Pitch boundary for the pitch-threshold hand split.\n" ..
+                          "Notes at or above this pitch are treated as right hand.\n" ..
+                          "Default C4 (middle C, pitch 60) works for most piano pieces.",
+    mc_keys_preview = "Preview: show note counts without writing to the project.\n" ..
+                      "Auto-insert: split and insert notes in one step (fully undoable).",
+
+    -- MIDI converter - Guitar tab
+    mc_gtr_src       = 'Source MIDI track with raw guitar pitches (Guitar Pro import, DAW export, etc.).\n' ..
+                       'Pitches can be any range - the tool maps them to 5 RB gem positions.',
+    mc_gtr_tgt       = 'Target MIDI track to write Rock Band Expert Guitar gems (96-100).\n' ..
+                       'Must already have a MIDI item (e.g. the PART GUITAR track).',
+    mc_gtr_wrap_gap  = 'Rest gap in milliseconds that marks a phrase boundary in the preview report.\n' ..
+                       'Gem assignments are NOT reset at phrase boundaries - the same pitch always\n' ..
+                       'maps to the same gem across the whole track. Wrapping (reusing a gem for\n' ..
+                       'a new pitch) only occurs when all 5 gem slots are already taken.',
+    mc_gtr_max_chord = 'Maximum simultaneous gems per chord. 3-note chords are reserved for augmented,\n' ..
+                       'diminished, or seventh-type chords. Set to 2 to keep all chords as 2-finger.',
+    mc_gtr_allow_14  = 'When unchecked, any 1-4 chord (gem spread ≥ 3, e.g. Green+Blue or Red+Orange)\n' ..
+                       'is narrowed to a 1-3 chord by moving the upper gem one step closer.',
+    mc_gtr_workflow  = 'Preview: show gem assignments and reasoning in the result panel below.\n' ..
+                       'Auto-insert: write gems directly to the target track (fully undoable).',
+    mc_gtr_convert   = 'Map source MIDI pitches to Expert Guitar gems on the target track.\n\n' ..
+                       'Respects time selection if active.',
+    mc_gtr_validate  = 'Check existing Expert Guitar gems on the target track against RB authoring rules:\n' ..
+                       '  • Max 3 notes per chord\n' ..
+                       '  • No Green+Orange in 3-note chords\n' ..
+                       '  • No overlapping notes\n' ..
+                       '  • Sustain gap requirements\n' ..
+                       '  • Minimum note length (1/64th)\n\n' ..
+                       'Respects time selection if active.',
+
+    -- Tab Input guide
+    mc_gtr_tab_format  = 'Horizontal: one event per line - 6 space-separated tokens, left = highest string (e),\n' ..
+                         'right = lowest string (E). Use a fret number or dash for unplayed.\n' ..
+                         'Supports multi-digit frets (10, 12, etc.). Blank line = phrase break.\n\n' ..
+                         'Vertical: standard guitar tab layout - 6 rows (e/B/G/D/A/E),\n' ..
+                         'each row is space-separated tokens, columns = events. All-dash column = phrase break.',
+    mc_gtr_tab_ordered = 'When checked, notes are in the order they are played. Repeat a pitch each\n' ..
+                         'time it appears in the riff. Blank lines (horizontal) or all-dash columns\n' ..
+                         '(vertical) start a new phrase and reset the anchor set.\n\n' ..
+                         'When unchecked (palette mode), write each distinct pitch once in any order.\n' ..
+                         'The tool sorts by pitch and assigns gems based on pitch spread alone -\n' ..
+                         'no ordering context is used.',
+    mc_gtr_add_note    = 'Append a new empty note slot to the input.\n\n' ..
+                         'Horizontal: appends a new all-dash line (- - - - - -).\n' ..
+                         'Vertical: pads all rows to equal length and appends a new all-dash column.',
+    mc_gtr_run_guide   = 'Convert the tab input to Rock Band gem colors and display the result.\n\n' ..
+                         'Nothing is written to the project - this is a reference guide only.\n' ..
+                         'Uses the same Wrap gap and Max chord settings as the Guitar converter.',
+    tab_input_mode     = 'Switch the Tab Input mode.\n\n' ..
+                         'Guitar/Bass: standard guitar tab format (horizontal or vertical).\n' ..
+                         'Keys/Pro Keys: enter fret numbers relative to guitar string pitches,\n' ..
+                         'shifted into the C2\xe2\x80\x93C4 Pro Keys range.\n' ..
+                         'Vocal: same tab format, shifted into the wider C1\xe2\x80\x93C5 vocal range.',
+    pk_run_guide       = 'Convert frets to pitches, shift into the C2\xe2\x80\x93C4 Pro Keys range\n' ..
+                         '(MIDI 48\xe2\x80\x9372), and suggest the best lane range.\n\n' ..
+                         'Nothing is written to the project \xe2\x80\x94 reference guide only.\n\n' ..
+                         'When \xe2\x80\x9cFor animation\xe2\x80\x9d is checked: skips lane window scoring\n' ..
+                         'and reports against the full C2\xe2\x80\x93C4 range instead.',
+    pk_tab_animation   = 'Animation mode: score against the full C2\xe2\x80\x93C4 range instead of a\n' ..
+                         '10th (17-key lane window). Use when planning notes for\n' ..
+                         'PART KEYS_ANIM_RH or PART KEYS_ANIM_LH.\n\n' ..
+                         'Lane range suggestions are hidden; only out-of-C2\xe2\x80\x93C4 notes are flagged.',
+    voc_run_guide      = 'Convert frets to pitches, find the best octave shift to fit C1\xe2\x80\x93C5\n' ..
+                         '(MIDI 36\xe2\x80\x9384), and report any out-of-range notes.\n\n' ..
+                         'Nothing is written to the project \xe2\x80\x94 reference guide only.\n' ..
+                         'Blank lines separate phrases.',
+
+    -- MIDI converter - Keys tab (Pro Keys animation)
+    mc_keys_pk_src     = 'Expert Pro Keys source track (PART REAL_KEYS_X or similar).\n' ..
+                         'Notes in C2\xe2\x80\x93C4 (MIDI 48\xe2\x80\x9372) are copied to the animation track.\n' ..
+                         'Lane shift markers (MIDI 0\xe2\x80\x939) are automatically excluded.',
+    gen_animation      = 'Copy Expert Pro Keys notes (C2\xe2\x80\x93C4) to the animation target track(s).\n\n' ..
+                         'Lane shift markers and any notes outside C2\xe2\x80\x93C4 are stripped.\n' ..
+                         'RH/LH targets are shared with the Hand Split section above.\n\n' ..
+                         'Respects time selection if active. Fully undoable.',
+
+    -- MIDI converter - Keys tab (piano→Pro Keys range)
+    mc_pk_conv_tgt      = 'Target Pro Keys track (typically PART REAL_KEYS_X).\n' ..
+                          'Notes will be octave-shifted into C2\xe2\x80\x93C4 (MIDI 48\xe2\x80\x9372).',
+    mc_pk_insert_shifts = 'Auto-insert lane shift marker notes when the melody moves outside\n' ..
+                          'the current 10th-window range.\n\n' ..
+                          'Markers are MIDI notes 0\xe2\x80\x939 (C\xe2\x80\x93A in the lowest octave), placed\n' ..
+                          'approximately one measure before the range transition.\n' ..
+                          'They can be moved or deleted after insertion.',
+    gen_pk_from_piano   = 'Convert piano MIDI to Pro Keys range by octave-shifting all notes\n' ..
+                          'into C2\xe2\x80\x93C4 (MIDI 48\xe2\x80\x9372).\n\n' ..
+                          'Each note is shifted up or down by whole octaves until it lands in range.\n' ..
+                          'Uses the source track from Hand Split above.\n\n' ..
+                          'Respects time selection if active. Fully undoable.',
+
+    -- MIDI converter - Keys tab (piano→5-Lane Keys)
+    mc_5k_tgt          = 'Target 5-Lane Keys track (PART KEYS).\n' ..
+                         'Output notes will be Expert gems (pitches 96\xe2\x80\x93100).',
+    mc_5k_phrase_gap   = 'Rest gap in milliseconds that resets the gem window to Green (position 0).\n' ..
+                         'After a silence of at least this length, the next note starts a new phrase\n' ..
+                         'and anchors the window to its pitch.',
+    mc_5k_max_chord    = 'Maximum simultaneous gems per chord.\n' ..
+                         '3-note chords keep the lowest, one middle, and highest note.\n' ..
+                         '2-note chords keep only the lowest and highest.',
+    gen_5k             = 'Map piano MIDI to 5-lane Expert Keys gems (96\xe2\x80\x93100).\n\n' ..
+                         'A 5-semitone window tracks the melody: the window root maps to Green,\n' ..
+                         'and the window shifts when the melody moves outside it.\n' ..
+                         'After a rest of the configured phrase gap length, the window resets.\n\n' ..
+                         'Uses the source track from Hand Split above.\n\n' ..
+                         'Respects time selection if active. Fully undoable.',
+
+    -- MIDI alignment
+    ma_midi_src = "MIDI track whose first item will be moved and/or stretched to align\n" ..
+                  "with the time selection.\n\n" ..
+                  "Only the first MIDI item on the track is affected.",
+    ma_mode     = "Move only: shifts the item so the first note lands at the time selection start.\n" ..
+                  "Move + Stretch: also adjusts the playback rate so the last note lands at the\n" ..
+                  "time selection end.\n\n" ..
+                  "The result does not need to be exact \xe2\x80\x94 snap/quantize finishes alignment.",
+    ma_align    = "Move (and optionally stretch) the MIDI item to align with the time selection.\n\n" ..
+                  "Set a time selection first. Move + Stretch adjusts the playback rate so the\n" ..
+                  "last note lands at the time selection end.\n\n" ..
+                  "Fully undoable.",
+
+    -- MIDI tab - Length Sync
+    ms_ref    = "The MIDI track whose item length will be used as the target.\n\n" ..
+                "Pick the track that is already sized to the full song length.",
+    ms_resize = "Set the item length of every MIDI item that starts at project position 0\n" ..
+                "to match the reference track - identical to dragging the right edge of\n" ..
+                "each item. Notes are not moved or deleted.\n\n" ..
+                "MIDI items that do NOT start at position 0 are skipped; those are\n" ..
+                "reference clips managed by the MIDI Alignment section above.\n\n" ..
+                "If shrinking: check that no notes exist beyond the new item end.",
+
+    -- MIDI tab - Pattern Replace
+    mr_midi_src    = "MIDI track to search and replace patterns within.\n\n" ..
+                     "All four actions (Set Search, Set Replace, Replace All, Fill Range)\n" ..
+                     "read from and write to this track.",
+    mr_set_search  = "Capture the current time selection as the pattern to search for.\n\n" ..
+                     "Both patterns must cover exactly the same duration.\n" ..
+                     "Setting a new Search pattern with a different length clears the Replace pattern.",
+    mr_set_replace = "Capture the current time selection as the replacement pattern.\n\n" ..
+                     "Must cover the same duration as the Search pattern (if one is already set).\n" ..
+                     "Also used as the source for Fill Range.",
+    mr_do_replace  = "Scan the MIDI track for every window matching the Search pattern\n" ..
+                     "and replace it with the Replace pattern.\n\n" ..
+                     "With a time selection: only scans within that range.\n" ..
+                     "Without: scans the full MIDI item.\n\n" ..
+                     "Fully undoable.",
+    mr_fill_range  = "Tile the Replace pattern across the active time selection.\n\n" ..
+                     "Clears each destination window first, then inserts the Replace notes.\n" ..
+                     "Requires an active time selection.\n\n" ..
+                     "Fully undoable.",
+
+    -- General tab - Song fade out
+    song_fade_out = "Create a volume fade out on the SONG AUDIO track within the time selection.\n\n" ..
+                    "Volume starts at the track's current fader level and reaches silence at\n" ..
+                    "the end of the selection. Existing envelope points inside the selection\n" ..
+                    "are replaced; points outside are untouched.\n\n" ..
+                    "Select a range that starts at a musically meaningful point (e.g. end of\n" ..
+                    "the last vocal phrase) for the most natural-sounding cutoff.",
+
+    -- Difficulty tab - Pro Keys
+    diff_pk_x       = "Expert Pro Keys track (PART REAL_KEYS_X).\n" ..
+                      "Source for Suggest reduction and cross-difficulty validation.",
+    diff_pk_h       = "Hard Pro Keys track (PART REAL_KEYS_H).\n" ..
+                      "Validated against Hard authoring rules and compared to Expert.",
+    diff_pk_m       = "Medium Pro Keys track (PART REAL_KEYS_M).\n" ..
+                      "Validated against Medium authoring rules and compared to Expert.",
+    diff_pk_e       = "Easy Pro Keys track (PART REAL_KEYS_E).\n" ..
+                      "Validated against Easy authoring rules and compared to Expert.",
+    diff_autodetect = "Search for PART REAL_KEYS_X/H/M/E tracks by exact name and assign them.\n" ..
+                      "Resets existing selections before scanning.",
+    diff_suggest    = "Analyze Expert and list what changes are needed to produce a compliant\n" ..
+                      "version of this difficulty.\n\n" ..
+                      "Read-only - no project changes are made.\n" ..
+                      "Respects time selection if active.",
+    diff_validate   = "Validate this difficulty track against RBN Pro Keys authoring rules:\n" ..
+                      "note range, chord count/span, interval jumps, spacing, lane range markers,\n" ..
+                      "and whether any notes exceed what is in Expert.\n\n" ..
+                      "Read-only - no project changes are made.\n" ..
+                      "Respects time selection if active.",
+    diff_validate_all = "Validate all four Pro Keys difficulty tracks in one combined report.\n" ..
+                        "Skips any difficulty whose track is set to (none).\n\n" ..
+                        "Read-only - no project changes are made.\n" ..
+                        "Respects time selection if active.",
+
+    -- Difficulty tab - 5-Lane Keys
+    diff_5k_track     = "5-Lane Keys track (PART KEYS).\n" ..
+                        "All four difficulties live on this single track in separate pitch ranges:\n" ..
+                        "Expert 96\xe2\x80\x93100 | Hard 84\xe2\x80\x9388 | Medium 72\xe2\x80\x9375 | Easy 60\xe2\x80\x9362",
+    diff_5k_autodetect = "Search for a track named PART KEYS and assign it.\n" ..
+                         "Resets the current selection before scanning.",
+    diff_5k_suggest   = "Analyze Expert notes (96\xe2\x80\x93100) and list what changes are needed\n" ..
+                        "to produce a compliant version of this difficulty.\n\n" ..
+                        "Read-only - no project changes are made.\n" ..
+                        "Respects time selection if active.",
+    diff_5k_validate  = "Validate the notes in this difficulty's pitch range against\n" ..
+                        "5-Lane Keys authoring rules: chord count, note spacing, note\n" ..
+                        "length, and sustain gaps.\n\n" ..
+                        "Read-only - no project changes are made.\n" ..
+                        "Respects time selection if active.",
+    diff_5k_validate_all = "Validate all four 5-Lane Keys difficulty ranges in one combined report.\n\n" ..
+                           "Read-only - no project changes are made.\n" ..
+                           "Respects time selection if active.",
+    venue_preview_scale  = "Scale for venue event sprite previews shown in tooltips.\n\n" ..
+                           "1\xc3\x97 \xe2\x80\x93 smaller display (213\xc3\x97120 px).\n" ..
+                           "2\xc3\x97 \xe2\x80\x93 larger display (426\xc3\x97240 px).\n\n" ..
+                           "The scale affects display size only. Which source folder is loaded\n" ..
+                           "(large or small) depends on what is installed.\n\n" ..
+                           "The Preview tab has its own independent size setting.",
+    venue_preview_animate = "Controls animation for venue sprite previews shown in tooltips.\n\n" ..
+                           "Animated \xe2\x80\x93 sprite plays through all frames continuously.\n" ..
+                           "Still \xe2\x80\x93 shows a single frame from the middle of the sheet.\n\n" ..
+                           "The Preview tab has its own independent Animated/Still toggle.",
+    venue_preview_combo   = "Which two instruments are in the player's band lineup.\n\n" ..
+                           "Bass + Guitar  \xe2\x80\x93  no Keys player; Keys camera shots are filtered.\n" ..
+                           "Bass + Keys    \xe2\x80\x93  no Guitar player; Guitar camera shots are filtered.\n" ..
+                           "Guitar + Keys  \xe2\x80\x93  no Bass player; Bass camera shots are filtered.\n\n" ..
+                           "Camera events that require the absent instrument are replaced by an\n" ..
+                           "alternative event at the same position, if one exists. Only the Camera\n" ..
+                           "row is affected; Lighting and Post-Process are unchanged.",
+    venue_preview_show_mode = "How many events to display per category.\n\n" ..
+                           "Current only       \xe2\x80\x93  one column showing the active event (started at or\n" ..
+                           "                      before the playhead and not yet superseded).\n" ..
+                           "Surrounding events \xe2\x80\x93  three columns: the previous, current, and next event.",
+    venue_preview_refresh ="Re-read all events from the VENUE track.\n\n" ..
+                           "Click this after editing the VENUE MIDI item so the preview\n" ..
+                           "reflects the latest state.",
+    venue_preview_refresh_resume = "Auto-refresh was paused because the last VENUE MIDI read\n" ..
+                           "took 150 ms or longer.\n\n" ..
+                           "Click to re-enable automatic updates. If it pauses again,\n" ..
+                           "the VENUE track may be too large to read in real time.",
+    show_wip_tabs        = "Show work-in-progress tabs (Tempo Map, Drums, Keys, Guitar).\n\n" ..
+                           "These tabs work at a basic level but have known issues and are\n" ..
+                           "not ready for general use. Set to No to hide them from the tab bar.",
 }

@@ -1,5 +1,5 @@
 -- DSP and audio analysis functions (shared library)
--- Requires globals: r (reaper), S (state table)
+-- Requires globals: r (reaper)
 
 ----------------------------------------------------------------------
 function ComputeRMSContour(audio_item, range_start, range_end, window_s, lpf_cutoff_hz)
@@ -31,7 +31,8 @@ function ComputeRMSContour(audio_item, range_start, range_end, window_s, lpf_cut
     local lpf_y1, lpf_y2 = {}, {}
     for c = 0, nch - 1 do lpf_y1[c] = 0; lpf_y2[c] = 0 end
 
-    local contour = {}
+    local contour   = {}
+    local truncated = false
     local w = 0
     while w < total_wins do
         local this_wins  = math.min(chunk_wins, total_wins - w)
@@ -40,7 +41,7 @@ function ComputeRMSContour(audio_item, range_start, range_end, window_s, lpf_cut
 
         buffer.clear()
         local ret = r.GetAudioAccessorSamples(accessor, sr, nch, t_start, this_samps, buffer)
-        if ret < 0 then break end
+        if ret < 0 then truncated = true; break end
 
         for k = 0, this_wins - 1 do
             local sum  = 0
@@ -74,13 +75,15 @@ function ComputeRMSContour(audio_item, range_start, range_end, window_s, lpf_cut
         win_samps   = win_samps,
         sr          = sr,
         time_offset = range_start,
+        truncated   = truncated or nil,
     }
 end
 
 ----------------------------------------------------------------------
 -- YIN monophonic pitch detection
 ----------------------------------------------------------------------
-function OpenYINContext(audio_item)
+-- params: { threshold, min_freq, max_freq, window_ms }
+function OpenYINContext(audio_item, params)
     local take = r.GetActiveTake(audio_item)
     if not take or r.TakeIsMIDI(take) then
         return nil, 'Audio item has no valid audio take.'
@@ -94,6 +97,7 @@ function OpenYINContext(audio_item)
         sr       = sr,
         nch      = nch,
         item_pos = r.GetMediaItemInfo_Value(audio_item, 'D_POSITION'),
+        params   = params,
     }
 end
 
@@ -101,61 +105,42 @@ function CloseYINContext(ctx)
     if ctx then r.DestroyAudioAccessor(ctx.accessor) end
 end
 
-function DetectPitchYIN(ctx, note_s, note_e)
-    local sr, nch = ctx.sr, ctx.nch
-    local note_len = note_e - note_s
+----------------------------------------------------------------------
+-- YIN core helpers (shared by DetectPitchYIN, SampleYINAt, AutoTuneYIN)
+----------------------------------------------------------------------
 
-    local win_s = math.min(S.yin_window_ms / 1000, note_len * 0.8)
-    if win_s < 0.01 then return nil end
-
-    local n_samps = math.max(2, math.floor(win_s * sr))
-    local tau_min = math.max(1, math.floor(sr / S.yin_max_freq))
-    local tau_max = math.min(
-        math.floor(sr / S.yin_min_freq),
-        math.floor(n_samps / 2) - 1)
-    if tau_max < tau_min then return nil end
-
-    -- Sample from 30% into the note to hit steady-state vowel, avoid attack
-    local t_off = note_s + note_len * 0.3 - ctx.item_pos
-    if t_off < 0 then t_off = 0 end
-
-    local buf = r.new_array(n_samps * nch)
-    buf.clear()
-    r.GetAudioAccessorSamples(ctx.accessor, sr, nch, t_off, n_samps, buf)
-
-    -- Mix to mono Lua table for the inner loop
-    local mono = {}
-    for i = 1, n_samps do
-        local s = 0
-        for c = 0, nch - 1 do s = s + buf[(i - 1) * nch + c + 1] end
-        mono[i] = nch > 1 and s / nch or s
-    end
-
-    -- Cumulative mean normalized difference function (CMND / YIN step 2)
+-- Compute the cumulative mean normalized difference function (CMND / YIN step 2)
+-- from a mono sample array. Returns table d[] where d[0]=0 and d[1..tau_max]
+-- hold the normalized differences.
+function ComputeCMND(mono, tau_max)
     local d = {}
     d[0] = 0
     local running_sum = 0
     for tau = 1, tau_max do
         local sq = 0
-        for j = 1, n_samps - tau do
+        for j = 1, #mono - tau do
             local diff = mono[j] - mono[j + tau]
             sq = sq + diff * diff
         end
         running_sum = running_sum + sq
         d[tau] = (running_sum > 0) and (sq * tau / running_sum) or 1
     end
+    return d
+end
 
-    -- First dip below threshold, sliding to local minimum
-    local tau_est = nil
+-- Search a CMND table for the best period estimate and convert to a MIDI pitch.
+-- First dip below threshold sliding to a local minimum; fallback to global
+-- minimum; parabolic interpolation for sub-sample precision.
+-- Returns MIDI pitch integer, or nil if no confident estimate.
+function SearchYINTau(d, tau_min, tau_max, threshold, sr, min_freq, max_freq)
+    local tau_est
     for tau = tau_min, tau_max - 1 do
-        if d[tau] < S.yin_threshold then
+        if d[tau] < threshold then
             while tau < tau_max and d[tau + 1] < d[tau] do tau = tau + 1 end
             tau_est = tau
             break
         end
     end
-
-    -- Fallback: global minimum if confident enough
     if not tau_est then
         local min_d, min_tau = math.huge, tau_min
         for tau = tau_min, tau_max do
@@ -164,8 +149,6 @@ function DetectPitchYIN(ctx, note_s, note_e)
         if min_d > 0.5 then return nil end
         tau_est = min_tau
     end
-
-    -- Parabolic interpolation for sub-sample period precision
     if tau_est > tau_min and tau_est < tau_max then
         local s0, s1, s2 = d[tau_est - 1], d[tau_est], d[tau_est + 1]
         local denom = 2 * s1 - s0 - s2
@@ -173,23 +156,26 @@ function DetectPitchYIN(ctx, note_s, note_e)
             tau_est = tau_est + (s0 - s2) / (2 * denom)
         end
     end
-
     local freq = sr / tau_est
-    if freq < S.yin_min_freq or freq > S.yin_max_freq then return nil end
+    if freq < min_freq or freq > max_freq then return nil end
     return math.floor(69 + 12 * math.log(freq / 440) / math.log(2) + 0.5)
 end
 
--- Variant of DetectPitchYIN that samples at an explicit project time instead
--- of the 30%-into-note heuristic. Used by ScanPitchSlidesAction for multi-
--- point sampling along a note.
+----------------------------------------------------------------------
+-- YIN pitch detection — public API
+----------------------------------------------------------------------
+
+-- Sample at an explicit project time. win_s controls the analysis window.
+-- Reads threshold/freq bounds from yctx.params.
 function SampleYINAt(yctx, t_sample, win_s)
     local sr, nch = yctx.sr, yctx.nch
+    local p       = yctx.params
     if win_s < 0.01 then return nil end
 
     local n_samps = math.max(2, math.floor(win_s * sr))
-    local tau_min = math.max(1, math.floor(sr / S.yin_max_freq))
+    local tau_min = math.max(1, math.floor(sr / p.max_freq))
     local tau_max = math.min(
-        math.floor(sr / S.yin_min_freq),
+        math.floor(sr / p.min_freq),
         math.floor(n_samps / 2) - 1)
     if tau_max < tau_min then return nil end
 
@@ -207,47 +193,18 @@ function SampleYINAt(yctx, t_sample, win_s)
         mono[i] = nch > 1 and s / nch or s
     end
 
-    local d = {}
-    d[0] = 0
-    local running_sum = 0
-    for tau = 1, tau_max do
-        local sq = 0
-        for j = 1, n_samps - tau do
-            local diff = mono[j] - mono[j + tau]
-            sq = sq + diff * diff
-        end
-        running_sum = running_sum + sq
-        d[tau] = (running_sum > 0) and (sq * tau / running_sum) or 1
-    end
+    local d = ComputeCMND(mono, tau_max)
+    return SearchYINTau(d, tau_min, tau_max, p.threshold, sr, p.min_freq, p.max_freq)
+end
 
-    local tau_est = nil
-    for tau = tau_min, tau_max - 1 do
-        if d[tau] < S.yin_threshold then
-            while tau < tau_max and d[tau + 1] < d[tau] do tau = tau + 1 end
-            tau_est = tau
-            break
-        end
-    end
-    if not tau_est then
-        local min_d, min_tau = math.huge, tau_min
-        for tau = tau_min, tau_max do
-            if d[tau] < min_d then min_d = d[tau]; min_tau = tau end
-        end
-        if min_d > 0.5 then return nil end
-        tau_est = min_tau
-    end
-
-    if tau_est > tau_min and tau_est < tau_max then
-        local s0, s1, s2 = d[tau_est - 1], d[tau_est], d[tau_est + 1]
-        local denom = 2 * s1 - s0 - s2
-        if math.abs(denom) > 1e-10 then
-            tau_est = tau_est + (s0 - s2) / (2 * denom)
-        end
-    end
-
-    local freq = sr / tau_est
-    if freq < S.yin_min_freq or freq > S.yin_max_freq then return nil end
-    return math.floor(69 + 12 * math.log(freq / 440) / math.log(2) + 0.5)
+-- Detect pitch for a note span. Samples at 30% into the note to hit
+-- steady-state vowel and avoid the attack transient. Reads all params
+-- (window_ms, threshold, freq bounds) from ctx.params.
+function DetectPitchYIN(ctx, note_s, note_e)
+    local note_len = note_e - note_s
+    local p        = ctx.params
+    local win_s    = math.min(p.window_ms / 1000, note_len * 0.8)
+    return SampleYINAt(ctx, note_s + note_len * 0.3, win_s)
 end
 
 ----------------------------------------------------------------------
@@ -321,6 +278,46 @@ function GateAndSplit(contour_info, threshold, split_ratio, min_note_s)
     end
 
     return notes, #phrases, split_extra
+end
+
+----------------------------------------------------------------------
+-- Snap note boundaries to the nearest peak energy transition
+----------------------------------------------------------------------
+function SnapOnsets(notes, contour_info, window_ms)
+    local contour = contour_info.contour
+    local win_s   = contour_info.win_samps / contour_info.sr
+    local t_off   = contour_info.time_offset
+    local half    = math.max(1, math.floor((window_ms / 1000) / win_s))
+    local n_total = #contour
+
+    local out = {}
+    for _, n in ipairs(notes) do
+        local si = math.max(1, math.floor((n.s - t_off) / win_s) + 1)
+        local ei = math.max(1, math.floor((n.e - t_off) / win_s) + 1)
+
+        -- Snap start: find peak positive derivative near si
+        local best_si, best_sd = si, -math.huge
+        for i = math.max(2, si - half), math.min(n_total, si + half) do
+            local d = contour[i] - contour[i - 1]
+            if d > best_sd then best_sd = d; best_si = i end
+        end
+
+        -- Snap end: find peak negative derivative near ei
+        local best_ei, best_ed = ei, math.huge
+        for i = math.max(2, ei - half), math.min(n_total, ei + half) do
+            local d = contour[i] - contour[i - 1]
+            if d < best_ed then best_ed = d; best_ei = i end
+        end
+
+        local snapped_s = t_off + (best_si - 1) * win_s
+        local snapped_e = t_off + (best_ei - 1) * win_s
+        if snapped_e > snapped_s then
+            out[#out + 1] = { s = snapped_s, e = snapped_e }
+        else
+            out[#out + 1] = { s = n.s, e = n.e }
+        end
+    end
+    return out
 end
 
 ----------------------------------------------------------------------

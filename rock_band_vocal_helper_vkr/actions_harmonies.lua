@@ -2,13 +2,16 @@
 
 local function ApplyLyricSuffix(lyric, unpitched, hidden)
     if not lyric then return nil end
-    lyric = lyric:gsub('[#$]+$', '')
-    if unpitched then lyric = lyric .. '#' end
-    if hidden    then lyric = lyric .. '$' end
-    return lyric
+    local suffix     = lyric:match('[#$]+$') or ''
+    local base       = lyric:sub(1, #lyric - #suffix)
+    local add_hash   = unpitched or suffix:find('#', 1, true) ~= nil
+    local add_dollar = hidden    or suffix:find('$', 1, true) ~= nil
+    if add_hash   then base = base .. '#' end
+    if add_dollar then base = base .. '$' end
+    return base
 end
 
-local function DiatonicThirdOffset(pitch, root, quality, direction)
+function DiatonicThirdOffset(pitch, root, quality, direction)
     local scale = quality == 1 and HARM_SCALE.minor or HARM_SCALE.major
     local pc = pitch % 12
     local spcs = {}
@@ -171,7 +174,7 @@ function HarmoniesAction()
 
         r.MarkTrackItemsDirty(dst.track, dst.item)
 
-        local cleared = ClearAllNotesInRange(dst.take, range_start, range_end)
+        local cleared = ClearNotesInRange(dst.take, range_start, range_end, RB3_MIN_PITCH, RB3_MAX_PITCH)
         local lyrics_cleared = ClearLyricsInRange(dst.take, range_start, range_end)
         if S.harm_copy_phrases then
             local _, nc = r.MIDI_CountEvts(dst.take)

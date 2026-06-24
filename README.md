@@ -1,11 +1,12 @@
 # Rock Band Authoring Tools for REAPER
 
-Two REAPER ReaScript tools for custom Rock Band song authoring, sharing a common library.
+Three REAPER ReaScript tools for custom Rock Band song authoring, sharing a common library.
 
 | Script                                                                 | What it does                                                                                              |
 | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | **[Rock Band Vocal Helper](rock_band_vocal_helper_vkr/README.md)**     | Generate timing-aligned MIDI notes from a vocal stem, with pitch assignment and lyric assignment built in |
 | **[Rock Band General Helper](rock_band_general_helper_vkr/README.md)** | Audio alignment utilities, audio-driven tempo map generation from a drum stem, and VENUE track validation |
+| **Rock Band Music Theory Helper**                                       | Interactive instrument reference — drum notation legend, common drum patterns, with hover highlighting and audio sample playback |
 
 ---
 
@@ -21,7 +22,7 @@ Each script checks both on startup: if ReaImGui is missing it shows an install p
 ## Installation
 
 1. Download and extract `rb_helper_scripts_vkr.zip` into your REAPER Scripts folder (or any folder you use for ReaScripts).
-2. In REAPER: **Actions → Show action list → Load ReaScript** and select either `rock_band_vocal_helper_vkr.lua` or `rock_band_general_helper_vkr.lua`.
+2. In REAPER: **Actions → Show action list → Load ReaScript** and select the script(s) you want: `rock_band_vocal_helper_vkr.lua`, `rock_band_general_helper_vkr.lua`, or `rock_band_music_theory_helper_vkr.lua`.
 3. Optionally assign either action to a toolbar button or keyboard shortcut.
 
 ---

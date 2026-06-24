@@ -2,9 +2,24 @@
 -- Requires: S, r, FormatTime, GetTimeSelection (globals)
 -- Requires: GetTempoContextBefore, GetMeasureStartTime (from helpers.lua)
 -- Requires: ComputeTempoRMSContour, DetectOnsets, EstimateBPM, GuessTimeSig,
---           GetSourcesForRange, FitBeatGrid (from tempomap.lua)
+--           FindPrimarySource, GetSourcesForRange, FitBeatGrid (from tempomap.lua)
 
 local BPM_MIN, BPM_MAX = 60, 250
+
+-- Extract a sub-range of a contour info table as a new ci-compatible table.
+-- Windows are aligned to ci.t_start; the slice covers [t_lo, t_hi) using
+-- the same window grid. Returns nil if the range yields no windows.
+local function SliceContour(ci, t_lo, t_hi)
+    local i_lo = math.floor((t_lo - ci.t_start) / ci.t_step) + 1
+    local n    = math.floor((t_hi - t_lo) / ci.t_step)
+    local i_hi = i_lo + n - 1
+    i_lo = math.max(1, i_lo)
+    i_hi = math.min(#ci.contour, i_hi)
+    if i_lo > i_hi then return nil end
+    local slice = {}
+    for i = i_lo, i_hi do slice[#slice + 1] = ci.contour[i] end
+    return { contour = slice, t_start = ci.t_start + (i_lo - 1) * ci.t_step, t_step = ci.t_step }
+end
 
 -- Read-only: show the tempo context and first-measure anchor time.
 function ShowTempoContext()
@@ -57,18 +72,18 @@ function ShowTempoContext()
     end
     lines[#lines + 1] = ('  Measure start:  %s'):format(FormatTime(measure_t))
     if S.tm_timesig_num > 0 then
-        lines[#lines + 1] = ('  (override: %d/%d  —  project marker is %d/%d)'):format(
+        lines[#lines + 1] = ('  (override: %d/%d  -  project marker is %d/%d)'):format(
             eff_num, eff_denom, num, denom)
     end
     if measure_t < 2.5 then
         lines[#lines + 1] = ''
-        lines[#lines + 1] = ('WARNING: measure %d starts at %.3fs — community guideline'):format(
+        lines[#lines + 1] = ('WARNING: measure %d starts at %.3fs - community guideline'):format(
             first_gen_measure, measure_t)
         lines[#lines + 1] = '  requires at least 2.5s before the first tempo marker.'
         lines[#lines + 1] = ('  Consider using measure %d or later.'):format(first_gen_measure + 1)
     end
 
-    S.status = ('%.3f BPM  %d/%d  —  m%d starts at %s'):format(
+    S.status = ('%.3f BPM  %d/%d  -  m%d starts at %s'):format(
         bpm, num, denom, first_gen_measure, FormatTime(measure_t))
     S.last_result = table.concat(lines, '\n')
 end
@@ -76,69 +91,30 @@ end
 -- Read-only: detect onsets and report BPM and time-signature estimates.
 function EstimateInitialBPM()
     local sel_s, sel_e = GetTimeSelection()
-    local track, source_name, audio_item, item_pos, item_end, ci_whole, onsets_whole
-    local is_fallback_source = false
-    for _, field in ipairs({'tm_kick_idx','tm_snare_idx','tm_kit_idx','tm_fallback_idx'}) do
-        local idx = S[field]
-        if idx >= 0 then
-            local tr = r.GetTrack(0, idx)
-            if tr then
-                local it = r.GetTrackMediaItem(tr, 0)
-                if it then
-                    local ip = r.GetMediaItemInfo_Value(it, 'D_POSITION')
-                    local ie = ip + r.GetMediaItemInfo_Value(it, 'D_LENGTH')
-                    -- Restrict the onset check to the time selection so a source with
-                    -- signal only outside the selection (e.g. drums after a guitar intro)
-                    -- does not block the fallback track from being used.
-                    local scan_s = sel_s and math.max(sel_s, ip) or ip
-                    local scan_e = sel_e and math.min(sel_e, ie) or ie
-                    if scan_s < scan_e then
-                        local is_fb  = (field == 'tm_fallback_idx')
-                        local thr    = is_fb and S.tm_fb_rms_threshold or S.tm_rms_threshold
-                        local win_s  = is_fb and (S.tm_fb_rms_window_ms / 1000.0) or (S.tm_rms_window_ms / 1000.0)
-                        local ci_scan = ComputeTempoRMSContour(it, scan_s, scan_e, win_s)
-                        if ci_scan and is_fb and S.tm_fb_use_flux then ci_scan = RmsToOnsetFlux(ci_scan) end
-                        if ci_scan then
-                            local ons_scan = DetectOnsets(ci_scan, thr, 0.05)
-                            if #ons_scan > 0 then
-                                -- Source wins; compute whole-item data for the full-song output.
-                                local ci, ons
-                                if scan_s == ip and scan_e == ie then
-                                    ci, ons = ci_scan, ons_scan
-                                else
-                                    ci = ComputeTempoRMSContour(it, ip, ie, win_s)
-                                    if ci then
-                                        if is_fb and S.tm_fb_use_flux then ci = RmsToOnsetFlux(ci) end
-                                        ons = DetectOnsets(ci, thr, 0.05)
-                                    else
-                                        ci, ons = ci_scan, ons_scan
-                                    end
-                                end
-                                track              = tr
-                                _, source_name     = r.GetTrackName(tr)
-                                audio_item         = it
-                                item_pos           = ip
-                                item_end           = ie
-                                ci_whole           = ci
-                                onsets_whole       = ons
-                                is_fallback_source = is_fb
-                                break
-                            end
-                        end
-                    end
-                end
-            end
-        end
-    end
-    if not track then
+    local src = FindPrimarySource(sel_s, sel_e)
+    if not src then
         S.status = 'Error: no onsets found on any selected source.'
         S.last_result = 'No audio onsets detected above the RMS threshold on any assigned track.\n' ..
                         'Try lowering the threshold or check that the correct tracks are assigned.'
         return
     end
 
+    local source_name        = src.name
+    local audio_item         = src.item
+    local item_pos           = src.item_pos
+    local item_end           = src.item_end
+    local is_fallback_source = src.is_fallback
     local eff_thr = is_fallback_source and S.tm_fb_rms_threshold or S.tm_rms_threshold
     local eff_win = is_fallback_source and (S.tm_fb_rms_window_ms / 1000.0) or (S.tm_rms_window_ms / 1000.0)
+
+    local ci_whole = ComputeTempoRMSContour(audio_item, item_pos, item_end, eff_win)
+    if not ci_whole then
+        S.status = 'Error: could not read audio from source track.'
+        S.last_result = nil
+        return
+    end
+    if is_fallback_source and S.tm_fb_use_flux then ci_whole = RmsToOnsetFlux(ci_whole) end
+    local onsets_whole = DetectOnsets(ci_whole, eff_thr, 0.05)
 
     local bpm_ctx, num_ctx, denom_ctx = GetTempoContextBefore(item_pos)
     if not bpm_ctx then
@@ -181,8 +157,7 @@ function EstimateInitialBPM()
             local te  = math.min(m_e, item_end)
             if ts >= te then break end
 
-            local ci_m    = ComputeTempoRMSContour(audio_item, ts, te, eff_win)
-            if ci_m and is_fallback_source and S.tm_fb_use_flux then ci_m = RmsToOnsetFlux(ci_m) end
+            local ci_m    = SliceContour(ci_whole, ts, te)
             local count_m = (ci_m and #DetectOnsets(ci_m, eff_thr, 0.05)) or 0
 
             if count_m > 0 then
@@ -207,8 +182,7 @@ function EstimateInitialBPM()
             local ts  = math.max(m_s, item_pos)
             local te  = math.min(m_e, item_end)
             if ts < te then
-                local ci_try  = ComputeTempoRMSContour(audio_item, ts, te, eff_win)
-                if ci_try and is_fallback_source and S.tm_fb_use_flux then ci_try = RmsToOnsetFlux(ci_try) end
+                local ci_try  = SliceContour(ci_whole, ts, te)
                 local ons_try = ci_try and DetectOnsets(ci_try, eff_thr, 0.05) or {}
                 if #ons_try > 0 then
                     t_s_local    = ts
@@ -216,10 +190,10 @@ function EstimateInitialBPM()
                     ci_local     = ci_try
                     onsets_local = ons_try
                     if stable_m ~= nil and fallback_m ~= nil and stable_m ~= fallback_m then
-                        window_desc = ('m%d – m%d  (m%d partial entry, skipped)'):format(
+                        window_desc = ('m%d - m%d  (m%d partial entry, skipped)'):format(
                             win_m, win_m + 5, fallback_m)
                     else
-                        window_desc = ('m%d – m%d'):format(win_m, win_m + 5)
+                        window_desc = ('m%d - m%d'):format(win_m, win_m + 5)
                     end
                 end
             end
@@ -238,7 +212,7 @@ function EstimateInitialBPM()
         if dev > 10 then
             lines[#lines + 1] = ('WARNING: estimated BPM (%d) differs from project tempo (%.0f) by %.0f.'):format(
                 bpm_whole, bpm_ctx, dev)
-            lines[#lines + 1] = 'Local window scan used project measure boundaries — onset'
+            lines[#lines + 1] = 'Local window scan used project measure boundaries - onset'
             lines[#lines + 1] = 'measure labels may not match actual song measures.'
             lines[#lines + 1] = 'If the estimated BPM looks correct, apply it to the project'
             lines[#lines + 1] = '(add a tempo marker), then re-run for accurate time signature results.'
@@ -263,7 +237,7 @@ function EstimateInitialBPM()
     if ci_local and onsets_local then
         local bpm_local, conf_local = EstimateBPM(onsets_local)
         lines[#lines + 1] = ('--- Local window (%s) ---'):format(window_desc)
-        lines[#lines + 1] = ('Range:     %s — %s  (%.1fs)'):format(
+        lines[#lines + 1] = ('Range:     %s - %s  (%.1fs)'):format(
             FormatTime(t_s_local), FormatTime(t_e_local), t_e_local - t_s_local)
         lines[#lines + 1] = ('Onsets:    %d'):format(#onsets_local)
         if bpm_local then
@@ -286,7 +260,7 @@ function EstimateInitialBPM()
         local m_lines, m_num = {}, nil
         local function flush_m()
             if m_num and #m_lines > 0 then
-                lines[#lines + 1] = ('  m%d  —  %d onset%s'):format(
+                lines[#lines + 1] = ('  m%d  -  %d onset%s'):format(
                     m_num, #m_lines, #m_lines == 1 and '' or 's')
                 for _, l in ipairs(m_lines) do lines[#lines + 1] = l end
                 lines[#lines + 1] = ''
@@ -322,13 +296,18 @@ function EstimateInitialBPM()
         if sel_s then
             lines[#lines + 1] = 'No onsets found in time selection. Try lowering the RMS threshold.'
         else
-            lines[#lines + 1] = ('No onsets found scanning m%d – m25.'):format(S.tm_first_measure)
+            lines[#lines + 1] = ('No onsets found scanning m%d - m30.'):format(S.tm_first_measure)
             lines[#lines + 1] = 'Try lowering the RMS threshold or adjusting "First measure".'
         end
     end
 
+    if (ci_whole and ci_whole.truncated) or (ci_local and ci_local.truncated) then
+        lines[#lines + 1] = ''
+        lines[#lines + 1] = 'WARNING: audio read error mid-range — results may be incomplete.'
+    end
+
     local status_bpm = bpm_whole and ('%d'):format(bpm_whole) or '?'
-    S.status = ('Est. BPM: %s  —  %d onsets (whole song)  from %s'):format(
+    S.status = ('Est. BPM: %s  -  %d onsets (whole song)  from %s'):format(
         status_bpm, #onsets_whole, source_name)
     S.last_result = table.concat(lines, '\n')
 end
@@ -360,42 +339,8 @@ function AutoTuneThreshold()
     end
 
     -- Identify source using a fixed low threshold (avoids chicken-and-egg with current thr).
-    local PROBE_THR = 0.01
-    local probe_source, probe_item, probe_ip, probe_ie, is_fallback_source
-    is_fallback_source = false
-    for _, field in ipairs({'tm_kick_idx','tm_snare_idx','tm_kit_idx','tm_fallback_idx'}) do
-        local idx = S[field]
-        if idx >= 0 then
-            local tr = r.GetTrack(0, idx)
-            if tr then
-                local it = r.GetTrackMediaItem(tr, 0)
-                if it then
-                    local ip = r.GetMediaItemInfo_Value(it, 'D_POSITION')
-                    local ie = ip + r.GetMediaItemInfo_Value(it, 'D_LENGTH')
-                    local scan_s = sel_s and math.max(sel_s, ip) or ip
-                    local scan_e = sel_e and math.min(sel_e, ie) or ie
-                    if scan_s < scan_e then
-                        local is_fb = (field == 'tm_fallback_idx')
-                        local win_s = is_fb and (S.tm_fb_rms_window_ms / 1000.0)
-                                              or (S.tm_rms_window_ms / 1000.0)
-                        local ci = ComputeTempoRMSContour(it, scan_s, scan_e, win_s)
-                        if ci then
-                            local ons = DetectOnsets(ci, PROBE_THR, 0.05)
-                            if #ons > 0 then
-                                probe_source       = tr
-                                probe_item         = it
-                                probe_ip           = ip
-                                probe_ie           = ie
-                                is_fallback_source = is_fb
-                                break
-                            end
-                        end
-                    end
-                end
-            end
-        end
-    end
-    if not probe_source then
+    local src = FindPrimarySource(sel_s, sel_e, 0.01)
+    if not src then
         S.status = 'Error: no signal found on any configured source.'
         S.last_result = 'No audio detected on any assigned track in the selected range.\n' ..
                         'Assign at least one audio track and check the time selection.'
@@ -403,8 +348,8 @@ function AutoTuneThreshold()
     end
 
     -- Clamp refs to audio item span.
-    local t_s = sel_s and math.max(sel_s, probe_ip) or probe_ip
-    local t_e = sel_e and math.min(sel_e, probe_ie) or probe_ie
+    local t_s = sel_s and math.max(sel_s, src.item_pos) or src.item_pos
+    local t_e = sel_e and math.min(sel_e, src.item_end) or src.item_end
     local clamped = {}
     for _, tp in ipairs(refs) do
         if tp >= t_s and tp <= t_e then clamped[#clamped + 1] = tp end
@@ -417,14 +362,14 @@ function AutoTuneThreshold()
     end
     refs = clamped
 
-    local is_fb       = is_fallback_source
+    local is_fb       = src.is_fallback
     local win_s       = is_fb and (S.tm_fb_rms_window_ms / 1000.0) or (S.tm_rms_window_ms / 1000.0)
     local old_thr     = is_fb and S.tm_fb_rms_threshold or S.tm_rms_threshold
-    local _, source_name = r.GetTrackName(probe_source)
+    local source_name = src.name
     local search_window_s = S.tm_search_window_ms / 1000.0
 
     -- Compute contour once; vary threshold only.
-    local ci = ComputeTempoRMSContour(probe_item, t_s, t_e, win_s)
+    local ci = ComputeTempoRMSContour(src.item, t_s, t_e, win_s)
     if not ci then
         S.status = 'Error: could not read audio from source track.'
         S.last_result = nil
@@ -493,7 +438,7 @@ function AutoTuneThreshold()
     local coarse = run_scan(THR_MAX, THR_MIN, 0.010)
     local c_floor, c_peak = find_plateau_floor(coarse)
     if c_peak == 0 then
-        S.status = 'Auto-tune: no onsets match references — check tracks, selection, and Onsets/measure.'
+        S.status = 'Auto-tune: no onsets match references - check tracks, selection, and Onsets/measure.'
         S.last_result = nil
         return
     end
@@ -538,13 +483,13 @@ end
 function ClearGeneratedTempoMarkers()
     local n = r.CountTempoTimeSigMarkers(0)
     if n <= 1 then
-        S.status = 'Nothing to clear — only the root marker exists.'
+        S.status = 'Nothing to clear - only the root marker exists.'
         S.last_result = nil
         return
     end
     local sel_s, sel_e = GetTimeSelection()
-    r.Undo_BeginBlock()
     r.PreventUIRefresh(1)
+    r.Undo_BeginBlock2(0)
     local deleted = 0
     for i = n - 1, 1, -1 do
         local ok, tp = r.GetTempoTimeSigMarker(0, i)
@@ -556,15 +501,15 @@ function ClearGeneratedTempoMarkers()
             end
         end
     end
-    r.PreventUIRefresh(-1)
     r.UpdateArrange()
-    r.Undo_EndBlock(('Clear tempo markers: %d removed'):format(deleted), -1)
+    r.Undo_EndBlock2(0, ('Clear tempo markers: %d removed'):format(deleted), -1)
+    r.PreventUIRefresh(-1)
     if deleted == 0 then
         S.status = 'No markers in selection to clear.'
     elseif sel_s then
         S.status = ('Cleared %d marker%s in selection.'):format(deleted, deleted == 1 and '' or 's')
     else
-        S.status = ('Cleared %d tempo marker%s — root marker kept.'):format(
+        S.status = ('Cleared %d tempo marker%s - root marker kept.'):format(
             deleted, deleted == 1 and '' or 's')
     end
     S.last_result = nil
@@ -572,49 +517,19 @@ end
 
 function GenerateTempoMap()
     local sel_s, sel_e = GetTimeSelection()
-    local primary_track, primary_name, audio_item, item_pos, item_end, onsets_whole
-    local is_fallback_source = false
-    for _, field in ipairs({'tm_kick_idx','tm_snare_idx','tm_kit_idx','tm_fallback_idx'}) do
-        local idx = S[field]
-        if idx >= 0 then
-            local tr = r.GetTrack(0, idx)
-            if tr then
-                local it = r.GetTrackMediaItem(tr, 0)
-                if it then
-                    local ip = r.GetMediaItemInfo_Value(it, 'D_POSITION')
-                    local ie = ip + r.GetMediaItemInfo_Value(it, 'D_LENGTH')
-                    local scan_s = sel_s and math.max(sel_s, ip) or ip
-                    local scan_e = sel_e and math.min(sel_e, ie) or ie
-                    if scan_s < scan_e then
-                        local is_fb  = (field == 'tm_fallback_idx')
-                        local thr    = is_fb and S.tm_fb_rms_threshold or S.tm_rms_threshold
-                        local win_s  = is_fb and (S.tm_fb_rms_window_ms / 1000.0) or (S.tm_rms_window_ms / 1000.0)
-                        local ci = ComputeTempoRMSContour(it, scan_s, scan_e, win_s)
-                        if ci and is_fb and S.tm_fb_use_flux then ci = RmsToOnsetFlux(ci) end
-                        if ci then
-                            local ons = DetectOnsets(ci, thr, 0.05)
-                            if #ons > 0 then
-                                primary_track      = tr
-                                _, primary_name    = r.GetTrackName(tr)
-                                audio_item         = it
-                                item_pos           = ip
-                                item_end           = ie
-                                onsets_whole       = ons
-                                is_fallback_source = is_fb
-                                break
-                            end
-                        end
-                    end
-                end
-            end
-        end
-    end
-    if not primary_track then
+    local src = FindPrimarySource(sel_s, sel_e)
+    if not src then
         S.status = 'Error: no onsets found on any selected source.'
         S.last_result = 'No audio onsets detected above the RMS threshold on any assigned track.\n' ..
                         'Try lowering the threshold or check that the correct tracks are assigned.'
         return
     end
+
+    local primary_name       = src.name
+    local audio_item         = src.item
+    local item_pos           = src.item_pos
+    local item_end           = src.item_end
+    local is_fallback_source = src.is_fallback
 
     local t_s = sel_s and math.max(sel_s, item_pos) or item_pos
     local t_e = sel_e and math.min(sel_e, item_end) or item_end
@@ -623,6 +538,14 @@ function GenerateTempoMap()
         S.last_result = 'Time selection does not overlap the audio item.'
         return
     end
+
+    local is_fb_gm  = is_fallback_source
+    local thr_gm    = is_fb_gm and S.tm_fb_rms_threshold or S.tm_rms_threshold
+    local win_gm    = is_fb_gm and (S.tm_fb_rms_window_ms / 1000.0) or (S.tm_rms_window_ms / 1000.0)
+    local ci_gm          = ComputeTempoRMSContour(audio_item, t_s, t_e, win_gm)
+    local ci_gm_truncated = ci_gm and ci_gm.truncated
+    if ci_gm and is_fb_gm and S.tm_fb_use_flux then ci_gm = RmsToOnsetFlux(ci_gm) end
+    local onsets_whole = (ci_gm and DetectOnsets(ci_gm, thr_gm, 0.05)) or {}
 
     local bpm_ctx, num_ctx, denom_ctx = GetTempoContextBefore(t_s)
     if not bpm_ctx then
@@ -652,7 +575,7 @@ function GenerateTempoMap()
         bpm_fit_note = best_note
     else
         bpm_fit      = bpm_ctx
-        bpm_fit_note = '  (project fallback — estimation failed)'
+        bpm_fit_note = '  (project fallback - estimation failed)'
     end
     local beat_dur = 60.0 / bpm_fit
 
@@ -671,6 +594,7 @@ function GenerateTempoMap()
                 local win_s = S.tm_fb_rms_window_ms / 1000.0
                 local ci = ComputeTempoRMSContour(fb_item, t_s, t_e, win_s)
                 if ci then
+                    if ci.truncated then ci_gm_truncated = true end
                     if S.tm_fb_use_flux then ci = RmsToOnsetFlux(ci) end
                     fb_ci = ci
                     _, fb_name = r.GetTrackName(fb_tr)
@@ -735,8 +659,8 @@ function GenerateTempoMap()
         end
     end
 
-    r.Undo_BeginBlock()
     r.PreventUIRefresh(1)
+    r.Undo_BeginBlock2(0)
 
     local n = r.CountTempoTimeSigMarkers(0)
     local delete_count = 0
@@ -781,10 +705,10 @@ function GenerateTempoMap()
     end
     local inserted = #inserts
 
-    r.PreventUIRefresh(-1)
     r.UpdateArrange()
-    r.Undo_EndBlock(('Generate tempo map: %d marker%s'):format(
+    r.Undo_EndBlock2(0, ('Generate tempo map: %d marker%s'):format(
         inserted, inserted == 1 and '' or 's'), -1)
+    r.PreventUIRefresh(-1)
 
     local source_names = {}
     for _, src in ipairs(sources) do source_names[#source_names + 1] = src.name end
@@ -801,7 +725,7 @@ function GenerateTempoMap()
     lines[#lines + 1] = ('Sources:  %s'):format(table.concat(source_names, ', '))
     lines[#lines + 1] = ('BPM used: %.1f%s'):format(bpm_fit, bpm_fit_note)
     lines[#lines + 1] = ('Time sig: %d/%d'):format(eff_num, eff_denom)
-    lines[#lines + 1] = ('Range:    %s — %s  (%.1fs)'):format(
+    lines[#lines + 1] = ('Range:    %s - %s  (%.1fs)'):format(
         FormatTime(t_s), FormatTime(t_e), t_e - t_s)
     lines[#lines + 1] = ('Deleted:  %d existing marker%s in range'):format(
         delete_count, delete_count == 1 and '' or 's')
@@ -819,7 +743,7 @@ function GenerateTempoMap()
         lines[#lines + 1] = ('Anchor:  * %s  (snapped to %s, %+.0f ms from measure)'):format(
             FormatTime(anchor_t), anchor_source, anchor_dev_ms)
     else
-        lines[#lines + 1] = ('Anchor:  * %s  (no onset nearby — using project measure boundary)'):format(
+        lines[#lines + 1] = ('Anchor:  * %s  (no onset nearby - using project measure boundary)'):format(
             FormatTime(anchor_t))
     end
     lines[#lines + 1] = ''
@@ -836,10 +760,15 @@ function GenerateTempoMap()
             lines[#lines + 1] = ('  %s m%d  %s  dev %+.0f ms  %.1f BPM%s'):format(
                 mark, m_num, FormatTime(entry.detected_t), dev_ms, entry.bpm, src_tag)
         else
-            lines[#lines + 1] = ('    m%d  %s  no onset — extrapolated'):format(
+            lines[#lines + 1] = ('    m%d  %s  no onset - extrapolated'):format(
                 m_num, FormatTime(entry.expected_t))
         end
         if entry == stopped_at then break end
+    end
+
+    if ci_gm_truncated then
+        lines[#lines + 1] = ''
+        lines[#lines + 1] = 'WARNING: audio read error mid-range — some measures may be missing.'
     end
 
     S.status = ('Generated %d marker%s from %s'):format(

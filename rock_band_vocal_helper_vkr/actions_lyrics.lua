@@ -1,7 +1,7 @@
 -- Lyrics tab actions (ParseLyricsFile, ClearLyricEvents, ClearLyricsInRange, ClearLyricsAction, AssignLyricsAction)
 
 ----------------------------------------------------------------------
--- Lyrics helpers (local — only called within this file)
+-- Lyrics helpers (local - only called within this file)
 ----------------------------------------------------------------------
 local function ParseLyricsFile(path)
     local f = io.open(path, 'r')
@@ -154,10 +154,10 @@ function AssignLyricsAction()
     if n_notes_in ~= n_lyrics_in then
         lines[#lines + 1] = ''
         if n_notes_in > n_lyrics_in then
-            lines[#lines + 1] = ('Warning: %d notes, %d lyrics — last %d notes have no lyric')
+            lines[#lines + 1] = ('Warning: %d notes, %d lyrics - last %d notes have no lyric')
                 :format(n_notes_in, n_lyrics_in, n_notes_in - n_lyrics_in)
         else
-            lines[#lines + 1] = ('Warning: %d notes, %d lyrics — last %d lyrics are unused')
+            lines[#lines + 1] = ('Warning: %d notes, %d lyrics - last %d lyrics are unused')
                 :format(n_notes_in, n_lyrics_in, n_lyrics_in - n_notes_in)
         end
     end
@@ -165,7 +165,7 @@ function AssignLyricsAction()
     -- Phrase capitalization check
     lines[#lines + 1] = ''
     if #phrase_markers == 0 then
-        lines[#lines + 1] = 'Phrase markers: none found — cannot validate capitalization.'
+        lines[#lines + 1] = 'Phrase markers: none found - cannot validate capitalization.'
     else
         local violations = {}
         for _, pm in ipairs(phrase_markers) do
@@ -180,7 +180,7 @@ function AssignLyricsAction()
             end
         end
         if #violations == 0 then
-            lines[#lines + 1] = ('Phrase capitalization: OK — all %d phrases start with a capital letter.')
+            lines[#lines + 1] = ('Phrase capitalization: OK - all %d phrases start with a capital letter.')
                 :format(#phrase_markers)
         else
             lines[#lines + 1] = ('Phrase capitalization: %d violation(s):'):format(#violations)

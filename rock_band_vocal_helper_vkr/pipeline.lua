@@ -158,6 +158,7 @@ function RunDetection(range_info)
 
     return {
         notes         = notes,
+        contour_info  = contour_info,
         raw_count     = #raw,
         phrases       = n_phrases,
         splits        = n_splits,
@@ -197,8 +198,14 @@ function AssignPitches(notes, ref_track, audio_item, force_mode)
             return nil, 'Audio source item is required for built-in pitch detection.'
         end
         local err
-        yin_ctx, err = OpenYINContext(audio_item)
+        yin_ctx, err = OpenYINContext(audio_item, {
+            threshold = S.yin_threshold,
+            min_freq  = S.yin_min_freq,
+            max_freq  = S.yin_max_freq,
+            window_ms = S.yin_window_ms,
+        })
         if not yin_ctx then return nil, err end
+        S.action_yctx = yin_ctx
     end
 
     local out = {}
@@ -235,7 +242,7 @@ function AssignPitches(notes, ref_track, audio_item, force_mode)
         }
     end
 
-    if yin_ctx then CloseYINContext(yin_ctx) end
+    if yin_ctx then CloseYINContext(yin_ctx); S.action_yctx = nil end
 
     local stats = { ref_used = ref_used, ref_fallback = ref_fallback }
     local shifted = 0
@@ -251,7 +258,7 @@ end
 function FormatResult(res, action, cleared, pitch_stats)
     local lines = {
         ('%s: %d notes'):format(action, #res.notes),
-        ('Range: %s — %s  (%.3fs)%s'):format(
+        ('Range: %s - %s  (%.3fs)%s'):format(
             FormatTime(res.range_start), FormatTime(res.range_end),
             res.range_end - res.range_start,
             res.has_selection and ' [time selection]' or ' [whole item]'),
