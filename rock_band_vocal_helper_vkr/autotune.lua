@@ -5,7 +5,7 @@
 ----------------------------------------------------------------------
 local MATCH_TOLERANCE_S = 0.25
 
-local function ScoreNotes(detected, reference)
+function ScoreNotes(detected, reference)
     local pairs_list = {}
     for i, ref in ipairs(reference) do
         for j, det in ipairs(detected) do
@@ -91,7 +91,7 @@ end
 
 function AutoTune(range_info, midi_take)
     local ref_notes = ReadAutoTuneRefNotes(midi_take,
-        range_info.range_start, range_info.range_end)
+        range_info.range_start, range_info.range_end, RB3_MIN_PITCH, RB3_MAX_PITCH)
     if #ref_notes == 0 then
         return nil, 'No notes in the time selection to use as reference.\n' ..
             'Place a few notes manually on the destination MIDI item first, then run Auto-tune.'
@@ -242,6 +242,7 @@ end
 function AutoTuneYIN(audio_item, ref_notes)
     local yin_ctx, err = OpenYINContext(audio_item)
     if not yin_ctx then return nil, err end
+    S.action_yctx = yin_ctx
 
     local sr  = yin_ctx.sr
     local nch = yin_ctx.nch
@@ -286,54 +287,11 @@ function AutoTuneYIN(audio_item, ref_notes)
                     mono[i] = nch > 1 and s / nch or s
                 end
 
-                local d = {}; d[0] = 0
-                local running_sum = 0
-                for tau = 1, tau_max do
-                    local sq = 0
-                    for j = 1, n_samps - tau do
-                        local diff = mono[j] - mono[j + tau]
-                        sq = sq + diff * diff
-                    end
-                    running_sum = running_sum + sq
-                    d[tau] = running_sum > 0 and sq * tau / running_sum or 1
-                end
-                entries[ni] = { d = d, n_samps = n_samps, tau_max = tau_max }
+                entries[ni] = { d = ComputeCMND(mono, tau_max), n_samps = n_samps, tau_max = tau_max }
             end
         end
         cmnd_cache[window_ms] = entries
         return entries
-    end
-
-    -- Scan a cached CMND with given freq/threshold bounds.
-    -- Returns MIDI pitch or nil on fallback. No audio I/O.
-    local function ScanCMND(e, tau_min, tau_max_eff, threshold, min_hz, max_hz)
-        local d       = e.d
-        local tau_est
-        for tau = tau_min, tau_max_eff - 1 do
-            if d[tau] < threshold then
-                while tau < tau_max_eff and d[tau + 1] < d[tau] do tau = tau + 1 end
-                tau_est = tau
-                break
-            end
-        end
-        if not tau_est then
-            local min_d, min_tau = math.huge, tau_min
-            for tau = tau_min, tau_max_eff do
-                if d[tau] < min_d then min_d = d[tau]; min_tau = tau end
-            end
-            if min_d > 0.5 then return nil end
-            tau_est = min_tau
-        end
-        if tau_est > tau_min and tau_est < tau_max_eff then
-            local s0, s1, s2 = d[tau_est - 1], d[tau_est], d[tau_est + 1]
-            local denom = 2 * s1 - s0 - s2
-            if math.abs(denom) > 1e-10 then
-                tau_est = tau_est + (s0 - s2) / (2 * denom)
-            end
-        end
-        local freq = sr / tau_est
-        if freq < min_hz or freq > max_hz then return nil end
-        return math.floor(69 + 12 * math.log(freq / 440) / math.log(2) + 0.5)
     end
 
     -- Score params using cached CMNDs; no audio access after first call per window_ms.
@@ -352,8 +310,8 @@ function AutoTuneYIN(audio_item, ref_notes)
                 if tau_max < tau_min then
                     total = total + 6
                 else
-                    local p = ScanCMND(e, tau_min, tau_max, params.yin_threshold,
-                                       params.yin_min_hz, params.yin_max_hz)
+                    local p = SearchYINTau(e.d, tau_min, tau_max, params.yin_threshold,
+                                          sr, params.yin_min_hz, params.yin_max_hz)
                     if p then
                         local diff = math.abs(p - n.pitch) % 12
                         total = total + math.min(diff, 12 - diff)
@@ -406,6 +364,7 @@ function AutoTuneYIN(audio_item, ref_notes)
         { -10, -5, 5, 10 }, 10, 100))
 
     -- All audio access is done; close accessor before the stats pass.
+    S.action_yctx = nil
     CloseYINContext(yin_ctx)
 
     -- Final pass at best params from cached CMNDs for detailed result panel stats.
@@ -428,8 +387,8 @@ function AutoTuneYIN(audio_item, ref_notes)
         if e then
             local tau_max = math.min(tau_max_hz_f, e.tau_max, math.floor(e.n_samps / 2) - 1)
             if tau_max >= tau_min_final then
-                p = ScanCMND(e, tau_min_final, tau_max, best.yin_threshold,
-                             best.yin_min_hz, best.yin_max_hz)
+                p = SearchYINTau(e.d, tau_min_final, tau_max, best.yin_threshold,
+                                sr, best.yin_min_hz, best.yin_max_hz)
             end
         end
         if p then

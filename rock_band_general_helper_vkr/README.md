@@ -2,7 +2,7 @@
 
 ← [Back to overview and installation](../README.md)
 
-**Utility actions for custom song authoring in REAPER.** A REAPER ReaScript that provides three main tool sets: general audio alignment utilities, audio-driven tempo map generation from a drum stem, and VENUE track validation for Rock Band authoring.
+**Utility actions for custom song authoring in REAPER.** A REAPER ReaScript with nine tabs: audio alignment, audio-driven tempo map generation, MIDI conversion for drums, keys, and guitar, difficulty validation, tab-input parsing, MIDI alignment, and VENUE track validation.
 
 ---
 
@@ -18,13 +18,19 @@
 
 ## UI overview
 
-The window is organized into three tabs plus a status panel at the bottom.
+The window is organized into nine tabs plus a status panel at the bottom.
 
-| Tab           | Purpose                                                                            |
-| ------------- | ---------------------------------------------------------------------------------- |
-| **General**   | Audio alignment utilities (align all audio, count-in clips) and settings save/load |
-| **Tempo Map** | Detect BPM from drum audio and generate REAPER tempo markers measure-by-measure    |
-| **Venue**     | Validate and list all text events on the VENUE track                               |
+| Tab            | Purpose                                                                              |
+| -------------- | ------------------------------------------------------------------------------------ |
+| **General**    | Audio alignment utilities (align all audio, count-in clips) and settings save/load  |
+| **Tempo Map**  | Detect BPM from drum audio and generate REAPER tempo markers measure-by-measure     |
+| **Drums**      | Convert GM MIDI drum notes to Rock Band 5-lane format                               |
+| **Keys**       | Convert piano MIDI to Rock Band Pro Keys, 5-Lane Keys, or split into hand tracks    |
+| **Guitar**     | Convert raw guitar MIDI pitches to Rock Band Expert gem notes                       |
+| **Difficulty** | Validate Pro Keys and 5-Lane Keys tracks at each difficulty level                   |
+| **Tab Input**  | Parse ASCII guitar tab notation and convert to MIDI gem notes                       |
+| **MIDI**       | Align an imported MIDI item to the project grid (move or move+stretch)              |
+| **Venue**      | Validate and generate text events on the VENUE track                                |
 
 The bottom of the window always shows the active time selection (or "No time selection") and the result panel from the last action.
 
@@ -142,7 +148,7 @@ Respects time selection: if a selection is active, only the measures within it a
 
 #### Clear generated markers
 
-Deletes all REAPER tempo markers except the root marker at index 0 (the one REAPER always preserves). Use this to reset between test runs. Fully undoable.
+Removes auto-generated tempo markers. If a time selection is active, only markers within the selection are deleted; otherwise all markers except the root marker at index 0 are removed. Use this to reset between test runs. Fully undoable.
 
 ### Sliders
 
@@ -162,22 +168,223 @@ Deletes all REAPER tempo markers except the root marker at index 0 (the one REAP
 
 ---
 
+## Drums tab
+
+Converts General MIDI drum notes to Rock Band 5-lane format and writes them to the target track.
+
+### Track selection
+
+| Dropdown           | What it expects                                          |
+| ------------------ | -------------------------------------------------------- |
+| **Source track**   | A MIDI track with GM drum notes (e.g. Guitar Pro export) |
+| **Target track**   | The `PART DRUMS` MIDI track to write into                |
+
+### Options
+
+- **Ghost note threshold** — MIDI velocity at or below which a note is skipped. Raise to filter out ghost notes or light pedal hits.
+- **Crash lane** — assigns crash cymbal notes to Yellow (default) or Green lane.
+- **Pro Drums** — when enabled, inserts cymbal marker notes (110/111/112) alongside the gem notes, enabling Pro Drums mode in-game.
+
+### Actions
+
+- **Preview** — runs the conversion and displays the result mapping without writing any notes.
+- **Convert drums** — writes Rock Band drum notes into the target track. Any existing drum notes in the time selection (or whole item if no selection) are cleared first. Fully undoable.
+
+---
+
+## Keys tab
+
+Contains four conversion tools for piano MIDI → Rock Band keys formats. Each tool has its own source and target track selectors.
+
+### Hand Split
+
+Splits a piano track into separate right-hand and left-hand MIDI tracks.
+
+- Split by **MIDI channel** (Guitar Pro: ch1 = RH, ch2 = LH) or by **pitch threshold**.
+- Set the right-hand target and left-hand target tracks independently — they can be different PART REAL_KEYS tracks.
+
+### Convert to Pro Keys
+
+Octave-shifts all notes into the C2–C4 range (MIDI 48–72) required for Pro Keys Expert authoring. Optionally inserts lane range shift markers where the pitch window moves.
+
+### Pro Keys Animation
+
+Copies notes in the C2–C4 range from a Pro Keys Expert source track to the animation target tracks. The animation tracks drive the on-screen keyboard highlight during gameplay.
+
+### 5-Lane Keys
+
+Maps a piano melody to Expert 5-Lane Keys gem pitches (96–100) using a sliding 5-semitone window. The window adapts measure-by-measure, so chords wider than 5 semitones are still mapped without collision. Phrase reset markers are inserted where the window resets to the lowest position.
+
+All actions respect time selection.
+
+---
+
+## Guitar tab
+
+Converts raw guitar MIDI pitches to Rock Band Expert Guitar gem notes (pitches 96–100) and optionally validates existing notes against RBN authoring rules.
+
+### Track selection
+
+| Dropdown           | What it expects                                                         |
+| ------------------ | ----------------------------------------------------------------------- |
+| **Source track**   | A MIDI track with raw guitar pitches (e.g. Guitar Pro MIDI export)      |
+| **Target track**   | The `PART GUITAR` MIDI track to write into                              |
+
+### Conversion options
+
+- **Wrap gap (ms)** — rest gap that resets the gem-assignment window back to Green (position 0). Shorter = more frequent resets for songs with many breaks.
+- **Context window (measures)** — how many measures ahead the gem-scale planner looks. Wider = smoother transitions; narrower = adapts more quickly to large pitch jumps.
+- **Max chord** — maximum simultaneous gems per chord event (2 or 3).
+
+### Actions
+
+- **Preview** — shows a detailed per-note reasoning report without writing anything.
+- **Convert guitar** — writes Rock Band gem notes into the target track. Existing gems in the range are cleared first. Fully undoable.
+- **Validate guitar** — checks existing gems on the target track against RBN authoring rules (chord density, sustain gaps, illegal combinations). Reports violations with measure positions.
+
+---
+
+## Difficulty tab
+
+Contains two sub-tabs for difficulty reduction guidance and validation.
+
+### Pro Keys sub-tab
+
+Analyzes PART REAL_KEYS_X/H/M/E tracks (auto-detected by name from the project).
+
+- **Suggest Hard / Medium / Easy** — read-only report of what changes are needed to meet RBN density and chord rules at that difficulty.
+- **Validate Expert / Hard / Medium / Easy / All** — checks note range, chord count and span, interval jumps, spacing (Medium/Easy), and lane range markers against RBN Pro Keys rules.
+
+### 5-Lane Keys sub-tab
+
+Analyzes PART KEYS, which carries all four difficulties in separate pitch ranges:
+
+| Difficulty | Pitch range |
+| ---------- | ----------- |
+| Expert     | 96–100      |
+| Hard       | 84–88       |
+| Medium     | 72–75       |
+| Easy       | 60–62       |
+
+- **Suggest Hard / Medium / Easy** — read-only report of required changes from Expert.
+- **Validate Expert / Hard / Medium / Easy / All** — checks chord count, spacing, note length, and sustain gaps.
+
+All actions respect time selection.
+
+---
+
+## Tab Input tab
+
+Converts ASCII guitar tab notation directly into Rock Band MIDI gem notes on the target track.
+
+### Accepted formats
+
+- **Horizontal tab** — standard multi-line tab with one row per string and fret numbers along each row. The most common format from tab websites.
+- **Vertical tab** — column-per-beat notation used in some editors.
+- **Reformat vertical** — reformats a vertical tab into a readable layout without generating MIDI.
+
+### Workflow
+
+1. Paste or type your tab text into the input area.
+2. Select the target PART GUITAR track.
+3. Click the appropriate convert button.
+
+Respects time selection: if active, generated notes are positioned starting from the selection start.
+
+---
+
+## MIDI tab
+
+Aligns a single imported MIDI item to the project grid.
+
+### Modes
+
+- **Move only** — shifts the item so its first note lands at the time selection start. Useful for rough alignment when tempo is known.
+- **Move + Stretch** — also adjusts the take playback rate so the last note aligns with the time selection end. Use this when the MIDI was recorded at a slightly different tempo and needs to stretch to fit the project grid.
+
+### Workflow
+
+1. Set a time selection over the target range.
+2. Select the source track in the dropdown.
+3. Click **Align MIDI**.
+
+The result panel reports the shift amount in milliseconds and, when stretching, the playback rate change. Fully undoable.
+
+---
+
 ## Venue
 
-![General tab](../assets/venue.jpg)
+![Venue tab](../assets/venue.jpg)
 
-### What it does
+The Venue tab contains five sub-tabs. The script finds the VENUE track automatically by name — no dropdown needed.
 
-**List venue events** reads the VENUE track (found by name) and audits all MIDI text events against the Rock Band Network specification. It reports:
+### Analysis sub-tab
 
-- **Unknown events** — text events not in the RBN spec. These will cause issues at compile time.
-- **Consecutive camera repeats** — the same directed or coop camera cut used back to back.
-- **Directed cut spacing** — directed cuts that are too close together (directed cuts require a minimum gap between them per RBN guidelines).
-- **Event frequency count** — how many times each event is used across the whole track, sorted by frequency.
+Read-only inspection tools.
 
-### Track naming
+**List venue events** audits all MIDI text events on the VENUE track against the Rock Band Network specification. It reports:
 
-The script looks for a track named `VENUE` (case-insensitive). No dropdown is needed — it finds the track automatically.
+- **Track name event** — whether a single `"VENUE"` type-3 event exists at PPQ 0.
+- **Unknown events** — text events not in the RBN spec; these cause compile errors.
+- **Consecutive camera repeats** — the same directed or coop shot used back to back.
+- **Directed cut spacing** — directed cuts within 2 s of the next camera event.
+- **Camera gap statistics** — average, slowest, and fastest cut durations for coop→any and directed→coop transitions.
+- **Event frequency count** — how many times each event is used, sorted by frequency.
+
+**Show event sections** reads `[prc_*]` markers from the EVENTS track and lists all detected song sections with time ranges. Letter-suffix variants (`[prc_verse_1a]`, `[prc_verse_1b]`) are merged into a single section entry.
+
+### Themes gen sub-tab
+
+Whole-song generation driven by a `.rbtheme` file.
+
+- **Theme** — select a `.rbtheme` file from the `resources/themes/` folder. Shows `(select a theme)` when none is loaded; Generate is disabled until a theme is chosen. If the folder is empty, all inputs are disabled.
+- **Camera pacing** — override the theme's camera cut rate, or keep the theme default. A jitter toggle adds ±20 % randomisation to cut intervals for a more natural feel.
+- **Keyframe align** — global alignment mode for `[first]`/`[next]` keyframe events. Options: Section start, Closest beat, Downbeat, and five instrument-aware modes (Guitar notes, Bass notes, Keys notes, Drum kicks, Drum snare) that place `[next]` only at beats where notes exist on the corresponding PART track.
+- **Generate venue events** — generates camera cuts, lighting changes, manual-lighting keyframes, and post-process effects on the VENUE track. Camera pools are filtered by which PART instrument tracks are present and unmuted. Respects time selection (partial regeneration). Fully undoable.
+
+### Section gen sub-tab
+
+Per-section manual configuration. Sections are read from `[prc_*]` markers on the EVENTS track.
+
+- **Section selector** — pick a song section. **Refresh** re-reads sections from the EVENTS track.
+- Per-section settings:
+  - **Lighting** — lighting preset for this section (manual or auto).
+  - **Keyframe align** — alignment mode for `[first]`/`[next]` events (disabled for auto/no lighting).
+  - **Keyframe rate** — how often `[first]`/`[next]` events are placed (beats).
+  - **Light blendin** — place the lighting event N beats before the section start.
+  - **Post-process** — post-process effect for this section.
+  - **PP blendin** — place the post-process event N beats before the section start.
+  - **Directed cut at start** — insert a forced directed camera cut at the section start.
+  - **Bonus FX** — insert a `[bonusfx]` event at the section start.
+- **Camera pacing** — camera cut rate override for the generated section.
+- **Generate section** — generates events for the selected section only. Fully undoable.
+
+### Manual gen sub-tab
+
+Shot-by-shot event insertion at the edit cursor.
+
+- **Normal camera** — pick any `[coop_*]` shot; **Add** inserts it at the edit cursor.
+- **Directed camera** — pick any `[directed_*]` shot including BRE events; **Add** inserts it.
+- **Lighting** — pick any lighting preset; **Add** inserts `[lighting (name)]`. When a manual preset is selected, Keyframe align and Keyframe rate controls appear.
+- **Post proc** — pick any `[*.pp]` effect; **Add** inserts it.
+- **Special** — `[bonusfx]`, `[bonusfx_optional]`, `[first]`, `[next]`, `[previous]`; **Add** inserts the chosen event.
+- **Camera pacing** — shared camera pacing override (same state as the other gen tabs).
+- **Advance camera pacing** — moves the edit cursor forward by one jittered camera interval.
+- **Generate keyframes** — generates `[first]`/`[next]` from the cursor to the next lighting event, time selection end, or VENUE item end. Clears existing keyframe events in the range first. Only available when a manual lighting preset is selected. Fully undoable.
+- **Remove** — category dropdown (Camera / Lighting / Post proc / Special / All) + **Remove** button; removes matching events from the time selection (if active) or the full song. Fully undoable.
+
+### Preview sub-tab
+
+Live readout of current, previous, and next venue events relative to the playhead (or edit cursor when stopped). Updates automatically when the VENUE track changes.
+
+- **Players** — select which two instruments are in the lineup (Bass + Guitar, Bass + Keys, Guitar + Keys). Camera shots requiring the absent instrument are shown with an alternative event, or highlighted in red if no alternative exists at that position.
+- **Preview size** — inline sprite display scale: 1× (213×120 px) or 2× (426×240 px).
+- **Sprites** — Animated (plays through all frames) or Still (single middle frame).
+- **Show** — Current only (one column) or Surrounding events (Previous / Current / Next columns).
+
+Sprite previews require JPEG spritesheets installed under `resources/img/spritesheets/`. If no spritesheets are found, event names are shown as text with no image.
+
+If the VENUE track is large and reading takes more than 150 ms, auto-refresh pauses automatically. A **Resume auto-refresh** button appears to re-enable it.
 
 ### Validated event categories
 

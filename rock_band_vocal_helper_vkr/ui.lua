@@ -6,7 +6,7 @@ local _active_tab  = ''
 
 -- TrackCombo variant that stores and matches by REAPER track index (.idx field)
 -- rather than list position, so selections survive filter list rebuilds.
-local function FilteredTrackCombo(label, reaper_idx, track_list)
+function FilteredTrackCombo(label, reaper_idx, track_list)
     local preview = '<no tracks>'
     for _, t in ipairs(track_list) do
         if t.idx == reaper_idx then preview = t.label; break end
@@ -68,7 +68,6 @@ function Loop()
 
     -- Build cached filtered lists on first frame if not yet populated.
     if not S.all_track_list then RefreshTrackLists() end
-    local tracks       = S.all_track_list
     local midi_tracks  = S.midi_track_list
     local audio_tracks = S.audio_track_list
     local sel_s, sel_e = GetTimeSelection()
@@ -88,13 +87,13 @@ function Loop()
 
         if sel_s then
             r.ImGui_Spacing(ctx)
-            r.ImGui_Text(ctx, ('Time selection: %s — %s'):format(FormatTime(sel_s), FormatTime(sel_e)))
+            r.ImGui_Text(ctx, ('Time selection: %s - %s'):format(FormatTime(sel_s), FormatTime(sel_e)))
         end
 
         r.ImGui_Separator(ctx)
 
         ----------------------------------------------------------------
-        -- Button widths — computed once, used across all tabs
+        -- Button widths - computed once, used across all tabs
         ----------------------------------------------------------------
         local _bp    = 40
         local bw_at  = r.ImGui_CalcTextSize(ctx, 'Auto-tune from reference') + _bp
@@ -104,14 +103,13 @@ function Loop()
         local bw_grp = r.ImGui_CalcTextSize(ctx, 'Generate (replace)') + _bp
         local bw_app = r.ImGui_CalcTextSize(ctx, 'Apply pitch changes') + _bp
         local bw_und = r.ImGui_CalcTextSize(ctx, 'Undo') + _bp
-        local bw_sld = r.ImGui_CalcTextSize(ctx, 'Scan pitch slides') + _bp
         local bw_lad = r.ImGui_CalcTextSize(ctx, 'Auto-detect') + _bp
         local bw_lbr = r.ImGui_CalcTextSize(ctx, 'Browse...') + _bp
         local bw_lcl = r.ImGui_CalcTextSize(ctx, 'Clear lyrics') + _bp
         local bw_las  = r.ImGui_CalcTextSize(ctx, 'Assign lyrics')      + _bp
         local bw_ref  = r.ImGui_CalcTextSize(ctx, 'Refresh tracks')     + _bp
-        local bw_harm = r.ImGui_CalcTextSize(ctx, 'Apply Harmonies')    + _bp
         local bw_tur  = r.ImGui_CalcTextSize(ctx, 'Stop Tuner')         + _bp
+        local bw_snap = r.ImGui_CalcTextSize(ctx, 'Snap draft notes')  + _bp
 
         ----------------------------------------------------------------
         -- Tab bar
@@ -149,6 +147,18 @@ function Loop()
                     S.status = 'Track lists refreshed.'
                 end
                 Tooltip(TIPS.track_refresh)
+
+                r.ImGui_Spacing(ctx)
+                r.ImGui_Text(ctx, 'WIP tabs')
+                r.ImGui_SameLine(ctx)
+                if r.ImGui_RadioButton(ctx, 'No##wip', not S.show_wip_tabs) then
+                    S.show_wip_tabs = false
+                end
+                r.ImGui_SameLine(ctx)
+                if r.ImGui_RadioButton(ctx, 'Yes##wip', S.show_wip_tabs) then
+                    S.show_wip_tabs = true
+                end
+                Tooltip(TIPS.show_wip_tabs)
 
                 r.ImGui_EndTabItem(ctx)
             end
@@ -211,9 +221,9 @@ function Loop()
                 SectionHeader('Pitch Tuner')
 
                 if S.tuner_active then
-                    if r.ImGui_Button(ctx, 'Stop Tuner', bw_tur, 24) then StopTuner() end
+                    if r.ImGui_Button(ctx, 'Stop Tuner', bw_tur, 24) then RunAction(StopTuner) end
                 else
-                    if r.ImGui_Button(ctx, 'Start Tuner', bw_tur, 24) then StartTuner() end
+                    if r.ImGui_Button(ctx, 'Start Tuner', bw_tur, 24) then RunAction(StartTuner) end
                 end
                 Tooltip(TIPS.tuner_toggle)
 
@@ -270,77 +280,6 @@ function Loop()
             end
 
             ------------------------------------------------------------
-            -- Tab: Note Placement
-            ------------------------------------------------------------
-            if r.ImGui_BeginTabItem(ctx, 'Note Placement') then
-                _new_tab = 'Note Placement'
-                r.ImGui_Spacing(ctx)
-                SectionHeader('Note Placement', 'Reset##det', ResetDetection, TIPS.reset_detection)
-
-                if r.ImGui_Button(ctx, 'Auto-tune from reference', bw_at, 24) then
-                    RunAutoTune()
-                end
-                Tooltip(TIPS.autotune)
-                r.ImGui_Spacing(ctx)
-
-                local _
-                _, S.rms_threshold = r.ImGui_SliderDouble(ctx, 'RMS threshold',
-                    S.rms_threshold, 0.001, 0.5, '%.4f')
-                SliderTooltip(TIPS.rms_threshold)
-
-                local lpf_fmt = (S.lpf_cutoff_hz > 0) and '%.0f Hz' or 'Off'
-                _, S.lpf_cutoff_hz = r.ImGui_SliderDouble(ctx, 'Low-pass cutoff',
-                    S.lpf_cutoff_hz, 0, 8000, lpf_fmt)
-                SliderTooltip(TIPS.lpf_cutoff)
-
-                local split_fmt = (S.split_ratio > 0) and '%.0f%%' or 'Off'
-                _, S.split_ratio = r.ImGui_SliderDouble(ctx, 'Peak-split ratio',
-                    S.split_ratio, 0, 95, split_fmt)
-                SliderTooltip(TIPS.split_ratio)
-
-                _, S.min_offset_ms = r.ImGui_SliderDouble(ctx, 'Min offset to next note (ms)',
-                    S.min_offset_ms, 0, 500, '%.0f')
-                SliderTooltip(TIPS.min_offset_ms)
-
-                _, S.min_note_ms = r.ImGui_SliderDouble(ctx, 'Min note length (ms)',
-                    S.min_note_ms, 10, 500, '%.0f')
-                SliderTooltip(TIPS.min_note_ms)
-
-                _, S.window_ms = r.ImGui_SliderDouble(ctx, 'RMS window (ms)',
-                    S.window_ms, 5, 100, '%.0f')
-                SliderTooltip(TIPS.window_ms)
-
-                r.ImGui_Separator(ctx)
-                SectionHeader('MIDI output', 'Reset##midi', ResetMIDIOutput, TIPS.reset_midi)
-                _, S.velocity = r.ImGui_SliderInt(ctx, 'Velocity', S.velocity, 1, 127)
-                SliderTooltip(TIPS.velocity)
-
-                local pfmt = ('%%d  (%s)'):format(PitchName(S.pitch))
-                _, S.pitch = r.ImGui_SliderInt(ctx, 'Default pitch', S.pitch, RB3_MIN_PITCH, RB3_MAX_PITCH, pfmt)
-                SliderTooltip(TIPS.pitch)
-
-                r.ImGui_Separator(ctx)
-                if r.ImGui_Button(ctx, 'Dry run', bw_dry, 24) then
-                    Preview()
-                end
-                Tooltip(TIPS.preview)
-
-                r.ImGui_SameLine(ctx)
-                if r.ImGui_Button(ctx, 'Generate (append)', bw_gen, 24) then
-                    Generate()
-                end
-                Tooltip(TIPS.generate)
-
-                r.ImGui_SameLine(ctx)
-                if r.ImGui_Button(ctx, 'Generate (replace)', bw_grp, 24) then
-                    Generate(true)
-                end
-                Tooltip(TIPS.generate_replace)
-
-                r.ImGui_EndTabItem(ctx)
-            end
-
-            ------------------------------------------------------------
             -- Tab: Pitch
             ------------------------------------------------------------
             if r.ImGui_BeginTabItem(ctx, 'Pitch') then
@@ -365,7 +304,7 @@ function Loop()
                 r.ImGui_Spacing(ctx)
                 r.ImGui_Text(ctx, 'Built-in detection settings')
                 if r.ImGui_Button(ctx, 'Auto-tune YIN from reference', bw_ayt, 24) then
-                    RunAutoTuneYIN()
+                    RunAction(RunAutoTuneYIN)
                 end
                 Tooltip(TIPS.autotune_yin)
                 r.ImGui_Spacing(ctx)
@@ -429,7 +368,7 @@ function Loop()
 
                 r.ImGui_Separator(ctx)
                 if r.ImGui_Button(ctx, 'Apply pitch changes', bw_app, 24) then
-                    ApplyPitchChangesAction()
+                    RunAction(ApplyPitchChangesAction)
                 end
                 Tooltip(TIPS.apply_pitch)
 
@@ -475,9 +414,9 @@ function Loop()
                         local res = r.ShowMessageBox(
                             'No time selection is active.\n\nAll notes in the full MIDI item will be snapped to the key.\n\nContinue?',
                             'Snap to Key', 1)
-                        if res == 1 then SnapToKeyAction() end
+                        if res == 1 then RunAction(SnapToKeyAction) end
                     else
-                        SnapToKeyAction()
+                        RunAction(SnapToKeyAction)
                     end
                 end
                 Tooltip(TIPS.snap_apply)
@@ -514,7 +453,7 @@ function Loop()
                             S.last_result = nil
                         end
                     else
-                        S.status = 'Project has no saved path — save the project first.'
+                        S.status = 'Project has no saved path - save the project first.'
                         S.last_result = nil
                     end
                 end
@@ -532,7 +471,7 @@ function Loop()
                     local ok, path = r.GetUserFileNameForRead(start, 'Select lyrics file', 'txt')
                     if ok and path and path ~= '' then
                         if not path:match('%.[Tt][Xx][Tt]$') then
-                            S.status = 'Invalid file — please select a .txt file.'
+                            S.status = 'Invalid file - please select a .txt file.'
                             S.last_result = nil
                         else
                             S.lyrics_path = path
@@ -549,7 +488,7 @@ function Loop()
 
                 r.ImGui_SameLine(ctx)
                 if r.ImGui_Button(ctx, 'Clear lyrics', bw_lcl, 24) then
-                    ClearLyricsAction()
+                    RunAction(ClearLyricsAction)
                 end
                 Tooltip(TIPS.lyrics_clear)
 
@@ -557,7 +496,7 @@ function Loop()
                 r.ImGui_SameLine(ctx)
                 if assign_disabled then r.ImGui_BeginDisabled(ctx) end
                 if r.ImGui_Button(ctx, 'Assign lyrics', bw_las, 24) then
-                    AssignLyricsAction()
+                    RunAction(AssignLyricsAction)
                 end
                 if assign_disabled then r.ImGui_EndDisabled(ctx) end
                 Tooltip(TIPS.lyrics_assign)
@@ -570,49 +509,7 @@ function Loop()
             ------------------------------------------------------------
             if r.ImGui_BeginTabItem(ctx, 'Pitch slide') then
                 _new_tab = 'Pitch slide'
-                r.ImGui_Spacing(ctx)
-                SectionHeader('Slide Scan', 'Reset##slides', ResetSlides, TIPS.reset_slides)
-                _, S.slide_min_note_ms = r.ImGui_SliderInt(ctx, 'Min note length (ms)##sld', S.slide_min_note_ms, 20, 500)
-                S.slide_min_note_ms = math.max(20,  math.floor(S.slide_min_note_ms / 10 + 0.5) * 10)
-                SliderTooltip(TIPS.slide_min_note_ms)
-                _, S.slide_min_seg_ms  = r.ImGui_SliderInt(ctx, 'Min segment (ms)##sld',     S.slide_min_seg_ms,   5, 100)
-                S.slide_min_seg_ms  = math.max(5,   math.floor(S.slide_min_seg_ms  /  5 + 0.5) *  5)
-                SliderTooltip(TIPS.slide_min_seg_ms)
-                _, S.slide_skip_ms     = r.ImGui_SliderInt(ctx, 'Edge skip (ms)##sld',       S.slide_skip_ms,      0,  50)
-                S.slide_skip_ms     = math.max(0,   math.floor(S.slide_skip_ms     /  5 + 0.5) *  5)
-                SliderTooltip(TIPS.slide_skip_ms)
-                _, S.slide_step_ms     = r.ImGui_SliderInt(ctx, 'Sample step (ms)##sld',     S.slide_step_ms,      5,  50)
-                S.slide_step_ms     = math.max(5,   math.floor(S.slide_step_ms     /  5 + 0.5) *  5)
-                SliderTooltip(TIPS.slide_step_ms)
-                _, S.slide_win_ms      = r.ImGui_SliderInt(ctx, 'Sample window (ms)##sld',   S.slide_win_ms,      10,  50)
-                S.slide_win_ms      = math.max(10,  math.floor(S.slide_win_ms      /  5 + 0.5) *  5)
-                SliderTooltip(TIPS.slide_win_ms)
-                local min_slidable_ms = S.slide_skip_ms * 2 + S.slide_min_seg_ms * 2
-                if min_slidable_ms > S.slide_min_note_ms then
-                    r.ImGui_Spacing(ctx)
-                    r.ImGui_TextColored(ctx, 0xFFAA00FF,
-                        ('! Min segment \xc3\x972 + Edge skip \xc3\x972 = %dms exceeds Min note length (%dms).')
-                            :format(min_slidable_ms, S.slide_min_note_ms))
-                    r.ImGui_TextColored(ctx, 0xFFAA00FF,
-                        '  No slides can be detected with these settings.')
-                end
-                r.ImGui_Separator(ctx)
-                SectionHeader('YIN Detection', 'Reset##yin', ResetYIN, TIPS.reset_yin)
-                _, S.yin_threshold = r.ImGui_SliderDouble(ctx, 'YIN threshold',
-                    S.yin_threshold, 0.01, 0.5, '%.3f')
-                SliderTooltip(TIPS.yin_threshold)
-                _, S.yin_min_freq = r.ImGui_SliderInt(ctx, 'Min frequency (Hz)',
-                    S.yin_min_freq, 40, 400)
-                SliderTooltip(TIPS.yin_min_freq)
-                _, S.yin_max_freq = r.ImGui_SliderInt(ctx, 'Max frequency (Hz)',
-                    S.yin_max_freq, 200, 2000)
-                SliderTooltip(TIPS.yin_max_freq)
-                if S.yin_min_freq >= S.yin_max_freq then S.yin_max_freq = S.yin_min_freq + 1 end
-                r.ImGui_Separator(ctx)
-                if r.ImGui_Button(ctx, 'Scan pitch slides', bw_sld, 24) then
-                    ScanPitchSlidesAction()
-                end
-                Tooltip(TIPS.scan_slides)
+                DrawPitchSlideTab(ctx)
                 r.ImGui_EndTabItem(ctx)
             end
 
@@ -621,134 +518,7 @@ function Loop()
             ------------------------------------------------------------
             if r.ImGui_BeginTabItem(ctx, 'Harmonies') then
                 _new_tab = 'Harmonies'
-                r.ImGui_Spacing(ctx)
-
-                ---- Source ----
-                r.ImGui_Text(ctx, 'Source')
-                Tooltip(TIPS.harm_src)
-                S.harm_src_idx = FilteredTrackCombo('##harm_src', S.harm_src_idx, midi_tracks)
-                Tooltip(TIPS.harm_src)
-
-                r.ImGui_Spacing(ctx)
-                r.ImGui_Separator(ctx)
-                r.ImGui_Spacing(ctx)
-
-                ---- Destination rows ----
-                local dst_rows = {
-                    { en='harm_dst1_enabled', idx='harm_dst1_idx', mode='harm_dst1_mode',
-                      en_id='##hd1en', trk_id='##harm_dst1', mode_id='##harm_m1',
-                      lu='harm_dst1_lyric_unpitched', lh='harm_dst1_lyric_hidden',
-                      lu_id='##hd1lu', lh_id='##hd1lh',
-                      label='Destination 1', tip='harm_dst1' },
-                    { en='harm_dst2_enabled', idx='harm_dst2_idx', mode='harm_dst2_mode',
-                      en_id='##hd2en', trk_id='##harm_dst2', mode_id='##harm_m2',
-                      lu='harm_dst2_lyric_unpitched', lh='harm_dst2_lyric_hidden',
-                      lu_id='##hd2lu', lh_id='##hd2lh',
-                      label='Destination 2', tip='harm_dst2' },
-                    { en='harm_dst3_enabled', idx='harm_dst3_idx', mode='harm_dst3_mode',
-                      en_id='##hd3en', trk_id='##harm_dst3', mode_id='##harm_m3',
-                      lu='harm_dst3_lyric_unpitched', lh='harm_dst3_lyric_hidden',
-                      lu_id='##hd3lu', lh_id='##hd3lh',
-                      label='Destination 3', tip='harm_dst3' },
-                }
-
-                local any_diatonic = false
-                for _, d in ipairs(dst_rows) do
-                    if S[d.en] and HARM_MODES[S[d.mode] + 1].diatonic then
-                        any_diatonic = true
-                    end
-                end
-
-                for _, d in ipairs(dst_rows) do
-                    r.ImGui_Text(ctx, d.label)
-                    r.ImGui_SameLine(ctx)
-                    local _, new_en = r.ImGui_Checkbox(ctx, d.en_id, S[d.en])
-                    S[d.en] = new_en
-                    Tooltip(TIPS.harm_dst_enabled)
-
-                    local row_off = not S[d.en]
-                    if row_off then r.ImGui_BeginDisabled(ctx) end
-                    S[d.idx] = FilteredTrackCombo(d.trk_id, S[d.idx], tracks)
-                    Tooltip(TIPS[d.tip])
-                    if r.ImGui_BeginCombo(ctx, d.mode_id, HARM_MODES[S[d.mode] + 1].label) then
-                        for mi, m in ipairs(HARM_MODES) do
-                            local is_sel = (mi - 1 == S[d.mode])
-                            if r.ImGui_Selectable(ctx, m.label, is_sel) then S[d.mode] = mi - 1 end
-                            if is_sel then r.ImGui_SetItemDefaultFocus(ctx) end
-                        end
-                        r.ImGui_EndCombo(ctx)
-                    end
-                    Tooltip(TIPS.harm_dst_mode)
-                    local _, new_lu = r.ImGui_Checkbox(ctx, 'Unpitched lyrics (#)' .. d.lu_id, S[d.lu])
-                    S[d.lu] = new_lu
-                    Tooltip(TIPS.harm_lyric_unpitched)
-                    r.ImGui_SameLine(ctx)
-                    local _, new_lh = r.ImGui_Checkbox(ctx, 'Hidden lyrics ($)' .. d.lh_id, S[d.lh])
-                    S[d.lh] = new_lh
-                    Tooltip(TIPS.harm_lyric_hidden)
-                    if row_off then r.ImGui_EndDisabled(ctx) end
-
-                    r.ImGui_Spacing(ctx)
-                end
-
-                r.ImGui_Spacing(ctx)
-                r.ImGui_Separator(ctx)
-                r.ImGui_Spacing(ctx)
-
-                ---- Key section ----
-                if not any_diatonic then r.ImGui_BeginDisabled(ctx) end
-                r.ImGui_Text(ctx, 'Key')
-                Tooltip(TIPS.harm_key)
-                r.ImGui_SameLine(ctx)
-                r.ImGui_SetNextItemWidth(ctx, 80)
-                if r.ImGui_BeginCombo(ctx, '##harm_kr', HARM_NOTE_NAMES[S.harm_key_root + 1]) then
-                    for i, name in ipairs(HARM_NOTE_NAMES) do
-                        local is_sel = (i - 1 == S.harm_key_root)
-                        if r.ImGui_Selectable(ctx, name, is_sel) then S.harm_key_root = i - 1 end
-                        if is_sel then r.ImGui_SetItemDefaultFocus(ctx) end
-                    end
-                    r.ImGui_EndCombo(ctx)
-                end
-                Tooltip(TIPS.harm_key)
-                r.ImGui_SameLine(ctx)
-                if r.ImGui_RadioButton(ctx, 'Major##hkq', S.harm_key_quality == 0) then
-                    S.harm_key_quality = 0
-                end
-                Tooltip(TIPS.harm_key_quality)
-                r.ImGui_SameLine(ctx)
-                if r.ImGui_RadioButton(ctx, 'Minor##hkq', S.harm_key_quality == 1) then
-                    S.harm_key_quality = 1
-                end
-                Tooltip(TIPS.harm_key_quality)
-                if not any_diatonic then r.ImGui_EndDisabled(ctx) end
-
-                r.ImGui_Spacing(ctx)
-                r.ImGui_Separator(ctx)
-                r.ImGui_Spacing(ctx)
-
-                ---- Copy phrases checkbox ----
-                local _, new_cp = r.ImGui_Checkbox(ctx,
-                    'Copy phrase markers & overdrive##harm_cp', S.harm_copy_phrases)
-                S.harm_copy_phrases = new_cp
-                Tooltip(TIPS.harm_copy_phrases)
-
-                r.ImGui_Spacing(ctx)
-
-                r.ImGui_Spacing(ctx)
-
-                ---- Apply button ----
-                if r.ImGui_Button(ctx, 'Apply Harmonies', bw_harm, 24) then
-                    if not sel_s then
-                        local res = r.ShowMessageBox(
-                            'No time selection is active.\n\nAll notes in the full source MIDI item will be processed.\n\nContinue?',
-                            'Apply Harmonies', 1)
-                        if res == 1 then HarmoniesAction() end
-                    else
-                        HarmoniesAction()
-                    end
-                end
-                Tooltip(TIPS.harm_apply)
-
+                DrawHarmoniesTab(ctx)
                 r.ImGui_EndTabItem(ctx)
             end
 
@@ -762,7 +532,7 @@ function Loop()
                 r.ImGui_Spacing(ctx)
                 local bw_vp = r.ImGui_CalcTextSize(ctx, 'Validate phrases') + _bp
                 if r.ImGui_Button(ctx, 'Validate phrases', bw_vp, 24) then
-                    ValidatePhrases()
+                    RunAction(ValidatePhrases)
                 end
                 Tooltip(TIPS.validate_phrases)
                 r.ImGui_Spacing(ctx)
@@ -783,9 +553,125 @@ function Loop()
                 r.ImGui_Spacing(ctx)
                 local bw_psc = r.ImGui_CalcTextSize(ctx, 'Check Phrase Similarity') + _bp
                 if r.ImGui_Button(ctx, 'Check Phrase Similarity', bw_psc, 24) then
-                    PhraseSimilarityAction()
+                    RunAction(PhraseSimilarityAction)
                 end
                 Tooltip(TIPS.phrase_sim_check)
+
+                r.ImGui_EndTabItem(ctx)
+            end
+
+            ------------------------------------------------------------
+            -- WIP: Note Placement tab
+            ------------------------------------------------------------
+            if S.show_wip_tabs and r.ImGui_BeginTabItem(ctx, 'Note Placement') then
+                _new_tab = 'Note Placement'
+                r.ImGui_Spacing(ctx)
+                local _
+                if r.ImGui_BeginTabBar(ctx, '##placement_subtabs') then
+
+                    ------------------------------------------------
+                    -- Sub-tab: Auto Detection
+                    ------------------------------------------------
+                    if r.ImGui_BeginTabItem(ctx, 'Auto Detection') then
+                        r.ImGui_Spacing(ctx)
+                        SectionHeader('MIDI output', 'Reset##midi', ResetMIDIOutput, TIPS.reset_midi)
+                        _, S.velocity = r.ImGui_SliderInt(ctx, 'Velocity', S.velocity, 1, 127)
+                        SliderTooltip(TIPS.velocity)
+
+                        local pfmt = ('%%d  (%s)'):format(PitchName(S.pitch))
+                        _, S.pitch = r.ImGui_SliderInt(ctx, 'Default pitch', S.pitch, RB3_MIN_PITCH, RB3_MAX_PITCH, pfmt)
+                        SliderTooltip(TIPS.pitch)
+
+                        r.ImGui_Separator(ctx)
+                        SectionHeader('Detection', 'Reset##det', ResetDetection, TIPS.reset_detection)
+
+                        if r.ImGui_Button(ctx, 'Auto-tune from reference', bw_at, 24) then
+                            RunAction(RunAutoTune)
+                        end
+                        Tooltip(TIPS.autotune)
+                        r.ImGui_Spacing(ctx)
+
+                        _, S.rms_threshold = r.ImGui_SliderDouble(ctx, 'RMS threshold',
+                            S.rms_threshold, 0.001, 0.5, '%.4f')
+                        SliderTooltip(TIPS.rms_threshold)
+
+                        local lpf_fmt = (S.lpf_cutoff_hz > 0) and '%.0f Hz' or 'Off'
+                        _, S.lpf_cutoff_hz = r.ImGui_SliderDouble(ctx, 'Low-pass cutoff',
+                            S.lpf_cutoff_hz, 0, 8000, lpf_fmt)
+                        SliderTooltip(TIPS.lpf_cutoff)
+
+                        local split_fmt = (S.split_ratio > 0) and '%.0f%%' or 'Off'
+                        _, S.split_ratio = r.ImGui_SliderDouble(ctx, 'Peak-split ratio',
+                            S.split_ratio, 0, 95, split_fmt)
+                        SliderTooltip(TIPS.split_ratio)
+
+                        _, S.min_offset_ms = r.ImGui_SliderDouble(ctx, 'Min offset to next note (ms)',
+                            S.min_offset_ms, 0, 500, '%.0f')
+                        SliderTooltip(TIPS.min_offset_ms)
+
+                        _, S.min_note_ms = r.ImGui_SliderDouble(ctx, 'Min note length (ms)',
+                            S.min_note_ms, 10, 500, '%.0f')
+                        SliderTooltip(TIPS.min_note_ms)
+
+                        _, S.window_ms = r.ImGui_SliderDouble(ctx, 'RMS window (ms)',
+                            S.window_ms, 5, 100, '%.0f')
+                        SliderTooltip(TIPS.window_ms)
+
+                        r.ImGui_Separator(ctx)
+                        _, S.snap_enabled = r.ImGui_Checkbox(ctx, 'Snap to onsets', S.snap_enabled)
+                        Tooltip(TIPS.snap_enabled)
+                        if S.snap_enabled then
+                            _, S.snap_window_ms = r.ImGui_SliderDouble(ctx, 'Snap window (ms)',
+                                S.snap_window_ms, 10, 200, '%.0f')
+                            SliderTooltip(TIPS.snap_window_ms)
+                        end
+
+                        r.ImGui_Separator(ctx)
+                        if r.ImGui_Button(ctx, 'Dry run', bw_dry, 24) then
+                            RunAction(Preview)
+                        end
+                        Tooltip(TIPS.preview)
+
+                        r.ImGui_SameLine(ctx)
+                        if r.ImGui_Button(ctx, 'Generate (append)', bw_gen, 24) then
+                            RunAction(Generate)
+                        end
+                        Tooltip(TIPS.generate)
+
+                        r.ImGui_SameLine(ctx)
+                        if r.ImGui_Button(ctx, 'Generate (replace)', bw_grp, 24) then
+                            RunAction(function() Generate(true) end)
+                        end
+                        Tooltip(TIPS.generate_replace)
+
+                        r.ImGui_EndTabItem(ctx)
+                    end
+
+                    ------------------------------------------------
+                    -- Sub-tab: Draft Snap
+                    ------------------------------------------------
+                    if r.ImGui_BeginTabItem(ctx, 'Draft Snap') then
+                        r.ImGui_Spacing(ctx)
+                        r.ImGui_TextWrapped(ctx,
+                            'Draw rough notes on the MIDI destination track (right count, approximate timing), ' ..
+                            'then click Snap draft notes to lock boundaries to the audio.')
+                        r.ImGui_Spacing(ctx)
+
+                        _, S.draft_snap_window_ms = r.ImGui_SliderDouble(ctx, 'Snap window (ms)',
+                            S.draft_snap_window_ms, 10, 300, '%.0f')
+                        SliderTooltip(TIPS.draft_snap_window_ms)
+
+                        r.ImGui_Separator(ctx)
+                        if r.ImGui_Button(ctx, 'Snap draft notes', bw_snap, 24) then
+                            RunAction(SnapDraft)
+                        end
+                        Tooltip(TIPS.snap_draft)
+
+                        r.ImGui_EndTabItem(ctx)
+                    end
+
+                    r.ImGui_EndTabBar(ctx)
+                end
 
                 r.ImGui_EndTabItem(ctx)
             end
@@ -816,7 +702,7 @@ function Loop()
         if can_undo then Tooltip('Undo: ' .. undo_str) end
         if S.last_result then
             r.ImGui_Separator(ctx)
-            for line in S.last_result:gmatch('([^\n]*)\n?') do
+            for line in (S.last_result .. '\n'):gmatch('([^\n]*)\n') do
                 if line ~= '' then
                     r.ImGui_Text(ctx, line)
                 else

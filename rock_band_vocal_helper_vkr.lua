@@ -8,7 +8,7 @@
 --   monophonic pitch detection. Includes Auto-tune to fit detection
 --   parameters to manually-placed reference timing notes.
 --
---   Built with Claude (Anthropic) — https://claude.ai
+--   Built with Claude (Anthropic) - https://claude.ai
 --
 --   v1.6
 --     - Validation tab: Validate phrases checks all phrase-marker regions for
@@ -93,15 +93,46 @@ end
 ctx = r.ImGui_CreateContext('Rock Band Vocal Helper')  -- global
 
 -- Module files live in a subfolder named after this script (without .lua).
--- Renaming the entry point requires renaming the folder too — intentional.
+-- Renaming the entry point requires renaming the folder too - intentional.
 local _script = ({reaper.get_action_context()})[2]
 local _dir    = _script:match('^(.+[\\/])')
 local _mdir   = _dir .. _script:match('[/\\]([^/\\]+)%.lua$') .. '/'
+
+for _, _f in ipairs({
+    _dir  .. 'lib/reaper_imgui_helpers.lua',
+    _dir  .. 'lib/reaper_dsp.lua',
+    _dir  .. 'lib/reaper_midi_helpers.lua',
+    _mdir .. 'defaults.lua',
+    _mdir .. 'tips.lua',
+    _mdir .. 'settings.lua',
+    _mdir .. 'helpers.lua',
+    _mdir .. 'pipeline.lua',
+    _mdir .. 'autotune.lua',
+    _mdir .. 'tuner.lua',
+    _mdir .. 'actions.lua',
+    _mdir .. 'actions_lyrics.lua',
+    _mdir .. 'actions_validation.lua',
+    _mdir .. 'actions_harmonies.lua',
+    _mdir .. 'actions_slides.lua',
+    _mdir .. 'actions_snap_key.lua',
+    _mdir .. 'ui_slides.lua',
+    _mdir .. 'ui_harmonies.lua',
+    _mdir .. 'ui.lua',
+}) do
+    if not r.file_exists(_f) then
+        r.ShowMessageBox(
+            'A required file is missing:\n\n  ' .. _f:sub(#_dir + 1) ..
+            '\n\nPlease reinstall the script.',
+            'Missing file', 0)
+        return
+    end
+end
 
 dofile(_dir  .. 'lib/reaper_imgui_helpers.lua')
 dofile(_dir  .. 'lib/reaper_dsp.lua')
 dofile(_dir  .. 'lib/reaper_midi_helpers.lua')
 dofile(_mdir .. 'defaults.lua')
+dofile(_mdir .. 'tips.lua')
 dofile(_mdir .. 'settings.lua')
 dofile(_mdir .. 'helpers.lua')
 dofile(_mdir .. 'pipeline.lua')
@@ -111,6 +142,10 @@ dofile(_mdir .. 'actions.lua')
 dofile(_mdir .. 'actions_lyrics.lua')
 dofile(_mdir .. 'actions_validation.lua')
 dofile(_mdir .. 'actions_harmonies.lua')
+dofile(_mdir .. 'actions_slides.lua')
+dofile(_mdir .. 'actions_snap_key.lua')
+dofile(_mdir .. 'ui_slides.lua')
+dofile(_mdir .. 'ui_harmonies.lua')
 dofile(_mdir .. 'ui.lua')  -- also calls r.defer(Loop) at end
 
 -- Startup initialisation (runs after all modules are loaded)

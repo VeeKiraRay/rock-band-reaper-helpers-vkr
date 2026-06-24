@@ -8,8 +8,9 @@ Two REAPER ReaScript (Lua) tools for Rock Band audio authoring, sharing a common
 | `rock_band_general_helper_vkr.lua` | Tempo map generation from drum audio, audio alignment, VENUE event validation |
 
 **Read the script-specific file before making changes:**
-- Working on `rock_band_vocal_helper_vkr` → read `CLAUDE_vocal.md`
-- Working on `rock_band_general_helper_vkr` → read `CLAUDE_general.md`
+- Working on `rock_band_vocal_helper_vkr` → read `.claude/CLAUDE_vocal.md`
+- Working on `rock_band_general_helper_vkr` → read `.claude/CLAUDE_general.md`
+- Working on `rock_band_music_theory_helper_vkr` → read `.claude/CLAUDE_music_theory.md`
 
 This file documents shared runtime, architecture, and conventions only.
 
@@ -100,7 +101,7 @@ Functions called from another file: define without `local`. Functions used only 
 
 For MIDI edits, `MarkTrackItemsDirty` is **required** inside the block — REAPER's MIDI
 functions do not mark the take dirty, so without it the undo entry is silently dropped.
-`MarkProjectDirty` and `UpdateArrange` do **not** fix this. See `CLAUDE_undo_fix.md`.
+`MarkProjectDirty` and `UpdateArrange` do **not** fix this. See `.claude/CLAUDE_undo_fix.md`.
 
 ```lua
 r.PreventUIRefresh(1)
@@ -223,8 +224,11 @@ These are guidelines, not hard stops. Tightly coupled code that must share local
     settings.lua     tempomap.lua    actions.lua    ui.lua
 
   CLAUDE.md           ← this file (shared conventions)
-  CLAUDE_vocal.md     ← vocal helper details
-  CLAUDE_general.md   ← general helper details
+  .claude/
+    CLAUDE_vocal.md               ← vocal helper details
+    CLAUDE_general.md             ← general helper details
+    CLAUDE_music_theory.md        ← music theory helper details
+    CLAUDE_venue_theme_generation.md  ← venue theme authoring guide
 ```
 
 Module file contents and load orders are in the script-specific CLAUDE files.

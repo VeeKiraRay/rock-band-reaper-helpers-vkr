@@ -45,7 +45,7 @@ function ValidatePhrases()
 
     if #phrase_markers == 0 then
         S.status = 'No phrase markers found.'
-        S.last_result = 'No phrase markers (pitch 105) found on the destination track — cannot validate.'
+        S.last_result = 'No phrase markers (pitch 105) found on the destination track - cannot validate.'
         return
     end
 
@@ -129,9 +129,9 @@ function ValidatePhrases()
     local n = #phrase_markers
     local summary
     if bad_count == 0 then
-        summary = ('Validated %d phrase%s — all OK.'):format(n, n == 1 and '' or 's')
+        summary = ('Validated %d phrase%s - all OK.'):format(n, n == 1 and '' or 's')
     else
-        summary = ('Validated %d phrase%s — %d with violations.'):format(
+        summary = ('Validated %d phrase%s - %d with violations.'):format(
             n, n == 1 and '' or 's', bad_count)
         local ok_count = n - bad_count
         if ok_count > 0 then
@@ -150,7 +150,7 @@ end
 -- Phrase Similarity Check
 ----------------------------------------------------------------------
 
-local function EditDistance(a, b)
+function EditDistance(a, b)
     local na, nb = #a, #b
     if na == 0 then return nb end
     if nb == 0 then return na end
@@ -390,7 +390,7 @@ function PhraseSimilarityAction()
         #groups, #groups == 1 and '' or 's',
         total_outliers, total_outliers == 1 and '' or 's')
     local mode_label = S.phrase_same_key and 'same key (pitch)' or 'any key (contour)'
-    table.insert(lines, 1, ('Compared %d phrase%s at %d%% threshold — %s.'):format(#phrases, #phrases == 1 and '' or 's', threshold, mode_label))
+    table.insert(lines, 1, ('Compared %d phrase%s at %d%% threshold - %s.'):format(#phrases, #phrases == 1 and '' or 's', threshold, mode_label))
     table.insert(lines, 1, summary)
     S.status = summary
     S.last_result = table.concat(lines, '\n')

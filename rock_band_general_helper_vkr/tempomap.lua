@@ -32,6 +32,7 @@ function ComputeTempoRMSContour(audio_item, t_s, t_e, window_s)
     local buf_samps  = win_samps * chunk_wins
     local buffer     = r.new_array(buf_samps * nch)
     local contour    = {}
+    local truncated  = false
     local w = 0
 
     while w < total_wins do
@@ -41,7 +42,7 @@ function ComputeTempoRMSContour(audio_item, t_s, t_e, window_s)
 
         buffer.clear()
         local ret = r.GetAudioAccessorSamples(accessor, sr, nch, t_chunk, this_samps, buffer)
-        if ret < 0 then break end
+        if ret < 0 then truncated = true; break end
 
         for k = 0, this_wins - 1 do
             local sum  = 0
@@ -57,7 +58,7 @@ function ComputeTempoRMSContour(audio_item, t_s, t_e, window_s)
 
     r.DestroyAudioAccessor(accessor)
 
-    return { contour = contour, t_start = t_s, t_step = window_s }
+    return { contour = contour, t_start = t_s, t_step = window_s, truncated = truncated or nil }
 end
 
 -- Peak picker over an RMS contour. Records the first-crossing window of each
@@ -222,6 +223,52 @@ end
 -- Build an ordered list of {onsets, name} for every configured source track
 -- that has an audio item overlapping [t_s, t_e]. Priority: kick → snare → kit → fallback.
 -- Pass priority_override to restrict to a subset of sources (e.g. drum-only).
+-- Find the first source track (kick → snare → kit → fallback) that has detectable
+-- signal in the given time range and return its identity.
+-- probe_thr: if provided, use this fixed threshold and skip flux (existence check only).
+--            If nil, uses per-source thresholds and applies flux for the fallback.
+-- Returns { track, name, item, item_pos, item_end, scan_s, scan_e, is_fallback } or nil.
+function FindPrimarySource(sel_s, sel_e, probe_thr)
+    for _, field in ipairs({'tm_kick_idx','tm_snare_idx','tm_kit_idx','tm_fallback_idx'}) do
+        local idx = S[field]
+        if idx >= 0 then
+            local tr = r.GetTrack(0, idx)
+            if tr then
+                local it = r.GetTrackMediaItem(tr, 0)
+                if it then
+                    local ip     = r.GetMediaItemInfo_Value(it, 'D_POSITION')
+                    local ie     = ip + r.GetMediaItemInfo_Value(it, 'D_LENGTH')
+                    local scan_s = sel_s and math.max(sel_s, ip) or ip
+                    local scan_e = sel_e and math.min(sel_e, ie) or ie
+                    if scan_s < scan_e then
+                        local is_fb = (field == 'tm_fallback_idx')
+                        local thr   = probe_thr or (is_fb and S.tm_fb_rms_threshold or S.tm_rms_threshold)
+                        local win_s = is_fb and (S.tm_fb_rms_window_ms / 1000.0) or (S.tm_rms_window_ms / 1000.0)
+                        local ci    = ComputeTempoRMSContour(it, scan_s, scan_e, win_s)
+                        if ci then
+                            if not probe_thr and is_fb and S.tm_fb_use_flux then ci = RmsToOnsetFlux(ci) end
+                            if #DetectOnsets(ci, thr, 0.05) > 0 then
+                                local _, name = r.GetTrackName(tr)
+                                return {
+                                    track      = tr,
+                                    name       = name,
+                                    item       = it,
+                                    item_pos   = ip,
+                                    item_end   = ie,
+                                    scan_s     = scan_s,
+                                    scan_e     = scan_e,
+                                    is_fallback = is_fb,
+                                }
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return nil
+end
+
 function GetSourcesForRange(t_s, t_e, priority_override)
     local priority = priority_override or {
         'tm_kick_idx', 'tm_snare_idx', 'tm_kit_idx', 'tm_fallback_idx',
