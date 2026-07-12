@@ -35,6 +35,51 @@ HARM_MODES = {
     { label = 'Fixed 5th below (-7 st)',        diatonic = false, offset = -7 },
 }
 
+-- YIN vocal-style presets. Frequency bounds follow standard voice-classification
+-- ranges with a small margin; a min freq above ~half the sung range excludes the
+-- subharmonic lag range, which prevents YIN's octave-down errors. Window is
+-- longer for low voices (>= 2 periods of the lowest pitch must fit: 70 Hz needs
+-- ~29 ms) and shorter for high voices (tracks fast vibrato). Threshold 0.10 for
+-- clean voices per the YIN paper; higher for breathy/raspy so less-periodic
+-- frames are accepted instead of falling back to Default pitch.
+-- min_pitch/max_pitch use Rock Band numbering (C1 = 36).
+-- nil fields are left unchanged by ApplyYINPreset - style-only presets omit
+-- frequency bounds and pitch range.
+YIN_PRESETS = {
+    { label = 'Low male (bass\xe2\x80\x93baritone)',
+      threshold = 0.12, min_freq = 70,  max_freq = 470,  window_ms = 40,
+      min_pitch = 40, max_pitch = 69 },   -- E2..A4
+    { label = 'Male (tenor / typical rock)',
+      threshold = 0.15, min_freq = 100, max_freq = 620,  window_ms = 30,
+      min_pitch = 45, max_pitch = 72 },   -- A2..C5
+    { label = 'High male (high tenor / belt)',
+      threshold = 0.15, min_freq = 130, max_freq = 700,  window_ms = 30,
+      min_pitch = 48, max_pitch = 76 },   -- C3..E5
+    { label = 'Female (alto\xe2\x80\x93mezzo)',
+      threshold = 0.15, min_freq = 160, max_freq = 900,  window_ms = 25,
+      min_pitch = 53, max_pitch = 81 },   -- F3..A5
+    { label = 'High female / falsetto (soprano)',
+      threshold = 0.15, min_freq = 220, max_freq = 1200, window_ms = 20,
+      min_pitch = 60, max_pitch = 84 },   -- C4..C6
+    { label = 'Breathy / raspy (style only)',
+      threshold = 0.25, window_ms = 45 },
+    { label = 'Clean / sustained (style only)',
+      threshold = 0.10, window_ms = 30 },
+    -- Instrument preset for the Tuner. Piano sustain is highly periodic
+    -- (strict threshold rejects the hammer attack); 45 Hz..2 kHz covers
+    -- ~E1..B6; 50 ms window fits 2+ periods of the lowest bound; tuner_rms
+    -- lowered because piano stems are typically quiet. Deliberately no
+    -- pitch range: RB3 keys only cover C2-C4 (48-72), but the tuner should
+    -- report the true sounding pitch so the author decides how to wrap the
+    -- part into the playable range.
+    -- YIN is monophonic: single-note lines only, chords confuse it.
+    -- keys = true makes YINPresetCombo run a soft track sanity check
+    -- (warns in the result panel if the selected tracks look vocal-related).
+    { label = 'Piano / keys (tuner, single notes)',
+      threshold = 0.10, min_freq = 45, max_freq = 2000, window_ms = 50,
+      tuner_rms = 0.002, keys = true },
+}
+
 -- Lyric text events that Clear and Assign both preserve (special game events).
 LYRIC_IGNORE = {
     ['[tambourine_start]'] = true, ['[tambourine_end]'] = true,
@@ -216,6 +261,25 @@ function ResetSlides()
     S.slide_skip_ms     = DEFAULTS.slide_skip_ms
     S.slide_step_ms     = DEFAULTS.slide_step_ms
     S.slide_win_ms      = DEFAULTS.slide_win_ms
+end
+
+-- Apply a YIN_PRESETS entry. nil fields keep their current values.
+-- Voice-range presets also set and enable the pitch range constraints;
+-- style-only presets leave them untouched. Caller sets S.status.
+function ApplyYINPreset(preset)
+    if preset.threshold then S.yin_threshold = preset.threshold end
+    if preset.min_freq  then S.yin_min_freq  = preset.min_freq  end
+    if preset.max_freq  then S.yin_max_freq  = preset.max_freq  end
+    if preset.window_ms then S.yin_window_ms = preset.window_ms end
+    if preset.min_pitch then
+        S.min_pitch         = preset.min_pitch
+        S.min_pitch_enabled = true
+    end
+    if preset.max_pitch then
+        S.max_pitch         = preset.max_pitch
+        S.max_pitch_enabled = true
+    end
+    if preset.tuner_rms then S.tuner_rms_threshold = preset.tuner_rms end
 end
 
 function ResetYIN()

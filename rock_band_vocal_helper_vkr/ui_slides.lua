@@ -32,6 +32,7 @@ function DrawPitchSlideTab(ctx)
     end
     r.ImGui_Separator(ctx)
     SectionHeader('YIN Detection', 'Reset##yin', ResetYIN, TIPS.reset_yin)
+    YINPresetCombo('##sld')
     _, S.yin_threshold = r.ImGui_SliderDouble(ctx, 'YIN threshold',
         S.yin_threshold, 0.01, 0.5, '%.3f')
     SliderTooltip(TIPS.yin_threshold)

@@ -30,6 +30,52 @@ function FilteredTrackCombo(label, reaper_idx, track_list)
     return new_idx
 end
 
+-- Soft sanity check for instrument presets: warn when the selected tracks
+-- still look vocal-related. Advisory only - never blocks, settings apply
+-- regardless. Returns a result-panel string, or nil when nothing looks off.
+local function KeysPresetTrackWarnings()
+    local lines = {}
+    local mtr = r.GetTrack(0, S.midi_idx)
+    if mtr then
+        local _, name = r.GetTrackName(mtr)
+        local u = name:upper()
+        if u:find('VOCAL', 1, true) or u:find('HARM', 1, true) then
+            lines[#lines + 1] =
+                ('Selected preset is piano, but the MIDI destination "%s" looks vocal-related.'):format(name)
+        end
+    end
+    local atr = r.GetTrack(0, S.audio_idx)
+    if atr then
+        local _, name = r.GetTrackName(atr)
+        if name:upper():find('VOCAL', 1, true) then
+            lines[#lines + 1] =
+                ('Selected preset is piano, but the audio source "%s" contains "vocal".'):format(name)
+        end
+    end
+    if #lines == 0 then return nil end
+    lines[#lines + 1] = ''
+    lines[#lines + 1] = 'Did you mean to switch the track selectors? Settings were applied anyway.'
+    return table.concat(lines, '\n')
+end
+
+-- One-shot preset applier for the YIN sliders + pitch range constraints.
+-- Not a stateful selector: sliders remain the source of truth, so the combo
+-- always previews 'Apply preset...' and selecting an entry just writes values.
+function YINPresetCombo(id_suffix)
+    if r.ImGui_BeginCombo(ctx, 'Vocal style preset' .. id_suffix, 'Apply preset...') then
+        for _, preset in ipairs(YIN_PRESETS) do
+            if r.ImGui_Selectable(ctx, preset.label, false) then
+                ApplyYINPreset(preset)
+                S.status = 'Applied preset: ' .. preset.label
+                -- Clears any stale result; shows track warnings for instrument presets.
+                S.last_result = preset.keys and KeysPresetTrackWarnings() or nil
+            end
+        end
+        r.ImGui_EndCombo(ctx)
+    end
+    Tooltip(TIPS.yin_preset)
+end
+
 function Loop()
     -- Detect project switch (tabs). Reinitialize if the active project changed.
     local proj = r.EnumProjects(-1, '')
@@ -172,6 +218,7 @@ function Loop()
 
                 r.ImGui_Spacing(ctx)
                 SectionHeader('YIN Detection', 'Reset##yin_tur', ResetYIN, TIPS.reset_yin)
+                YINPresetCombo('##tur')
                 local _
                 _, S.yin_threshold = r.ImGui_SliderDouble(ctx, 'YIN threshold##tur',
                     S.yin_threshold, 0.01, 0.5, '%.3f')
@@ -309,6 +356,7 @@ function Loop()
                 Tooltip(TIPS.autotune_yin)
                 r.ImGui_Spacing(ctx)
 
+                YINPresetCombo('')
                 local _
                 _, S.yin_threshold = r.ImGui_SliderDouble(ctx, 'YIN threshold',
                     S.yin_threshold, 0.01, 0.5, '%.3f')

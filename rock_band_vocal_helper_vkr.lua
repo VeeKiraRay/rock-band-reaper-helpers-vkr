@@ -1,6 +1,6 @@
 -- @description Rock Band Vocal Helper
 -- @author VeeKiraRay
--- @version 1.6
+-- @version 1.7
 -- @about
 --   Analyses a vocal audio track and appends MIDI notes to an existing MIDI
 --   item on a destination track, one note per detected syllable or phrase.
@@ -9,6 +9,15 @@
 --   parameters to manually-placed reference timing notes.
 --
 --   Built with Claude (Anthropic) - https://claude.ai
+--
+--   v1.7
+--     - Vocal style presets: one-click combo on the Pitch, Tuner and Pitch
+--       slide tabs applies YIN settings derived from standard voice ranges
+--       (low male, tenor, high male, alto, soprano) plus style-only variants
+--       (breathy/raspy, clean). Voice-range presets also enable matching
+--       Min/Max pitch constraints to octave-snap detection errors. A
+--       Piano / keys preset tunes YIN and the tuner's Min RMS level for
+--       quiet single-note piano stems.
 --
 --   v1.6
 --     - Validation tab: Validate phrases checks all phrase-marker regions for

@@ -154,7 +154,7 @@ ui.lua:
 | `rock_band_vocal_helper_vkr/actions_snap_key.lua`   | `SnapToKeyAction`, `NearestScalePitch`; `NextScalePitch` (local)                                                                             |
 | `rock_band_vocal_helper_vkr/ui_slides.lua`          | `DrawPitchSlideTab(ctx)`                                                                                                                     |
 | `rock_band_vocal_helper_vkr/ui_harmonies.lua`       | `DrawHarmoniesTab(ctx)`                                                                                                                      |
-| `rock_band_vocal_helper_vkr/ui.lua`                 | `FilteredTrackCombo` (global), `Loop`, `r.defer(Loop)`                                                                                       |
+| `rock_band_vocal_helper_vkr/ui.lua`                 | `FilteredTrackCombo`, `YINPresetCombo` (global), `Loop`, `r.defer(Loop)`; `KeysPresetTrackWarnings` (local)                                  |
 
 **Local-only functions:**
 
@@ -266,6 +266,16 @@ An alternative workflow when you already have roughly-placed notes with the righ
 | **Min frequency (Hz)** | 40 – 400   | 80 Hz   | Lower bound on detectable pitch; sets the longest lag searched.                                                                  |
 | **Max frequency (Hz)** | 200 – 2000 | 1000 Hz | Upper bound on detectable pitch; sets the shortest lag. Must be > Min frequency.                                                 |
 | **YIN window (ms)**    | 10 – 100   | 30 ms   | Audio length analysed per note. Capped at 80% of the note length.                                                                |
+
+#### YIN vocal-style presets
+
+One-shot preset combo shown above the YIN sliders on the **Pitch**, **Tuner**, and **Pitch slide** tabs. Preset data: `YIN_PRESETS` in `defaults.lua`; applier: `ApplyYINPreset(preset)` in `defaults.lua`; combo widget: `YINPresetCombo(id_suffix)` (global, `ui.lua`).
+
+- Voice-range presets (low male → soprano) set all four YIN sliders **and** set + enable the Min/Max pitch constraints. Frequency bounds follow standard voice-classification ranges; raising min freq above the subharmonic range is the primary fix for octave-down errors.
+- Style-only presets (breathy/raspy, clean) set only threshold and window — `nil` fields in a preset entry are left unchanged.
+- Instrument preset "Piano / keys" (tuner-focused): strict threshold 0.10, 45–2000 Hz, 50 ms window, and lowers `S.tuner_rms_threshold` to 0.002 via the optional `tuner_rms` preset field. Deliberately no pitch range: RB3 keys only cover C2–C4 (48–72), but the tuner should report the true sounding pitch so the author decides how to wrap the part into the playable range. Monophonic only — chords confuse YIN.
+- The combo is a command, not state: preview text is always `Apply preset...`, nothing new is persisted (applied values land in the already-persisted `S.yin_*` / pitch fields), and sliders remain the source of truth afterwards. Applying any preset clears `S.last_result`.
+- Presets with `keys = true` run `KeysPresetTrackWarnings` (local, `ui.lua`): a soft sanity check that writes to `S.last_result` if the MIDI destination name contains `VOCAL`/`HARM` or the audio source name contains `VOCAL` (case-insensitive). Advisory only — both warnings can co-exist, nothing is blocked, settings apply regardless.
 
 #### Auto-tune YIN from reference
 
@@ -531,6 +541,8 @@ Assign lyrics ignores time selection and operates on the full MIDI take. If Assi
 - [ ] Phrase Similarity: groups similar phrases; flags differing notes; same-key vs contour mode both work.
 - [ ] Scan pitch slides: shows warning when no time selection; result in global panel.
 - [ ] YIN threshold changed on Pitch slide tab is visible on Pitch tab (same `S.yin_*` state).
+- [ ] YIN presets: combo appears on Pitch, Tuner, and Pitch slide tabs; a voice-range preset sets all four YIN sliders and enables Min/Max pitch; a style-only preset changes only threshold and window; status bar reports the preset label.
+- [ ] Piano preset: with "PART VOCALS" MIDI destination and/or a "VOCALS"-named audio source selected, applying it shows the vocal-track warning(s) in the result panel (both when both match); with keys-named tracks, no warning; settings apply in every case.
 - [ ] Save → modify slide sliders → reload project → values restored.
 - [ ] Result summary shows current Min note length value, not a hardcoded string.
 

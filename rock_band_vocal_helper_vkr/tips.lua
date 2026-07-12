@@ -79,6 +79,20 @@ TIPS = {
         "Notes where pitch cannot be reliably detected fall back to the Default pitch.\n\n" ..
         "Works best on clean, dry vocal stems.",
 
+    yin_preset =
+        "Apply a starting-point preset derived from standard voice ranges " ..
+        "(bass, tenor, soprano, ...).\n\n" ..
+        "Voice-range presets set all four YIN sliders AND enable matching " ..
+        "Min/Max pitch constraints - raising Min frequency above the " ..
+        "subharmonic range is the main fix for octave-down detection errors.\n" ..
+        "Style-only presets adjust threshold and window, leaving the " ..
+        "frequency and pitch range untouched.\n" ..
+        "The Piano / keys preset targets the Tuner: wide frequency range, " ..
+        "strict threshold, and a lower Min RMS level for quiet stems. " ..
+        "Single-note lines only - YIN cannot track chords.\n\n" ..
+        "Presets are one-shot: sliders stay editable afterwards. Refine " ..
+        "further by hand or with Auto-tune YIN from reference.",
+
     yin_threshold =
         "Confidence threshold for YIN pitch detection (0.01 - 0.5).\n\n" ..
         "YIN measures aperiodicity: 0 = perfectly periodic, 1 = no periodicity.\n\n" ..
