@@ -105,6 +105,15 @@ local function GetBeatDurAt(t)
     return 60.0 / bpm
 end
 
+-- Project time → quarter-note position, exact w.r.t. the tempo map.
+-- Beat-fraction rules must be measured this way, not as seconds against a
+-- single sampled BPM: with a fluctuating tempo map the seconds-length of a
+-- 1/4 note changes inside the gap, so even grid-quantized notes drift a few ms.
+local function QNAt(t) return r.TimeMap2_timeToQN(0, t) end
+
+local GRACE  = 0.05  -- forgive gaps up to 5% under the requirement (hand-placed notes)
+local EPS_QN = 0.01  -- epsilon for classification thresholds (~5 ms at 120 BPM)
+
 -- 1-based measure number at project time t.
 local function GetMeasureAt(t)
     local s = r.format_timestr_pos(t, '', 1)  -- "M.B.HH" e.g. "5.1.00"
@@ -286,10 +295,11 @@ local function CheckSpacing(events, min_beat_frac)
     local issues = {}
     for i = 2, #events do
         local prev, curr = events[i-1], events[i]
-        local gap   = curr.s - prev.s
-        local bdur  = GetBeatDurAt(prev.s)
-        local min_s = min_beat_frac * bdur
-        if gap < min_s - 0.002 then
+        local qn_prev = QNAt(prev.s)
+        local gap_qn  = QNAt(curr.s) - qn_prev
+        if gap_qn < min_beat_frac * (1 - GRACE) then
+            local gap   = curr.s - prev.s
+            local min_s = r.TimeMap2_QNToTime(0, qn_prev + min_beat_frac) - prev.s
             local frac_str = min_beat_frac == 1.0 and '1/4 note' or '1/2 note'
             issues[#issues + 1] = ('%s: %s is %.0f ms after previous note (min %s = %.0f ms)'):format(
                 FormatTime(curr.s), EventLabel(curr.pitches),
@@ -377,7 +387,7 @@ local function CheckOverlappingGems(events, diff_label)
                     last_start = prev.s
                 end
             end
-            if curr.s - last_start >= GetBeatDurAt(curr.s) - 0.002 then goto ov_next end
+            if QNAt(curr.s) - QNAt(last_start) >= 1.0 - EPS_QN then goto ov_next end
         end
 
         do
@@ -425,13 +435,13 @@ local function CheckSustainGaps(events, diff_label)
     for i = 1, #events - 1 do
         local ev      = events[i]
         local next_ev = events[i + 1]
-        local beat    = GetBeatDurAt(ev.s)
-        local dur     = ev.e - ev.s
+        local qn_e    = QNAt(ev.e)
+        local dur_qn  = qn_e - QNAt(ev.s)
 
-        if dur < beat * 0.5 - 0.002 then goto sg_next end  -- not sustained (< 1/8 note)
+        if dur_qn < 0.5 - EPS_QN then goto sg_next end  -- not sustained (< 1/8 note)
 
-        local gap = next_ev.s - ev.e
-        if gap < 0 then goto sg_next end  -- overlap: handled by CheckOverlappingGems
+        local gap_qn = QNAt(next_ev.s) - qn_e
+        if gap_qn < 0 then goto sg_next end  -- overlap: handled by CheckOverlappingGems
 
         local is_chord   = #ev.pitches > 1
         local next_chord = #next_ev.pitches > 1
@@ -458,23 +468,25 @@ local function CheckSustainGaps(events, diff_label)
             end
         end  -- chord→different chord: simple stays false
 
-        local min_gap, min_label, ttype
+        local min_qn, min_label, ttype
         if diff_label == 'M' or diff_label == 'E' then
-            min_gap, min_label, ttype = beat, '1/4 note', ''
+            min_qn, min_label, ttype = 1.0, '1/4 note', ''
         elseif simple then
-            min_gap, min_label, ttype = beat * 0.25, '1/16 note', 'simple transition: '
+            min_qn, min_label, ttype = 0.25, '1/16 note', 'simple transition: '
         elseif is_chord and next_chord then
-            min_gap, min_label, ttype = beat * 0.5, '1/8 note', 'chord \xe2\x86\x92 chord: '
+            min_qn, min_label, ttype = 0.5, '1/8 note', 'chord \xe2\x86\x92 chord: '
         elseif is_chord then
-            min_gap, min_label, ttype = beat * 0.5, '1/8 note', 'chord \xe2\x86\x92 unrelated note: '
+            min_qn, min_label, ttype = 0.5, '1/8 note', 'chord \xe2\x86\x92 unrelated note: '
         else
-            min_gap, min_label, ttype = beat * 0.5, '1/8 note', 'note \xe2\x86\x92 unrelated chord: '
+            min_qn, min_label, ttype = 0.5, '1/8 note', 'note \xe2\x86\x92 unrelated chord: '
         end
 
-        if gap < min_gap - 0.002 then
+        if gap_qn < min_qn * (1 - GRACE) then
+            local gap   = next_ev.s - ev.e
+            local min_s = r.TimeMap2_QNToTime(0, qn_e + min_qn) - ev.e
             issues[#issues + 1] = ('%s: %s ends %.0f ms before %s (%sneed %s gap = %.0f ms)'):format(
                 FormatTime(next_ev.s), EventLabel(ev.pitches), gap * 1000,
-                EventLabel(next_ev.pitches), ttype, min_label, min_gap * 1000)
+                EventLabel(next_ev.pitches), ttype, min_label, min_s * 1000)
         end
 
         ::sg_next::

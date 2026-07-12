@@ -1,6 +1,6 @@
 -- @description Rock Band General Helper
 -- @author VeeKiraRay
--- @version 0.9
+-- @version 0.9.1
 -- @about
 --   Utility actions for Rock Band authoring in REAPER.
 --
@@ -17,6 +17,10 @@
 --
 --   Built with Claude (Anthropic) - https://claude.ai
 --
+--   v0.9.1
+--     - Difficulty validation: gap/spacing/length rules now measured in quarter
+--       notes via the tempo map (accurate with fluctuating BPM) with a 5% grace
+--       for hand-placed notes.
 --   v0.9
 --     - Added Drums, Keys, Guitar, Difficulty, Tab Input, MIDI tabs.
 --       Refactored into per-feature action files (actions_drums, actions_keys,

@@ -82,6 +82,15 @@ local function GetK5BeatDur(t)
     return 60.0 / bpm
 end
 
+-- Project time → quarter-note position, exact w.r.t. the tempo map.
+-- Beat-fraction rules must be measured this way, not as seconds against a
+-- single sampled BPM: with a fluctuating tempo map the seconds-length of a
+-- 1/4 note changes inside the gap, so even grid-quantized notes drift a few ms.
+local function QNAt(t) return r.TimeMap2_timeToQN(0, t) end
+
+local GRACE  = 0.05  -- forgive gaps up to 5% under the requirement (hand-placed notes)
+local EPS_QN = 0.01  -- epsilon for classification thresholds (~5 ms at 120 BPM)
+
 -- Returns the gem lane color name for a pitch.
 -- Uses offset from the nearest difficulty's lo, checking all 5 gem slots (0-4),
 -- so OOR notes (e.g. Blue/Orange on Easy) still get a color name.
@@ -126,17 +135,19 @@ local function CheckK5Spacing(events, min_beats, advisory_beats)
     local issues = {}
     for i = 2, #events do
         local prev, curr = events[i-1], events[i]
-        local gap    = curr.s - prev.s
-        local bdur   = GetK5BeatDur(prev.s)
-        local min_s  = min_beats * bdur
-        if gap < min_s - 0.002 then
+        local qn_prev = QNAt(prev.s)
+        local gap_qn  = QNAt(curr.s) - qn_prev
+        local gap     = curr.s - prev.s
+        if gap_qn < min_beats * (1 - GRACE) then
+            local min_s = r.TimeMap2_QNToTime(0, qn_prev + min_beats) - prev.s
             local frac_str = min_beats == 1.0 and '1/4 note' or '1/2 note'
             issues[#issues + 1] = ('%s: %s is %.0f ms after previous (min %s = %.0f ms)'):format(
                 FormatTime(curr.s), K5Label(curr.pitches), gap * 1000, frac_str, min_s * 1000)
-        elseif advisory_beats and gap < advisory_beats * bdur - 0.002 then
+        elseif advisory_beats and gap_qn < advisory_beats * (1 - GRACE) then
+            local adv_s = r.TimeMap2_QNToTime(0, qn_prev + advisory_beats) - prev.s
             local adv_str = advisory_beats == 2.0 and '1/2 note' or '1/4 note'
             issues[#issues + 1] = ('%s: %s is %.0f ms after previous (advisory: %s = %.0f ms recommended for Easy)'):format(
-                FormatTime(curr.s), K5Label(curr.pitches), gap * 1000, adv_str, advisory_beats * bdur * 1000)
+                FormatTime(curr.s), K5Label(curr.pitches), gap * 1000, adv_str, adv_s * 1000)
         end
     end
     return issues
@@ -146,12 +157,13 @@ end
 local function CheckK5NoteLength(events)
     local issues = {}
     for _, ev in ipairs(events) do
-        local bdur    = GetK5BeatDur(ev.s)
-        local min_dur = bdur * 0.0625  -- 1/64 note = 1/16 of a beat
-        local dur     = ev.e - ev.s
-        if dur < min_dur - 0.001 then
+        local qn_s   = QNAt(ev.s)
+        local dur_qn = QNAt(ev.e) - qn_s
+        if dur_qn < 0.0625 * (1 - GRACE) then  -- 1/64 note = 1/16 of a beat
+            local dur   = ev.e - ev.s
+            local min_s = r.TimeMap2_QNToTime(0, qn_s + 0.0625) - ev.s
             issues[#issues + 1] = ('%s: %s is %.1f ms long (min 1/64 note = %.1f ms)'):format(
-                FormatTime(ev.s), K5Label(ev.pitches), dur * 1000, min_dur * 1000)
+                FormatTime(ev.s), K5Label(ev.pitches), dur * 1000, min_s * 1000)
         end
     end
     return issues
@@ -165,27 +177,29 @@ local function CheckK5SustainGaps(events, diff_label)
     for i = 1, #events - 1 do
         local ev      = events[i]
         local next_ev = events[i + 1]
-        local beat    = GetK5BeatDur(ev.s)
-        local dur     = ev.e - ev.s
+        local qn_e    = QNAt(ev.e)
+        local dur_qn  = qn_e - QNAt(ev.s)
 
-        if dur < beat * 0.5 - 0.002 then goto k5sg_next end  -- not sustained (< 1/8 note)
+        if dur_qn < 0.5 - EPS_QN then goto k5sg_next end  -- not sustained (< 1/8 note)
 
-        local gap = next_ev.s - ev.e
-        if gap < 0 then goto k5sg_next end  -- overlap; handled elsewhere
+        local gap_qn = QNAt(next_ev.s) - qn_e
+        if gap_qn < 0 then goto k5sg_next end  -- overlap; handled elsewhere
 
-        local min_gap, min_label
+        local min_qn, min_label
         if diff_label == 'M' or diff_label == 'E' then
-            min_gap, min_label = beat * 1.0, '1/4 note'
+            min_qn, min_label = 1.0,  '1/4 note'
         elseif #ev.pitches > 1 then
-            min_gap, min_label = beat * 0.5,  '1/8 note'
+            min_qn, min_label = 0.5,  '1/8 note'
         else
-            min_gap, min_label = beat * 0.25, '1/16 note'
+            min_qn, min_label = 0.25, '1/16 note'
         end
 
-        if gap < min_gap - 0.002 then
+        if gap_qn < min_qn * (1 - GRACE) then
+            local gap   = next_ev.s - ev.e
+            local min_s = r.TimeMap2_QNToTime(0, qn_e + min_qn) - ev.e
             issues[#issues + 1] = ('%s: %s ends %.0f ms before %s (need %s gap = %.0f ms)'):format(
                 FormatTime(next_ev.s), K5Label(ev.pitches), gap * 1000,
-                K5Label(next_ev.pitches), min_label, min_gap * 1000)
+                K5Label(next_ev.pitches), min_label, min_s * 1000)
         end
 
         ::k5sg_next::
@@ -198,15 +212,16 @@ end
 local function CheckK5SustainLength(events)
     local issues = {}
     for _, ev in ipairs(events) do
-        local beat = GetK5BeatDur(ev.s)
-        local bpm  = 60.0 / beat
+        local bpm = 60.0 / GetK5BeatDur(ev.s)
         if bpm < 100 then goto k5sl_next end
-        local dur         = ev.e - ev.s
-        local min_sustain = beat * 0.75  -- 3/16 note at >= 100 BPM
-        local hit_top     = beat * 0.5   -- 1/8 note: lower bound of gray zone
-        if dur >= hit_top - 0.002 and dur < min_sustain - 0.002 then
+        local qn_s   = QNAt(ev.s)
+        local dur_qn = QNAt(ev.e) - qn_s
+        -- Gray zone: >= 1/8 note (too long for a hit) but < 3/16 note (too short to sustain)
+        if dur_qn >= 0.5 - EPS_QN and dur_qn < 0.75 * (1 - GRACE) then
+            local dur   = ev.e - ev.s
+            local min_s = r.TimeMap2_QNToTime(0, qn_s + 0.75) - ev.s
             issues[#issues + 1] = ('%s: %s is %.0f ms (need >= 3/16 note = %.0f ms at %.0f BPM, or shorten to hit)'):format(
-                FormatTime(ev.s), K5Label(ev.pitches), dur * 1000, min_sustain * 1000, bpm)
+                FormatTime(ev.s), K5Label(ev.pitches), dur * 1000, min_s * 1000, bpm)
         end
         ::k5sl_next::
     end

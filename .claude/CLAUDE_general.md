@@ -150,8 +150,15 @@ Four WIP tabs appear only when **Show WIPs? = Yes** in the General tab (persiste
 - `actions_keys_guides.lua`: `PkEventLabel`, `ParseTabToRaws`
 - `actions_guitar.lua`: `ReadGuitarMIDI`, `GroupIntoEvents`, `IsIllegalGO`, `AssignGems`, `BuildPreviewReport`, `BuildOutNotes`, `ClearGuitarGems`
 - `actions_guitar_guide.lua`: `AssignGemsForGuide`
-- `actions_difficulty.lua`: `EventLabel`, `ReadPKNotes`, `GroupIntoEvents`, `GetBeatDurAt`, `CheckRange`, `CheckChordCount`, `CheckChordSpan`, `CheckIntervalJumps`, `CheckSpacing`, `CheckLaneShifts`, `CheckNotesAboveExpert`, `BuildReport`, `RunPKValidation`
-- `actions_difficulty_5k.lua`: `ReadK5Notes`, `GroupK5Chords`, `GetK5BeatDur`, `K5Label`, `CheckK5ChordCount`, `CheckK5Spacing`, `CheckK5NoteLength`, `CheckK5SustainGaps`, `BuildK5Report`, `RunK5Checks`
+- `actions_difficulty.lua`: `EventLabel`, `ReadPKNotes`, `GroupIntoEvents`, `GetBeatDurAt`, `QNAt`, `CheckRange`, `CheckChordCount`, `CheckChordSpan`, `CheckIntervalJumps`, `CheckSpacing`, `CheckLaneShifts`, `CheckNotesAboveExpert`, `BuildReport`, `RunPKValidation`
+- `actions_difficulty_5k.lua`: `ReadK5Notes`, `GroupK5Chords`, `GetK5BeatDur`, `QNAt`, `K5Label`, `CheckK5ChordCount`, `CheckK5Spacing`, `CheckK5NoteLength`, `CheckK5SustainGaps`, `BuildK5Report`, `RunK5Checks`
+
+Beat-fraction rules in both difficulty files (spacing, sustain gaps, note length)
+are measured in quarter notes via `TimeMap2_timeToQN`, never as seconds against
+one sampled BPM — with a fluctuating tempo map the seconds-length of a 1/4 note
+varies inside the gap, so even grid-quantized notes fail by a few ms otherwise.
+Minimum-gap rules get a 5% grace (`GRACE`) for hand-placed notes; classification
+thresholds (is-sustained, sustain gray zone) use a small `EPS_QN` epsilon instead.
 - `actions_midi_replace.lua`: `MeasureLabel`, `NoteLabel`, `PatternsMatch`, `ClearPatternWindow`, `GetTrackAndTake`
 - `ui.lua`: `Loop`
 
