@@ -1,7 +1,7 @@
 -- Camera event generation: pools, weighted picking, coop/directed logic.
 -- Requires: GetCoopRequiredInstruments, GetDirectedRequiredInstruments, r, S (globals)
 -- Globals exported: COOP_POOL, DIRECTED_POOL, PickRandom, JitteredInterval,
---   BuildSuffixPools, CategorizeCoopPool, WeightedPickCoopEvent,
+--   BuildSuffixPools, CategorizeCoopPool, WeightedPickCoopEvent, FindCompanion,
 --   ComputeIdleState, ComputeSingState, GenerateCameraEvents,
 --   CAM_INTERVAL_16THS, CAM_JITTER, CAM_START_MIN_16THS, CAM_START_MAX_16THS,
 --   CAM_SHORT_START_MIN_16THS, CAM_SHORT_START_MAX_16THS
@@ -151,12 +151,16 @@ math.randomseed(os.time())
 
 -- ---------------------------------------------------------------------------
 
+-- avoid: either a single string to exclude, or a set (table with string keys = true) of
+-- multiple strings to exclude - lets callers ban every event from the previous "spot"
+-- (a primary shot plus its companion, if any) rather than just the last single pick.
 function PickRandom(pool, avoid)
     if #pool == 0 then return nil end
     if #pool == 1 then return pool[1] end
     for _ = 1, 10 do
         local choice = pool[math.random(#pool)]
-        if choice ~= avoid then return choice end
+        local banned = (type(avoid) == 'table') and avoid[choice] or (choice == avoid)
+        if not banned then return choice end
     end
     return pool[math.random(#pool)]
 end
@@ -320,18 +324,16 @@ end
 
 -- Keys / guitar / bass swap failsafe: when all three of {bass, guitar, keys} are
 -- present in the project, the in-game band can only have two of them at once.
--- Emitting companion events at the same tick gives the game alternatives to pick
+-- Emitting a companion event at the same tick gives the game an alternative to pick
 -- from based on which two instruments are actually populated in the band setup.
 --
--- Returns a list (empty, one, or two companion event strings):
---   bg / bk / gk (pure trio duos) → both remaining variants; game always has a hit
---   solo g/b/k or mixed duo (gv/bv/kv/dg/bd) → one random companion
---   no b/g/k in code (venue, dv, …) → empty list
 -- Companion pick for keys/guitar/bass failsafe.
 -- Uses the same weighted randomness as a normal camera pick, filtered to exclude
 -- any instrument letter already present in the primary shot's code.
--- Returns one companion string or nil.
-local function FindCompanion(event_text, coop_opts, idle_set, singing_set)
+-- avoid_set: optional set of event strings to exclude (the previous spot's banned events) -
+-- see PickRandom for the set format.
+-- Returns one companion string or nil (never more than one).
+function FindCompanion(event_text, coop_opts, idle_set, singing_set, avoid_set)
     local code = event_text:match('^%[coop_(%a+)_')
     if not code then return nil end
     if code == 'all' or code == 'front' then return nil end
@@ -361,7 +363,7 @@ local function FindCompanion(event_text, coop_opts, idle_set, singing_set)
         if ok and #shots > 0 then fduo[dcode] = shots end
     end
 
-    return WeightedPickCoopEvent(coop_opts.venue_pool, fsolo, fduo, nil,
+    return WeightedPickCoopEvent(coop_opts.venue_pool, fsolo, fduo, avoid_set,
                                  idle_set, nil, coop_opts.suffix_pools, singing_set)
 end
 
@@ -508,9 +510,11 @@ end
 -- coop_opts:    optional weighted-pick config:
 --   { venue_pool, solo_pools, duo_pools, active_coop_set, keys_failsafe, play_states }
 --   When present, uses WeightedPickCoopEvent instead of PickRandom.
+-- initial_avoid_set: optional set of event strings banned for the very first pick (e.g. the
+--   text(s) placed at a caller's bookend spot immediately before this call) - see PickRandom.
 function GenerateCameraEvents(active_coop, active_directed, total_16ths, ppq,
                               cam_interval, forced_cuts, interval_changes,
-                              start_min, start_max, coop_opts)
+                              start_min, start_max, coop_opts, initial_avoid_set)
     local base_interval   = cam_interval or CAM_INTERVAL_16THS
     local sixteenth_ticks = ppq / 4
     local events          = {}
@@ -548,7 +552,10 @@ function GenerateCameraEvents(active_coop, active_directed, total_16ths, ppq,
     if blackout_16ths < start_16ths then blackout_16ths = total_16ths end
 
     local pos_16ths        = start_16ths
-    local last_pick        = nil
+    -- Set of event strings banned for the current pick - the previous spot's placed event(s)
+    -- (primary + companion, if any). Replaced wholesale each spot, never merged across spots,
+    -- so a shot is only off-limits for one spot ahead.
+    local last_spot        = initial_avoid_set or {}
     local last_event_16ths = start_16ths
     local directed_idx     = 1
     local fc_idx           = 1
@@ -587,7 +594,7 @@ function GenerateCameraEvents(active_coop, active_directed, total_16ths, ppq,
                     text        = fc.text,
                     is_directed = true,
                 }
-                last_pick          = fc.text
+                last_spot          = { [fc.text] = true }
                 last_event_16ths   = fc.pos_16ths
                 is_directed        = true
                 fc_idx             = fc_idx + 1
@@ -597,9 +604,9 @@ function GenerateCameraEvents(active_coop, active_directed, total_16ths, ppq,
         -- Random directed cuts
         if not is_directed and directed_idx <= #directed_positions and #active_directed > 0 then
             if pos_16ths >= directed_positions[directed_idx] - cur_interval / 2 then
-                local text = PickRandom(active_directed, last_pick)
+                local text = PickRandom(active_directed, last_spot)
                 if text then
-                    last_pick          = text
+                    last_spot          = { [text] = true }
                     last_event_16ths   = pos_16ths
                     events[#events + 1] = {
                         tick        = math.floor(pos_16ths * sixteenth_ticks + 0.5),
@@ -620,21 +627,23 @@ function GenerateCameraEvents(active_coop, active_directed, total_16ths, ppq,
                 local gw = all_idle and { solo = 30, duo = 10, venue = 60 } or nil
                 text = WeightedPickCoopEvent(
                     coop_opts.venue_pool, coop_opts.solo_pools,
-                    coop_opts.duo_pools, last_pick, idle_set, gw,
+                    coop_opts.duo_pools, last_spot, idle_set, gw,
                     coop_opts.suffix_pools, singing_set)
             else
-                text = PickRandom(active_coop, last_pick)
+                text = PickRandom(active_coop, last_spot)
             end
             if text then
-                last_pick          = text
+                local prev_spot    = last_spot
+                last_spot          = { [text] = true }
                 last_event_16ths   = pos_16ths
                 local tick         = math.floor(pos_16ths * sixteenth_ticks + 0.5)
                 events[#events + 1] = {
                     tick = tick, text = text, is_directed = false,
                 }
                 if coop_opts and coop_opts.keys_failsafe then
-                    local companion = FindCompanion(text, coop_opts, idle_set, singing_set)
+                    local companion = FindCompanion(text, coop_opts, idle_set, singing_set, prev_spot)
                     if companion then
+                        last_spot[companion] = true
                         events[#events + 1] = {
                             tick         = tick,
                             text         = companion,
@@ -664,10 +673,10 @@ function GenerateCameraEvents(active_coop, active_directed, total_16ths, ppq,
             local gw = all_idle and { solo = 30, duo = 10, venue = 60 } or nil
             text = WeightedPickCoopEvent(
                 coop_opts.venue_pool, coop_opts.solo_pools,
-                coop_opts.duo_pools, last_pick, idle_set, gw,
+                coop_opts.duo_pools, last_spot, idle_set, gw,
                 coop_opts.suffix_pools, singing_set)
         else
-            text = PickRandom(active_coop, last_pick)
+            text = PickRandom(active_coop, last_spot)
         end
         if text then
             local tick = math.floor(blackout_16ths * sixteenth_ticks + 0.5)
@@ -675,7 +684,7 @@ function GenerateCameraEvents(active_coop, active_directed, total_16ths, ppq,
                 tick = tick, text = text, is_directed = false,
             }
             if coop_opts and coop_opts.keys_failsafe then
-                local companion = FindCompanion(text, coop_opts, idle_set, singing_set)
+                local companion = FindCompanion(text, coop_opts, idle_set, singing_set, last_spot)
                 if companion then
                     events[#events + 1] = {
                         tick         = tick,

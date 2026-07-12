@@ -1,6 +1,7 @@
 -- Venue track awareness: instrument mute detection, pool filtering,
 -- and [prc_*] section detection from the EVENTS track.
 -- Requires: FindTrackByName, r, S, FormatTime (globals)
+-- Globals exported here also include: FindMusicStartTime
 
 local INST_TRACK_NAMES = {
     d = 'PART DRUMS',
@@ -249,6 +250,32 @@ function ReadEventSections(song_end_t)
     end
 
     return sections
+end
+
+-- Returns the project time of the earliest "[music_start]" text event on the
+-- EVENTS track, or nil if the track/item/event doesn't exist. Used by the
+-- venue generator to anchor the first generated camera cut and any [prc_*]
+-- section placed right at the song's literal start.
+function FindMusicStartTime()
+    local track = FindTrackByName('EVENTS')
+    if not track then return nil end
+    local item, take = nil, nil
+    for i = 0, r.CountTrackMediaItems(track) - 1 do
+        local it = r.GetTrackMediaItem(track, i)
+        local tk = r.GetActiveTake(it)
+        if tk and r.TakeIsMIDI(tk) then item, take = it, tk; break end
+    end
+    if not take then return nil end
+    local best_ppq
+    local _, _, _, text_count = r.MIDI_CountEvts(take)
+    for i = 0, text_count - 1 do
+        local ok, _, _, ppq, evt_type, msg = r.MIDI_GetTextSysexEvt(take, i)
+        if ok and evt_type == 1 and msg == '[music_start]' then
+            if not best_ppq or ppq < best_ppq then best_ppq = ppq end
+        end
+    end
+    if not best_ppq then return nil end
+    return r.MIDI_GetProjTimeFromPPQPos(take, best_ppq)
 end
 
 function ListEventSections()

@@ -1,6 +1,6 @@
 -- Section-by-section venue event generator.
 -- Requires: venue_generator.lua (ClearVenueTextEventsInRange, ClearVenueNonCameraEventsInRange,
---                                 ClearVenueExceptLPInRange), venue_camera.lua,
+--                                 ClearVenueExceptLPInRange), venue_camera.lua (FindCompanion, …),
 --           venue_lighting.lua (GenerateThemedSectionEvents, FindNextMeasureStartPpq),
 --           venue_awareness.lua (ReadEventSections, ReadInstrumentPlayStates),
 --           venue_themes.lua (GetSectionPreset, BuildLightingPool, BuildPostprocPool,
@@ -279,17 +279,24 @@ function GenerateSectionEvent()
     local total_inserted = 0
 
     -- Song-start bookends (same as GenerateVenueEvents; only fire if inside section range)
-    local last_bookend_16ths = nil
+    local last_bookend_16ths     = nil
+    local bookend_companion_count = 0
+    -- Set of event strings banned for the next pick (see PickRandom) - chains through the
+    -- bookends into GenerateCameraEvents so the regular loop's first cut doesn't immediately
+    -- repeat whatever the bookends just placed.
+    local last_spot = {}
     if #coop_venue_pool > 0 then
         local song_start_ppq = r.MIDI_GetPPQPosFromProjTime(take, item_start_sec)
         local bk_m2_ppq      = FindNextMeasureStartPpq(take, song_start_ppq, ppq)
         local bk_m3_ppq      = FindNextMeasureStartPpq(take, bk_m2_ppq, ppq)
 
         if song_start_ppq >= sec_start_ppq and song_start_ppq < sec_end_ppq then
-            local tick = math.floor(song_start_ppq - sec_start_ppq + 0.5)
-            insert_snapped(sec_start_ppq + tick, PickRandom(coop_venue_pool, nil))
+            local tick    = math.floor(song_start_ppq - sec_start_ppq + 0.5)
+            local m1_text = PickRandom(coop_venue_pool, nil)
+            insert_snapped(sec_start_ppq + tick, m1_text)
             total_inserted = total_inserted + 1
             last_bookend_16ths = tick / sixteenth_ticks
+            last_spot           = { [m1_text] = true }
         end
 
         if bk_m3_ppq >= sec_start_ppq and bk_m3_ppq < sec_end_ppq then
@@ -304,12 +311,24 @@ function GenerateSectionEvent()
             local m3_gw   = m3_all_idle and { solo = 30, duo = 10, venue = 60 } or nil
             local m3_text = WeightedPickCoopEvent(
                 coop_opts.venue_pool, coop_opts.solo_pools,
-                coop_opts.duo_pools, nil, m3_idle, m3_gw,
+                coop_opts.duo_pools, last_spot, m3_idle, m3_gw,
                 coop_opts.suffix_pools, m3_singing)
             if m3_text then
+                local prev_spot = last_spot
                 insert_snapped(sec_start_ppq + m3_tick, m3_text)
                 total_inserted = total_inserted + 1
                 last_bookend_16ths = m3_16ths
+                last_spot           = { [m3_text] = true }
+
+                if coop_opts.keys_failsafe then
+                    local m3_companion = FindCompanion(m3_text, coop_opts, m3_idle, m3_singing, prev_spot)
+                    if m3_companion then
+                        insert_snapped(sec_start_ppq + m3_tick, m3_companion)
+                        total_inserted         = total_inserted + 1
+                        bookend_companion_count = bookend_companion_count + 1
+                        last_spot[m3_companion] = true
+                    end
+                end
             end
         end
     end
@@ -354,7 +373,7 @@ function GenerateSectionEvent()
     local total_16ths = math.floor((sec_end_ppq - sec_start_ppq) / sixteenth_ticks)
     local cam_events  = GenerateCameraEvents(active_coop, {}, total_16ths, ppq,
                                              cam_interval, forced_cuts, nil,
-                                             cam_start_min, cam_start_max, coop_opts)
+                                             cam_start_min, cam_start_max, coop_opts, last_spot)
     local cam_coop_count     = 0
     local cam_directed_count = 0
     local cam_companion_count = 0
@@ -365,6 +384,7 @@ function GenerateSectionEvent()
         if ev.is_companion then cam_companion_count  = cam_companion_count + 1 end
         if not ev.is_directed and not ev.is_companion then cam_coop_count = cam_coop_count + 1 end
     end
+    cam_companion_count = cam_companion_count + bookend_companion_count
 
     -- Lighting / postproc / keyframes via GenerateThemedSectionEvents
     local lt_count   = 0

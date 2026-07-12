@@ -1,6 +1,6 @@
 -- @description Rock Band General Helper
 -- @author VeeKiraRay
--- @version 0.9.1
+-- @version 0.9.3
 -- @about
 --   Utility actions for Rock Band authoring in REAPER.
 --
@@ -17,6 +17,27 @@
 --
 --   Built with Claude (Anthropic) - https://claude.ai
 --
+--   v0.9.3
+--     - Venue camera generation (Themes gen and Section gen tabs) now avoids
+--       placing the same camera/companion event(s) back-to-back: the full set
+--       of event(s) placed at one generated spot (a primary shot plus its
+--       companion, if any) is banned for the very next spot only, then clears.
+--       The ban chains continuously from the forced tick-0 shot through the
+--       music-start anchor pick into the regular per-tick generation loop.
+--   v0.9.2
+--     - Venue Themes gen: song start now gets a forced, deterministic trio
+--       ([coop_all_far] / [lighting (intro)] / [ProFilm_a.pp]) at tick 0
+--       instead of a random camera pick, regardless of theme state.
+--     - The first generated camera cut is now anchored to the song's actual
+--       musical start - an explicit [music_start] EVENTS marker if present,
+--       else whichever of measure 3/4 is closer to the 3-second mark - rather
+--       than a fixed measure 3.
+--     - A theme's first [prc_*] section (e.g. [prc_intro]) placed right at
+--       tick 0 is now treated as starting at that same music-start anchor for
+--       lighting/postproc/dircut/bonusfx placement, instead of at tick 0.
+--     - Fix: the song-start/music-start bookend camera picks (Themes gen and
+--       Section gen tabs) now emit the keys/guitar/bass swap companion event
+--       when applicable, matching the regular per-tick camera generation loop.
 --   v0.9.1
 --     - Difficulty validation: gap/spacing/length rules now measured in quarter
 --       notes via the tempo map (accurate with fluctuating BPM) with a 5% grace

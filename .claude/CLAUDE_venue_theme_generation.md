@@ -136,25 +136,26 @@ At ≥ 150 BPM all intervals are scaled by ×1.5 (rounded) — `crazy` at 160 BP
 5.  ReadInstrumentPlayStates() → per-instrument play/idle timelines (converted to 16ths)
 6.  Resolve active theme (S.venue_theme_idx)
 7.  If theme: ReadEventSections() → sections[]
-8.  Build forced_cuts[] (dircut_at_start per section) and interval_changes[] (camera_pacing overrides)
-9.  ClearVenueTextEventsInRange (overwrites range)
-10. All subsequent inserts go through insert_text, which snaps to the nearest half-beat (ppq/2).
-11. Bookend intro: [lighting (intro)] at tick 0 — only for full-item AND no theme sections
-12. Song-start camera bookends (when their absolute positions fall in range):
-      Measure 1: forced venue shot ([coop_all_*] / [coop_front_*])
-      Measure 3: weighted pick with play-state awareness at that tick
-13. Camera:
+8.  Resolve the music-start anchor (FindMusicStartTime, else measure-3/4-nearest-3s fallback);
+    if sections[1] sits at the song's literal start, re-anchor its t_start to this position
+9.  Build forced_cuts[] (dircut_at_start per section) and interval_changes[] (camera_pacing overrides)
+10. ClearVenueTextEventsInRange (overwrites range)
+11. All subsequent inserts go through insert_text, which snaps to the nearest half-beat (ppq/2).
+12. Forced song-start trio at tick 0 (unconditional on theme state):
+      [coop_all_far], [lighting (intro)], [ProFilm_a.pp]
+13. First generated camera cut: weighted pick with play-state awareness at the music-start anchor
+14. Camera:
       cam_dir = theme active → {} (no random directed)
               = no theme     → filtered DIRECTED_POOL
       first cut = one camera interval after last bookend (or default start range)
       GenerateCameraEvents(active_coop, cam_dir, ..., forced_cuts, interval_changes, coop_opts)
         → per-tick play-state cursors advance; idle instruments get weight 5; all-idle shifts groups
-14. Lighting + keyframes:
+15. Lighting + keyframes:
       theme + sections → GenerateThemedSectionEvents (per-section presets)
       theme, no sections → GenerateLightingEvents with default preset pool
       no theme → GenerateLightingEvents (full random MANUAL+AUTO pool)
-15. Bookend outro: [lighting (blackout_spot)] 2 measures before end — full-item only
-16. Undo block, UpdateArrange
+16. Bookend outro: [lighting (blackout_spot)] 2 measures before end — full-item only
+17. Undo block, UpdateArrange
 ```
 
 ### `GenerateCameraEvents` — randomness constants
@@ -171,6 +172,31 @@ These are `local` constants at the top of `venue_generator.lua`, marked as
 | `CAM_START_MAX_16THS` | 48 | Latest first camera cut (3 bars). |
 | `DIRECTED_MIN_COUNT` | 1 | Min random directed cuts — only in no-theme mode (theme uses forced_cuts). |
 | `DIRECTED_MAX_COUNT` | 4 | Max random directed cuts — only in no-theme mode. |
+
+### No-repeat avoidance (`last_spot`)
+
+`GenerateCameraEvents` tracks a `last_spot` **set** (not a single value) of every event string
+placed at the immediately preceding "spot" — a primary coop/directed pick plus its companion
+event, if one fired. This set is passed as the `avoid` argument to `PickRandom` /
+`WeightedPickCoopEvent` for the next pick, and to `FindCompanion` for that pick's companion, so
+neither the primary nor the companion can repeat anything from the previous spot.
+
+`last_spot` is **replaced wholesale** at every spot, never merged across spots — a shot banned
+at spot N is fully available again at spot N+2. This applies uniformly to forced directed cuts,
+random directed cuts, and coop cuts (directed and coop share the same `last_spot`, matching the
+existing structure — pools never overlap between the two categories in practice).
+
+`PickRandom(pool, avoid)` accepts either a single string (legacy scalar equality) or a set
+(`{ [text] = true, ... }`, checked via table membership) — `type(avoid) == 'table'` selects
+which check runs. `WeightedPickCoopEvent` and `WeightedPickSoloShot` forward `avoid` opaquely,
+so they work with either form unchanged.
+
+`GenerateCameraEvents` accepts an optional trailing `initial_avoid_set` parameter so a caller's
+own bookend picks (see "Song-start bookends and the music-start anchor" below) can seed the ban
+before the regular loop's very first pick — `GenerateVenueEvents` and `GenerateSectionEvent`
+both thread their own bookend `last_spot` through to this parameter, so the ban chains
+continuously from the forced tick-0 shot through every generated cut in the song, with no seam
+at the bookend/regular-loop boundary.
 
 ### Weighted coop camera selection
 
@@ -242,44 +268,86 @@ whichever two instruments are actually populated in the band setup.
 Condition: `keys_failsafe = not muted.k and not muted.g and not muted.b`
 (Does **not** activate when only two of the three are present.)
 
-`FindKeySwapCompanions` in `venue_generator.lua` returns a **list** of 0, 1, or 2 companion
-strings. The inner `try_swap` helper substitutes one letter for another, sorts the result
-alphabetically (the pool always uses alphabetical order, e.g. `bg` not `gb`), and checks
-`active_coop_set`. Returns nil if the candidate doesn't exist in the pool — drum duos
-resolve naturally to only one valid companion because `[coop_dk_*]` is not in the pool.
+`FindCompanion(event_text, coop_opts, idle_set, singing_set, avoid_set)` (global,
+`venue_camera.lua`) always returns **one** companion string or `nil` for a given primary pick —
+it does one filtered `WeightedPickCoopEvent` call, never more. It excludes every instrument
+letter already present in the primary shot's code from the solo/duo pools before picking, then
+weight-picks from whatever remains, passing `avoid_set` through so the companion also can't
+repeat the previous spot's event(s) (see "No-repeat avoidance" above). Returns nil if nothing
+valid remains (e.g. the primary shot already used every non-excluded instrument, or the
+candidate duo doesn't exist in the pool — drum duos resolve naturally to no companion because
+`[coop_dk_*]` is not in the pool).
 
-**Companion count by source code:**
+**Companion emitted by source code:**
 
-| Source code | Companions emitted |
+| Source code | Companion |
 |---|---|
-| `bg` / `bk` / `gk` (pure trio duo) | **2** — both missing variants, all three at the same tick |
-| `g` / `b` / `k` (solo) | **1** at random from the two valid alternatives |
-| `gv` / `bv` / `kv` / `dg` / `bd` (mixed duo) | **1** at random (or the only valid one for drum duos) |
-| `dv`, `d`, `v`, `all`, `front`, … | **0** |
+| `bg` / `bk` / `gk` (duo between two of bass/guitar/keys) | **1** — the remaining third instrument's solo or duo shot |
+| `g` / `b` / `k` (solo) | **1** at random from the remaining valid alternatives |
+| `gv` / `bv` / `kv` / `dg` / `bd` (mixed duo) | **1** at random (or none for drum duos) |
+| `dv`, `d`, `v`, `all`, `front`, … | **0** (no b/g/k in the code) |
 
 Companion events are flagged `is_companion = true` and counted separately in the result
 stats as "Camera (companion)".
 
-### Song-start camera bookends
+**`FindCompanion` must be called at every insertion point that can pick a solo/duo coop
+event, not just the main per-tick loop.** It was originally only wired into
+`GenerateCameraEvents`'s regular loop (`venue_camera.lua`); the song-start/music-start bookend
+picks (`GenerateVenueEvents` in `venue_generator.lua`, and the equivalent bookend block in
+`actions_venue_section.lua`'s `GenerateSectionEvent`) call `WeightedPickCoopEvent` directly and
+were missing the `FindCompanion` follow-up, so a keys/guitar/bass swap band would silently lose
+the alternate shot whenever the bookend picked a `g`/`b`/`k`/duo event. `FindCompanion` had to
+be changed from `local` to a global function in `venue_camera.lua` so these other files could
+call it (see `CLAUDE.md`'s global-vs-local function rule). Both bookend call sites now check
+`coop_opts.keys_failsafe` and call `FindCompanion` the same way the main loop does.
 
-Two camera events are inserted before the regular generation loop, anchored to the absolute
-start of the VENUE item regardless of the current time selection. Each is only inserted
-when its position falls within the generation range — both full-item and time-selection runs.
+### Song-start bookends and the music-start anchor
+
+Two events are inserted before the regular generation loop, anchored to the absolute start of
+the VENUE item regardless of the current time selection. Each is only inserted when its
+position falls within the generation range — both full-item and time-selection runs.
 
 | Position | Event |
 |---|---|
-| Song measure 1 beat 1 (VENUE item start) | Forced random pick from venue pool (`[coop_all_*]` / `[coop_front_*]`) |
-| Song measure 3 beat 1 | `WeightedPickCoopEvent` with play-state awareness at that tick |
+| Song measure 1 beat 1 (VENUE item start, tick 0) | **Forced, not randomised:** `[coop_all_far]` + `[lighting (intro)]` + `[ProFilm_a.pp]`, fired regardless of theme state |
+| Music-start anchor (see below) | `WeightedPickCoopEvent` with play-state awareness at that tick |
 
-The measure 3 shot advances play-state cursors to that exact position: instruments with
-`[play]` at or before measure 3 get their full base weight; instruments still idle (or with
-no events yet) get weight 5. This makes the very first weighted shot reflect which instruments
-actually start the song.
+**Resolving the music-start anchor.** The literal song start (tick 0) is not the same as
+where the music actually begins — songs conventionally have a count-in/silence first.
+`GenerateVenueEvents` resolves one anchor position and reuses it in two places:
+
+1. An explicit `[music_start]` text event on the EVENTS track (`FindMusicStartTime` in
+   `venue_awareness.lua`), if present — authoritative, no guessing needed.
+2. Otherwise, whichever of measure 3 or measure 4 (via `FindNextMeasureStartPpq`) has a
+   real project time closer to `item_start_sec + 3.0` — adapts to tempo instead of a fixed
+   measure count.
+
+The weighted second bookend fires at this anchor and advances play-state cursors to that exact
+position: instruments with `[play]` at or before the anchor get their full base weight;
+instruments still idle (or with no events yet) get weight 5. This makes the very first weighted
+shot reflect which instruments actually start the song.
+
+**First `[prc_*]` section re-anchoring.** When a theme is active and the earliest detected
+section (`sections[1]`, typically `[prc_intro]`) was placed right at the song's literal start
+(`t_start` within ~1ms of `item_start_sec`), `GenerateVenueEvents` rewrites `sections[1].t_start`
+to the same music-start anchor before building `forced_cuts`/`interval_changes`/`bonusfx_events`
+and before calling `GenerateThemedSectionEvents` — so that section's lighting, postproc, forced
+directed cut, and bonus FX all land at the real musical start instead of during the count-in.
+A section the author already placed later (not at tick 0) is left untouched.
 
 The first regular camera cut from `GenerateCameraEvents` is set to one full camera interval
 (with ±jitter, using the same `CAM_INTERVAL_16THS` and `CAM_JITTER` constants as the rest of
-the song) after the last inserted bookend — so the measure 3 shot acts as the "first cut"
-and subsequent spacing is uniform throughout.
+the song) after the last inserted bookend — so the music-start anchor shot acts as the
+"first cut" and subsequent spacing is uniform throughout.
+
+**No-repeat chaining across the bookend boundary.** Both `venue_generator.lua` and
+`actions_venue_section.lua` build their own local `last_spot` set (see "No-repeat avoidance"
+above) as they insert each bookend: the forced `[coop_all_far]` seeds it, the anchor/measure-3
+pick's `WeightedPickCoopEvent` call is given the current `last_spot` as its avoid set (so it
+won't repeat the forced shot), `FindCompanion` is given the pre-update `last_spot` for the same
+reason, and the result (primary + companion) replaces `last_spot` for the next step. The final
+`last_spot` is passed as `GenerateCameraEvents`'s `initial_avoid_set` argument, so the regular
+loop's very first pick also can't repeat whatever the bookends just placed.
 
 ### Half-beat snapping
 

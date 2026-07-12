@@ -1,9 +1,9 @@
 -- Venue event generator: main orchestration for GenerateVenueEvents.
 -- Requires: venue_camera.lua and venue_lighting.lua loaded first.
 -- Requires: GetMutedInstruments, FilterPool, GetCoopRequiredInstruments,
---           GetDirectedRequiredInstruments, FindTrackByName,
+--           GetDirectedRequiredInstruments, FindTrackByName, FindCompanion,
 --           ReadEventSections, ReadInstrumentPlayStates, GetSectionPreset,
---           GetThemeCameraInterval, r, S (globals)
+--           GetThemeCameraInterval, FindMusicStartTime, FindNextMeasureStartPpq, r, S (globals)
 
 function ClearVenueTextEventsInRange(take, start_ppq, end_ppq)
     local _, _, _, text_count = r.MIDI_CountEvts(take)
@@ -130,6 +130,33 @@ function GenerateVenueEvents()
         if s then sections = s end
     end
 
+    -- "Actual music start": an explicit [music_start] marker on the EVENTS track if present,
+    -- else whichever of measure 3/4 lands closer to the 3-second mark (adapts to tempo).
+    -- Used to anchor the first generated camera cut, and to re-anchor a [prc_*] section
+    -- that was placed right at the song's literal start (see below).
+    local song_start_ppq = r.MIDI_GetPPQPosFromProjTime(take, item_start_sec)
+    local music_start_ppq
+    local music_start_t = FindMusicStartTime()
+    if music_start_t then
+        music_start_ppq = r.MIDI_GetPPQPosFromProjTime(take, music_start_t)
+    else
+        local bk_m2_ppq = FindNextMeasureStartPpq(take, song_start_ppq, ppq)
+        local bk_m3_ppq = FindNextMeasureStartPpq(take, bk_m2_ppq, ppq)
+        local bk_m4_ppq = FindNextMeasureStartPpq(take, bk_m3_ppq, ppq)
+        local t_target   = item_start_sec + 3.0
+        local t3         = r.MIDI_GetProjTimeFromPPQPos(take, bk_m3_ppq)
+        local t4         = r.MIDI_GetProjTimeFromPPQPos(take, bk_m4_ppq)
+        music_start_ppq  = (math.abs(t4 - t_target) < math.abs(t3 - t_target)) and bk_m4_ppq or bk_m3_ppq
+    end
+
+    -- If the first [prc_*] section was placed right at the song's literal start (e.g. a
+    -- [prc_intro] marker at measure 1), treat it as if it actually starts at the resolved
+    -- music-start anchor instead - its lighting/postproc (and any dircut/bonusfx) then land
+    -- at the real musical start rather than during the count-in/silence.
+    if theme and sections[1] and sections[1].t_start <= item_start_sec + 0.001 then
+        sections[1].t_start = r.MIDI_GetProjTimeFromPPQPos(take, music_start_ppq)
+    end
+
     -- Camera: theme-level interval and per-section overrides
     local cam_interval     = theme and GetThemeCameraInterval(theme.camera_pacing, bpm) or nil
 
@@ -237,48 +264,62 @@ function GenerateVenueEvents()
         count = count + 1
     end
 
-    -- Intro bookend: only when not using themed sections (theme handles intro section)
-    if not (theme and #sections > 0) then
-        insert_text(0, '[lighting (intro)]')
+    -- Forced song-start trio: not randomised, fires regardless of theme, so every song
+    -- opens the same way. A themed [prc_*] section covering song start still gets its own
+    -- lighting/postproc pick independently (see the section-shift above and ProcessThemeSection).
+    local cam_bookend_count      = 0
+    local forced_pp_count        = 0
+    local bookend_companion_count = 0
+    local last_bookend_16ths    = nil  -- 16ths position of last inserted bookend shot
+    -- Set of event strings banned for the next pick (see PickRandom) - chains through the
+    -- bookends into GenerateCameraEvents so the regular loop's first cut doesn't immediately
+    -- repeat whatever the bookends just placed.
+    local last_spot              = {}
+    if song_start_ppq >= range_start_ppq and song_start_ppq < range_end_ppq then
+        local tick = math.floor(song_start_ppq - range_start_ppq + 0.5)
+        insert_text(tick, '[coop_all_far]')
+        insert_text(tick, '[lighting (intro)]')
+        insert_text(tick, '[ProFilm_a.pp]')
+        cam_bookend_count  = 1
+        forced_pp_count    = 1
+        last_bookend_16ths = tick / sixteenth_ticks
+        last_spot           = { ['[coop_all_far]'] = true }
     end
 
-    -- Song-start camera bookends anchored to VENUE item start.
-    --   Measure 1: forced venue shot  ([coop_all_*] / [coop_front_*])
-    --   Measure 3: weighted pick with play-state awareness at that exact tick
-    local cam_bookend_count  = 0
-    local last_bookend_16ths = nil  -- 16ths position of last inserted bookend shot
-    if #coop_opts.venue_pool > 0 then
-        local song_start_ppq = r.MIDI_GetPPQPosFromProjTime(take, item_start_sec)
-        local bk_m2_ppq      = FindNextMeasureStartPpq(take, song_start_ppq, ppq)
-        local bk_m3_ppq      = FindNextMeasureStartPpq(take, bk_m2_ppq, ppq)
-
-        if song_start_ppq >= range_start_ppq and song_start_ppq < range_end_ppq then
-            local tick = math.floor(song_start_ppq - range_start_ppq + 0.5)
-            insert_text(tick, PickRandom(coop_opts.venue_pool, nil))
-            cam_bookend_count  = cam_bookend_count + 1
-            last_bookend_16ths = tick / sixteenth_ticks
+    -- First randomly-generated camera cut: weighted pick with play-state awareness,
+    -- anchored to the resolved music-start position (not a fixed measure).
+    if #coop_opts.venue_pool > 0
+        and music_start_ppq >= range_start_ppq and music_start_ppq < range_end_ppq then
+        local anchor_tick    = math.floor(music_start_ppq - range_start_ppq + 0.5)
+        local anchor_16ths   = anchor_tick / sixteenth_ticks
+        local anchor_cursors = {}
+        for letter, _ in pairs(coop_opts.play_states) do
+            anchor_cursors[letter] = 1
         end
+        local anchor_sing_cursors = {}
+        for letter in pairs(coop_opts.sing_states) do anchor_sing_cursors[letter] = 1 end
+        local anchor_idle, anchor_all_idle = ComputeIdleState(coop_opts, anchor_cursors, anchor_16ths)
+        local anchor_singing               = ComputeSingState(coop_opts, anchor_sing_cursors, anchor_16ths)
+        local anchor_gw   = anchor_all_idle and { solo = 30, duo = 10, venue = 60 } or nil
+        local anchor_text = WeightedPickCoopEvent(
+            coop_opts.venue_pool, coop_opts.solo_pools,
+            coop_opts.duo_pools, last_spot, anchor_idle, anchor_gw,
+            coop_opts.suffix_pools, anchor_singing)
+        if anchor_text then
+            local prev_spot    = last_spot
+            insert_text(anchor_tick, anchor_text)
+            cam_bookend_count  = cam_bookend_count + 1
+            last_bookend_16ths = anchor_16ths
+            last_spot           = { [anchor_text] = true }
 
-        if bk_m3_ppq >= range_start_ppq and bk_m3_ppq < range_end_ppq then
-            local m3_tick    = math.floor(bk_m3_ppq - range_start_ppq + 0.5)
-            local m3_16ths   = m3_tick / sixteenth_ticks
-            local m3_cursors = {}
-            for letter, _ in pairs(coop_opts.play_states) do
-                m3_cursors[letter] = 1
-            end
-            local m3_sing_cursors = {}
-            for letter in pairs(coop_opts.sing_states) do m3_sing_cursors[letter] = 1 end
-            local m3_idle, m3_all_idle = ComputeIdleState(coop_opts, m3_cursors, m3_16ths)
-            local m3_singing           = ComputeSingState(coop_opts, m3_sing_cursors, m3_16ths)
-            local m3_gw   = m3_all_idle and { solo = 30, duo = 10, venue = 60 } or nil
-            local m3_text = WeightedPickCoopEvent(
-                coop_opts.venue_pool, coop_opts.solo_pools,
-                coop_opts.duo_pools, nil, m3_idle, m3_gw,
-                coop_opts.suffix_pools, m3_singing)
-            if m3_text then
-                insert_text(m3_tick, m3_text)
-                cam_bookend_count  = cam_bookend_count + 1
-                last_bookend_16ths = m3_16ths
+            if coop_opts.keys_failsafe then
+                local anchor_companion = FindCompanion(anchor_text, coop_opts, anchor_idle, anchor_singing, prev_spot)
+                if anchor_companion then
+                    insert_text(anchor_tick, anchor_companion)
+                    cam_bookend_count      = cam_bookend_count + 1
+                    bookend_companion_count = bookend_companion_count + 1
+                    last_spot[anchor_companion] = true
+                end
             end
         end
     end
@@ -294,7 +335,7 @@ function GenerateVenueEvents()
     local cam_dir        = {}
     local cam_events     = GenerateCameraEvents(active_coop, cam_dir, total_16ths, ppq,
                                                 cam_interval, forced_cuts, interval_changes,
-                                                cam_start_min, cam_start_max, coop_opts)
+                                                cam_start_min, cam_start_max, coop_opts, last_spot)
     local directed_count  = 0
     local companion_count = 0
     for _, ev in ipairs(cam_events) do
@@ -363,21 +404,23 @@ function GenerateVenueEvents()
     lines[#lines + 1] = ''
     lines[#lines + 1] = ('Camera (coop):      %d'):format(#cam_events - directed_count - companion_count)
     lines[#lines + 1] = ('Camera (directed):  %d'):format(directed_count)
-    if companion_count > 0 then
-        lines[#lines + 1] = ('Camera (companion): %d'):format(companion_count)
+    if companion_count + bookend_companion_count > 0 then
+        lines[#lines + 1] = ('Camera (companion): %d'):format(companion_count + bookend_companion_count)
     end
     lines[#lines + 1] = ('Lighting (auto):    %d'):format(#lt_events - manual_count)
     lines[#lines + 1] = ('Lighting (manual):  %d'):format(manual_count)
     lines[#lines + 1] = ('Control [first]/[next]: %d'):format(#ctrl_events)
-    if #pp_events > 0 then
-        lines[#lines + 1] = ('Post-process:       %d'):format(#pp_events)
+    if #pp_events + forced_pp_count > 0 then
+        lines[#lines + 1] = ('Post-process:       %d'):format(#pp_events + forced_pp_count)
     end
     if bonusfx_count > 0 then
         lines[#lines + 1] = ('Bonus FX:           %d'):format(bonusfx_count)
     end
-    local bookend_count = 1 + cam_bookend_count  -- blackout_spot + camera venue bookends
-    if not (theme and #sections > 0) then bookend_count = bookend_count + 1 end  -- intro
+    -- intro lighting + blackout_spot + camera bookends (forced measure-1 shot + music-start weighted pick)
+    local bookend_count = 2 + cam_bookend_count
     lines[#lines + 1] = ('Bookend events:     %d'):format(bookend_count)
+    lines[#lines + 1] = ('Music start anchor: %s'):format(
+        music_start_t and 'explicit [music_start] marker' or '~3s fallback (measure 3/4)')
     lines[#lines + 1] = ''
     local warn_no_data = {}
     local nd_names_map = { d='Drums', v='Vocals', b='Bass', g='Guitar', k='Keys' }

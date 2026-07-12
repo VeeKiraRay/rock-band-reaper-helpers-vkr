@@ -109,9 +109,9 @@ Four WIP tabs appear only when **Show WIPs? = Yes** in the General tab (persiste
 | `rock_band_general_helper_vkr/settings.lua` | `SaveSettings`, `LoadSettings` (project key: `RBHelperVKR/settings_v1`) |
 | `rock_band_general_helper_vkr/helpers.lua` | `FindTrackByName`, `SetDefaultTempoTracks`, `SetDefaultMIDITracks`, `GetTempoContextBefore`, `GetMeasureStartTime`, `GetAudioItems` |
 | `rock_band_general_helper_vkr/venue.lua` | `ListVenueEvents` (global); `FindVenueTrack`, `ReadVenueTextEvents`, `BuildCameraGaps`, `GapStats` (local) |
-| `rock_band_general_helper_vkr/venue_awareness.lua` | `GetMutedInstruments`, `GetCoopRequiredInstruments`, `GetDirectedRequiredInstruments`, `FilterPool`, `ReadEventSections`, `ListEventSections` (global); `INST_TRACK_NAMES`, `ParsePrcEvent` (local) |
+| `rock_band_general_helper_vkr/venue_awareness.lua` | `GetMutedInstruments`, `GetCoopRequiredInstruments`, `GetDirectedRequiredInstruments`, `FilterPool`, `ReadEventSections`, `ListEventSections`, `FindMusicStartTime` (global); `INST_TRACK_NAMES`, `ParsePrcEvent` (local) |
 | `rock_band_general_helper_vkr/venue_themes.lua` | `ThemeDisplayLabel`, `LoadVenueThemes`, `GetSectionPreset`, `GetThemeCameraInterval`, `BuildLightingPool`, `BuildPostprocPool` (global); `POSTPROC_VALID_SET`, `LIGHTING_VALID_SET`, `CAMERA_PACING`, `Tokenize`, `ParseSexpr`, `ParseThemeFile`, `InterpretSectionPreset`, `InterpretTheme` (local) |
-| `rock_band_general_helper_vkr/venue_camera.lua` | `COOP_POOL`, `DIRECTED_POOL`, `PickRandom`, `JitteredInterval`, `CategorizeCoopPool`, `WeightedPickCoopEvent`, `ComputeIdleState`, `GenerateCameraEvents` (global); camera constants (`CAM_INTERVAL_16THS` etc., partially global); `WeightedPickInstrument`, `FindKeySwapCompanions` (local) |
+| `rock_band_general_helper_vkr/venue_camera.lua` | `COOP_POOL`, `DIRECTED_POOL`, `PickRandom`, `JitteredInterval`, `CategorizeCoopPool`, `WeightedPickCoopEvent`, `FindCompanion`, `ComputeIdleState`, `GenerateCameraEvents` (global); camera constants (`CAM_INTERVAL_16THS` etc., partially global); `WeightedPickInstrument` (local) |
 | `rock_band_general_helper_vkr/venue_sprites.lua` | `LoadVenueSprite`, `DrawVenueTooltipSprite`, `BeginVenueTooltip`, `EndVenueTooltip`, `VenueSpriteFoldersFound` (global); `DIRECTED_SPRITE_NAMES`, `VENUE_SPRITE_ROOT` (module-level globals). JPEG-only. Checks `resources/img/spritesheets/{category}/` (large) then `resources/img/spritesheets/{category} small/` (small) — no third-party fallback. Frame count is read from the filename (`{key}_f{N}_spritesheet.jpg`). Display size scales by `S.venue_preview_scale` (1 or 2). Cache stores `{image, frame_count, cols, rows}` per sprite. |
 | `rock_band_general_helper_vkr/venue_lighting.lua` | `MANUAL_LIGHTING_SET`, `LIGHTING_OFFSET_16THS`, `INST_KF_MODES`, `FindNextMeasureStartPpq`, `CollectInstNotePositions`, `GenerateLightingEvents`, `GenerateThemedSectionEvents` (global); `MANUAL_LIGHTING_POOL`, `AUTO_LIGHTING_POOL`, lighting constants, `SnapPpqToNearestBeat`, `ProcessThemeSection` (local) |
 | `rock_band_general_helper_vkr/venue_generator.lua` | `GenerateVenueEvents` (global); `ClearVenueTextEventsInRange` (local) |
@@ -139,7 +139,7 @@ Four WIP tabs appear only when **Show WIPs? = Yes** in the General tab (persiste
 - `venue.lua`: `FindVenueTrack`, `ReadVenueTextEvents`, `BuildCameraGaps`, `GapStats`
 - `venue_awareness.lua`: `INST_TRACK_NAMES`, `ParsePrcEvent`
 - `venue_themes.lua`: `POSTPROC_VALID_SET`, `LIGHTING_VALID_SET`, `CAMERA_PACING`, `Tokenize`, `ParseSexpr`, `ParseThemeFile`, `InterpretSectionPreset`, `InterpretTheme`
-- `venue_camera.lua`: `WeightedPickInstrument`, `FindKeySwapCompanions`; camera constants `CAM_DIRECTED_COOLDOWN`, `DIRECTED_MIN_COUNT`, `DIRECTED_MAX_COUNT`, `INST_WEIGHTS`, `INST_ORDER`, `IDLE_WEIGHT`
+- `venue_camera.lua`: `WeightedPickInstrument`; camera constants `CAM_DIRECTED_COOLDOWN`, `DIRECTED_MIN_COUNT`, `DIRECTED_MAX_COUNT`, `INST_WEIGHTS`, `INST_ORDER`, `IDLE_WEIGHT`
 - `venue_sprites.lua`: `_sprite_cache`, `_sprite_dirs_found`, `NormalizeSpriteKey`, `_try_load_from_dir`, `FindAndLoadSprite`, `_CAT_FOLDER`, `POSTPROC_SPRITE_NAMES`; `SPRITE_COLS`, `SPRITE_ROWS`, `SPRITE_FRAME_RATE`, `SPRITE_DISPLAY_W`, `SPRITE_DISPLAY_H`
 - `venue_lighting.lua`: `MANUAL_LIGHTING_POOL`, `AUTO_LIGHTING_POOL`, `LIGHTING_INTERVAL_16THS`, `LIGHTING_JITTER`, `KEYFRAME_MIN_BEATS`, `KEYFRAME_MAX_BEATS`, `SnapPpqToNearestBeat`, `ProcessThemeSection`
 - `venue_generator.lua`: `ClearVenueTextEventsInRange`
@@ -177,12 +177,13 @@ helpers.lua                    → FindTrackByName, SetDefaultTempoTracks, SetDe
 venue.lua                      → ListVenueEvents
 venue_awareness.lua            → GetMutedInstruments, GetCoopRequiredInstruments,
                                   GetDirectedRequiredInstruments, FilterPool,
-                                  ReadEventSections, ListEventSections
+                                  ReadEventSections, ListEventSections, FindMusicStartTime
 venue_themes.lua               → ThemeDisplayLabel, LoadVenueThemes, GetSectionPreset,
                                   GetThemeCameraInterval, BuildLightingPool, BuildPostprocPool
 venue_camera.lua               → COOP_POOL, DIRECTED_POOL, PickRandom, JitteredInterval,
-                                  CategorizeCoopPool, WeightedPickCoopEvent, ComputeIdleState,
-                                  GenerateCameraEvents; camera globals (CAM_INTERVAL_16THS etc.)
+                                  CategorizeCoopPool, WeightedPickCoopEvent, FindCompanion,
+                                  ComputeIdleState, GenerateCameraEvents; camera globals
+                                  (CAM_INTERVAL_16THS etc.)
 venue_sprites.lua              → LoadVenueSprite, DrawVenueTooltipSprite, BeginVenueTooltip,
                                   EndVenueTooltip; VENUE_SPRITE_ROOT, VENUE_SPRITE_SELF_ROOT,
                                   DIRECTED_SPRITE_NAMES, POSTPROC_SPRITE_NAMES (module globals)
@@ -466,17 +467,37 @@ Camera events that require an unavailable instrument are removed from the pool b
 | `MANUAL_LIGHTING_POOL` | 6  | Lighting modes that require `[first]`/`[next]` keyframe control events: verse, chorus, manual_cool, manual_warm, dischord, stomp |
 | `AUTO_LIGHTING_POOL`   | 15 | Self-contained lighting modes that need no control events: loop_cool, loop_warm, harmony, frenzy, silhouettes, silhouettes_spot, searchlights, sweep, strobe_slow, strobe_fast, blackout_slow, blackout_fast, flare_slow, flare_fast, bre |
 
-**Not generated in random mode:** post-processing effects (`[*.pp]` family) and bonus FX (`[bonusfx]`, `[bonusfx_optional]`). When a theme is active, `[*.pp]` events are generated from each section's `allowed_postprocs` preset. Bonus FX remain manual.
+**Bonus FX remain manual** (`[bonusfx]`, `[bonusfx_optional]`) except via a theme's `dircut_at_start`/`bonusfx_at_start` section presets. Post-process (`[*.pp]`) is otherwise theme-driven only (each section's `allowed_postprocs` preset), **except** for the forced song-start post-process below, which fires unconditionally.
 
 ### Generated event types
 
-1. **Bookend: `[lighting (intro)]`** — placed at tick 0 of the range. Only inserted on full-item generation (no time selection active).
-2. **Camera cuts (coop)** — placed at jittered intervals from measure 2–3 onward up to the blackout position.
-3. **Camera cuts (directed)** — 1–4 cuts placed at random positions in the middle 80% of the range, each followed by a 2× cooldown before the next coop cut.
-4. **Final coop cut** — placed at the blackout position (32 sixteenths before range end).
-5. **Lighting changes** — placed from 32 sixteenths in, at jittered intervals. Each picks from the combined manual + auto pool.
-6. **Control keyframes (`[first]`/`[next]`)** — generated only for manual lighting events. `[first]` at the lighting event position, then `[next]` every 1–4 beats until the next lighting change.
-7. **Bookend: `[lighting (blackout_spot)]`** — placed 32 sixteenths before range end.
+1. **Forced song-start trio** — `[coop_all_far]`, `[lighting (intro)]`, `[ProFilm_a.pp]`, all placed at tick 0 (the VENUE item's literal start). Fixed, not randomised, and fires **regardless of theme state** — see "Song-start bookends and the music-start anchor" below.
+2. **First generated camera cut (coop)** — a weighted pick (not a fixed measure) anchored to the resolved **music-start position**: an explicit `[music_start]` EVENTS-track marker if present, else whichever of measure 3/4 lands closer to the 3-second mark from song start.
+3. **Camera cuts (coop)** — placed at jittered intervals from one interval after the music-start anchor onward, up to the blackout position.
+4. **Camera cuts (directed)** — 1–4 cuts placed at random positions in the middle 80% of the range, each followed by a 2× cooldown before the next coop cut.
+5. **Final coop cut** — placed at the blackout position (32 sixteenths before range end).
+6. **Lighting changes** — placed from 32 sixteenths in, at jittered intervals. Each picks from the combined manual + auto pool.
+7. **Control keyframes (`[first]`/`[next]`)** — generated only for manual lighting events. `[first]` at the lighting event position, then `[next]` every 1–4 beats until the next lighting change.
+8. **Bookend: `[lighting (blackout_spot)]`** — placed 32 sixteenths before range end.
+
+### Song-start bookends and the music-start anchor
+
+The literal start of the VENUE item (tick 0) is not the same as where the song's music
+actually begins — songs conventionally have a count-in/silence first. `GenerateVenueEvents`
+resolves a single **music-start anchor** (`FindMusicStartTime` in `venue_awareness.lua`, plus
+a measure-3/4 fallback computed in `venue_generator.lua`) and uses it in two places:
+
+- **First generated camera cut** — placed at the anchor instead of a fixed measure, so the
+  timing adapts to tempo (or to an explicit `[music_start]` marker when the chart has one).
+- **First `[prc_*]` section, if placed at tick 0** — when a theme is active and the earliest
+  detected section (typically `[prc_intro]`) sits right at the song's literal start,
+  `GenerateVenueEvents` re-anchors that section's `t_start` to the music-start position before
+  handing sections to `GenerateThemedSectionEvents` — so its lighting/postproc/dircut/bonusfx
+  land at the real musical start rather than during the count-in. A section the author already
+  placed later is left untouched.
+
+The forced song-start trio (tick 0) is independent of this anchor and always fires — see
+"Generated event types" above.
 
 ### Timing constants (local in `venue_generator.lua`, future S-field candidates)
 
