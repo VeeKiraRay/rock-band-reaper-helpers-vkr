@@ -29,7 +29,7 @@ local _tdir   = _dir .. 'tests/'
 
 local results = { vocal = nil, general = nil, vocal_midi = nil, general_midi = nil,
                   dsp_algo = nil, vocal_algo = nil, general_algo = nil,
-                  spritesheet = nil }
+                  quick_actions = nil, spritesheet = nil }
 
 local COL_OK  = 0x55DD55FF
 local COL_ERR = 0xFF5555FF
@@ -64,8 +64,8 @@ local function draw_status(res)
 end
 
 function Loop()
-    r.ImGui_SetNextWindowSizeConstraints(ctx, 340, 370, 9999, 9999)
-    r.ImGui_SetNextWindowSize(ctx, 340, 370, r.ImGui_Cond_FirstUseEver())
+    r.ImGui_SetNextWindowSizeConstraints(ctx, 340, 410, 9999, 9999)
+    r.ImGui_SetNextWindowSize(ctx, 340, 410, r.ImGui_Cond_FirstUseEver())
     local visible, open = r.ImGui_Begin(ctx, 'RB Helper Test Runner', true)
     if visible then
         r.ImGui_Spacing(ctx)
@@ -130,6 +130,14 @@ function Loop()
 
         r.ImGui_Spacing(ctx)
         r.ImGui_Separator(ctx)
+        r.ImGui_Spacing(ctx)
+
+        if r.ImGui_Button(ctx, 'Quick Action Tests', 155, 24) then
+            run('run_quick_actions.lua', 'quick_actions')
+        end
+        r.ImGui_SameLine(ctx)
+        draw_status(results.quick_actions)
+
         r.ImGui_Spacing(ctx)
 
         if r.ImGui_Button(ctx, 'Spritesheet Coverage', 155, 24) then
