@@ -372,6 +372,14 @@ half-beat (`ppq / 2` ticks) in absolute project PPQ space. Snapping happens in t
 Controls where `[first]` and `[next]` events land relative to the section start.
 Saved to project state as `vkfa` (integer 0–7).
 
+This same setting (and `S.venue_kf_inst_subdiv`) is shared by every keyframe generator in the
+codebase: `ProcessThemeSection` (this file's themed pipeline), `GenerateManualKeyframes`
+(Manual gen sub-tab, one span from the playhead), and `GenerateKeyframesForSpan` (extracted in
+`venue_lighting.lua`, used by the Keyframes sub-tab's `RegenerateVenueKeyframes` to bulk-refresh
+every manual lighting event already on the VENUE track — see `CLAUDE_general.md`'s Venue tab
+description). All three implement the same modes 0-7 algorithm independently rather than
+sharing one function, to avoid touching already-working generation paths.
+
 ### Modes 0–2 (standard)
 
 | Mode | Value | `[first]` position | `[next]` sequence starts from |

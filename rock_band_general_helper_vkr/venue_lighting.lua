@@ -2,7 +2,7 @@
 -- Requires: BuildLightingPool, BuildPostprocPool, GetSectionPreset, FindTrackByName,
 --           PickRandom, JitteredInterval, r, S (globals from venue_camera.lua and venue_themes.lua)
 -- Globals exported: MANUAL_LIGHTING_SET, LIGHTING_OFFSET_16THS, INST_KF_MODES,
---   FindNextMeasureStartPpq, CollectInstNotePositions,
+--   FindNextMeasureStartPpq, CollectInstNotePositions, GenerateKeyframesForSpan,
 --   GenerateLightingEvents, GenerateThemedSectionEvents
 
 local MANUAL_LIGHTING_POOL = {
@@ -96,6 +96,74 @@ function CollectInstNotePositions(track_name, pitch_min, pitch_max, venue_take,
     end
     table.sort(positions)
     return positions
+end
+
+-- Returns an array of {ppq, text} keyframe events ('[first]'/'[next]') for one manual-lighting
+-- span [start_ppq, end_ppq), using the shared S.venue_keyframe_align / S.venue_kf_inst_subdiv
+-- settings and the given rate in beats. Same algorithm as GenerateManualKeyframes's body
+-- (actions_venue_manual.lua), parameterized so it can be reused per-span by other callers.
+function GenerateKeyframesForSpan(take, start_ppq, end_ppq, ppq, kf_rate_beats)
+    local ctrl_events = {}
+    local align    = S.venue_keyframe_align
+    local kf_ticks = kf_rate_beats * ppq
+
+    if align >= 3 and INST_KF_MODES[align] then
+        local inst_info    = INST_KF_MODES[align]
+        local inst_pos     = CollectInstNotePositions(
+            inst_info.track_name, inst_info.pitch_min, inst_info.pitch_max,
+            take, start_ppq, end_ppq)
+        local subdiv_ticks = math.floor(S.venue_kf_inst_subdiv == 1 and ppq / 2 or ppq)
+
+        ctrl_events[#ctrl_events + 1] = { ppq = start_ppq, text = '[first]' }
+
+        local sec_qn    = r.TimeMap_timeToQN(r.MIDI_GetProjTimeFromPPQPos(take, start_ppq))
+        local subdiv_qn = S.venue_kf_inst_subdiv == 1 and 0.5 or 1.0
+        local grid_qn   = math.ceil(sec_qn / subdiv_qn + 1e-6) * subdiv_qn
+        local pos_ppq   = r.MIDI_GetPPQPosFromProjTime(take, r.TimeMap_QNToTime(grid_qn))
+        local tolerance = math.floor(ppq / 32)
+        local ni        = 1
+        while pos_ppq < end_ppq do
+            while ni <= #inst_pos and inst_pos[ni] < pos_ppq - tolerance do
+                ni = ni + 1
+            end
+            if ni <= #inst_pos and inst_pos[ni] <= pos_ppq + tolerance then
+                ctrl_events[#ctrl_events + 1] = { ppq = pos_ppq, text = '[next]' }
+            end
+            pos_ppq = pos_ppq + subdiv_ticks
+        end
+    else
+        -- Standard modes 0-2
+        local first_ppq
+        if align == 1 then
+            first_ppq = math.max(start_ppq, math.floor(start_ppq / ppq + 0.5) * ppq)
+        else
+            first_ppq = start_ppq
+        end
+
+        local next_ppq
+        if align == 2 then
+            local nms = FindNextMeasureStartPpq(take, start_ppq, ppq)
+            next_ppq  = nms < end_ppq and nms or nil
+        else
+            -- Anchor [next] to the nearest beat to the span start so the [next] grid lands on
+            -- whole beats even when [first] is not beat-aligned (modes 0 & 1).
+            local beat_anchor = math.floor(start_ppq / ppq + 0.5) * ppq
+            next_ppq = beat_anchor + kf_ticks
+        end
+
+        if first_ppq < end_ppq then
+            ctrl_events[#ctrl_events + 1] = { ppq = first_ppq, text = '[first]' }
+        end
+        if next_ppq then
+            local pos_ppq = next_ppq
+            while pos_ppq < end_ppq do
+                ctrl_events[#ctrl_events + 1] = { ppq = pos_ppq, text = '[next]' }
+                pos_ppq = pos_ppq + kf_ticks
+            end
+        end
+    end
+
+    return ctrl_events
 end
 
 -- pool_override: use a specific pool instead of the combined MANUAL+AUTO default

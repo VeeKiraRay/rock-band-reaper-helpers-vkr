@@ -43,6 +43,20 @@ function ClearVenueExceptLPInRange(take, start_ppq, end_ppq)
     end
 end
 
+-- Deletes only [first]/[next]/[previous] text events in range. Leaves camera, lighting,
+-- postproc, and bonusfx untouched.
+function ClearVenueKeyframesInRange(take, start_ppq, end_ppq)
+    local _, _, _, tc = r.MIDI_CountEvts(take)
+    for i = tc - 1, 0, -1 do
+        local ok, _, _, ppq, evt_type, msg = r.MIDI_GetTextSysexEvt(take, i)
+        if ok and evt_type == 1 and ppq >= start_ppq and ppq < end_ppq then
+            if msg == '[first]' or msg == '[next]' or msg == '[previous]' then
+                r.MIDI_DeleteTextSysexEvt(take, i)
+            end
+        end
+    end
+end
+
 -- ---------------------------------------------------------------------------
 
 function GenerateVenueEvents()

@@ -960,6 +960,14 @@ function DrawVenueTab(ctx)
         end
 
         ------------------------------------------------
+        -- Venue > Keyframes sub-tab
+        ------------------------------------------------
+        if r.ImGui_BeginTabItem(ctx, 'Keyframes') then
+            DrawVenueKeyframesTab()
+            r.ImGui_EndTabItem(ctx)
+        end
+
+        ------------------------------------------------
         -- Venue > Preview sub-tab
         ------------------------------------------------
         if r.ImGui_BeginTabItem(ctx, 'Preview') then

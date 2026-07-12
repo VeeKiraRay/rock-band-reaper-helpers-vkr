@@ -192,6 +192,8 @@ S = {
     venue_mg_special     = '',   -- full event e.g. '[bonusfx]'
     venue_mg_kf_rate     = 2,    -- keyframe rate in beats (1-8)
     venue_mg_remove_type = 0,    -- 0=Camera 1=Lighting 2=PostProc 3=Special 4=All
+    -- Keyframes tab (not persisted - session state only)
+    venue_kf_rate        = 2,    -- keyframe rate in beats (1-8), independent of venue_mg_kf_rate
     -- UI visibility (persisted)
     show_wip_tabs           = false, -- show Tempo Map, Drums, Keys, Guitar tabs
 }
@@ -304,6 +306,17 @@ TIPS = {
                          "Select a directed event name, or leave blank for no forced cut.\n" ..
                          "Random directed cuts are suppressed in section generation mode.",
     venue_sec_bonusfx  = "Insert a [bonusfx] event at the section start.",
+
+    -- Keyframes tab
+    venue_kf_regenerate = "Find every manual lighting event ([lighting (verse)], (chorus),\n" ..
+                          "(manual_cool), (manual_warm), (dischord), (stomp)) already on the\n" ..
+                          "VENUE track and regenerate its [first]/[next] keyframes, running from\n" ..
+                          "that lighting event to the next lighting event of any kind.\n\n" ..
+                          "Only [first]/[next]/[previous] events are cleared and replaced -\n" ..
+                          "camera, lighting, post-process, and bonus FX are untouched.\n\n" ..
+                          "Respects an active time selection (only lighting events inside the\n" ..
+                          "selection are regenerated); otherwise processes the whole song.\n\n" ..
+                          "Fully undoable.",
 
     -- Tempo map - track dropdowns
     kick_track     = "Audio track containing the isolated kick drum stem (KICK AUDIO).\n" ..

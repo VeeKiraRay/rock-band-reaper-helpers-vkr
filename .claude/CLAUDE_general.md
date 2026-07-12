@@ -69,7 +69,7 @@ Four WIP tabs appear only when **Show WIPs? = Yes** in the General tab (persiste
 - Move + Stretch: also adjusts the take playback rate so the last note lands at the time selection end.
 - Set a time selection first, then click **Align MIDI**. Fully undoable.
 
-**Venue tab** — VENUE MIDI track events. Contains four sub-tabs (plus Preview):
+**Venue tab** — VENUE MIDI track events. Contains five sub-tabs (plus Preview):
 
 *Analysis sub-tab* — read-only inspection tools.
 - **List venue events** — validates the VENUE track against the Rock Band Network spec: track name event, event type checks, unknown events, consecutive camera repeats, directed cut spacing, camera gap statistics, event usage frequency.
@@ -98,6 +98,11 @@ Four WIP tabs appear only when **Show WIPs? = Yes** in the General tab (persiste
 - **Generate keyframes** — generates `[first]`/`[next]` from cursor to the next lighting event / time selection end / VENUE item end. Clears existing keyframe events in the range first. Only available when a manual lighting preset is selected. Fully undoable.
 - **Remove** — category dropdown (Camera / Lighting / Post proc / Special) + **Remove** button; removes matching events from time selection (if active) or full song. Fully undoable.
 
+*Keyframes sub-tab* — bulk regeneration of `[first]`/`[next]` keyframes for every manual lighting event already on the VENUE track.
+- **Keyframe align** + subdivision (when an instrument-aware mode is selected) — shared global state, same as the other gen tabs.
+- **Keyframe rate** — this tab's own value (`S.venue_kf_rate`), independent of Manual gen's rate.
+- **Regenerate keyframes** — scans the VENUE track for `[lighting (...)]` events that are manual (`verse`, `chorus`, `manual_cool`, `manual_warm`, `dischord`, `stomp`); for each one inside the processing range, clears and regenerates its `[first]`/`[next]`/`[previous]` events running from that lighting event to the next lighting event of any kind. Camera, lighting, postproc, and bonus FX are never touched. Respects time selection (only lighting events whose own position is inside the selection are regenerated — a section already in progress from before the selection is left untouched); otherwise processes the whole song. Fully undoable.
+
 ---
 
 ## Module contents
@@ -113,8 +118,8 @@ Four WIP tabs appear only when **Show WIPs? = Yes** in the General tab (persiste
 | `rock_band_general_helper_vkr/venue_themes.lua` | `ThemeDisplayLabel`, `LoadVenueThemes`, `GetSectionPreset`, `GetThemeCameraInterval`, `BuildLightingPool`, `BuildPostprocPool` (global); `POSTPROC_VALID_SET`, `LIGHTING_VALID_SET`, `CAMERA_PACING`, `Tokenize`, `ParseSexpr`, `ParseThemeFile`, `InterpretSectionPreset`, `InterpretTheme` (local) |
 | `rock_band_general_helper_vkr/venue_camera.lua` | `COOP_POOL`, `DIRECTED_POOL`, `PickRandom`, `JitteredInterval`, `CategorizeCoopPool`, `WeightedPickCoopEvent`, `FindCompanion`, `ComputeIdleState`, `GenerateCameraEvents` (global); camera constants (`CAM_INTERVAL_16THS` etc., partially global); `WeightedPickInstrument` (local) |
 | `rock_band_general_helper_vkr/venue_sprites.lua` | `LoadVenueSprite`, `DrawVenueTooltipSprite`, `BeginVenueTooltip`, `EndVenueTooltip`, `VenueSpriteFoldersFound` (global); `DIRECTED_SPRITE_NAMES`, `VENUE_SPRITE_ROOT` (module-level globals). JPEG-only. Checks `resources/img/spritesheets/{category}/` (large) then `resources/img/spritesheets/{category} small/` (small) — no third-party fallback. Frame count is read from the filename (`{key}_f{N}_spritesheet.jpg`). Display size scales by `S.venue_preview_scale` (1 or 2). Cache stores `{image, frame_count, cols, rows}` per sprite. |
-| `rock_band_general_helper_vkr/venue_lighting.lua` | `MANUAL_LIGHTING_SET`, `LIGHTING_OFFSET_16THS`, `INST_KF_MODES`, `FindNextMeasureStartPpq`, `CollectInstNotePositions`, `GenerateLightingEvents`, `GenerateThemedSectionEvents` (global); `MANUAL_LIGHTING_POOL`, `AUTO_LIGHTING_POOL`, lighting constants, `SnapPpqToNearestBeat`, `ProcessThemeSection` (local) |
-| `rock_band_general_helper_vkr/venue_generator.lua` | `GenerateVenueEvents` (global); `ClearVenueTextEventsInRange` (local) |
+| `rock_band_general_helper_vkr/venue_lighting.lua` | `MANUAL_LIGHTING_SET`, `LIGHTING_OFFSET_16THS`, `INST_KF_MODES`, `FindNextMeasureStartPpq`, `CollectInstNotePositions`, `GenerateKeyframesForSpan`, `GenerateLightingEvents`, `GenerateThemedSectionEvents` (global); `MANUAL_LIGHTING_POOL`, `AUTO_LIGHTING_POOL`, lighting constants, `SnapPpqToNearestBeat`, `ProcessThemeSection` (local) |
+| `rock_band_general_helper_vkr/venue_generator.lua` | `GenerateVenueEvents`, `ClearVenueTextEventsInRange`, `ClearVenueNonCameraEventsInRange`, `ClearVenueExceptLPInRange`, `ClearVenueKeyframesInRange` (global) |
 | `rock_band_general_helper_vkr/tempomap.lua` | `ComputeTempoRMSContour`, `DetectOnsets`, `EstimateBPM`, `GuessTimeSig`, `GetSourcesForRange`, `FitBeatGrid`, `RmsToOnsetFlux`, `FindLocalPeak` |
 | `rock_band_general_helper_vkr/actions.lua` | `AlignAudioTracks`, `AlignAllAudio`, `AlignCountIn`, `CreateSongFadeOut`; `CountInBeatSlots` (local) |
 | `rock_band_general_helper_vkr/actions_tempomap.lua` | `ShowTempoContext`, `EstimateInitialBPM`, `AutoTuneThreshold`, `ClearGeneratedTempoMarkers`, `GenerateTempoMap`; `BPM_MIN`, `BPM_MAX` (locals) |
@@ -131,7 +136,10 @@ Four WIP tabs appear only when **Show WIPs? = Yes** in the General tab (persiste
 | `rock_band_general_helper_vkr/ui_keys.lua` | `DrawKeysTab`, `DrawDifficultyTab` (global) — Keys and Difficulty tab rendering |
 | `rock_band_general_helper_vkr/ui_midi.lua` | `DrawTabInputTab`, `DrawMIDITab` (global) — Tab Input and MIDI tab rendering |
 | `rock_band_general_helper_vkr/actions_venue_manual.lua` | `InsertVenueEventAtPlayhead`, `AdvanceCameraPacing`, `GenerateManualKeyframes`, `RemoveVenueEventsByType` (global) — Manual gen actions |
-| `rock_band_general_helper_vkr/ui_venue.lua` | `DrawVenueTab` (global) — Venue tab rendering (all four sub-tabs: Analysis, Themes gen, Section gen, Manual gen, Preview) |
+| `rock_band_general_helper_vkr/actions_venue_keyframes.lua` | `RegenerateVenueKeyframes` (global) — Keyframes tab action: bulk-regenerates keyframes for every manual lighting event on the VENUE track |
+| `rock_band_general_helper_vkr/ui_venue.lua` | `DrawVenueTab` (global) — Venue tab rendering (sub-tab bar: Analysis, Themes gen, Section gen, Manual gen, Keyframes, Preview; Keyframes and Preview delegate to their own files) |
+| `rock_band_general_helper_vkr/ui_venue_preview.lua` | `DrawVenuePreviewTab` (global) — Preview sub-tab rendering |
+| `rock_band_general_helper_vkr/ui_venue_keyframes.lua` | `DrawVenueKeyframesTab` (global) — Keyframes sub-tab rendering |
 | `rock_band_general_helper_vkr/ui.lua` | `TrackCombo` (global override supporting `sel_idx=-1`), `Loop`, `r.defer(Loop)` |
 
 **Local-only functions:**
@@ -142,7 +150,6 @@ Four WIP tabs appear only when **Show WIPs? = Yes** in the General tab (persiste
 - `venue_camera.lua`: `WeightedPickInstrument`; camera constants `CAM_DIRECTED_COOLDOWN`, `DIRECTED_MIN_COUNT`, `DIRECTED_MAX_COUNT`, `INST_WEIGHTS`, `INST_ORDER`, `IDLE_WEIGHT`
 - `venue_sprites.lua`: `_sprite_cache`, `_sprite_dirs_found`, `NormalizeSpriteKey`, `_try_load_from_dir`, `FindAndLoadSprite`, `_CAT_FOLDER`, `POSTPROC_SPRITE_NAMES`; `SPRITE_COLS`, `SPRITE_ROWS`, `SPRITE_FRAME_RATE`, `SPRITE_DISPLAY_W`, `SPRITE_DISPLAY_H`
 - `venue_lighting.lua`: `MANUAL_LIGHTING_POOL`, `AUTO_LIGHTING_POOL`, `LIGHTING_INTERVAL_16THS`, `LIGHTING_JITTER`, `KEYFRAME_MIN_BEATS`, `KEYFRAME_MAX_BEATS`, `SnapPpqToNearestBeat`, `ProcessThemeSection`
-- `venue_generator.lua`: `ClearVenueTextEventsInRange`
 - `actions.lua`: `CountInBeatSlots`
 - `actions_tempomap.lua`: `BPM_MIN`, `BPM_MAX` (module-level locals)
 - `actions_drums.lua`: `BuildMap`, `ReadMIDINotes`, `ClearDrumNotes`, `BuildDrumOutput`, `BuildReport`
@@ -189,8 +196,11 @@ venue_sprites.lua              → LoadVenueSprite, DrawVenueTooltipSprite, Begi
                                   DIRECTED_SPRITE_NAMES, POSTPROC_SPRITE_NAMES (module globals)
 venue_lighting.lua             → MANUAL_LIGHTING_SET, LIGHTING_OFFSET_16THS, INST_KF_MODES,
                                   FindNextMeasureStartPpq, CollectInstNotePositions,
-                                  GenerateLightingEvents, GenerateThemedSectionEvents
-venue_generator.lua            → GenerateVenueEvents
+                                  GenerateKeyframesForSpan, GenerateLightingEvents,
+                                  GenerateThemedSectionEvents
+venue_generator.lua            → GenerateVenueEvents, ClearVenueTextEventsInRange,
+                                  ClearVenueNonCameraEventsInRange, ClearVenueExceptLPInRange,
+                                  ClearVenueKeyframesInRange
 tempomap.lua                   → ComputeTempoRMSContour, DetectOnsets, EstimateBPM,
                                   GuessTimeSig, GetSourcesForRange, FitBeatGrid,
                                   RmsToOnsetFlux, FindLocalPeak
@@ -209,9 +219,12 @@ actions_difficulty.lua         → SuggestProKeysDiff, ValidateProKeysDiff, Vali
 actions_difficulty_5k.lua      → ValidateKeys5Diff, ValidateAllKeys5, SuggestKeys5Diff
 actions_venue_manual.lua       → InsertVenueEventAtPlayhead, AdvanceCameraPacing,
                                   GenerateManualKeyframes, RemoveVenueEventsByType
+actions_venue_keyframes.lua    → RegenerateVenueKeyframes
 ui_keys.lua                    → DrawKeysTab, DrawDifficultyTab
 ui_midi.lua                    → DrawTabInputTab, DrawMIDITab
 ui_venue.lua                   → DrawVenueTab
+ui_venue_preview.lua           → DrawVenuePreviewTab
+ui_venue_keyframes.lua         → DrawVenueKeyframesTab
 ui.lua                         → Loop (also calls r.defer(Loop))
 [entry point startup]          → LoadSettings(), SetDefaultTempoTracks(),
                                   SetDefaultMIDITracks(), SetDefaultDifficultyTracks()
