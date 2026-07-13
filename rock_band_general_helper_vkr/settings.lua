@@ -114,9 +114,12 @@ local function DeserializeSettings(str)
     end
 end
 
+-- Save/LoadSectionConfigs live in actions_venue_section.lua, which the slim
+-- standalone preview entry point (rock_band_preview_vkr.lua) does not load —
+-- guard the calls so this file works in both entry points.
 function SaveSettings()
     r.SetProjExtState(0, PROJ_KEY_SECTION, PROJ_KEY_NAME, SerializeSettings())
-    SaveSectionConfigs()
+    if SaveSectionConfigs then SaveSectionConfigs() end
     r.MarkProjectDirty(0)
 end
 
@@ -129,9 +132,9 @@ function LoadSettings()
         else
             S.tm_timesig_text = S.tm_timesig_num .. '/' .. S.tm_timesig_denom
         end
-        LoadSectionConfigs()
+        if LoadSectionConfigs then LoadSectionConfigs() end
         return true
     end
-    LoadSectionConfigs()
+    if LoadSectionConfigs then LoadSectionConfigs() end
     return false
 end

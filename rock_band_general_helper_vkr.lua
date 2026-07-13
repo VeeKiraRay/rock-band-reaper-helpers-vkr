@@ -1,6 +1,6 @@
 -- @description Rock Band General Helper
 -- @author VeeKiraRay
--- @version 0.9.5
+-- @version 0.9.6
 -- @about
 --   Utility actions for Rock Band authoring in REAPER.
 --
@@ -17,6 +17,11 @@
 --
 --   Built with Claude (Anthropic) - https://claude.ai
 --
+--   v0.9.6
+--     - Venue > Preview is now also available as a standalone script,
+--       rock_band_preview_vkr.lua, so the preview can sit in its own window
+--       next to the generation tabs. The sub-tab is unchanged; both load the
+--       same module files.
 --   v0.9.5
 --     - Venue > Analysis: new "Generate sing along" action. Derives VENUE
 --       sing-along notes (pitch 87 guitarist from HARM2, pitch 85 bassist
