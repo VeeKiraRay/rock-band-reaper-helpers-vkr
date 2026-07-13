@@ -1,6 +1,6 @@
 -- @description Rock Band General Helper
 -- @author VeeKiraRay
--- @version 0.9.3
+-- @version 0.9.5
 -- @about
 --   Utility actions for Rock Band authoring in REAPER.
 --
@@ -17,6 +17,20 @@
 --
 --   Built with Claude (Anthropic) - https://claude.ai
 --
+--   v0.9.5
+--     - Venue > Analysis: new "Generate sing along" action. Derives VENUE
+--       sing-along notes (pitch 87 guitarist from HARM2, pitch 85 bassist
+--       from HARM3) from each harmony track's vocal phrases, merging phrases
+--       less than a measure apart into one continuous note. Clears/replaces
+--       only the pitch of each unmuted-and-present source track.
+--   v0.9.4
+--     - Venue tab: new Keyframes sub-tab. Bulk-regenerates [first]/[next]
+--       keyframes for every manual lighting event already on the VENUE track
+--       (from that lighting event to the next lighting event of any kind),
+--       using the shared Keyframe align/subdivision settings and its own
+--       Keyframe rate. Only keyframe events are cleared/replaced; camera,
+--       lighting, postproc, and bonus FX are untouched. Respects time
+--       selection; otherwise processes the whole song.
 --   v0.9.3
 --     - Venue camera generation (Themes gen and Section gen tabs) now avoids
 --       placing the same camera/companion event(s) back-to-back: the full set
@@ -100,6 +114,8 @@ for _, _f in ipairs({
     _mdir .. 'venue_generator.lua',
     _mdir .. 'actions_venue_section.lua',
     _mdir .. 'actions_venue_manual.lua',
+    _mdir .. 'actions_venue_keyframes.lua',
+    _mdir .. 'actions_venue_sing_along.lua',
     _mdir .. 'tempomap.lua',
     _mdir .. 'actions.lua',
     _mdir .. 'actions_tempomap.lua',
@@ -117,6 +133,7 @@ for _, _f in ipairs({
     _mdir .. 'ui_midi.lua',
     _mdir .. 'ui_venue.lua',
     _mdir .. 'ui_venue_preview.lua',
+    _mdir .. 'ui_venue_keyframes.lua',
     _mdir .. 'ui.lua',
 }) do
     if not r.file_exists(_f) then
@@ -143,6 +160,8 @@ dofile(_mdir .. 'venue_lighting.lua')
 dofile(_mdir .. 'venue_generator.lua')
 dofile(_mdir .. 'actions_venue_section.lua')
 dofile(_mdir .. 'actions_venue_manual.lua')
+dofile(_mdir .. 'actions_venue_keyframes.lua')
+dofile(_mdir .. 'actions_venue_sing_along.lua')
 dofile(_mdir .. 'tempomap.lua')
 dofile(_mdir .. 'actions.lua')
 dofile(_mdir .. 'actions_tempomap.lua')
@@ -160,6 +179,7 @@ dofile(_mdir .. 'ui_keys.lua')
 dofile(_mdir .. 'ui_midi.lua')
 dofile(_mdir .. 'ui_venue.lua')
 dofile(_mdir .. 'ui_venue_preview.lua')
+dofile(_mdir .. 'ui_venue_keyframes.lua')
 dofile(_mdir .. 'ui.lua')  -- also calls r.defer(Loop) at end
 
 -- Startup initialisation (runs after all modules are loaded)

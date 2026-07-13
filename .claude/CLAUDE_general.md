@@ -71,9 +71,10 @@ Four WIP tabs appear only when **Show WIPs? = Yes** in the General tab (persiste
 
 **Venue tab** — VENUE MIDI track events. Contains five sub-tabs (plus Preview):
 
-*Analysis sub-tab* — read-only inspection tools.
-- **List venue events** — validates the VENUE track against the Rock Band Network spec: track name event, event type checks, unknown events, consecutive camera repeats, directed cut spacing, camera gap statistics, event usage frequency.
-- **Show event sections** — reads `[prc_*]` markers from the EVENTS track and lists detected song sections with time ranges. Letter-suffix variants (`[prc_verse_1a]`, `[prc_verse_1b]`) are merged into a single section entry.
+*Analysis sub-tab* — inspection tools, plus one generation action.
+- **List venue events** — validates the VENUE track against the Rock Band Network spec: track name event, event type checks, unknown events, consecutive camera repeats, directed cut spacing, camera gap statistics, event usage frequency. Read-only.
+- **Show event sections** — reads `[prc_*]` markers from the EVENTS track and lists detected song sections with time ranges. Letter-suffix variants (`[prc_verse_1a]`, `[prc_verse_1b]`) are merged into a single section entry. Read-only.
+- **Generate sing along** — derives VENUE sing-along notes (pitch 87 guitarist from HARM2, pitch 85 bassist from HARM3) from each harmony track's vocal phrase content: a phrase (bounded by a pitch-105 marker note) qualifies when it has at least one vocal-range note (36-84); qualifying phrases less than a measure apart are merged into one continuous note. Only the pitch of a source track that is present and unmuted is cleared/replaced — a muted or missing source is skipped, leaving its existing notes untouched. If both HARM2 and HARM3 are unavailable, nothing is generated. Always processes the whole song (no time-selection scoping). Fully undoable.
 
 *Themes gen sub-tab* — whole-song generation driven by a `.rbtheme` file.
 - **Theme combo** — select a `.rbtheme` file from the `resources/themes/` folder (themes are not shipped with the project; add `.rbtheme` files to enable). Shows `(select a theme)` when none loaded; Generate button is disabled until a theme is chosen. If the `resources/themes/` folder is empty a warning is displayed and all inputs are disabled.
@@ -137,6 +138,7 @@ Four WIP tabs appear only when **Show WIPs? = Yes** in the General tab (persiste
 | `rock_band_general_helper_vkr/ui_midi.lua` | `DrawTabInputTab`, `DrawMIDITab` (global) — Tab Input and MIDI tab rendering |
 | `rock_band_general_helper_vkr/actions_venue_manual.lua` | `InsertVenueEventAtPlayhead`, `AdvanceCameraPacing`, `GenerateManualKeyframes`, `RemoveVenueEventsByType` (global) — Manual gen actions |
 | `rock_band_general_helper_vkr/actions_venue_keyframes.lua` | `RegenerateVenueKeyframes` (global) — Keyframes tab action: bulk-regenerates keyframes for every manual lighting event on the VENUE track |
+| `rock_band_general_helper_vkr/actions_venue_sing_along.lua` | `GenerateSingAlong` (global) — Analysis tab action: derives VENUE pitch 85/87 sing-along notes from HARM2/HARM3 vocal phrases; `AvailableHarmTake`, `ReadPhrasesAndVocalNotes`, `MeasureDurationAtTime`, `BuildSpans` (local) |
 | `rock_band_general_helper_vkr/ui_venue.lua` | `DrawVenueTab` (global) — Venue tab rendering (sub-tab bar: Analysis, Themes gen, Section gen, Manual gen, Keyframes, Preview; Keyframes and Preview delegate to their own files) |
 | `rock_band_general_helper_vkr/ui_venue_preview.lua` | `DrawVenuePreviewTab` (global) — Preview sub-tab rendering |
 | `rock_band_general_helper_vkr/ui_venue_keyframes.lua` | `DrawVenueKeyframesTab` (global) — Keyframes sub-tab rendering |
@@ -150,6 +152,7 @@ Four WIP tabs appear only when **Show WIPs? = Yes** in the General tab (persiste
 - `venue_camera.lua`: `WeightedPickInstrument`; camera constants `CAM_DIRECTED_COOLDOWN`, `DIRECTED_MIN_COUNT`, `DIRECTED_MAX_COUNT`, `INST_WEIGHTS`, `INST_ORDER`, `IDLE_WEIGHT`
 - `venue_sprites.lua`: `_sprite_cache`, `_sprite_dirs_found`, `NormalizeSpriteKey`, `_try_load_from_dir`, `FindAndLoadSprite`, `_CAT_FOLDER`, `POSTPROC_SPRITE_NAMES`; `SPRITE_COLS`, `SPRITE_ROWS`, `SPRITE_FRAME_RATE`, `SPRITE_DISPLAY_W`, `SPRITE_DISPLAY_H`
 - `venue_lighting.lua`: `MANUAL_LIGHTING_POOL`, `AUTO_LIGHTING_POOL`, `LIGHTING_INTERVAL_16THS`, `LIGHTING_JITTER`, `KEYFRAME_MIN_BEATS`, `KEYFRAME_MAX_BEATS`, `SnapPpqToNearestBeat`, `ProcessThemeSection`
+- `actions_venue_sing_along.lua`: `RB3_VOCAL_MIN`, `RB3_VOCAL_MAX`, `RB3_PHRASE_PITCH` (module-level locals), `AvailableHarmTake`, `ReadPhrasesAndVocalNotes`, `MeasureDurationAtTime`, `BuildSpans`
 - `actions.lua`: `CountInBeatSlots`
 - `actions_tempomap.lua`: `BPM_MIN`, `BPM_MAX` (module-level locals)
 - `actions_drums.lua`: `BuildMap`, `ReadMIDINotes`, `ClearDrumNotes`, `BuildDrumOutput`, `BuildReport`
@@ -220,6 +223,7 @@ actions_difficulty_5k.lua      → ValidateKeys5Diff, ValidateAllKeys5, SuggestK
 actions_venue_manual.lua       → InsertVenueEventAtPlayhead, AdvanceCameraPacing,
                                   GenerateManualKeyframes, RemoveVenueEventsByType
 actions_venue_keyframes.lua    → RegenerateVenueKeyframes
+actions_venue_sing_along.lua   → GenerateSingAlong
 ui_keys.lua                    → DrawKeysTab, DrawDifficultyTab
 ui_midi.lua                    → DrawTabInputTab, DrawMIDITab
 ui_venue.lua                   → DrawVenueTab

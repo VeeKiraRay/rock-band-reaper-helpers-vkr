@@ -144,6 +144,7 @@ function DrawVenueTab(ctx)
         if r.ImGui_BeginTabItem(ctx, 'Analysis') then
             local bw_lv = r.ImGui_CalcTextSize(ctx, 'List venue events')   + _bp
             local bw_es = r.ImGui_CalcTextSize(ctx, 'Show event sections') + _bp
+            local bw_sa = r.ImGui_CalcTextSize(ctx, 'Generate sing along') + _bp
 
             if r.ImGui_Button(ctx, 'List venue events', bw_lv, 24) then
                 RunAction(ListVenueEvents)
@@ -154,6 +155,11 @@ function DrawVenueTab(ctx)
                 RunAction(ListEventSections)
             end
             Tooltip(TIPS.venue_sections)
+            r.ImGui_SameLine(ctx)
+            if r.ImGui_Button(ctx, 'Generate sing along', bw_sa, 24) then
+                RunAction(GenerateSingAlong)
+            end
+            Tooltip(TIPS.venue_sing_along)
 
             r.ImGui_EndTabItem(ctx)
         end

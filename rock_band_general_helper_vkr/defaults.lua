@@ -227,6 +227,16 @@ TIPS = {
                       "Letter-suffix events ([prc_verse_1a], [prc_verse_1b], ...) are grouped\n" ..
                       "into a single section. Plain-number ([prc_verse_1]) and bare\n" ..
                       "([prc_verse]) events are each their own standalone section.",
+    venue_sing_along = "Derive VENUE sing-along notes from the HARM2/HARM3 harmony tracks:\n" ..
+                      "pitch 87 (guitarist) from HARM2, pitch 85 (bassist) from HARM3.\n\n" ..
+                      "For each vocal phrase (bounded by a pitch-105 marker) where the harmony\n" ..
+                      "track actually sings a note, draws a note spanning that phrase. Phrases\n" ..
+                      "back to back (gap of one measure or less) are merged into one continuous\n" ..
+                      "note instead of one per phrase.\n\n" ..
+                      "If only one of HARM2/HARM3 is muted or missing, that instrument is\n" ..
+                      "skipped - its existing notes are left untouched. If both are muted or\n" ..
+                      "missing, nothing is generated. Pitch 86 (drummer) is never touched.\n\n" ..
+                      "Always processes the whole song. Fully undoable.",
     venue_generate  = "Generate random camera and lighting events on the VENUE track.\n\n" ..
                       "Camera events are filtered by instrument availability: if a PART track is\n" ..
                       "absent from the project or muted, camera shots featuring that instrument\n" ..
