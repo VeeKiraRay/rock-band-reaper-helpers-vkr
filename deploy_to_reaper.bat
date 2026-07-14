@@ -23,11 +23,13 @@ robocopy "%SRC%rock_band_vocal_helper_vkr"              "%DST%\rock_band_vocal_h
 robocopy "%SRC%rock_band_general_helper_vkr"            "%DST%\rock_band_general_helper_vkr"         *.lua    /MIR /NJH /NJS
 robocopy "%SRC%resources\themes"                        "%DST%\resources\themes"                     *.rbtheme /MIR /NJH /NJS
 robocopy "%SRC%rock_band_music_theory_helper_vkr"       "%DST%\rock_band_music_theory_helper_vkr"    *.lua    /MIR /NJH /NJS
+robocopy "%SRC%quick_actions"                           "%DST%\quick_actions"                        *.lua    /MIR /NJH /NJS
 robocopy "%SRC%dev\rock_band_venue_demo_vkr"             "%DST%\dev\rock_band_venue_demo_vkr"          *.lua    /MIR /NJH /NJS
 robocopy "%SRC%resources\img"                           "%DST%\resources\img"                        *.png *.jpg /MIR /NJH /NJS
 robocopy "%SRC%resources\audio\drums"                   "%DST%\resources\audio\drums"                *.ogg    /MIR /NJH /NJS
 copy /Y  "%SRC%rock_band_vocal_helper_vkr.lua"          "%DST%\rock_band_vocal_helper_vkr.lua"        >nul
 copy /Y  "%SRC%rock_band_general_helper_vkr.lua"        "%DST%\rock_band_general_helper_vkr.lua"      >nul
+copy /Y  "%SRC%rock_band_preview_vkr.lua"               "%DST%\rock_band_preview_vkr.lua"             >nul
 copy /Y  "%SRC%rock_band_music_theory_helper_vkr.lua"   "%DST%\rock_band_music_theory_helper_vkr.lua" >nul
 copy /Y  "%SRC%dev\rock_band_venue_demo_vkr.lua"        "%DST%\dev\rock_band_venue_demo_vkr.lua"      >nul
 copy /Y  "%SRC%dev\venue_sprite_tester_vkr.lua"         "%DST%\dev\venue_sprite_tester_vkr.lua"       >nul
