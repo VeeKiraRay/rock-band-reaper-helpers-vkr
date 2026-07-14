@@ -982,5 +982,6 @@ function DrawVenueTab(ctx)
         end
 
         r.ImGui_EndTabBar(ctx)
+        DrawActivePlayersRow()
     end
 end

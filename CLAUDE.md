@@ -31,6 +31,8 @@ end
 
 The 6.x floor is set by ReaImGui's own requirements. All REAPER core APIs (audio accessor, MIDI events, `new_array`) have been available since REAPER 5.x.
 
+Note: the 0.7 floor is nominal — sprite tooltips and image loading already use v0.8 APIs behind pcall guards (silently absent on 0.7). ReaImGui version landscape, floor-bump plan, and the repo's move to Codeberg are documented in `REAIMGUI_UPDATE_PLAN.md`.
+
 **Versioning.** Entry point header carries `@version`. Bump it whenever behavior or UI changes meaningfully. Document changes in the `@about` block.
 
 ---
@@ -189,6 +191,32 @@ These are guidelines, not hard stops. Tightly coupled code that must share local
 
 ---
 
+## Testing
+
+Tests live in `dev/tests/` and run **inside REAPER** (manually, with full access
+to all REAPER APIs) — there is no headless runner. Launch them via the
+`dev/test_rock_band_helpers_vkr.lua` button window, or run an individual
+`dev/tests/run_*.lua` directly from the Actions list for an isolated Lua
+context. Results print to the REAPER console.
+
+Structure: `framework.lua` provides `Test.section` / `Test.it` / `Test.expect`
+/ `Test.report`; `fixture_helpers.lua` provides fixture loading and temp-track
+helpers; each suite is a `<name>.lua` test set plus a `run_<name>.lua` runner
+that dofiles the code under test and the set.
+
+**When adding a new feature, plan quick tests for it in the same task:**
+- Add cases to the matching existing test set when one covers that area.
+- Otherwise create a new set + `run_*.lua` runner (copy an existing runner's
+  path-derivation preamble) and add a button for it in
+  `dev/test_rock_band_helpers_vkr.lua`.
+- Design for testability: keep UI/editor acquisition (active MIDI editor,
+  edit cursor, `S` indices) in a thin wrapper and put the logic in a function
+  taking explicit arguments (e.g. `VocalNoteSnapInTake(take, cursor, mode)`),
+  so tests can drive it against a generated MIDI item without a MIDI editor.
+- Tests must clean up any tracks/items they create (`CleanupFixture`).
+
+---
+
 ## Lua specifics (REAPER)
 
 - `reaper.new_array(n)` for sample buffers. 1-based indexing. Does **not** work inside Lua coroutines — REAPER restriction.
@@ -223,6 +251,21 @@ These are guidelines, not hard stops. Tightly coupled code that must share local
     defaults.lua     helpers.lua     venue.lua
     settings.lua     tempomap.lua    actions.lua    ui.lua
 
+  rock_band_preview_vkr.lua                  ← standalone Venue Preview window
+                                               (no module folder of its own —
+                                               reuses rock_band_general_helper_vkr/
+                                               modules; documented exception to
+                                               the folder-naming rule)
+
+  quick_actions/                             ← single-file, no-UI hotkey scripts
+    lib/
+      vocal_note_snap_core.lua               ← shared cores (not bindable)
+      vocal_note_create_core.lua
+    vocal_note_snap_to_playhead_vkr.lua      ← bindable wrapper (auto)
+    vocal_note_snap_start_to_playhead_vkr.lua
+    vocal_note_snap_end_to_playhead_vkr.lua
+    vocal_note_create_at_playhead_vkr.lua
+
   CLAUDE.md           ← this file (shared conventions)
   .claude/
     CLAUDE_vocal.md               ← vocal helper details
@@ -232,6 +275,25 @@ These are guidelines, not hard stops. Tightly coupled code that must share local
 ```
 
 Module file contents and load orders are in the script-specific CLAUDE files.
+
+### Quick actions (`quick_actions/`)
+
+Small no-UI scripts meant to be bound to a hotkey and fired once (no ImGui, no
+defer loop). Conventions:
+
+- `*_vkr.lua` files at the folder root are the bindable entry points; shared
+  cores live in `quick_actions/lib/` (loaded via `dofile`, never bound
+  directly), keeping the root listing bindable-only.
+- Exit silently when preconditions fail (no MIDI editor, no target note) —
+  never `ShowMessageBox`. A no-op run must not create an undo point: return
+  before any `Undo_*` call.
+- Self-contained: hardcode constants (e.g. pitch range 36–84) rather than
+  loading a helper's `defaults.lua`.
+- Cores expose a take-level function (explicit take/cursor args) alongside the
+  hotkey entry point, so `dev/tests/quick_actions.lua` can test them without
+  an open MIDI editor.
+- New scripts need a line in `deploy_to_reaper.bat` (the `quick_actions`
+  robocopy already mirrors the whole folder).
 
 ---
 

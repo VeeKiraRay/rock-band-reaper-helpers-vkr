@@ -126,11 +126,13 @@ function ReadInstrumentPlayStates()
                                 events[#events + 1] = {
                                     t = r.MIDI_GetProjTimeFromPPQPos(tk, ppq),
                                     is_active = true,
+                                    msg = msg,
                                 }
                             elseif PLAY_STATE_IDLE[msg] then
                                 events[#events + 1] = {
                                     t = r.MIDI_GetProjTimeFromPPQPos(tk, ppq),
                                     is_active = false,
+                                    msg = msg,
                                 }
                             end
                         end
@@ -148,6 +150,43 @@ function ReadInstrumentPlayStates()
         -- absent track: muted check handles exclusion, no play-state entry needed
     end
     return states, no_data
+end
+
+function GetInstrumentTrackName(letter)
+    return INST_TRACK_NAMES[letter]
+end
+
+-- Pure point-in-time query over ReadInstrumentPlayStates() data (UI row + tests).
+-- playhead in project seconds; states/no_data from ReadInstrumentPlayStates();
+-- muted from GetMutedInstruments().
+-- Returns result[letter] = { state = 'muted'|'nodata'|'active'|'idle',
+--                            msg = play-state event string or nil,
+--                            t   = that event's project time or nil }
+-- Before the first event an instrument counts as active, matching how the
+-- generator treats missing/preceding play-state data.
+function ComputePlayerStatesAt(playhead, states, no_data, muted)
+    local nodata_set = {}
+    for _, letter in ipairs(no_data or {}) do nodata_set[letter] = true end
+    local result = {}
+    for letter in pairs(INST_TRACK_NAMES) do
+        if muted and muted[letter] then
+            result[letter] = { state = 'muted' }
+        elseif nodata_set[letter] then
+            result[letter] = { state = 'nodata' }
+        else
+            local last = nil
+            for _, ev in ipairs(states and states[letter] or {}) do
+                if ev.t <= playhead then last = ev else break end
+            end
+            if last then
+                result[letter] = { state = last.is_active and 'active' or 'idle',
+                                   msg = last.msg, t = last.t }
+            else
+                result[letter] = { state = 'active' }
+            end
+        end
+    end
+    return result
 end
 
 -- =============================================================================

@@ -328,6 +328,23 @@ TIPS = {
                           "selection are regenerated); otherwise processes the whole song.\n\n" ..
                           "Fully undoable.",
 
+    -- Active players row (bottom of the Venue tab and standalone preview window).
+    -- venue_player_* entries are string.format templates filled in by
+    -- ui_venue_players.lua (%s = PART track name / play-state event / time).
+    venue_players_row = "Instrument availability at the playhead, as venue generation sees it:\n\n" ..
+                        "green   active ([play]/[mellow]/[intense])\n" ..
+                        "blue    idle ([idle]/[idle_realtime])\n" ..
+                        "red     track muted or missing\n" ..
+                        "orange  no play-state events (treated as always in [play] state)\n\n" ..
+                        "Follows the play cursor during playback, the edit cursor otherwise.\n" ..
+                        "Hover an instrument for details.",
+    venue_player_muted   = "%s is muted - excluded from venue generation.",
+    venue_player_missing = "%s track is missing - excluded from venue generation.",
+    venue_player_nodata  = "%s has no [play]/[idle] play-state events -\n" ..
+                           "venue generation treats it as always in [play] state.",
+    venue_player_state   = "%s - %s since %s.",
+    venue_player_default_active = "%s - active (before the first play-state event).",
+
     -- Tempo map - track dropdowns
     kick_track     = "Audio track containing the isolated kick drum stem (KICK AUDIO).\n" ..
                      "Primary source for downbeat detection.",

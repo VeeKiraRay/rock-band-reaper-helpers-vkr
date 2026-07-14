@@ -1,6 +1,6 @@
 -- @description Rock Band Venue Preview
 -- @author VeeKiraRay
--- @version 0.1
+-- @version 0.2
 -- @about
 --   Standalone window for the Venue > Preview sub-tab of the Rock Band
 --   General Helper. Shows previous / current / next VENUE events (camera,
@@ -10,6 +10,11 @@
 --   this entry point offers the same UI in its own window so it can sit
 --   next to the generation tabs (e.g. Manual) without tab switching.
 --
+--   v0.2
+--     - Added the "Active players" row below the preview: a colored dot per
+--       instrument shows its state at the playhead - active (green), idle
+--       (blue), track muted or missing (red), or no play-state events
+--       (orange) - matching the general helper's Venue tab.
 --   v0.1
 --     - Initial release. Reuses the general helper's module files directly
 --       (ui_venue_preview.lua and its dependencies) - fixes and features
@@ -58,6 +63,7 @@ local _files = {
     _mdir .. 'venue_awareness.lua',
     _mdir .. 'venue_sprites.lua',
     _mdir .. 'ui_venue_preview.lua',
+    _mdir .. 'ui_venue_players.lua',
 }
 
 for _, _f in ipairs(_files) do
@@ -95,6 +101,7 @@ local function Loop()
     local visible, open = r.ImGui_Begin(ctx, 'Rock Band Venue Preview', true)
     if visible then
         DrawVenuePreviewTab()
+        DrawActivePlayersRow()
         r.ImGui_End(ctx)
     end
     if open then r.defer(Loop) end

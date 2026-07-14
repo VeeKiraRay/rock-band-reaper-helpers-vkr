@@ -106,3 +106,65 @@ Test.it('onset slightly early: detected_t is the actual onset, deviation negativ
     Test.expect(entry.deviation_s ~= nil and entry.deviation_s < 0, 'deviation is negative (early)')
     Test.expect(math.abs(entry.deviation_s - (-0.05)) < 1e-6, 'deviation = -0.05s')
 end)
+
+----------------------------------------------------------------------
+Test.section('ComputePlayerStatesAt')
+
+-- Hand-built inputs mirroring ReadInstrumentPlayStates() / GetMutedInstruments()
+local ps_states = {
+    g = {
+        { t = 10, is_active = true,  msg = '[play]' },
+        { t = 20, is_active = false, msg = '[idle]' },
+        { t = 30, is_active = true,  msg = '[intense]' },
+    },
+}
+local ps_no_data = { 'k' }
+local ps_muted   = { d = true }
+
+Test.it('muted instrument reports muted regardless of playhead', function()
+    local res = ComputePlayerStatesAt(15, ps_states, ps_no_data, ps_muted)
+    Test.expect(res.d.state == 'muted', 'd is muted; got ' .. tostring(res.d.state))
+end)
+
+Test.it('present track without play-state events reports nodata', function()
+    local res = ComputePlayerStatesAt(15, ps_states, ps_no_data, ps_muted)
+    Test.expect(res.k.state == 'nodata', 'k is nodata; got ' .. tostring(res.k.state))
+end)
+
+Test.it('playhead before first event: active with no msg', function()
+    local res = ComputePlayerStatesAt(5, ps_states, ps_no_data, ps_muted)
+    Test.expect(res.g.state == 'active', 'g active before first event')
+    Test.expect(res.g.msg == nil, 'no msg before first event')
+end)
+
+Test.it('playhead between events picks last at-or-before', function()
+    local res = ComputePlayerStatesAt(25, ps_states, ps_no_data, ps_muted)
+    Test.expect(res.g.state == 'idle', 'g idle at t=25; got ' .. tostring(res.g.state))
+    Test.expect(res.g.msg == '[idle]', 'msg is [idle]; got ' .. tostring(res.g.msg))
+    Test.expect(res.g.t == 20, 'event time is 20; got ' .. tostring(res.g.t))
+end)
+
+Test.it('playhead exactly on an event: that event counts', function()
+    local res = ComputePlayerStatesAt(20, ps_states, ps_no_data, ps_muted)
+    Test.expect(res.g.state == 'idle', 'g idle exactly at t=20')
+end)
+
+Test.it('playhead after last event keeps its state', function()
+    local res = ComputePlayerStatesAt(99, ps_states, ps_no_data, ps_muted)
+    Test.expect(res.g.state == 'active', 'g active after last event')
+    Test.expect(res.g.msg == '[intense]', 'msg is [intense]; got ' .. tostring(res.g.msg))
+end)
+
+Test.it('unmuted instrument with no timeline defaults to active', function()
+    local res = ComputePlayerStatesAt(15, ps_states, ps_no_data, ps_muted)
+    Test.expect(res.b.state == 'active', 'b defaults to active')
+    Test.expect(res.v.state == 'active', 'v defaults to active')
+end)
+
+Test.it('all five instruments are always present in the result', function()
+    local res = ComputePlayerStatesAt(0, {}, {}, {})
+    for _, letter in ipairs({ 'b', 'g', 'd', 'k', 'v' }) do
+        Test.expect(res[letter] ~= nil, 'missing letter ' .. letter)
+        Test.expect(res[letter].state == 'active', letter .. ' defaults to active')
+    end
+end)

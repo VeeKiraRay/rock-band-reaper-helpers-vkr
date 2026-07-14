@@ -1,6 +1,6 @@
 -- @description Rock Band General Helper
 -- @author VeeKiraRay
--- @version 0.9.6
+-- @version 0.9.7
 -- @about
 --   Utility actions for Rock Band authoring in REAPER.
 --
@@ -17,6 +17,14 @@
 --
 --   Built with Claude (Anthropic) - https://claude.ai
 --
+--   v0.9.7
+--     - Venue tab: new "Active players" row shown under every sub-tab. A
+--       colored dot per instrument shows its state at the playhead - active
+--       (green), idle (blue), track muted or missing (red), or no
+--       play-state events (orange, treated as always in [play] state) -
+--       using the same mute/play-state logic as venue generation. Hover
+--       for details.
+--       Also shown in the standalone Venue Preview window.
 --   v0.9.6
 --     - Venue > Preview is now also available as a standalone script,
 --       rock_band_preview_vkr.lua, so the preview can sit in its own window
@@ -139,6 +147,7 @@ for _, _f in ipairs({
     _mdir .. 'ui_venue.lua',
     _mdir .. 'ui_venue_preview.lua',
     _mdir .. 'ui_venue_keyframes.lua',
+    _mdir .. 'ui_venue_players.lua',
     _mdir .. 'ui.lua',
 }) do
     if not r.file_exists(_f) then
@@ -185,6 +194,7 @@ dofile(_mdir .. 'ui_midi.lua')
 dofile(_mdir .. 'ui_venue.lua')
 dofile(_mdir .. 'ui_venue_preview.lua')
 dofile(_mdir .. 'ui_venue_keyframes.lua')
+dofile(_mdir .. 'ui_venue_players.lua')
 dofile(_mdir .. 'ui.lua')  -- also calls r.defer(Loop) at end
 
 -- Startup initialisation (runs after all modules are loaded)
