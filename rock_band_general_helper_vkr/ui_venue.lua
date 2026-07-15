@@ -140,9 +140,9 @@ function DrawVenueTab(ctx)
     if r.ImGui_BeginTabBar(ctx, '##venue_subtabs') then
 
         ------------------------------------------------
-        -- Venue > Analysis sub-tab
+        -- Venue > Actions sub-tab
         ------------------------------------------------
-        if r.ImGui_BeginTabItem(ctx, 'Analysis') then
+        if r.ImGui_BeginTabItem(ctx, 'Actions') then
             local bw_lv = r.ImGui_CalcTextSize(ctx, 'List venue events')   + _bp
             local bw_es = r.ImGui_CalcTextSize(ctx, 'Show event sections') + _bp
             local bw_sa = r.ImGui_CalcTextSize(ctx, 'Generate sing along') + _bp
