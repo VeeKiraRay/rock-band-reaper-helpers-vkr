@@ -19,7 +19,7 @@ Read `CLAUDE.md` first for shared architecture, conventions, and Lua specifics.
 **Specialized actions:**
 
 - **Auto-tune from reference.** Manually place a few notes at Default pitch as timing reference → make time selection → Auto-tune. Coordinate descent finds detection parameters that best reproduce those reference notes. Doesn't touch pitch settings or RMS window.
-- **Auto-tune YIN from reference.** Generate in YIN mode → manually correct pitches on a few notes → Auto-tune YIN. Sweeps YIN parameter combinations scored against the corrected pitches, applies best values to the sliders. Enabled only when Pitch source = Built-in detection.
+- **Auto-tune YIN from reference.** Generate in YIN mode → manually correct pitches on a few notes → Auto-tune YIN. Sweeps YIN parameter combinations scored against the corrected pitches, applies best values to the sliders. Lives on the Pitch tab's Placement - Built-in sub-tab.
 - **Apply pitch changes.** Skips detection entirely. Re-assigns pitches to existing notes using the configured pitch source (YIN or Reference MIDI), preserving position and length. Always enabled.
 
 ---
@@ -127,9 +127,12 @@ ui_slides.lua:
 ui_harmonies.lua:
   23. Harmonies tab               DrawHarmoniesTab(ctx)
 
+ui_pitch.lua:
+  24. Pitch tab                   DrawPitchTab(ctx) — Placement / Snap sub-tabs
+
 ui.lua:
-  24. UI                          Loop, FilteredTrackCombo (global)
-  25. r.defer(Loop)               start
+  25. UI                          Loop, FilteredTrackCombo (global)
+  26. r.defer(Loop)               start
 ```
 
 ---
@@ -154,6 +157,7 @@ ui.lua:
 | `rock_band_vocal_helper_vkr/actions_snap_key.lua`   | `SnapToKeyAction`, `NearestScalePitch`; `NextScalePitch` (local)                                                                             |
 | `rock_band_vocal_helper_vkr/ui_slides.lua`          | `DrawPitchSlideTab(ctx)`                                                                                                                     |
 | `rock_band_vocal_helper_vkr/ui_harmonies.lua`       | `DrawHarmoniesTab(ctx)`                                                                                                                      |
+| `rock_band_vocal_helper_vkr/ui_pitch.lua`           | `DrawPitchTab(ctx)` — Placement - Built-in (detection/range/apply), Placement - Reference (reference track/apply), and Snap (Snap to Key Scale) sub-tabs |
 | `rock_band_vocal_helper_vkr/ui.lua`                 | `FilteredTrackCombo`, `YINPresetCombo` (global), `Loop`, `r.defer(Loop)`; `KeysPresetTrackWarnings` (local)                                  |
 
 **Local-only functions:**
@@ -192,6 +196,7 @@ actions_slides.lua             → ScanPitchSlidesAction
 actions_snap_key.lua           → SnapToKeyAction
 ui_slides.lua                  → DrawPitchSlideTab
 ui_harmonies.lua               → DrawHarmoniesTab
+ui_pitch.lua                   → DrawPitchTab
 ui.lua                         → FilteredTrackCombo, Loop (also calls r.defer(Loop))
 [entry point startup]          → LoadSettings(), SetDefaultTracks(), AutoDetectLyricsFile()
 ```
@@ -253,10 +258,12 @@ An alternative workflow when you already have roughly-placed notes with the righ
 - Scope: active time selection, or full MIDI item if no selection.
 - Complement to the automatic onset-snap in Auto Detection (which fires immediately after `GateAndSplit`). Draft Snap is for manual workflows; Auto Detection snap is automatic after RMS detection.
 
-### Pitch sources (Pitch tab — used by Apply pitch changes)
+### Pitch sources (Pitch tab → Placement - Built-in / Placement - Reference sub-tabs — used by Apply pitch changes)
 
-- **Built-in detection (YIN).** Runs YIN on the audio source. Samples a window from ~30% into each note (avoids attack transient, hits steady-state vowel). Falls back to Default pitch when confidence is low. Default mode.
-- **Reference MIDI.** For each note, finds the nearest MIDI note on a chosen reference track within the configured Search tolerance (50–2000 ms). Falls back to Default pitch when nothing is in range. Reads from _all_ MIDI items on the reference track that overlap the range.
+`S.pitch_mode` (`MODE_YIN` / `MODE_REFERENCE`) is no longer chosen via an explicit selector — each sub-tab sets it as a side effect while it's the active sub-tab (`DrawPitchTab` in `ui_pitch.lua`, mirrors the general helper's Tab Input pattern of a per-sub-tab body setting its own mode). `Apply pitch changes` appears in both sub-tabs so applying works from whichever source is currently active.
+
+- **Built-in detection (YIN)** (Placement - Built-in sub-tab). Runs YIN on the audio source. Samples a window from ~30% into each note (avoids attack transient, hits steady-state vowel). Falls back to Default pitch when confidence is low. Default mode.
+- **Reference MIDI** (Placement - Reference sub-tab). For each note, finds the nearest MIDI note on a chosen reference track within the configured Search tolerance (50–2000 ms). Falls back to Default pitch when nothing is in range. Reads from _all_ MIDI items on the reference track that overlap the range.
 
 #### YIN parameters
 
@@ -269,7 +276,7 @@ An alternative workflow when you already have roughly-placed notes with the righ
 
 #### YIN vocal-style presets
 
-One-shot preset combo shown above the YIN sliders on the **Pitch**, **Tuner**, and **Pitch slide** tabs. Preset data: `YIN_PRESETS` in `defaults.lua`; applier: `ApplyYINPreset(preset)` in `defaults.lua`; combo widget: `YINPresetCombo(id_suffix)` (global, `ui.lua`).
+One-shot preset combo shown above the YIN sliders on the **Pitch → Placement**, **Tuner**, and **Pitch slide** tabs/sub-tabs. Preset data: `YIN_PRESETS` in `defaults.lua`; applier: `ApplyYINPreset(preset)` in `defaults.lua`; combo widget: `YINPresetCombo(id_suffix, col)` (global, `ui.lua`) — `col` is optional and, when given, draws the "Vocal style preset" label to the left via `LabelColWidth`-style alignment instead of ImGui's native trailing label.
 
 - Voice-range presets (low male → soprano) set all four YIN sliders **and** set + enable the Min/Max pitch constraints. Frequency bounds follow standard voice-classification ranges; raising min freq above the subharmonic range is the primary fix for octave-down errors.
 - Style-only presets (breathy/raspy, clean) set only threshold and window — `nil` fields in a preset entry are left unchanged.
@@ -279,7 +286,7 @@ One-shot preset combo shown above the YIN sliders on the **Pitch**, **Tuner**, a
 
 #### Auto-tune YIN from reference
 
-Enabled only when Pitch source = Built-in detection. Reads existing notes from the MIDI destination at manually-corrected pitches, sweeps YIN parameter combinations, scores against those pitches, applies the best values to the sliders.
+Lives on the Placement - Built-in sub-tab. Reads existing notes from the MIDI destination at manually-corrected pitches, sweeps YIN parameter combinations, scores against those pitches, applies the best values to the sliders.
 
 - **Fixed timings.** Note positions from the MIDI take are ground truth; only `AssignPitches` is re-run per candidate set. Much lighter than detection auto-tune.
 - **CMND cache.** Pre-computes CMND arrays per `window_ms` candidate. All threshold/frequency sweeps scan the cache with no audio I/O; a different `window_ms` forces a full recompute.
@@ -304,7 +311,7 @@ Uses current YIN threshold and frequency range from the Pitch tab.
 
 Two checkbox+slider pairs (min/max). Out-of-range pitches are octave-shifted toward the range first (±12 at a time, up to 16 attempts). Clamp to the nearer endpoint only when the range is narrower than 12 semitones. The `range_adjusted` count appears in the result panel when non-zero.
 
-### Snap to Key Scale (Pitch tab)
+### Snap to Key Scale (Pitch tab → Snap sub-tab)
 
 Shifts each vocal note to the nearest pitch in a chosen major or minor scale. Phrase markers (pitch 105) are preserved unchanged; lyrics survive because only pitch is changed (not position or length).
 
@@ -368,7 +375,7 @@ Copies vocal notes from a source MIDI track to up to three destination tracks, a
 
 **Diatonic modes** require the key settings: `harm_key_root` (0–11, default A=9, persisted as `hkr`) and `harm_key_quality` (0=major, 1=minor, persisted as `hkq`). Implemented by `DiatonicThirdOffset(note, root, quality, dir)` in `actions_harmonies.lua` using `HARM_SCALE`.
 
-**Copy phrase markers** (`harm_copy_phrases`, persisted as `hcp`). When on, also copies phrase marker and overdrive notes (outside C1–C5) to each enabled destination. Out-of-range notes in the destination are cleared first.
+**Copy phrase markers / overdrive** — two independent flags: `harm_copy_phrase_markers` (persisted as `hcpm`) copies pitch-105 phrase-marker notes; `harm_copy_overdrive` (persisted as `hcod`) copies pitch-116 overdrive notes (`RB3_PHRASE_PITCH` / `RB3_OVERDRIVE_PITCH` in `defaults.lua`). Each destination's matching notes are cleared first, independently.
 
 **Scope:** active time selection, or full source item after confirmation.
 
@@ -514,7 +521,7 @@ Assign lyrics ignores time selection and operates on the full MIDI take. If Assi
 - [ ] Apply pitch changes is always enabled; works for Built-in detection and Reference MIDI.
 - [ ] YIN mode: Generate assigns non-default pitches for pitched vocal audio.
 - [ ] YIN mode: ambiguous pitches fall back to Default without error.
-- [ ] Auto-tune YIN: enabled only when Pitch source = Built-in detection; greys out in other modes.
+- [ ] Auto-tune YIN: available on the Placement - Built-in sub-tab.
 - [ ] Auto-tune YIN: runs without error, updates four YIN sliders, reports octave mismatch advisory.
 - [ ] Auto-tune YIN: with no time selection, operates on all notes in the MIDI item.
 - [ ] Save → modify sliders (including YIN params) → Load → all values restored.
@@ -532,7 +539,7 @@ Assign lyrics ignores time selection and operates on the full MIDI take. If Assi
 - [ ] Lyrics — Count mismatch warning appears when notes ≠ lyrics.
 - [ ] Lyrics — Phrase capitalization check reports violations with timestamps.
 - [ ] Lyrics — Assign is greyed out when no file selected; active after auto-detect or browse.
-- [ ] Tab bar: 8 tabs (General, Tuner, Note Placement, Pitch, Lyrics, Pitch slide, Harmonies, Validation); switching doesn't clear `S.status` / `S.last_result`.
+- [ ] Tab bar: 8 tabs (General, Tuner, Note Placement, Pitch, Lyrics, Pitch slide, Harmonies, Validation); switching doesn't clear `S.status` / `S.last_result`. General has Actions/Settings sub-tabs; Pitch has Placement - Built-in/Placement - Reference/Snap sub-tabs; Note Placement (WIP) has Auto Detection/Draft Snap sub-tabs.
 - [ ] Generate (replace): clears all existing vocal-range notes in the range, then inserts fresh detections; result panel says "Replaced".
 - [ ] Draft Snap: rough hand-drawn notes snap to audio onsets; pitches assigned from configured pitch source.
 - [ ] Snap to Key Scale: notes shift to nearest scale degree; phrase markers preserved; avoid-collision pushes duplicates to next scale degree.

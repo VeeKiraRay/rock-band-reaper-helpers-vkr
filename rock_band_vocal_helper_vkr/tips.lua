@@ -62,23 +62,6 @@ TIPS = {
         "destination MIDI item, so reference notes at other pitches are " ..
         "preserved when you regenerate.",
 
-    pitch_mode_reference =
-        "For each generated note, look at a separate MIDI track and copy " ..
-        "the pitch of the nearest reference note (by start time) within " ..
-        "the configured Search tolerance. If nothing is in range, use the " ..
-        "Default pitch.\n\n" ..
-        "It's up to you to align the reference MIDI item to the song. " ..
-        "Generate it externally with Basic Pitch / Melodyne / etc., import, " ..
-        "and shift/stretch as needed.",
-
-    pitch_mode_yin =
-        "Built-in monophonic pitch detection using the YIN algorithm.\n\n" ..
-        "Analyses the audio from the source track directly to estimate the " ..
-        "fundamental frequency of each note - no external MIDI reference needed.\n\n" ..
-        "Adjust the YIN threshold and frequency range to suit the source. " ..
-        "Notes where pitch cannot be reliably detected fall back to the Default pitch.\n\n" ..
-        "Works best on clean, dry vocal stems.",
-
     yin_preset =
         "Apply a starting-point preset derived from standard voice ranges " ..
         "(bass, tenor, soprano, ...).\n\n" ..
@@ -139,8 +122,7 @@ TIPS = {
     ref_track =
         "MIDI track containing reference notes whose pitches will be copied " ..
         "into the generated notes. The track may contain one or more MIDI " ..
-        "items; all notes inside the analysis range are considered.\n\n" ..
-        "Only used when Pitch source is set to 'Reference MIDI'.",
+        "items; all notes inside the analysis range are considered.",
 
     ref_search =
         "How far (in either direction from a note's start) to search for the " ..
@@ -155,13 +137,13 @@ TIPS = {
         "Useful for fixing octave-error artifacts from stem separation: " ..
         "weird low octaves get shifted up by 12 semitones until they're " ..
         "in range.\n\n" ..
-        "Disable if you don't want any minimum.",
+        "Uncheck if you don't want any minimum.",
 
     max_pitch_enabled =
         "Constrain notes to be at or below this pitch.\n\n" ..
         "Useful for fixing octave-error artifacts: weird high octaves " ..
         "get shifted down by 12 semitones until they're in range.\n\n" ..
-        "Disable if you don't want any maximum.",
+        "Uncheck if you don't want any maximum.",
 
     min_pitch =
         "Lowest allowed pitch.\n\n" ..
@@ -357,10 +339,15 @@ TIPS = {
     harm_key_quality =
         "Major or natural minor quality for the key.",
 
-    harm_copy_phrases =
-        "Also copy phrase marker and overdrive notes (outside the C1-C5 vocal range)\n" ..
-        "from the source to each enabled destination.\n\n" ..
-        "Existing out-of-range notes in the destination are cleared before copying.",
+    harm_copy_phrase_markers =
+        "Also copy phrase marker notes (pitch 105) from the source to each\n" ..
+        "enabled destination.\n\n" ..
+        "Existing phrase-marker notes in the destination are cleared before copying.",
+
+    harm_copy_overdrive =
+        "Also copy overdrive marker notes (pitch 116) from the source to each\n" ..
+        "enabled destination.\n\n" ..
+        "Existing overdrive-marker notes in the destination are cleared before copying.",
 
     track_refresh =
         "Re-scan all tracks and rebuild the filtered track dropdowns.\n\n" ..

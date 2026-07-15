@@ -9,9 +9,10 @@ MODE_REFERENCE = 1
 MODE_YIN       = 2
 
 -- Rock Band 3 vocal note range. Notes outside this are phrase/overdrive markers.
-RB3_MIN_PITCH    = 36   -- C1
-RB3_MAX_PITCH    = 84   -- C5
-RB3_PHRASE_PITCH = 105  -- phrase/overdrive marker pitch
+RB3_MIN_PITCH       = 36   -- C1
+RB3_MAX_PITCH       = 84   -- C5
+RB3_PHRASE_PITCH    = 105  -- phrase marker pitch
+RB3_OVERDRIVE_PITCH = 116  -- overdrive marker pitch
 
 -- Diatonic harmony support
 HARM_SCALE = {
@@ -178,7 +179,8 @@ S = {
     harm_dst1_mode      = 0,
     harm_dst2_mode      = 0,
     harm_dst3_mode      = 0,
-    harm_copy_phrases   = true,
+    harm_copy_phrase_markers = true,
+    harm_copy_overdrive      = true,
     harm_key_root       = 9,   -- A (common rock key)
     harm_key_quality    = 0,   -- 0 = major, 1 = minor
 

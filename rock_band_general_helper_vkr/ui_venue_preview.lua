@@ -203,19 +203,25 @@ function DrawVenuePreviewTab()
         end
     end
 
+    local lbl_col = LabelColWidth({ 'Players', 'Preview size', 'Sprites', 'Show' })
+    local radio_w = RadioGroupWidth({
+        'Bass + Guitar', 'Bass + Keys', 'Guitar + Keys', '1x', '2x',
+        'Animated', 'Still', 'Current only', 'Surrounding events',
+    })
+
     r.ImGui_Text(ctx, 'Players')
-    r.ImGui_SameLine(ctx)
+    r.ImGui_SameLine(ctx, lbl_col)
     local _t_vpc = TIPS.venue_preview_combo
     if r.ImGui_RadioButton(ctx, 'Bass + Guitar##vpc', S.venue_preview_combo == _COMBO_BG) then
         S.venue_preview_combo = _COMBO_BG
     end
     Tooltip(_t_vpc)
-    r.ImGui_SameLine(ctx)
+    r.ImGui_SameLine(ctx, lbl_col + radio_w)
     if r.ImGui_RadioButton(ctx, 'Bass + Keys##vpc', S.venue_preview_combo == _COMBO_BK) then
         S.venue_preview_combo = _COMBO_BK
     end
     Tooltip(_t_vpc)
-    r.ImGui_SameLine(ctx)
+    r.ImGui_SameLine(ctx, lbl_col + 2 * radio_w)
     if r.ImGui_RadioButton(ctx, 'Guitar + Keys##vpc', S.venue_preview_combo == _COMBO_GK) then
         S.venue_preview_combo = _COMBO_GK
     end
@@ -234,39 +240,39 @@ function DrawVenuePreviewTab()
     end
 
     r.ImGui_Text(ctx, 'Preview size')
-    r.ImGui_SameLine(ctx)
+    r.ImGui_SameLine(ctx, lbl_col)
     local _t_vpts = TIPS.venue_preview_scale
     if r.ImGui_RadioButton(ctx, '1x##vpts', S.venue_preview_tab_scale == 1) then
         S.venue_preview_tab_scale = 1
     end
     Tooltip(_t_vpts)
-    r.ImGui_SameLine(ctx)
+    r.ImGui_SameLine(ctx, lbl_col + radio_w)
     if r.ImGui_RadioButton(ctx, '2x##vpts', S.venue_preview_tab_scale == 2) then
         S.venue_preview_tab_scale = 2
     end
     Tooltip(_t_vpts)
 
     r.ImGui_Text(ctx, 'Sprites')
-    r.ImGui_SameLine(ctx)
+    r.ImGui_SameLine(ctx, lbl_col)
     local _t_vpan = TIPS.venue_preview_animate
     if r.ImGui_RadioButton(ctx, 'Animated##vpan', _preview_animate) then
         _preview_animate = true
     end
     Tooltip(_t_vpan)
-    r.ImGui_SameLine(ctx)
+    r.ImGui_SameLine(ctx, lbl_col + radio_w)
     if r.ImGui_RadioButton(ctx, 'Still##vpan', not _preview_animate) then
         _preview_animate = false
     end
     Tooltip(_t_vpan)
 
     r.ImGui_Text(ctx, 'Show')
-    r.ImGui_SameLine(ctx)
+    r.ImGui_SameLine(ctx, lbl_col)
     local _t_vpshw = TIPS.venue_preview_show_mode
     if r.ImGui_RadioButton(ctx, 'Current only##vpshw', S.venue_preview_show_mode == _SHOW_CURRENT_ONLY) then
         S.venue_preview_show_mode = _SHOW_CURRENT_ONLY
     end
     Tooltip(_t_vpshw)
-    r.ImGui_SameLine(ctx)
+    r.ImGui_SameLine(ctx, lbl_col + radio_w)
     if r.ImGui_RadioButton(ctx, 'Surrounding events##vpshw', S.venue_preview_show_mode == _SHOW_SURROUNDING) then
         S.venue_preview_show_mode = _SHOW_SURROUNDING
     end

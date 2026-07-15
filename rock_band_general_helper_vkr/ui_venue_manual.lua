@@ -13,8 +13,6 @@
 --                   EndVenueTooltip
 
 function DrawVenueManualTab()
-    local _bp = 40
-
     r.ImGui_Text(ctx, 'Insert individual venue events at the playhead position')
     r.ImGui_Spacing(ctx)
 
@@ -38,8 +36,10 @@ function DrawVenueManualTab()
         ['[previous]']         = '[previous] keyframe',
     }
 
-    local _bp_add  = r.ImGui_CalcTextSize(ctx, 'Add') + _bp
-    local _lbl_col = r.ImGui_CalcTextSize(ctx, 'Directed camera') + 16
+    local _lbl_col = LabelColWidth({
+        'Normal camera', 'Directed camera', 'Lighting', 'Keyframe align',
+        'Keyframe rate', 'Post proc', 'Special', 'Camera pacing', 'Remove',
+    })
 
     -- ---- Normal camera ----
     r.ImGui_Text(ctx, 'Normal camera')
@@ -77,7 +77,7 @@ function DrawVenueManualTab()
     r.ImGui_SameLine(ctx)
     local _mg_coop_dis = S.venue_mg_coop == ''
     if _mg_coop_dis then r.ImGui_BeginDisabled(ctx) end
-    if r.ImGui_Button(ctx, 'Add##mg_coop_add', _bp_add, 0) then
+    if Btn('Add##mg_coop_add', 0) then
         local _ev = S.venue_mg_coop
         RunAction(function() InsertVenueEventAtPlayhead(_ev) end)
     end
@@ -127,7 +127,7 @@ function DrawVenueManualTab()
     r.ImGui_SameLine(ctx)
     local _mg_dir_dis = S.venue_mg_directed == ''
     if _mg_dir_dis then r.ImGui_BeginDisabled(ctx) end
-    if r.ImGui_Button(ctx, 'Add##mg_dir_add', _bp_add, 0) then
+    if Btn('Add##mg_dir_add', 0) then
         local _ev = '[' .. S.venue_mg_directed .. ']'
         RunAction(function() InsertVenueEventAtPlayhead(_ev) end)
     end
@@ -176,26 +176,13 @@ function DrawVenueManualTab()
     r.ImGui_SameLine(ctx)
     local _mg_lt_dis = S.venue_mg_lighting == ''
     if _mg_lt_dis then r.ImGui_BeginDisabled(ctx) end
-    if r.ImGui_Button(ctx, 'Add##mg_lt_add', _bp_add, 0) then
+    if Btn('Add##mg_lt_add', 0) then
         local _ev = '[lighting (' .. S.venue_mg_lighting .. ')]'
         RunAction(function() InsertVenueEventAtPlayhead(_ev) end)
     end
     if _mg_lt_dis then r.ImGui_EndDisabled(ctx) end
-    r.ImGui_SameLine(ctx)
     local _mg_is_manual = S.venue_mg_lighting ~= '' and
         MANUAL_LIGHTING_SET['[lighting (' .. S.venue_mg_lighting .. ')]']
-    local _gkf_dis = not _mg_is_manual
-    if _gkf_dis then r.ImGui_BeginDisabled(ctx) end
-    local _bw_kf = r.ImGui_CalcTextSize(ctx, 'Keyframes') + _bp
-    if r.ImGui_Button(ctx, 'Keyframes##mg_kf_btn', _bw_kf, 0) then
-        RunAction(GenerateManualKeyframes)
-    end
-    Tooltip('Generate [first]/[next] keyframe events from the playhead to the next\n' ..
-            'lighting event, the time selection end (if active), or the VENUE item end.\n\n' ..
-            'Clears any existing [first]/[next]/[previous] events in that range first.\n' ..
-            'Only available when a manual lighting preset is selected above.\n' ..
-            'Fully undoable.')
-    if _gkf_dis then r.ImGui_EndDisabled(ctx) end
 
     -- Keyframe settings (shown only when a manual lighting preset is selected)
     local _kf_dis = not _mg_is_manual
@@ -203,7 +190,7 @@ function DrawVenueManualTab()
 
     r.ImGui_Text(ctx, 'Keyframe align')
     r.ImGui_SameLine(ctx, _lbl_col)
-    r.ImGui_SetNextItemWidth(ctx, 170)
+    r.ImGui_SetNextItemWidth(ctx, 230)
     local _mg_kfa_labels = {
         'Playhead', 'Closest beat', 'Downbeat',
         'Guitar notes', 'Bass notes', 'Keys notes',
@@ -231,7 +218,19 @@ function DrawVenueManualTab()
             '  Keys notes   \xe2\x80\x93 PART KEYS   (pitches 96\xe2\x80\x93100)\n' ..
             '  Drum kicks   \xe2\x80\x93 PART DRUMS  (pitch 96)\n' ..
             '  Drum snare   \xe2\x80\x93 PART DRUMS  (pitch 97)')
+    r.ImGui_SameLine(ctx)
+    if Btn('Add##mg_kf_btn', 0) then
+        RunAction(GenerateManualKeyframes)
+    end
+    Tooltip('Generate [first]/[next] keyframe events from the playhead to the next\n' ..
+            'lighting event, the time selection end (if active), or the VENUE item end.\n\n' ..
+            'Clears any existing [first]/[next]/[previous] events in that range first.\n' ..
+            'Only available when a manual lighting preset is selected above.\n' ..
+            'Fully undoable.')
+
     if S.venue_keyframe_align >= 3 then
+        r.ImGui_Spacing(ctx)
+        r.ImGui_Text(ctx, 'Subdivision    ')
         r.ImGui_SameLine(ctx)
         if r.ImGui_RadioButton(ctx, 'Every beat##mg_kfis', S.venue_kf_inst_subdiv == 0) then
             S.venue_kf_inst_subdiv = 0
@@ -294,7 +293,7 @@ function DrawVenueManualTab()
     r.ImGui_SameLine(ctx)
     local _mg_pp_dis = S.venue_mg_postproc == ''
     if _mg_pp_dis then r.ImGui_BeginDisabled(ctx) end
-    if r.ImGui_Button(ctx, 'Add##mg_pp_add', _bp_add, 0) then
+    if Btn('Add##mg_pp_add', 0) then
         local _ev = '[' .. S.venue_mg_postproc .. ']'
         RunAction(function() InsertVenueEventAtPlayhead(_ev) end)
     end
@@ -324,7 +323,7 @@ function DrawVenueManualTab()
     r.ImGui_SameLine(ctx)
     local _mg_sp_dis = S.venue_mg_special == ''
     if _mg_sp_dis then r.ImGui_BeginDisabled(ctx) end
-    if r.ImGui_Button(ctx, 'Add##mg_sp_add', _bp_add, 0) then
+    if Btn('Add##mg_sp_add', 0) then
         local _ev = S.venue_mg_special
         RunAction(function() InsertVenueEventAtPlayhead(_ev) end)
     end
@@ -336,8 +335,7 @@ function DrawVenueManualTab()
 
     -- ---- Tools ----
     r.ImGui_Spacing(ctx)
-    local bw_adv = r.ImGui_CalcTextSize(ctx, 'Advance camera pacing') + _bp
-    if r.ImGui_Button(ctx, 'Advance camera pacing', bw_adv, 0) then
+    if Btn('Advance camera pacing', 0) then
         RunAction(AdvanceCameraPacing)
     end
     Tooltip('Move the playhead forward by one camera pacing interval.\n\n' ..
@@ -349,7 +347,7 @@ function DrawVenueManualTab()
     r.ImGui_Separator(ctx)
     r.ImGui_Spacing(ctx)
     r.ImGui_Text(ctx, 'Remove')
-    r.ImGui_SameLine(ctx)
+    r.ImGui_SameLine(ctx, _lbl_col)
     r.ImGui_SetNextItemWidth(ctx, 130)
     local _rm_labels = { 'Camera', 'Lighting', 'Post proc', 'Special', 'All' }
     local _rm_prev   = _rm_labels[S.venue_mg_remove_type + 1] or 'Camera'
@@ -373,8 +371,7 @@ function DrawVenueManualTab()
     Tooltip((_rm_tips[S.venue_mg_remove_type + 1] or '') ..
             '\n\nRespects time selection if active. Fully undoable.')
     r.ImGui_SameLine(ctx)
-    local bw_rm = r.ImGui_CalcTextSize(ctx, 'Remove') + _bp
-    if r.ImGui_Button(ctx, 'Remove##mg_rm', bw_rm, 0) then
+    if Btn('Remove##mg_rm', 0) then
         local _type = S.venue_mg_remove_type
         RunAction(function() RemoveVenueEventsByType(_type) end)
     end

@@ -1,4 +1,4 @@
--- Venue > Events sub-tab
+﻿-- Venue > Events sub-tab
 -- Inserts EVENTS-track section/crowd/global text events at the playhead, one
 -- row per event group, with number stepper, letter suffixes, and insert
 -- validation. Also hosts the Clear all / Insert bookends quick actions.
@@ -7,8 +7,6 @@
 --                   FindEventsTake, ScanEventsTextEvents, NextSectionEvent,
 --                   ValidatePlainInsert, InsertEventsEvent, AddSectionEvent,
 --                   ClearAllEventsTexts, InsertEventsBookends
-
-local _bp = 40
 
 -- Cached EVENTS take + scan, refreshed via MakeProjectPoll (at most every
 -- 1 s and only when the project changed; 5 s fallback). This tab's own edit
@@ -21,7 +19,7 @@ local _ev_track, _ev_take, _scan
 local _force_rescan = false
 
 -- Row for a 'prc' or 'generic' group: combo + number stepper + Add + indicator
-local function _draw_prc_row(g, scan, cur_t, cur_ppq, no_take, use_letters, lbl_col, bp_add)
+local function _draw_prc_row(g, scan, cur_t, cur_ppq, no_take, use_letters, lbl_col)
     local sel = S.venue_ev_sel[g.key] or ''
 
     r.ImGui_Text(ctx, g.label)
@@ -54,7 +52,7 @@ local function _draw_prc_row(g, scan, cur_t, cur_ppq, no_take, use_letters, lbl_
     r.ImGui_SameLine(ctx)
     local dis = no_take or sel == ''
     if dis then r.ImGui_BeginDisabled(ctx) end
-    if r.ImGui_Button(ctx, 'Add##ev_' .. g.key, bp_add, 0) then
+    if Btn('Add##ev_' .. g.key, 0) then
         local _b, _n, _l = sel, num, use_letters
         local _c = (SECTION_EVENT_BASE[sel] or {}).caps
         local _g = g.kind == 'generic'
@@ -83,7 +81,7 @@ end
 
 -- Row for a 'plain' group (Crowd/Global): combo of full event strings + Add.
 -- The combo is widened to span the stepper column so Add buttons line up.
-local function _draw_plain_row(g, scan, cur_ppq, no_take, lbl_col, bp_add, combo_w)
+local function _draw_plain_row(g, scan, cur_ppq, no_take, lbl_col, combo_w)
     local sel = S.venue_ev_sel[g.key] or ''
 
     r.ImGui_Text(ctx, g.label)
@@ -108,7 +106,7 @@ local function _draw_plain_row(g, scan, cur_ppq, no_take, lbl_col, bp_add, combo
     r.ImGui_SameLine(ctx)
     local dis = no_take or sel == ''
     if dis then r.ImGui_BeginDisabled(ctx) end
-    if r.ImGui_Button(ctx, 'Add##ev_' .. g.key, bp_add, 0) then
+    if Btn('Add##ev_' .. g.key, 0) then
         local _ev = sel
         RunAction(function() InsertEventsEvent(_ev) end)
         _force_rescan = true
@@ -127,8 +125,9 @@ local function _draw_plain_row(g, scan, cur_ppq, no_take, lbl_col, bp_add, combo
 end
 
 function DrawVenueEventsTab()
-    local bp_add  = r.ImGui_CalcTextSize(ctx, 'Add') + _bp
-    local lbl_col = r.ImGui_CalcTextSize(ctx, 'Interlude / Jam') + 16
+    local _group_labels = { 'Use letter suffix' }
+    for _, g in ipairs(SECTION_EVENT_GROUPS) do _group_labels[#_group_labels + 1] = g.label end
+    local lbl_col = LabelColWidth(_group_labels)
     local item_sp = r.ImGui_GetStyleVar(ctx, r.ImGui_StyleVar_ItemSpacing())
 
     r.ImGui_Text(ctx,
@@ -148,28 +147,20 @@ function DrawVenueEventsTab()
     local no_take = not ev_take              -- snapshot once (BeginDisabled balance)
 
     -- Quick actions row
-    local bw_be = r.ImGui_CalcTextSize(ctx, 'Insert bookends') + _bp
-    local bw_ca = r.ImGui_CalcTextSize(ctx, 'Clear all') + _bp
+    local bw_qa = BtnGroupWidth({ 'Insert bookends', 'Clear all' })
     if no_take then r.ImGui_BeginDisabled(ctx) end
-    if r.ImGui_Button(ctx, 'Insert bookends', bw_be, 24) then
+    if Btn('Insert bookends', BTN_H, bw_qa) then
         RunAction(InsertEventsBookends)
         _force_rescan = true
     end
     if not no_take then Tooltip(TIPS.venue_ev_bookends) end
     r.ImGui_SameLine(ctx)
-    if r.ImGui_Button(ctx, 'Clear all', bw_ca, 24) then
+    if Btn('Clear all', BTN_H, bw_qa) then
         RunAction(ClearAllEventsTexts)
         _force_rescan = true
     end
     if not no_take then Tooltip(TIPS.venue_ev_clear) end
     if no_take then r.ImGui_EndDisabled(ctx) end
-
-    -- Phase 2 adds a target-mode radio row here (EVENTS / other MIDI track);
-    -- S.venue_ev_mode is already reserved for it.
-    r.ImGui_SameLine(ctx)
-    _, S.venue_ev_letters = r.ImGui_Checkbox(ctx, 'Use letter suffix', S.venue_ev_letters)
-    Tooltip(TIPS.venue_ev_letters)
-    local use_letters = S.venue_ev_letters  -- snapshot once per frame
 
     local scan, cur_t, cur_ppq
     if ev_take then
@@ -183,15 +174,22 @@ function DrawVenueEventsTab()
             and 'No MIDI item on EVENTS track - add one to enable Add'
             or  'No EVENTS track found - create it to enable Add')
     end
+
+    -- Phase 2 adds a target-mode radio row here (EVENTS / other MIDI track);
+    -- S.venue_ev_mode is already reserved for it.
+    r.ImGui_Text(ctx, 'Use letter suffix')
+    r.ImGui_SameLine(ctx, lbl_col)
+    _, S.venue_ev_letters = r.ImGui_Checkbox(ctx, '##venue_ev_letters', S.venue_ev_letters)
+    Tooltip(TIPS.venue_ev_letters)
+    local use_letters = S.venue_ev_letters  -- snapshot once per frame
     r.ImGui_Spacing(ctx)
 
     for _, g in ipairs(SECTION_EVENT_GROUPS) do
         if g.kind == 'plain' then
-            _draw_plain_row(g, scan, cur_ppq, no_take, lbl_col, bp_add,
+            _draw_plain_row(g, scan, cur_ppq, no_take, lbl_col,
                             170 + item_sp + 90)
         else
-            _draw_prc_row(g, scan, cur_t, cur_ppq, no_take, use_letters,
-                          lbl_col, bp_add)
+            _draw_prc_row(g, scan, cur_t, cur_ppq, no_take, use_letters, lbl_col)
         end
     end
 end

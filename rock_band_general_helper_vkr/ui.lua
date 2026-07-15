@@ -1,4 +1,4 @@
--- UI loop
+﻿-- UI loop
 -- Requires: S, TIPS, r, ctx (globals)
 -- Requires: all action functions, GetTimeSelection, RefreshTrackLists, Tooltip,
 --           SliderTooltip, SectionHeader (globals)
@@ -89,8 +89,7 @@ local function Loop()
     r.ImGui_SetNextWindowSize(ctx, 560, 660, r.ImGui_Cond_FirstUseEver())
     local visible, open = r.ImGui_Begin(ctx, 'Rock Band General Helper', true)
     if visible then
-        local _bp  = 40
-        local bw_und = r.ImGui_CalcTextSize(ctx, 'Undo') + _bp
+        local bw_und = BtnWidth('Undo')
         local _new_tab = ''
 
         if r.ImGui_BeginTabBar(ctx, '##tabs') then
@@ -100,100 +99,121 @@ local function Loop()
             ------------------------------------------------------------
             if r.ImGui_BeginTabItem(ctx, 'General') then
                 _new_tab = 'General'
-                local bw_aall = r.ImGui_CalcTextSize(ctx, 'Align all audio') + _bp
-                local bw_acin = r.ImGui_CalcTextSize(ctx, 'Align count-in')  + _bp
-                local bw_fade = r.ImGui_CalcTextSize(ctx, 'Fade out')         + _bp
 
-                SectionHeader('Audio alignment')
+                if r.ImGui_BeginTabBar(ctx, '##general_subtabs') then
 
-                if r.ImGui_Button(ctx, 'Align all audio', bw_aall, 24) then
-                    RunAction(AlignAllAudio)
-                end
-                Tooltip(TIPS.align_all_audio)
-                r.ImGui_SameLine(ctx)
-                if r.ImGui_Button(ctx, 'Align count-in', bw_acin, 24) then
-                    RunAction(AlignCountIn)
-                end
-                Tooltip(TIPS.align_count_in)
+                    ------------------------------------------------
+                    -- General > Actions sub-tab
+                    ------------------------------------------------
+                    if r.ImGui_BeginTabItem(ctx, 'Actions') then
+                        SectionHeader('General actions')
+                        if Btn('Refresh tracks', BTN_H) then
+                            RefreshTrackLists()
+                            S.status = 'Track lists refreshed.'
+                        end
+                        Tooltip(TIPS.track_refresh)
 
-                r.ImGui_Separator(ctx)
-                SectionHeader('Song fade out')
-                if r.ImGui_Button(ctx, 'Fade out', bw_fade, 24) then
-                    RunAction(CreateSongFadeOut)
-                end
-                Tooltip(TIPS.song_fade_out)
+                        r.ImGui_Separator(ctx)
+                        SectionHeader('Audio alignment')
 
-                r.ImGui_Separator(ctx)
-                SectionHeader('Settings')
+                        local bw_align = BtnGroupWidth({ 'Align all audio', 'Align count-in' })
+                        if Btn('Align all audio', BTN_H, bw_align) then
+                            RunAction(AlignAllAudio)
+                        end
+                        Tooltip(TIPS.align_all_audio)
+                        r.ImGui_SameLine(ctx)
+                        if Btn('Align count-in', BTN_H, bw_align) then
+                            RunAction(AlignCountIn)
+                        end
+                        Tooltip(TIPS.align_count_in)
 
-                if r.ImGui_Button(ctx, 'Save', 90, 24) then
-                    SaveSettings()
-                    S.status = 'Settings saved to project.'
-                end
-                Tooltip(TIPS.save)
-                r.ImGui_SameLine(ctx)
-                if r.ImGui_Button(ctx, 'Load', 90, 24) then
-                    if LoadSettings() then
-                        S.status = 'Settings loaded from project.'
-                    else
-                        S.status = 'No saved settings found in this project.'
+                        r.ImGui_Separator(ctx)
+                        SectionHeader('Song fade out')
+                        if Btn('Fade out', BTN_H) then
+                            RunAction(CreateSongFadeOut)
+                        end
+                        Tooltip(TIPS.song_fade_out)
+
+                        r.ImGui_EndTabItem(ctx)
                     end
-                end
-                Tooltip(TIPS.load)
-                r.ImGui_SameLine(ctx)
-                local bw_ref = r.ImGui_CalcTextSize(ctx, 'Refresh tracks') + _bp
-                if r.ImGui_Button(ctx, 'Refresh tracks', bw_ref, 24) then
-                    RefreshTrackLists()
-                    S.status = 'Track lists refreshed.'
-                end
-                Tooltip(TIPS.track_refresh)
 
-                r.ImGui_Separator(ctx)
-                SectionHeader('Venue preview')
-                r.ImGui_Text(ctx, 'Preview size')
-                r.ImGui_SameLine(ctx)
-                local _t_vpscl = TIPS.venue_preview_scale
-                if r.ImGui_RadioButton(ctx, '1x##vpscl', S.venue_preview_scale == 1) then
-                    S.venue_preview_scale = 1
-                end
-                Tooltip(_t_vpscl)
-                r.ImGui_SameLine(ctx)
-                if r.ImGui_RadioButton(ctx, '2x##vpscl', S.venue_preview_scale == 2) then
-                    S.venue_preview_scale = 2
-                end
-                Tooltip(_t_vpscl)
-                r.ImGui_Text(ctx, 'Sprites')
-                r.ImGui_SameLine(ctx)
-                local _t_vpan = TIPS.venue_preview_animate
-                if r.ImGui_RadioButton(ctx, 'Animated##vpan_g', S.venue_preview_animate) then
-                    S.venue_preview_animate = true
-                end
-                Tooltip(_t_vpan)
-                r.ImGui_SameLine(ctx)
-                if r.ImGui_RadioButton(ctx, 'Still##vpan_g', not S.venue_preview_animate) then
-                    S.venue_preview_animate = false
-                end
-                Tooltip(_t_vpan)
-                if not VenueSpriteFoldersFound() then
-                    r.ImGui_Spacing(ctx)
-                    r.ImGui_TextDisabled(ctx,
-                        'Venue spritesheets not found - check readme for installation instructions')
-                end
+                    ------------------------------------------------
+                    -- General > Settings sub-tab
+                    ------------------------------------------------
+                    if r.ImGui_BeginTabItem(ctx, 'Settings') then
+                        local lbl_col_gen = LabelColWidth({ 'Preview size', 'Sprites', 'Show WIPs?' })
+                        local radio_w_gen = RadioGroupWidth({ '1x', '2x', 'Animated', 'Still', 'No', 'Yes' })
 
-                r.ImGui_Separator(ctx)
-                SectionHeader('WIP tabs')
-                r.ImGui_Text(ctx, 'Show WIPs?')
-                r.ImGui_SameLine(ctx)
-                local _t_wip = TIPS.show_wip_tabs
-                if r.ImGui_RadioButton(ctx, 'No##wip', not S.show_wip_tabs) then
-                    S.show_wip_tabs = false
+                        SectionHeader('Venue preview')
+                        r.ImGui_Text(ctx, 'Preview size')
+                        r.ImGui_SameLine(ctx, lbl_col_gen)
+                        local _t_vpscl = TIPS.venue_preview_scale
+                        if r.ImGui_RadioButton(ctx, '1x##vpscl', S.venue_preview_scale == 1) then
+                            S.venue_preview_scale = 1
+                        end
+                        Tooltip(_t_vpscl)
+                        r.ImGui_SameLine(ctx, lbl_col_gen + radio_w_gen)
+                        if r.ImGui_RadioButton(ctx, '2x##vpscl', S.venue_preview_scale == 2) then
+                            S.venue_preview_scale = 2
+                        end
+                        Tooltip(_t_vpscl)
+                        r.ImGui_Text(ctx, 'Sprites')
+                        r.ImGui_SameLine(ctx, lbl_col_gen)
+                        local _t_vpan = TIPS.venue_preview_animate
+                        if r.ImGui_RadioButton(ctx, 'Animated##vpan_g', S.venue_preview_animate) then
+                            S.venue_preview_animate = true
+                        end
+                        Tooltip(_t_vpan)
+                        r.ImGui_SameLine(ctx, lbl_col_gen + radio_w_gen)
+                        if r.ImGui_RadioButton(ctx, 'Still##vpan_g', not S.venue_preview_animate) then
+                            S.venue_preview_animate = false
+                        end
+                        Tooltip(_t_vpan)
+                        if not VenueSpriteFoldersFound() then
+                            r.ImGui_Spacing(ctx)
+                            r.ImGui_TextDisabled(ctx,
+                                'Venue spritesheets not found - check readme for installation instructions')
+                        end
+
+                        r.ImGui_Separator(ctx)
+                        SectionHeader('WIP tabs')
+                        r.ImGui_Text(ctx, 'Show WIPs?')
+                        r.ImGui_SameLine(ctx, lbl_col_gen)
+                        local _t_wip = TIPS.show_wip_tabs
+                        if r.ImGui_RadioButton(ctx, 'No##wip', not S.show_wip_tabs) then
+                            S.show_wip_tabs = false
+                        end
+                        Tooltip(_t_wip)
+                        r.ImGui_SameLine(ctx, lbl_col_gen + radio_w_gen)
+                        if r.ImGui_RadioButton(ctx, 'Yes##wip', S.show_wip_tabs) then
+                            S.show_wip_tabs = true
+                        end
+                        Tooltip(_t_wip)
+
+                        r.ImGui_Separator(ctx)
+                        SectionHeader('Settings')
+
+                        local bw_settings = BtnGroupWidth({ 'Save', 'Load' })
+                        if Btn('Save', BTN_H, bw_settings) then
+                            SaveSettings()
+                            S.status = 'Settings saved to project.'
+                        end
+                        Tooltip(TIPS.save)
+                        r.ImGui_SameLine(ctx)
+                        if Btn('Load', BTN_H, bw_settings) then
+                            if LoadSettings() then
+                                S.status = 'Settings loaded from project.'
+                            else
+                                S.status = 'No saved settings found in this project.'
+                            end
+                        end
+                        Tooltip(TIPS.load)
+
+                        r.ImGui_EndTabItem(ctx)
+                    end
+
+                    r.ImGui_EndTabBar(ctx)
                 end
-                Tooltip(_t_wip)
-                r.ImGui_SameLine(ctx)
-                if r.ImGui_RadioButton(ctx, 'Yes##wip', S.show_wip_tabs) then
-                    S.show_wip_tabs = true
-                end
-                Tooltip(_t_wip)
 
                 r.ImGui_EndTabItem(ctx)
             end
@@ -240,28 +260,22 @@ local function Loop()
             ------------------------------------------------------------
             if S.show_wip_tabs and r.ImGui_BeginTabItem(ctx, 'Tempo Map') then
                 _new_tab = 'Tempo Map'
-                local bw_ctx   = r.ImGui_CalcTextSize(ctx, 'Show context')              + _bp
-                local bw_ali   = r.ImGui_CalcTextSize(ctx, 'Align audio')                + _bp
-                local bw_ebpm  = r.ImGui_CalcTextSize(ctx, 'Estimate initial BPM')       + _bp
-                local bw_gen   = r.ImGui_CalcTextSize(ctx, 'Generate tempo map')         + _bp
-                local bw_clrtm = r.ImGui_CalcTextSize(ctx, 'Clear markers')              + _bp
-                local bw_c643  = r.ImGui_CalcTextSize(ctx, 'Convert 6/4 \xe2\x86\x92 3/4') + _bp
 
                 r.ImGui_Text(ctx, 'KICK track ')
                 r.ImGui_SameLine(ctx)
-                r.ImGui_SetNextItemWidth(ctx, 200)
+                r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
                 S.tm_kick_idx = TrackCombo('##tm_kick', S.tm_kick_idx, audio_tracks)
                 Tooltip(TIPS.kick_track)
 
                 r.ImGui_Text(ctx, 'SNARE track')
                 r.ImGui_SameLine(ctx)
-                r.ImGui_SetNextItemWidth(ctx, 200)
+                r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
                 S.tm_snare_idx = TrackCombo('##tm_snare', S.tm_snare_idx, audio_tracks)
                 Tooltip(TIPS.snare_track)
 
                 r.ImGui_Text(ctx, 'FULL KIT   ')
                 r.ImGui_SameLine(ctx)
-                r.ImGui_SetNextItemWidth(ctx, 200)
+                r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
                 S.tm_kit_idx = TrackCombo('##tm_kit', S.tm_kit_idx, audio_tracks)
                 Tooltip(TIPS.kit_track)
 
@@ -329,32 +343,32 @@ local function Loop()
 
                 r.ImGui_Spacing(ctx)
 
-                if r.ImGui_Button(ctx, 'Show context', bw_ctx, 24) then
+                if Btn('Show context', BTN_H) then
                     RunAction(ShowTempoContext)
                 end
                 Tooltip(TIPS.show_ctx)
                 r.ImGui_SameLine(ctx)
-                if r.ImGui_Button(ctx, 'Align audio', bw_ali, 24) then
+                if Btn('Align audio', BTN_H) then
                     RunAction(AlignAudioTracks)
                 end
                 Tooltip(TIPS.align_audio)
                 r.ImGui_SameLine(ctx)
-                if r.ImGui_Button(ctx, 'Estimate initial BPM', bw_ebpm, 24) then
+                if Btn('Estimate initial BPM', BTN_H) then
                     RunAction(EstimateInitialBPM)
                 end
                 Tooltip(TIPS.est_bpm)
                 r.ImGui_SameLine(ctx)
-                if r.ImGui_Button(ctx, 'Generate tempo map', bw_gen, 24) then
+                if Btn('Generate tempo map', BTN_H) then
                     RunAction(GenerateTempoMap)
                 end
                 Tooltip(TIPS.gen_tempo)
 
-                if r.ImGui_Button(ctx, 'Clear markers', bw_clrtm, 24) then
+                if Btn('Clear markers', BTN_H) then
                     RunAction(ClearGeneratedTempoMarkers)
                 end
                 Tooltip(TIPS.clear_tempo)
                 r.ImGui_SameLine(ctx)
-                if r.ImGui_Button(ctx, 'Convert 6/4 \xe2\x86\x92 3/4', bw_c643, 24) then
+                if Btn('Convert 6/4 \xe2\x86\x92 3/4', BTN_H) then
                     RunAction(ConvertTimeSig6to3)
                 end
                 Tooltip(TIPS.convert_6_4_to_3_4)
@@ -367,17 +381,16 @@ local function Loop()
             ------------------------------------------------------------
             if S.show_wip_tabs and r.ImGui_BeginTabItem(ctx, 'Drums') then
                 _new_tab = 'Drums'
-                local bw_cvt = r.ImGui_CalcTextSize(ctx, 'Convert Drums') + _bp
 
                 r.ImGui_Text(ctx, 'Source track')
                 r.ImGui_SameLine(ctx)
-                r.ImGui_SetNextItemWidth(ctx, 200)
+                r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
                 S.mc_drum_src_idx = TrackCombo('##mc_drum_src', S.mc_drum_src_idx, midi_tracks)
                 Tooltip(TIPS.mc_drum_src)
 
                 r.ImGui_Text(ctx, 'Target track')
                 r.ImGui_SameLine(ctx)
-                r.ImGui_SetNextItemWidth(ctx, 200)
+                r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
                 S.mc_drum_tgt_idx = TrackCombo('##mc_drum_tgt', S.mc_drum_tgt_idx, midi_tracks)
                 Tooltip(TIPS.mc_drum_tgt)
 
@@ -390,7 +403,7 @@ local function Loop()
                 SliderTooltip(TIPS.mc_ghost_thresh)
 
                 local crash_label = S.mc_crash_to_green and 'Crashes \xe2\x86\x92 Green' or 'Crashes \xe2\x86\x92 Yellow'
-                if r.ImGui_Button(ctx, crash_label, 160, 22) then
+                if Btn(crash_label, 22) then
                     S.mc_crash_to_green = not S.mc_crash_to_green
                 end
                 Tooltip(TIPS.mc_crash_color)
@@ -412,7 +425,7 @@ local function Loop()
                 Tooltip(_t_dru)
 
                 r.ImGui_Spacing(ctx)
-                if r.ImGui_Button(ctx, 'Convert Drums', bw_cvt, 24) then
+                if Btn('Convert Drums', BTN_H) then
                     RunAction(ConvertDrums)
                 end
 
@@ -433,20 +446,18 @@ local function Loop()
             ------------------------------------------------------------
             if S.show_wip_tabs and r.ImGui_BeginTabItem(ctx, 'Guitar') then
                 _new_tab = 'Guitar'
-                local bw_cvt = r.ImGui_CalcTextSize(ctx, 'Convert Guitar') + _bp
-                local bw_val = r.ImGui_CalcTextSize(ctx, 'Validate Guitar') + _bp
 
                 SectionHeader('Source / Target')
 
                 r.ImGui_Text(ctx, 'Source track')
                 r.ImGui_SameLine(ctx)
-                r.ImGui_SetNextItemWidth(ctx, 200)
+                r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
                 S.mc_gtr_src_idx = TrackCombo('##mc_gtr_src', S.mc_gtr_src_idx, midi_tracks)
                 Tooltip(TIPS.mc_gtr_src)
 
                 r.ImGui_Text(ctx, 'Target track')
                 r.ImGui_SameLine(ctx)
-                r.ImGui_SetNextItemWidth(ctx, 200)
+                r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
                 S.mc_gtr_tgt_idx = TrackCombo('##mc_gtr_tgt', S.mc_gtr_tgt_idx, midi_tracks)
                 Tooltip(TIPS.mc_gtr_tgt)
 
@@ -458,14 +469,19 @@ local function Loop()
                     ctx, 'Phrase gap (ms)', S.mc_gtr_wrap_gap_ms, 50, 1000)
                 SliderTooltip(TIPS.mc_gtr_wrap_gap)
 
+                local lbl_col_gtr = LabelColWidth({ 'Max chord:' })
+                local radio_w_gtr = RadioGroupWidth({
+                    '2 notes', '3 notes', 'Preview', 'Auto-insert',
+                })
+
                 r.ImGui_Text(ctx, 'Max chord:')
-                r.ImGui_SameLine(ctx)
+                r.ImGui_SameLine(ctx, lbl_col_gtr)
                 local _t_gmc = TIPS.mc_gtr_max_chord
                 if r.ImGui_RadioButton(ctx, '2 notes##gtr', S.mc_gtr_max_chord == 2) then
                     S.mc_gtr_max_chord = 2
                 end
                 Tooltip(_t_gmc)
-                r.ImGui_SameLine(ctx)
+                r.ImGui_SameLine(ctx, lbl_col_gtr + radio_w_gtr)
                 if r.ImGui_RadioButton(ctx, '3 notes##gtr', S.mc_gtr_max_chord == 3) then
                     S.mc_gtr_max_chord = 3
                 end
@@ -480,7 +496,7 @@ local function Loop()
                     S.mc_gtr_workflow = 0
                 end
                 Tooltip(_t_gwf)
-                r.ImGui_SameLine(ctx)
+                r.ImGui_SameLine(ctx, radio_w_gtr)
                 if r.ImGui_RadioButton(ctx, 'Auto-insert##gtr', S.mc_gtr_workflow == 1) then
                     S.mc_gtr_workflow = 1
                 end
@@ -490,7 +506,7 @@ local function Loop()
                 local no_src = S.mc_gtr_src_idx < 0
                 local no_tgt = S.mc_gtr_tgt_idx < 0
                 if no_src or no_tgt then r.ImGui_BeginDisabled(ctx) end
-                if r.ImGui_Button(ctx, 'Convert Guitar', bw_cvt, 24) then
+                if Btn('Convert Guitar', BTN_H) then
                     RunAction(ConvertGuitar)
                 end
                 if no_src or no_tgt then r.ImGui_EndDisabled(ctx) end
@@ -498,7 +514,7 @@ local function Loop()
 
                 r.ImGui_SameLine(ctx)
                 if no_tgt then r.ImGui_BeginDisabled(ctx) end
-                if r.ImGui_Button(ctx, 'Validate Guitar', bw_val, 24) then
+                if Btn('Validate Guitar', BTN_H) then
                     RunAction(ValidateGuitar)
                 end
                 if no_tgt then r.ImGui_EndDisabled(ctx) end
@@ -534,7 +550,7 @@ local function Loop()
             r.ImGui_SetCursorPosX(ctx, r.ImGui_GetCursorPosX(ctx) + (avail_x - bw_und))
         end
         if not can_undo then r.ImGui_BeginDisabled(ctx) end
-        if r.ImGui_Button(ctx, 'Undo', bw_und, 24) then r.Undo_DoUndo2(0) end
+        if Btn('Undo', BTN_H) then r.Undo_DoUndo2(0) end
         if not can_undo then r.ImGui_EndDisabled(ctx) end
         if can_undo then Tooltip('Undo: ' .. undo_str) end
         if S.last_result then

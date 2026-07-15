@@ -1,8 +1,6 @@
--- Harmonies tab rendering
+﻿-- Harmonies tab rendering
 
 function DrawHarmoniesTab(ctx)
-    local _bp      = 40
-    local bw_harm  = r.ImGui_CalcTextSize(ctx, 'Apply Harmonies') + _bp
     local sel_s, _ = GetTimeSelection()
     local tracks       = S.all_track_list
     local midi_tracks  = S.midi_track_list
@@ -10,8 +8,11 @@ function DrawHarmoniesTab(ctx)
     r.ImGui_Spacing(ctx)
 
     ---- Source ----
+    local lbl_col_src = LabelColWidth({ 'Source' })
     r.ImGui_Text(ctx, 'Source')
     Tooltip(TIPS.harm_src)
+    r.ImGui_SameLine(ctx, lbl_col_src)
+    r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
     S.harm_src_idx = FilteredTrackCombo('##harm_src', S.harm_src_idx, midi_tracks)
     Tooltip(TIPS.harm_src)
 
@@ -54,8 +55,10 @@ function DrawHarmoniesTab(ctx)
 
         local row_off = not S[d.en]
         if row_off then r.ImGui_BeginDisabled(ctx) end
+        r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
         S[d.idx] = FilteredTrackCombo(d.trk_id, S[d.idx], tracks)
         Tooltip(TIPS[d.tip])
+        r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
         if r.ImGui_BeginCombo(ctx, d.mode_id, HARM_MODES[S[d.mode] + 1].label) then
             for mi, m in ipairs(HARM_MODES) do
                 local is_sel = (mi - 1 == S[d.mode])
@@ -83,10 +86,11 @@ function DrawHarmoniesTab(ctx)
 
     ---- Key section ----
     if not any_diatonic then r.ImGui_BeginDisabled(ctx) end
+    local lbl_col_key = LabelColWidth({ 'Key' })
     r.ImGui_Text(ctx, 'Key')
     Tooltip(TIPS.harm_key)
-    r.ImGui_SameLine(ctx)
-    r.ImGui_SetNextItemWidth(ctx, 80)
+    r.ImGui_SameLine(ctx, lbl_col_key)
+    r.ImGui_SetNextItemWidth(ctx, WIDTH_SHORT)
     if r.ImGui_BeginCombo(ctx, '##harm_kr', HARM_NOTE_NAMES[S.harm_key_root + 1]) then
         for i, name in ipairs(HARM_NOTE_NAMES) do
             local is_sel = (i - 1 == S.harm_key_root)
@@ -112,17 +116,20 @@ function DrawHarmoniesTab(ctx)
     r.ImGui_Separator(ctx)
     r.ImGui_Spacing(ctx)
 
-    ---- Copy phrases checkbox ----
-    local _, new_cp = r.ImGui_Checkbox(ctx,
-        'Copy phrase markers & overdrive##harm_cp', S.harm_copy_phrases)
-    S.harm_copy_phrases = new_cp
-    Tooltip(TIPS.harm_copy_phrases)
+    ---- Copy phrase markers / overdrive checkboxes ----
+    local _, new_cpm = r.ImGui_Checkbox(ctx, 'Copy phrase markers##harm_cpm', S.harm_copy_phrase_markers)
+    S.harm_copy_phrase_markers = new_cpm
+    Tooltip(TIPS.harm_copy_phrase_markers)
+    r.ImGui_SameLine(ctx)
+    local _, new_cod = r.ImGui_Checkbox(ctx, 'Copy overdrive##harm_cod', S.harm_copy_overdrive)
+    S.harm_copy_overdrive = new_cod
+    Tooltip(TIPS.harm_copy_overdrive)
 
     r.ImGui_Spacing(ctx)
     r.ImGui_Spacing(ctx)
 
     ---- Apply button ----
-    if r.ImGui_Button(ctx, 'Apply Harmonies', bw_harm, 24) then
+    if Btn('Apply Harmonies', BTN_H) then
         if not sel_s then
             local res = r.ShowMessageBox(
                 'No time selection is active.\n\nAll notes in the full source MIDI item will be processed.\n\nContinue?',

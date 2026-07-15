@@ -1,6 +1,6 @@
 -- @description Rock Band General Helper
 -- @author VeeKiraRay
--- @version 0.9.13
+-- @version 0.9.19
 -- @about
 --   Utility actions for Rock Band authoring in REAPER.
 --
@@ -17,140 +17,90 @@
 --
 --   Built with Claude (Anthropic) - https://claude.ai
 --
---   v0.9.13
---     - Fix: [prc_*] section grouping (List event sections, and the
---       section-aware generator) failed to merge letter-only suffix variants
---       with no number (e.g. [prc_verse_a]/[prc_verse_b]/[prc_verse_c]) -
---       each was read as an unrelated standalone section instead of one
---       merged section. Numbered-letter variants ([prc_verse_1a]) and bare
---       forms ([prc_verse]) were unaffected.
---     - Venue tab: "Analysis" sub-tab renamed to "Actions". "Show event
---       sections" renamed to "List event sections" for consistency with the
---       tab's other buttons.
---     - Venue > Actions: new "List lighting/postproc" action. Lists every
---       [lighting*] and *.pp] (postproc) text event on the VENUE track, in
---       timeline order of appearance, each with its measure/timestamp.
---   v0.9.12
---     - Internal housekeeping, no behavior changes. ui_venue.lua split:
---       Section gen and Manual gen sub-tabs moved to their own files
---       (ui_venue_section_gen.lua, ui_venue_manual.lua); the shared camera
---       pacing / keyframe align widgets became globals. Deduplicated
---       shared logic (track+MIDI-take lookup, text-event delete loops,
---       ticks-per-QN, camera-pacing resolution, instrument letter names)
---       and removed dead code (unused preview track_end computation and a
---       leftover tooltip).
---   v0.9.11
---     - Unified throttling for continuous MIDI reads in the Venue tab UI
---       (new shared MakeProjectPoll helper: re-read only when the project
---       changed, subject to a minimum interval, with a 5 s fallback).
---       Events sub-tab no longer re-scans the EVENTS track every frame -
---       it polls like the Active players row (1 s + project-change gate)
---       and refreshes immediately after its own Add/bookends/Clear buttons.
---       Players row: during playback the per-playhead dot lookup now
---       updates ~2x/s instead of every frame (stopped-cursor moves still
---       react instantly). Preview: the per-frame muted-instruments read
---       now rides along with the existing event-cache refresh.
---   v0.9.10
---     - Venue > Events: with "Use letter suffix" on, Add now only inserts
---       lettered forms ([prc_verse_1a] from the very first part - never the
---       unlettered [prc_verse_1]), so lettered parts always merge cleanly in
---       Section gen. Plain and lettered forms of one event must not be
---       mixed: adding either is refused while the other exists. Events with
---       no lettered variants (e.g. [prc_bre], entry cues) insert the plain
---       form regardless of the checkbox.
---     - Venue > Events: refusal reasons no longer print next to the row
---       (they took too much horizontal space). The indicator shows a short
---       "-> (blocked)" - hover it for the reason - and a refused Add reports
---       the reason in the result section.
---   v0.9.9
---     - Venue > Events: insert validation. Adds refuse duplicates (with the
---       existing event's location), bare and numbered variants of the same
---       event may not co-exist, numbers/letters must be used in sequence and
---       placed in timeline order (letter gaps are re-offered), and no two
---       text events may share a position - crowd events are exempt and may
---       stack anywhere. The row indicator shows the exact event the Add
---       will insert, or why it would be refused, live at the playhead.
---     - Venue > Events: new quick actions. "Insert bookends" places the
---       minimal per-song event set ([prc_intro] + [crowd_normal] at m1,
---       [music_start] at m3, [prc_outro]/[music_end]/[end] at E-5/E-2/E
---       where E is the last full measure; skipped for items under 7
---       measures), removing prior instances first. "Clear all" removes
---       every text event from the EVENTS track (track name kept).
---     - Venue > Events: "Use letter suffix" is now on by default.
---     - Venue tab: sub-tab description lines use the default text color;
---       Manual gen insert status now names its target track (VENUE).
---   v0.9.8
---     - Venue tab: new Events sub-tab. Inserts EVENTS-track text events at
---       the playhead - [prc_*] section markers grouped by category (intro,
---       structure, solo, break, tempo/energy, interlude, outro, misc,
---       generic a-k), crowd events, and global markers ([music_start],
---       [music_end], [end], [coda]). Each section row has a number stepper
---       (bare or _1.._9) and an opt-in automatic letter suffix mode that
---       reads the EVENTS track and appends the next free letter
---       ([prc_verse_1] -> [prc_verse_1a] -> [prc_verse_1b]), capped to the
---       valid RB3 event vocabulary. A read-only indicator shows the exact
---       event the Add button will insert.
---   v0.9.7
---     - Venue tab: new "Active players" row shown under every sub-tab. A
---       colored dot per instrument shows its state at the playhead - active
---       (green), idle (blue), track muted or missing (red), or no
---       play-state events (orange, treated as always in [play] state) -
---       using the same mute/play-state logic as venue generation. Hover
---       for details.
---       Also shown in the standalone Venue Preview window.
---   v0.9.6
---     - Venue > Preview is now also available as a standalone script,
---       rock_band_preview_vkr.lua, so the preview can sit in its own window
---       next to the generation tabs. The sub-tab is unchanged; both load the
---       same module files.
---   v0.9.5
---     - Venue > Analysis: new "Generate sing along" action. Derives VENUE
---       sing-along notes (pitch 87 guitarist from HARM2, pitch 85 bassist
---       from HARM3) from each harmony track's vocal phrases, merging phrases
---       less than a measure apart into one continuous note. Clears/replaces
---       only the pitch of each unmuted-and-present source track.
---   v0.9.4
---     - Venue tab: new Keyframes sub-tab. Bulk-regenerates [first]/[next]
---       keyframes for every manual lighting event already on the VENUE track
---       (from that lighting event to the next lighting event of any kind),
---       using the shared Keyframe align/subdivision settings and its own
---       Keyframe rate. Only keyframe events are cleared/replaced; camera,
---       lighting, postproc, and bonus FX are untouched. Respects time
---       selection; otherwise processes the whole song.
---   v0.9.3
---     - Venue camera generation (Themes gen and Section gen tabs) now avoids
---       placing the same camera/companion event(s) back-to-back: the full set
---       of event(s) placed at one generated spot (a primary shot plus its
---       companion, if any) is banned for the very next spot only, then clears.
---       The ban chains continuously from the forced tick-0 shot through the
---       music-start anchor pick into the regular per-tick generation loop.
---   v0.9.2
---     - Venue Themes gen: song start now gets a forced, deterministic trio
---       ([coop_all_far] / [lighting (intro)] / [ProFilm_a.pp]) at tick 0
---       instead of a random camera pick, regardless of theme state.
---     - The first generated camera cut is now anchored to the song's actual
---       musical start - an explicit [music_start] EVENTS marker if present,
---       else whichever of measure 3/4 is closer to the 3-second mark - rather
---       than a fixed measure 3.
---     - A theme's first [prc_*] section (e.g. [prc_intro]) placed right at
---       tick 0 is now treated as starting at that same music-start anchor for
---       lighting/postproc/dircut/bonusfx placement, instead of at tick 0.
---     - Fix: the song-start/music-start bookend camera picks (Themes gen and
---       Section gen tabs) now emit the keys/guitar/bass swap companion event
---       when applicable, matching the regular per-tick camera generation loop.
---   v0.9.1
---     - Difficulty validation: gap/spacing/length rules now measured in quarter
---       notes via the tempo map (accurate with fluctuating BPM) with a 5% grace
---       for hand-placed notes.
---   v0.9
---     - Added Drums, Keys, Guitar, Difficulty, Tab Input, MIDI tabs.
---       Refactored into per-feature action files (actions_drums, actions_keys,
---       actions_guitar, actions_midi_align, actions_midi_replace,
---       actions_difficulty, actions_difficulty_5k).
---     - General tab: song fade out action.
---   v0.2
---     - Refactored into multiple module files loaded via dofile.
---       Shares lib/ (ImGui helpers, DSP, MIDI) with rock_band_vocal_helper_vkr.
+--   This @about block keeps only the 5 most recent versions.
+--   Full history: CHANGELOG.md in the repo.
+--
+--   v0.9.19
+--     - Fix: RadioGroupWidth()'s per-option padding was a fixed pixel guess
+--       that could undershoot the real rendered width of a radio button at
+--       larger REAPER UI scales, causing the second option to overlap the
+--       first's label when the group's labels were short (surfaced by the
+--       Tab Input tab's Horizontal/Vertical row after its width group
+--       shrank from 5 labels to 2). Now derives padding from
+--       ImGui_GetFrameHeight() + the real ItemSpacing style value (tracks
+--       font size / UI scale) plus a fixed cushion, instead of a flat guess;
+--       falls back to the old fixed constant if GetFrameHeight isn't
+--       available. (First pass still left Horizontal/Vertical visibly tight
+--       - the flat "+10" buffer wasn't enough headroom on the group's widest
+--       label; this revision widens it.)
+--     - General tab: "Song fade out" moved back to the Actions sub-tab
+--       (it's an action, not a setting).
+--     - Venue > Actions: "List venue events"/"List event sections"/"List
+--       lighting/postproc" grouped under an "Analyze" label; "Generate sing
+--       along" under its own "Quick actions" label - same pattern as the
+--       General tab's "General actions"/"Audio alignment" split.
+--     - Venue > Section gen and Manual gen: the Keyframe align dropdown is
+--       now the same width as the Lighting dropdown in the same sub-tab
+--       (was narrower than Lighting in both).
+--   v0.9.18
+--     - General tab: split into Actions (General actions, Audio alignment)
+--       and Settings (Song fade out, Venue preview, WIP tabs, Settings)
+--       sub-tabs. Save/Load moved to the end of Settings, after the values
+--       they persist.
+--     - Difficulty tab: Validate row now wraps at 3 buttons per row (Expert/
+--       Hard/Medium, then Easy/All) instead of 4+1, since the button text is
+--       long. Applies to both Pro Keys and 5-Lane Keys sub-tabs.
+--     - Tab Input tab: the Guitar/Bass, Keys/Pro Keys, and Vocal instrument
+--       modes are now sub-tabs instead of radio buttons. The Horizontal/
+--       Vertical format selector's column width no longer factors in the
+--       old mode-selector labels.
+--     - MIDI tab: MIDI Alignment, MIDI Length Sync, and Pattern Replace are
+--       now sub-tabs (Alignment / Length / Pattern) instead of stacked
+--       sections.
+--     - Venue > Section gen: the Custom/Template selector now has a "Mode"
+--       label, aligned with the rest of the tab's inputs.
+--     - Venue > Manual gen: the Keyframes button moved next to the Keyframe
+--       align dropdown and renamed to "Add" (was on the Lighting row).
+--       Subdivision (Every beat/Every half beat) moved to its own labeled
+--       row, matching Section gen and Themes gen's style, instead of sitting
+--       inline after the Keyframe align dropdown.
+--     - Venue > Keyframes: Subdivision moved to its own labeled row, same
+--       change as Manual gen.
+--   v0.9.17
+--     - Radio button options now align into columns within each tab view via
+--       a new RadioGroupWidth() helper (in lib/reaper_imgui_helpers.lua,
+--       same idea as BtnGroupWidth()/LabelColWidth() but for radio option
+--       spacing): General tab (Preview size/Sprites/Show WIPs?), Guitar WIP
+--       tab (Max chord/Workflow - also gained its first row-label column),
+--       Tab Input tab (instrument mode/format selector), Keys tab (Split
+--       by/Max chord/Workflow - also gained a row-label column), and Venue >
+--       Preview (Players/Preview size/Sprites/Show).
+--   v0.9.16
+--     - Row labels (the text before a dropdown/slider/radio group) now align
+--       within each tab or sub-tab via a new LabelColWidth() helper (in
+--       lib/reaper_imgui_helpers.lua), same idea as BtnGroupWidth() but for
+--       label columns instead of button widths: General tab (Preview size/
+--       Sprites/Show WIPs?), Difficulty > Pro Keys (Expert/Hard/Medium/
+--       Easy), MIDI tab (Source track/Reference track), Venue > Themes gen,
+--       Section gen, and Manual gen (Remove folded into the existing
+--       column), Venue > Preview (Players/Preview size/Sprites/Show).
+--       RenderKeyframeAlignCombo() gained an optional col_offset param
+--       (matching RenderCamPacingRow()) so it can join a tab's column.
+--       Also replaced two remaining hardcoded-longest-label guesses (Venue
+--       > Events, Venue > Keyframes) with the same helper for consistency.
+--   v0.9.15
+--     - Related buttons (Align all audio/Align count-in, Save/Load, the
+--       Suggest/Validate rows on the Difficulty tab, Add note/Run guide,
+--       the Pattern Replace row, Venue > Actions, Venue > Events quick
+--       actions) now share a uniform width per group (BtnGroupWidth(), new
+--       in lib/reaper_imgui_helpers.lua) instead of each sizing to its own
+--       label.
+--     - General tab: "Refresh tracks" moved out of Settings into its own
+--       "General actions" section at the top (it wasn't really a setting).
+--     - Venue > Events: "Use letter suffix" moved to its own row below the
+--       quick-action buttons, restyled as a label + checkbox aligned to the
+--       same column as the section rows below it (was a same-line checkbox
+--       with an inline label).
 
 r = reaper  -- global so all dofile'd modules can use it
 

@@ -1,6 +1,6 @@
 -- @description Rock Band Vocal Helper
 -- @author VeeKiraRay
--- @version 1.7
+-- @version 1.12
 -- @about
 --   Analyses a vocal audio track and appends MIDI notes to an existing MIDI
 --   item on a destination track, one note per detected syllable or phrase.
@@ -10,62 +10,61 @@
 --
 --   Built with Claude (Anthropic) - https://claude.ai
 --
---   v1.7
---     - Vocal style presets: one-click combo on the Pitch, Tuner and Pitch
---       slide tabs applies YIN settings derived from standard voice ranges
---       (low male, tenor, high male, alto, soprano) plus style-only variants
---       (breathy/raspy, clean). Voice-range presets also enable matching
---       Min/Max pitch constraints to octave-snap detection errors. A
---       Piano / keys preset tunes YIN and the tuner's Min RMS level for
---       quiet single-note piano stems.
+--   This @about block keeps only the 5 most recent versions.
+--   Full history: CHANGELOG.md in the repo.
 --
---   v1.6
---     - Validation tab: Validate phrases checks all phrase-marker regions for
---       six common authoring issues: lyric capitalization, grid snap (start and
---       end on a 64th-note boundary), gap to the next phrase (>= 4x64th),
---       first note lead (>= 2x64th from phrase start), and last note tail
---       (>= 1x64th before phrase end). Read-only; reports violations grouped
---       by phrase position.
+--   v1.12
+--     - Sliders and combo boxes now use a fixed pixel width
+--       (SetNextItemWidth(ctx, 200), matching the general helper's
+--       convention) instead of stretching to fill the window on resize.
+--       Applied across General, Tuner, Pitch, Pitch slide, Harmonies, and
+--       Validation tabs (WIP Note Placement tab intentionally left as-is,
+--       to be redone later).
 --
---   v1.5
---     - Generate (replace): new button clears all vocal-range notes in the
---       analysis range before inserting, producing a clean result. Phrase
---       markers at other pitches are preserved.
---     - Generate (append) renamed from "Generate notes (append)".
---     - Pitch name display now uses Rock Band octave numbering (C1=36).
---     - Generate and Dry run always assign a fixed pitch (Default pitch
---       slider, now on the Note Placement tab). Pitch tab is now exclusively
---       for Apply pitch changes: only Built-in detection and Reference MIDI
---       remain; Single pitch mode removed; YIN is the new default.
---       Apply pitch changes is always enabled.
---     - Validation tab renamed to Pitch slide. YIN threshold and frequency
---       sliders added alongside Slide Scan controls so the full pitch slide
---       workflow is contained in one tab.
+--   v1.11
+--     - Pitch tab: removed the "Pitch source" selector. Placement is now two
+--       sub-tabs, Placement - Built-in and Placement - Reference, each
+--       setting the active pitch source while open (mirrors the general
+--       helper's Tab Input pattern). Apply pitch changes appears in both.
+--     - Harmonies: "Copy phrase markers & overdrive" split into two
+--       independent checkboxes/settings - Copy phrase markers (pitch 105)
+--       and Copy overdrive (pitch 116, new RB3_OVERDRIVE_PITCH constant).
+--     - Lyrics tab: "File: ..." renamed to "Selected: ..." in normal text
+--       color (was greyed out), avoiding repeating "File" under its new
+--       section header.
+--     - Min/max pitch enable checkbox tooltips now say "Uncheck" instead of
+--       "Disable".
 --
---   v1.4
---     - Slide Scan sliders added to the Validation tab: all five scan
---       parameters (min note length, min segment, edge skip, sample step,
---       sample window) are now adjustable and persisted with project settings.
+--   v1.10
+--     - UI consistency pass matching the general helper's conventions:
+--       row labels now sit to the left of their slider/combo/checkbox and
+--       align into a shared column (LabelColWidth()) instead of relying on
+--       ImGui's native trailing label; radio rows use RadioGroupWidth() for
+--       uniform option widths. Applied across General, Tuner, Pitch, Lyrics,
+--       Pitch slide, Harmonies, and Validation tabs (WIP Note Placement tab
+--       intentionally left as-is, to be redone later).
+--     - General tab split into Actions (Refresh tracks) and Settings (WIP
+--       tabs, then Save/Load last) sub-tabs, mirroring the general helper.
+--     - Pitch tab split into Placement and Snap sub-tabs; the "Pitch range"
+--       Min/Max pitch rows now read label -> slider -> enable checkbox
+--       (checkbox moved from the slider's left to its right). Pitch tab
+--       content moved to a new ui_pitch.lua module (DrawPitchTab).
+--     - Lyrics tab buttons grouped under File (Auto-detect, Browse...) and
+--       Actions (Clear lyrics, Assign lyrics) section headers.
 --
---   v1.3
---     - Tab-based UI: reorganised into 5 tabs (General, Note Placement,
---       Pitch, Lyrics, Validation). Track selectors and status/results panel
---       remain global above and below the tab bar.
---     - MIDI destination track selector now appears before Audio source.
---     - "Note Detection" section renamed to "Note Placement".
+--   v1.9
+--     - Related buttons now share a uniform width per group
+--       (BtnGroupWidth(), from lib/reaper_imgui_helpers.lua) instead of each
+--       sizing to its own label: Save/Load (General tab) and
+--       Auto-detect/Browse.../Clear lyrics/Assign lyrics (Lyrics tab).
 --
---   v1.2
---     - Added Scan pitch slides: scans existing MIDI notes and reports any
---       where pitch moves significantly during the note (Slide up/down,
---       Scoop, Bend, Complex slide). Read-only; respects time selection.
---       Includes lyric text in the report when present.
---
---   v1.1
---     - Added Auto-tune YIN from reference: sweeps YIN parameters
---       (threshold, frequency range, window) against manually corrected
---       pitches to find the best-fit settings automatically.
---     - Fixed Assign lyrics to always operate on the whole MIDI take,
---       ignoring any time selection (required for correct word-to-note order).
+--   v1.8
+--     - Internal housekeeping, no behavior changes. Every button in every tab
+--       now goes through a shared Btn(label, height) helper (new, in
+--       lib/reaper_imgui_helpers.lua) instead of a manual CalcTextSize+Button
+--       pair, so each label string appears once instead of twice. Also fixes
+--       a pre-existing hardcoded button width (Save/Load, General tab) to
+--       compute from its label like every other button.
 --
 --   Workflow:
 --     1. Pick the audio source track and the MIDI destination track.
@@ -155,6 +154,7 @@ dofile(_mdir .. 'actions_slides.lua')
 dofile(_mdir .. 'actions_snap_key.lua')
 dofile(_mdir .. 'ui_slides.lua')
 dofile(_mdir .. 'ui_harmonies.lua')
+dofile(_mdir .. 'ui_pitch.lua')
 dofile(_mdir .. 'ui.lua')  -- also calls r.defer(Loop) at end
 
 -- Startup initialisation (runs after all modules are loaded)

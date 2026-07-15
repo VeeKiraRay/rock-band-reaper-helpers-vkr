@@ -12,11 +12,17 @@ Five stable tabs are always visible: **General | Difficulty | Tab Input | MIDI |
 
 Four WIP tabs appear only when **Show WIPs? = Yes** in the General tab (persisted setting, default No): **Tempo Map | Drums | Keys | Guitar**. These tabs function at a basic level but have known issues and are not ready for general users.
 
-**General tab** — audio alignment and settings persistence.
+**General tab** — audio alignment and settings persistence. Contains two sub-tabs:
+
+*Actions sub-tab*
+- **Refresh tracks** — re-scans the project's track list.
 - **Align all audio** — aligns every audio item on every track to a common reference position.
 - **Align count-in** — positions the COUNT IN clip relative to the first measure.
 - **Song fade out** — creates a fade-out automation envelope on the master track at the end of the project.
-- Save / Load buttons for project-scoped settings.
+
+*Settings sub-tab*
+- Venue preview size/sprite display options, Show WIPs? toggle.
+- Save / Load buttons for project-scoped settings (placed last, since they persist the settings above them).
 
 **Tempo Map tab** — generate a REAPER tempo map from drum audio analysis.
 1. Set the four source track dropdowns (KICK, SNARE, KIT, Fallback). Any can be left as "(none)".
@@ -63,11 +69,20 @@ Four WIP tabs appear only when **Show WIPs? = Yes** in the General tab (persiste
 - Track index auto-detected by name (PART KEYS).
 - All actions respect time selection.
 
-**MIDI tab** — align an imported MIDI item to the project grid.
+**MIDI tab** — MIDI alignment, length sync, and pattern replace. Contains three sub-tabs:
+
+*Alignment sub-tab* — align an imported MIDI item to the project grid.
 - Source track selector.
 - Move only: shifts the item so the first note lands at the time selection start.
 - Move + Stretch: also adjusts the take playback rate so the last note lands at the time selection end.
 - Set a time selection first, then click **Align MIDI**. Fully undoable.
+
+*Length sub-tab* — resize every MIDI item on every track to match a reference track's length.
+- Reference track selector, **Resize all MIDI** button.
+
+*Pattern sub-tab* — find and replace a note pattern across a MIDI track.
+- Source track selector; **Set Search** / **Set Replace** capture the currently-selected notes in the active MIDI editor as the search/replace patterns.
+- **Replace All** applies the replace pattern wherever the search pattern is found; **Fill Range** repeats the replace pattern across the time selection.
 
 **Venue tab** — VENUE and EVENTS MIDI track events. Contains six sub-tabs (plus Preview):
 
@@ -95,6 +110,7 @@ Four WIP tabs appear only when **Show WIPs? = Yes** in the General tab (persiste
 - **Generate venue events** — generates camera cuts, lighting changes, manual lighting control keyframes, and postproc effects on the VENUE track. Filters camera pools based on which PART instrument tracks are present and unmuted. Respects time selection (partial regeneration). Fully undoable.
 
 *Section gen sub-tab* — per-section manual configuration.
+- **Mode** — Custom (configure the section by hand) or Template (read values from a theme's section preset).
 - **Section selector** — pick a song section (auto-loaded from `[prc_*]` markers). Refresh button re-reads sections from the EVENTS track.
 - Per-section config: Lighting preset, Keyframe align (disabled for auto/no lighting), Keyframe rate, Light blendin, Post-process, PP blendin, Directed cut at start, Bonus FX.
 - **Camera pacing** — override the camera cut rate for the generated section.
@@ -103,12 +119,12 @@ Four WIP tabs appear only when **Show WIPs? = Yes** in the General tab (persiste
 *Manual gen sub-tab* — shot-by-shot event insertion at the playhead.
 - **Normal camera** — pick any `[coop_*]` shot; **Add** inserts it at the edit cursor.
 - **Directed camera** — pick any `[directed_*]` shot including BRE events; **Add** inserts it.
-- **Lighting** — pick any lighting preset; **Add** inserts `[lighting (name)]`. When a manual preset is selected, shows Keyframe align + Keyframe rate controls.
+- **Lighting** — pick any lighting preset; **Add** inserts `[lighting (name)]`. When a manual preset is selected, shows Keyframe align (with an **Add** button next to it that generates keyframes) + Subdivision (own row, instrument-aware modes only) + Keyframe rate controls.
 - **Post proc** — pick any `[*.pp]` effect; **Add** inserts it.
 - **Special** — `[bonusfx]`, `[bonusfx_optional]`, `[first]`, `[next]`, `[previous]`; **Add** inserts the chosen event.
 - **Camera pacing** — shared camera pacing override (same state as other gen tabs).
 - **Advance camera pacing** — moves the edit cursor forward by one jittered camera interval.
-- **Generate keyframes** — generates `[first]`/`[next]` from cursor to the next lighting event / time selection end / VENUE item end. Clears existing keyframe events in the range first. Only available when a manual lighting preset is selected. Fully undoable.
+- Keyframe align's **Add** button generates `[first]`/`[next]` from cursor to the next lighting event / time selection end / VENUE item end. Clears existing keyframe events in the range first. Only available when a manual lighting preset is selected. Fully undoable.
 - **Remove** — category dropdown (Camera / Lighting / Post proc / Special) + **Remove** button; removes matching events from time selection (if active) or full song. Fully undoable.
 
 *Keyframes sub-tab* — bulk regeneration of `[first]`/`[next]` keyframes for every manual lighting event already on the VENUE track.
@@ -153,7 +169,7 @@ Four WIP tabs appear only when **Show WIPs? = Yes** in the General tab (persiste
 | `rock_band_general_helper_vkr/actions_venue_events.lua` | `FindEventsTake`, `ScanEventsTextEvents`, `NextSectionEvent` (pure), `ValidatePlainInsert` (pure), `InsertEventsEvent`, `AddSectionEvent`, `ClearAllEventsTexts`, `InsertEventsBookends` (global) — Events sub-tab actions + validation |
 | `rock_band_general_helper_vkr/actions_venue_keyframes.lua` | `RegenerateVenueKeyframes` (global) — Keyframes tab action: bulk-regenerates keyframes for every manual lighting event on the VENUE track |
 | `rock_band_general_helper_vkr/actions_venue_sing_along.lua` | `GenerateSingAlong` (global) — Analysis tab action: derives VENUE pitch 85/87 sing-along notes from HARM2/HARM3 vocal phrases; `AvailableHarmTake`, `ReadPhrasesAndVocalNotes`, `MeasureDurationAtTime`, `BuildSpans` (local) |
-| `rock_band_general_helper_vkr/ui_venue.lua` | `DrawVenueTab`, `RenderCamPacingRow`, `RenderKeyframeAlignCombo` (global) — Venue tab bar (Analysis, Events, Themes gen, Section gen, Manual gen, Keyframes, Preview; only Analysis and Themes gen are drawn inline — every other sub-tab delegates to its own file) plus the camera-pacing / keyframe-align widgets shared by the generation sub-tabs |
+| `rock_band_general_helper_vkr/ui_venue.lua` | `DrawVenueTab`, `RenderCamPacingRow`, `RenderKeyframeAlignCombo` (global) — Venue tab bar (Actions, Events, Themes gen, Section gen, Manual gen, Keyframes, Preview; only Actions and Themes gen are drawn inline — every other sub-tab delegates to its own file) plus the camera-pacing / keyframe-align widgets shared by the generation sub-tabs |
 | `rock_band_general_helper_vkr/ui_venue_section_gen.lua` | `DrawVenueSectionGenTab` (global) — Section gen sub-tab rendering |
 | `rock_band_general_helper_vkr/ui_venue_manual.lua` | `DrawVenueManualTab` (global) — Manual gen sub-tab rendering |
 | `rock_band_general_helper_vkr/ui_venue_events.lua` | `DrawVenueEventsTab` (global) — Events sub-tab rendering |

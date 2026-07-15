@@ -115,7 +115,9 @@ function HarmoniesAction()
             if s_t >= range_start - 0.001 and s_t < range_end + 0.001 then
                 if p >= RB3_MIN_PITCH and p <= RB3_MAX_PITCH then
                     vocal_notes[#vocal_notes + 1] = { s = s_t, e = e_t, pitch = p, lyric = lyric_at[sppq] }
-                elseif S.harm_copy_phrases then
+                elseif p == RB3_PHRASE_PITCH and S.harm_copy_phrase_markers then
+                    phrase_notes[#phrase_notes + 1] = { s = s_t, e = e_t, pitch = p, lyric = lyric_at[sppq] }
+                elseif p == RB3_OVERDRIVE_PITCH and S.harm_copy_overdrive then
                     phrase_notes[#phrase_notes + 1] = { s = s_t, e = e_t, pitch = p, lyric = lyric_at[sppq] }
                 end
             end
@@ -176,11 +178,13 @@ function HarmoniesAction()
 
         local cleared = ClearNotesInRange(dst.take, range_start, range_end, RB3_MIN_PITCH, RB3_MAX_PITCH)
         local lyrics_cleared = ClearLyricsInRange(dst.take, range_start, range_end)
-        if S.harm_copy_phrases then
+        if S.harm_copy_phrase_markers or S.harm_copy_overdrive then
             local _, nc = r.MIDI_CountEvts(dst.take)
             for i = nc - 1, 0, -1 do
                 local ok, _, _, sppq, eppq, _, p = r.MIDI_GetNote(dst.take, i)
-                if ok and (p < RB3_MIN_PITCH or p > RB3_MAX_PITCH) then
+                local copy_this = (p == RB3_PHRASE_PITCH and S.harm_copy_phrase_markers)
+                    or (p == RB3_OVERDRIVE_PITCH and S.harm_copy_overdrive)
+                if ok and copy_this then
                     local s_t = r.MIDI_GetProjTimeFromPPQPos(dst.take, sppq)
                     local e_t = r.MIDI_GetProjTimeFromPPQPos(dst.take, eppq)
                     if s_t < range_end and e_t > range_start then

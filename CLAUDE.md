@@ -35,6 +35,12 @@ Note: the 0.7 floor is nominal — sprite tooltips and image loading already use
 
 **Versioning.** Entry point header carries `@version`. Bump it whenever behavior or UI changes meaningfully. Document changes in the `@about` block.
 
+**Changelog / `@about` trimming.** Each entry point's `@about` block keeps only its **5 most recent** version entries (newest first, as today). When adding a new version entry pushes the count to 6, move the oldest of the 5 previously-kept entries out to `CHANGELOG.md` at the repo root — don't let `@about` grow unbounded, since it's read in-app (REAPER's script info / ReaPack "about" panel) where a long scroll of old history isn't useful.
+
+- `CHANGELOG.md` has one `##` section per entry-point script (its display name, e.g. `## Rock Band General Helper`), each section's entries in the same newest-first order as `@about`. The entry being moved out goes at the **top** of its script's section (it's the newest entry in that file, even though it's the oldest one leaving `@about`).
+- `@about` gets a one-line pointer right after the intro/`Built with Claude` text and before the version entries: `This @about block keeps only the 5 most recent versions.` / `Full history: CHANGELOG.md in the repo.`
+- A script with 5 or fewer versions total (e.g. `rock_band_preview_vkr.lua`, `rock_band_music_theory_helper_vkr.lua` as of this writing) doesn't need the pointer line or a `CHANGELOG.md` section yet — add both the first time it overflows.
+
 ---
 
 ## Shared architecture
@@ -66,7 +72,7 @@ dofile(_mdir .. 'defaults.lua')                   -- script-specific modules
 
 | File | Contents |
 |---|---|
-| `lib/reaper_imgui_helpers.lua` | `PitchName`, `Tooltip`, `SliderTooltip`, `SectionHeader`, `GetTrackList`, `TrackCombo`, `FormatTime`, `GetTimeSelection` |
+| `lib/reaper_imgui_helpers.lua` | `PitchName`, `Tooltip`, `SliderTooltip`, `Btn`, `BtnWidth`, `BtnGroupWidth`, `LabelColWidth`, `RadioGroupWidth`, `SectionHeader`, `GetTrackList`, `TrackCombo`, `FormatTime`, `GetTimeSelection` |
 | `lib/reaper_dsp.lua` | `ComputeRMSContour`, `OpenYINContext`, `DetectPitchYIN`, `SampleYINAt`, `GateAndSplit`, `ApplyMinOffset` |
 | `lib/reaper_midi_helpers.lua` | `FindMIDIItem`, `FindFirstMIDIItem`, `ReadAllMIDINotesOnTrack`, `ClearNotesAtPitchesInRange`, `InsertNotes`, … |
 
@@ -124,11 +130,101 @@ For non-MIDI edits (track state, markers, tempo map) `MarkTrackItemsDirty` is no
 - Errors surface via `S.status` and `S.last_result`. Never call `error()` or `ShowMessageBox` from action functions.
 
 ### Button widths
+Use `Btn(label, height)` (from `lib/reaper_imgui_helpers.lua`) instead of a manual
+`CalcTextSize` + `Button` pair — it sizes the button to its own label in one call,
+so the label string appears once instead of twice (two copies of the same string
+can silently drift out of sync when a label is renamed). Height should be the
+shared `BTN_H` constant (`lib/reaper_imgui_helpers.lua`), not a bare `24` —
+`BTN_H` is the one place that value lives, so every button stays in lockstep
+if it ever changes:
 ```lua
-local _bp  = 40   -- ~20 px padding each side
-local bw_x = r.ImGui_CalcTextSize(ctx, 'Label') + _bp
+if Btn('Label', BTN_H) then
+    RunAction(SomeAction)
+end
 ```
-Compute all widths together near the top of `if visible then`. Never hardcode pixel values.
+`Btn` strips any `##id` suffix before measuring, so id-suffixed buttons
+(`'Refresh##vsec_refresh'`) still size to their visible text. Never hardcode
+pixel values.
+
+If you need the width *before* drawing (e.g. right-aligning a button via
+`SetCursorPosX`), use `BtnWidth(label)` to get the same computed width without
+drawing, then draw with `Btn` as normal:
+```lua
+local bw_und = BtnWidth('Undo')
+-- ... position math using bw_und ...
+if Btn('Undo', BTN_H) then r.Undo_DoUndo2(0) end
+```
+
+When several related buttons sit in a row (or block), give them a uniform
+width with `BtnGroupWidth(labels)` — the widest label in the group, plus the
+same padding `Btn` uses — instead of each button sizing to its own text:
+```lua
+local bw = BtnGroupWidth({ 'Save', 'Load' })
+if Btn('Save', BTN_H, bw) then ... end
+if Btn('Load', BTN_H, bw) then ... end
+```
+
+### Label column alignment
+When a block of rows each pair a text label with an input (`Text` + `SameLine`
++ combo/slider/radio/checkbox), align the inputs with `LabelColWidth(labels)`
+— the widest label in the group, plus padding — passed as the `col` arg to
+`SameLine`, instead of hardcoding whichever label is presumed longest (that
+assumption silently breaks alignment the day a longer label is added):
+```lua
+local lbl_col = LabelColWidth({ 'Source track', 'Reference track' })
+r.ImGui_Text(ctx, 'Source track')
+r.ImGui_SameLine(ctx, lbl_col)
+-- ... combo ...
+```
+Shared row-drawing functions used by more than one tab (`RenderCamPacingRow`,
+`RenderKeyframeAlignCombo`) take an optional `col_offset` param for this —
+pass the caller's `lbl_col` through so the row joins that tab's alignment.
+
+### Radio button columns
+`RadioButton` has no width parameter, so when a tab has multiple rows of
+side-by-side radio options (e.g. "Preview size: 1x / 2x" and "Sprites:
+Animated / Still"), the options don't line up unless each is explicitly
+positioned. Use `RadioGroupWidth(labels)` — the widest option label in the
+tab's group, plus padding — as a uniform per-option pitch, and position
+option *i* (i ≥ 2) at `base + (i-1) * radio_w`, where `base` is that row's
+own start (`0`, or its `lbl_col` if it has a row label):
+```lua
+local radio_w = RadioGroupWidth({ '1x', '2x', 'Animated', 'Still' })
+r.ImGui_Text(ctx, 'Preview size')
+r.ImGui_SameLine(ctx, lbl_col)
+if r.ImGui_RadioButton(ctx, '1x##vpscl', ...) then ... end
+r.ImGui_SameLine(ctx, lbl_col + radio_w)          -- option 2
+if r.ImGui_RadioButton(ctx, '2x##vpscl', ...) then ... end
+```
+Only build a group where 2+ radio rows exist to align against each other in
+the same tab view — a single isolated row has nothing to align. `SameLine(ctx,
+x)` sets an *absolute* cursor position, so every option in the group
+(including option 1) needs an explicit offset — leaving option 1 on a bare
+`SameLine(ctx)` (natural flow after label text) while positioning option 2
+with `SameLine(ctx, radio_w)` will misplace or overlap it, since `radio_w`
+has no relationship to where the label pushed option 1.
+
+### Fixed-width sliders and combos
+Sliders and combo boxes should get an explicit
+`r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)` (the standard width, `200`, defined
+in `lib/reaper_imgui_helpers.lua`; the narrower `WIDTH_SHORT`, `80`, is used
+for short selectors such as a note-name combo) immediately before the widget
+call. Without it, ReaImGui defaults to filling the remaining line width, so
+the control visibly stretches or shrinks as the user resizes the window —
+inconsistent with every other sized element (`Btn`, `LabelColWidth`,
+`RadioGroupWidth` all compute a fixed pixel width). Apply this to every
+slider/combo, including ones that are the only widget on their line:
+```lua
+r.ImGui_Text(ctx, 'YIN threshold')
+r.ImGui_SameLine(ctx, lbl_col)
+r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
+_, S.yin_threshold = r.ImGui_SliderDouble(ctx, '##yinthr', S.yin_threshold, 0.01, 0.5, '%.3f')
+```
+A row where a widget must share the line with something after it (e.g. a
+slider followed by an enable checkbox) still uses `WIDTH_STD` — the fixed
+width is what leaves room for the trailing widget in the first place. Use a
+bare pixel literal only for a genuinely one-off, context-specific width (e.g.
+a camera-pacing column) that isn't the shared convention.
 
 ### `BeginDisabled` / `EndDisabled` balance
 Snapshot any state flag that drives a `BeginDisabled` guard once before widget calls — a button click mid-frame can change `S.busy`, breaking the paired `EndDisabled`:

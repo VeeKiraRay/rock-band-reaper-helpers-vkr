@@ -1,4 +1,4 @@
--- Venue > Section gen sub-tab
+﻿-- Venue > Section gen sub-tab
 -- Per-section venue event generation: pick a [prc_*] section, configure its
 -- lighting/postproc/dircut/bonusfx (or use a template theme), and generate.
 -- Requires globals: r, ctx, S, TIPS, Tooltip, SliderTooltip, RunAction,
@@ -9,7 +9,11 @@
 --                   BeginVenueTooltip, DrawVenueTooltipSprite, EndVenueTooltip
 
 function DrawVenueSectionGenTab()
-    local _bp = 40
+    local lbl_col = LabelColWidth({
+        'Mode', 'Section', 'Theme', 'Lighting', 'Keyframe align', 'Keyframe rate',
+        'Light blendin', 'Post-process', 'PP blendin', 'Directed cut',
+        'Bonus FX', 'Camera pacing',
+    })
 
     r.ImGui_Text(ctx, 'Generate venue events for a single section by defining the style or using a theme')
     r.ImGui_Spacing(ctx)
@@ -30,8 +34,8 @@ function DrawVenueSectionGenTab()
     end
 
     -- Section selector row
-    r.ImGui_Text(ctx, 'Section      ')
-    r.ImGui_SameLine(ctx)
+    r.ImGui_Text(ctx, 'Section')
+    r.ImGui_SameLine(ctx, lbl_col)
     r.ImGui_SetNextItemWidth(ctx, 260)
     local _vsec_secs  = S.venue_sections
     local _vsec_count = _vsec_secs and #_vsec_secs or 0
@@ -49,8 +53,7 @@ function DrawVenueSectionGenTab()
         r.ImGui_EndCombo(ctx)
     end
     r.ImGui_SameLine(ctx)
-    local _bw_ref = r.ImGui_CalcTextSize(ctx, 'Refresh') + _bp
-    if r.ImGui_Button(ctx, 'Refresh##vsec_refresh', _bw_ref, 0) then
+    if Btn('Refresh##vsec_refresh', 0) then
         LoadVenueSections()
     end
     Tooltip(TIPS.venue_sec_section)
@@ -61,6 +64,8 @@ function DrawVenueSectionGenTab()
     end
 
     r.ImGui_Spacing(ctx)
+    r.ImGui_Text(ctx, 'Mode')
+    r.ImGui_SameLine(ctx, lbl_col)
     if r.ImGui_RadioButton(ctx, 'Custom', S.venue_sec_mode == 0) then
         S.venue_sec_mode = 0
     end
@@ -87,9 +92,9 @@ function DrawVenueSectionGenTab()
             MANUAL_LIGHTING_SET['[lighting (' .. _cfg.lighting .. ')]']
 
         -- Lighting combo
-        r.ImGui_Text(ctx, 'Lighting     ')
-        r.ImGui_SameLine(ctx)
-        r.ImGui_SetNextItemWidth(ctx, 200)
+        r.ImGui_Text(ctx, 'Lighting')
+        r.ImGui_SameLine(ctx, lbl_col)
+        r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
         local _lt_prev = _cfg.lighting ~= ''
             and (LIGHTING_LABELS[_cfg.lighting] or _cfg.lighting)
             or '(none)'
@@ -140,8 +145,8 @@ function DrawVenueSectionGenTab()
         local _kf_dis = not _is_manual
         if _kf_dis then r.ImGui_BeginDisabled(ctx) end
         r.ImGui_Text(ctx, 'Keyframe align')
-        r.ImGui_SameLine(ctx)
-        r.ImGui_SetNextItemWidth(ctx, 170)
+        r.ImGui_SameLine(ctx, lbl_col)
+        r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
         local _kfa_preview = _kfa_labels[S.venue_keyframe_align + 1] or 'Section start'
         if r.ImGui_BeginCombo(ctx, '##vkfa', _kfa_preview) then
             for _ki, _kl in ipairs(_kfa_labels) do
@@ -172,7 +177,7 @@ function DrawVenueSectionGenTab()
         -- Keyframe rate (only for manual lighting presets)
         if _is_manual then
             r.ImGui_Text(ctx, 'Keyframe rate')
-            r.ImGui_SameLine(ctx)
+            r.ImGui_SameLine(ctx, lbl_col)
             r.ImGui_SetNextItemWidth(ctx, 120)
             _, _cfg.keyframe_rate = r.ImGui_SliderInt(
                 ctx, '##vsec_kr', _cfg.keyframe_rate, 1, 8)
@@ -181,15 +186,15 @@ function DrawVenueSectionGenTab()
 
         -- Light blendin
         r.ImGui_Text(ctx, 'Light blendin')
-        r.ImGui_SameLine(ctx)
+        r.ImGui_SameLine(ctx, lbl_col)
         r.ImGui_SetNextItemWidth(ctx, 120)
         _, _cfg.light_blendin = r.ImGui_SliderInt(
             ctx, '##vsec_ltb', _cfg.light_blendin, 0, 8)
         SliderTooltip(TIPS.venue_sec_lt_blend)
 
         -- Postproc combo
-        r.ImGui_Text(ctx, 'Post-process ')
-        r.ImGui_SameLine(ctx)
+        r.ImGui_Text(ctx, 'Post-process')
+        r.ImGui_SameLine(ctx, lbl_col)
         r.ImGui_SetNextItemWidth(ctx, 240)
         local _pp_prev = _cfg.postproc ~= ''
             and (POSTPROC_LABELS[_cfg.postproc] or _cfg.postproc)
@@ -233,16 +238,16 @@ function DrawVenueSectionGenTab()
         end
 
         -- PP blendin
-        r.ImGui_Text(ctx, 'PP blendin   ')
-        r.ImGui_SameLine(ctx)
+        r.ImGui_Text(ctx, 'PP blendin')
+        r.ImGui_SameLine(ctx, lbl_col)
         r.ImGui_SetNextItemWidth(ctx, 120)
         _, _cfg.pp_blendin = r.ImGui_SliderInt(
             ctx, '##vsec_ppb', _cfg.pp_blendin, 0, 8)
         SliderTooltip(TIPS.venue_sec_pp_blend)
 
         -- Dircut combo
-        r.ImGui_Text(ctx, 'Directed cut ')
-        r.ImGui_SameLine(ctx)
+        r.ImGui_Text(ctx, 'Directed cut')
+        r.ImGui_SameLine(ctx, lbl_col)
         r.ImGui_SetNextItemWidth(ctx, 220)
         local _dc_prev = _cfg.dircut ~= ''
             and (DIRECTED_LABELS[_cfg.dircut] or _cfg.dircut)
@@ -286,8 +291,8 @@ function DrawVenueSectionGenTab()
         end
 
         -- BonusFX checkbox
-        r.ImGui_Text(ctx, 'Bonus FX     ')
-        r.ImGui_SameLine(ctx)
+        r.ImGui_Text(ctx, 'Bonus FX')
+        r.ImGui_SameLine(ctx, lbl_col)
         _, _cfg.bonusfx = r.ImGui_Checkbox(ctx, '##vsec_bfx', _cfg.bonusfx)
         Tooltip(TIPS.venue_sec_bonusfx)
     end
@@ -302,7 +307,7 @@ function DrawVenueSectionGenTab()
             r.ImGui_BeginDisabled(ctx)
         end
         r.ImGui_Text(ctx, 'Theme')
-        r.ImGui_SameLine(ctx)
+        r.ImGui_SameLine(ctx, lbl_col)
         r.ImGui_SetNextItemWidth(ctx, 240)
         local _tmpl_prev = S.venue_sec_tmpl_idx > 0
             and S.venue_themes[S.venue_sec_tmpl_idx].label
@@ -331,26 +336,26 @@ function DrawVenueSectionGenTab()
                     table.concat(_preset.allowed_lightpresets, ', ') or '\xe2\x80\x94'
                 local _pp_val = _preset.allowed_postprocs and
                     table.concat(_preset.allowed_postprocs, ', ') or '\xe2\x80\x94'
-                r.ImGui_Text(ctx, 'Lighting     ')
-                r.ImGui_SameLine(ctx)
+                r.ImGui_Text(ctx, 'Lighting')
+                r.ImGui_SameLine(ctx, lbl_col)
                 r.ImGui_TextDisabled(ctx, _lt_val)
-                r.ImGui_Text(ctx, 'Post-process ')
-                r.ImGui_SameLine(ctx)
+                r.ImGui_Text(ctx, 'Post-process')
+                r.ImGui_SameLine(ctx, lbl_col)
                 r.ImGui_TextDisabled(ctx, _pp_val)
                 r.ImGui_Text(ctx, 'Keyframe rate')
-                r.ImGui_SameLine(ctx)
+                r.ImGui_SameLine(ctx, lbl_col)
                 r.ImGui_TextDisabled(ctx, _preset.keyframe_rate and tostring(_preset.keyframe_rate) or '\xe2\x80\x94')
                 r.ImGui_Text(ctx, 'Light blendin')
-                r.ImGui_SameLine(ctx)
+                r.ImGui_SameLine(ctx, lbl_col)
                 r.ImGui_TextDisabled(ctx, _preset.lightpreset_blendin and tostring(_preset.lightpreset_blendin) or '\xe2\x80\x94')
-                r.ImGui_Text(ctx, 'PP blendin   ')
-                r.ImGui_SameLine(ctx)
+                r.ImGui_Text(ctx, 'PP blendin')
+                r.ImGui_SameLine(ctx, lbl_col)
                 r.ImGui_TextDisabled(ctx, _preset.postproc_blendin and tostring(_preset.postproc_blendin) or '\xe2\x80\x94')
-                r.ImGui_Text(ctx, 'Directed cut ')
-                r.ImGui_SameLine(ctx)
+                r.ImGui_Text(ctx, 'Directed cut')
+                r.ImGui_SameLine(ctx, lbl_col)
                 r.ImGui_TextDisabled(ctx, _preset.dircut_at_start or '\xe2\x80\x94')
-                r.ImGui_Text(ctx, 'Bonus FX     ')
-                r.ImGui_SameLine(ctx)
+                r.ImGui_Text(ctx, 'Bonus FX')
+                r.ImGui_SameLine(ctx, lbl_col)
                 r.ImGui_TextDisabled(ctx, _preset.bonusfx_at_start and 'yes' or 'no')
             else
                 r.ImGui_TextDisabled(ctx, 'No preset for this section type in the selected theme')
@@ -358,18 +363,17 @@ function DrawVenueSectionGenTab()
         end
         if _tmpl_no_themes then r.ImGui_EndDisabled(ctx) end
         r.ImGui_Spacing(ctx)
-        RenderKeyframeAlignCombo()
+        RenderKeyframeAlignCombo(lbl_col)
     end -- S.venue_sec_mode == 1
 
     r.ImGui_Spacing(ctx)
-    RenderCamPacingRow()
+    RenderCamPacingRow(lbl_col)
 
     r.ImGui_Spacing(ctx)
     local _gen_disabled = _sg_no_sections
         or (S.venue_sec_mode == 1 and S.venue_sec_tmpl_idx == 0)
     if _gen_disabled then r.ImGui_BeginDisabled(ctx) end
-    local bw_gs = r.ImGui_CalcTextSize(ctx, 'Generate section') + _bp
-    if r.ImGui_Button(ctx, 'Generate section', bw_gs, 24) then
+    if Btn('Generate section', BTN_H) then
         RunAction(GenerateSectionEvent)
     end
     if _gen_disabled then r.ImGui_EndDisabled(ctx) end

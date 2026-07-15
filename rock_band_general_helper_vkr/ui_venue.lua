@@ -1,4 +1,4 @@
--- Venue tab rendering
+﻿-- Venue tab rendering
 
 -- Camera pacing widget shared by all generation sub-tabs.
 -- col_offset: if set, use SameLine(col_offset) to align the dropdown with other rows.
@@ -65,14 +65,19 @@ function RenderCamPacingRow(col_offset, hide_theme_default)
     end
 end
 
-function RenderKeyframeAlignCombo()
+-- col_offset: if set, use SameLine(col_offset) to align the dropdown with other rows.
+function RenderKeyframeAlignCombo(col_offset)
     local _kfa_labels = {
         'Section start', 'Closest beat', 'Downbeat',
         'Guitar notes', 'Bass notes', 'Keys notes',
         'Drum kicks', 'Drum snare',
     }
     r.ImGui_Text(ctx, 'Keyframe align')
-    r.ImGui_SameLine(ctx)
+    if col_offset then
+        r.ImGui_SameLine(ctx, col_offset)
+    else
+        r.ImGui_SameLine(ctx)
+    end
     r.ImGui_SetNextItemWidth(ctx, 170)
     local _kfa_preview = _kfa_labels[S.venue_keyframe_align + 1] or 'Section start'
     if r.ImGui_BeginCombo(ctx, '##vkfa', _kfa_preview) then
@@ -104,8 +109,6 @@ function RenderKeyframeAlignCombo()
 end
 
 function DrawVenueTab(ctx)
-    local _bp = 40
-
     -- Lazy-load themes on first Venue tab open
     if S.venue_themes == nil then
         S.venue_themes = LoadVenueThemes(SCRIPT_DIR .. 'resources/themes/')
@@ -143,26 +146,28 @@ function DrawVenueTab(ctx)
         -- Venue > Actions sub-tab
         ------------------------------------------------
         if r.ImGui_BeginTabItem(ctx, 'Actions') then
-            local bw_lv = r.ImGui_CalcTextSize(ctx, 'List venue events')       + _bp
-            local bw_es = r.ImGui_CalcTextSize(ctx, 'List event sections')    + _bp
-            local bw_lp = r.ImGui_CalcTextSize(ctx, 'List lighting/postproc') + _bp
-            local bw_sa = r.ImGui_CalcTextSize(ctx, 'Generate sing along')    + _bp
-
-            if r.ImGui_Button(ctx, 'List venue events', bw_lv, 24) then
+            SectionHeader('Analyze')
+            local bw_analyze = BtnGroupWidth({
+                'List venue events', 'List event sections', 'List lighting/postproc',
+            })
+            if Btn('List venue events', BTN_H, bw_analyze) then
                 RunAction(ListVenueEvents)
             end
             Tooltip(TIPS.list_venue)
             r.ImGui_SameLine(ctx)
-            if r.ImGui_Button(ctx, 'List event sections', bw_es, 24) then
+            if Btn('List event sections', BTN_H, bw_analyze) then
                 RunAction(ListEventSections)
             end
             Tooltip(TIPS.venue_sections)
             r.ImGui_SameLine(ctx)
-            if r.ImGui_Button(ctx, 'List lighting/postproc', bw_lp, 24) then
+            if Btn('List lighting/postproc', BTN_H, bw_analyze) then
                 RunAction(ListLightingPostProcEvents)
             end
             Tooltip(TIPS.venue_lighting_postproc)
-            if r.ImGui_Button(ctx, 'Generate sing along', bw_sa, 24) then
+
+            r.ImGui_Separator(ctx)
+            SectionHeader('Quick actions')
+            if Btn('Generate sing along', BTN_H) then
                 RunAction(GenerateSingAlong)
             end
             Tooltip(TIPS.venue_sing_along)
@@ -197,11 +202,12 @@ function DrawVenueTab(ctx)
             end
 
             -- Theme combo
+            local lbl_col_tg = LabelColWidth({ 'Theme', 'Camera pacing', 'Keyframe align' })
             local _tg_preview = S.venue_theme_idx > 0
                 and S.venue_themes[S.venue_theme_idx].label
                 or '(select a theme)'
             r.ImGui_Text(ctx, 'Theme')
-            r.ImGui_SameLine(ctx)
+            r.ImGui_SameLine(ctx, lbl_col_tg)
             r.ImGui_SetNextItemWidth(ctx, 240)
             if r.ImGui_BeginCombo(ctx, '##venue_theme', _tg_preview) then
                 for i, t in ipairs(S.venue_themes) do
@@ -217,17 +223,16 @@ function DrawVenueTab(ctx)
             Tooltip(TIPS.venue_theme)
 
             r.ImGui_Spacing(ctx)
-            RenderCamPacingRow()
+            RenderCamPacingRow(lbl_col_tg)
 
             -- Keyframe align (global, applies to all sections in the theme)
             r.ImGui_Spacing(ctx)
-            RenderKeyframeAlignCombo()
+            RenderKeyframeAlignCombo(lbl_col_tg)
 
             r.ImGui_Spacing(ctx)
             local _tg_no_sel = S.venue_theme_idx == 0
             if _tg_no_sel then r.ImGui_BeginDisabled(ctx) end
-            local bw_gv = r.ImGui_CalcTextSize(ctx, 'Generate venue events') + _bp
-            if r.ImGui_Button(ctx, 'Generate venue events', bw_gv, 24) then
+            if Btn('Generate venue events', BTN_H) then
                 RunAction(GenerateVenueEvents)
             end
             Tooltip(TIPS.venue_generate)

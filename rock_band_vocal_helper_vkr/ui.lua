@@ -1,4 +1,4 @@
--- Main UI render loop
+﻿-- Main UI render loop
 
 local _browse_tooltip_suppressed = false
 local _active_proj = r.EnumProjects(-1, '')
@@ -61,8 +61,17 @@ end
 -- One-shot preset applier for the YIN sliders + pitch range constraints.
 -- Not a stateful selector: sliders remain the source of truth, so the combo
 -- always previews 'Apply preset...' and selecting an entry just writes values.
-function YINPresetCombo(id_suffix)
-    if r.ImGui_BeginCombo(ctx, 'Vocal style preset' .. id_suffix, 'Apply preset...') then
+-- col (optional): if given, draws 'Vocal style preset' as its own label at
+-- the left, SameLine(col), then a blank-labelled combo - matching the
+-- label-column convention used for every other row in the calling tab.
+function YINPresetCombo(id_suffix, col)
+    if col then
+        r.ImGui_Text(ctx, 'Vocal style preset')
+        r.ImGui_SameLine(ctx, col)
+    end
+    local label = col and ('##yinpreset' .. id_suffix) or ('Vocal style preset' .. id_suffix)
+    r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
+    if r.ImGui_BeginCombo(ctx, label, 'Apply preset...') then
         for _, preset in ipairs(YIN_PRESETS) do
             if r.ImGui_Selectable(ctx, preset.label, false) then
                 ApplyYINPreset(preset)
@@ -125,10 +134,12 @@ function Loop()
         -- Global: track selectors (MIDI first, then audio source)
         ----------------------------------------------------------------
         r.ImGui_Text(ctx, 'MIDI destination track  (must already contain a MIDI item)')
+        r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
         S.midi_idx = FilteredTrackCombo('##midi', S.midi_idx, midi_tracks)
 
         r.ImGui_Spacing(ctx)
         r.ImGui_Text(ctx, 'Audio source track')
+        r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
         S.audio_idx = FilteredTrackCombo('##audio', S.audio_idx, audio_tracks)
 
         if sel_s then
@@ -138,24 +149,7 @@ function Loop()
 
         r.ImGui_Separator(ctx)
 
-        ----------------------------------------------------------------
-        -- Button widths - computed once, used across all tabs
-        ----------------------------------------------------------------
-        local _bp    = 40
-        local bw_at  = r.ImGui_CalcTextSize(ctx, 'Auto-tune from reference') + _bp
-        local bw_ayt = r.ImGui_CalcTextSize(ctx, 'Auto-tune YIN from reference') + _bp
-        local bw_dry = r.ImGui_CalcTextSize(ctx, 'Dry run') + _bp
-        local bw_gen = r.ImGui_CalcTextSize(ctx, 'Generate (append)') + _bp
-        local bw_grp = r.ImGui_CalcTextSize(ctx, 'Generate (replace)') + _bp
-        local bw_app = r.ImGui_CalcTextSize(ctx, 'Apply pitch changes') + _bp
-        local bw_und = r.ImGui_CalcTextSize(ctx, 'Undo') + _bp
-        local bw_lad = r.ImGui_CalcTextSize(ctx, 'Auto-detect') + _bp
-        local bw_lbr = r.ImGui_CalcTextSize(ctx, 'Browse...') + _bp
-        local bw_lcl = r.ImGui_CalcTextSize(ctx, 'Clear lyrics') + _bp
-        local bw_las  = r.ImGui_CalcTextSize(ctx, 'Assign lyrics')      + _bp
-        local bw_ref  = r.ImGui_CalcTextSize(ctx, 'Refresh tracks')     + _bp
-        local bw_tur  = r.ImGui_CalcTextSize(ctx, 'Stop Tuner')         + _bp
-        local bw_snap = r.ImGui_CalcTextSize(ctx, 'Snap draft notes')  + _bp
+        local bw_und = BtnWidth('Undo')
 
         ----------------------------------------------------------------
         -- Tab bar
@@ -169,42 +163,67 @@ function Loop()
             ------------------------------------------------------------
             if r.ImGui_BeginTabItem(ctx, 'General') then
                 _new_tab = 'General'
-                r.ImGui_Spacing(ctx)
-                r.ImGui_Text(ctx, 'Settings')
-                if r.ImGui_Button(ctx, 'Save', 90, 24) then
-                    SaveSettings()
-                    S.status = 'Settings saved to project.'
-                end
-                Tooltip(TIPS.save_settings)
-                r.ImGui_SameLine(ctx)
-                if r.ImGui_Button(ctx, 'Load', 90, 24) then
-                    if LoadSettings() then
-                        S.status = 'Settings loaded from project.'
-                    else
-                        S.status = 'No saved settings found in this project.'
+
+                if r.ImGui_BeginTabBar(ctx, '##general_subtabs') then
+
+                    ------------------------------------------------
+                    -- General > Actions sub-tab
+                    ------------------------------------------------
+                    if r.ImGui_BeginTabItem(ctx, 'Actions') then
+                        SectionHeader('Track lists')
+                        if Btn('Refresh tracks', BTN_H) then
+                            RefreshTrackLists()
+                            S.status = 'Track lists refreshed.'
+                        end
+                        Tooltip(TIPS.track_refresh)
+
+                        r.ImGui_EndTabItem(ctx)
                     end
-                end
-                Tooltip(TIPS.load_settings)
 
-                r.ImGui_Spacing(ctx)
-                r.ImGui_Text(ctx, 'Track lists')
-                if r.ImGui_Button(ctx, 'Refresh tracks', bw_ref, 24) then
-                    RefreshTrackLists()
-                    S.status = 'Track lists refreshed.'
-                end
-                Tooltip(TIPS.track_refresh)
+                    ------------------------------------------------
+                    -- General > Settings sub-tab
+                    ------------------------------------------------
+                    if r.ImGui_BeginTabItem(ctx, 'Settings') then
+                        local lbl_col_gen = LabelColWidth({ 'Show WIPs?' })
+                        local radio_w_gen = RadioGroupWidth({ 'No', 'Yes' })
 
-                r.ImGui_Spacing(ctx)
-                r.ImGui_Text(ctx, 'WIP tabs')
-                r.ImGui_SameLine(ctx)
-                if r.ImGui_RadioButton(ctx, 'No##wip', not S.show_wip_tabs) then
-                    S.show_wip_tabs = false
+                        SectionHeader('WIP tabs')
+                        r.ImGui_Text(ctx, 'Show WIPs?')
+                        r.ImGui_SameLine(ctx, lbl_col_gen)
+                        if r.ImGui_RadioButton(ctx, 'No##wip', not S.show_wip_tabs) then
+                            S.show_wip_tabs = false
+                        end
+                        Tooltip(TIPS.show_wip_tabs)
+                        r.ImGui_SameLine(ctx, lbl_col_gen + radio_w_gen)
+                        if r.ImGui_RadioButton(ctx, 'Yes##wip', S.show_wip_tabs) then
+                            S.show_wip_tabs = true
+                        end
+                        Tooltip(TIPS.show_wip_tabs)
+
+                        r.ImGui_Separator(ctx)
+                        SectionHeader('Settings')
+
+                        local bw_settings = BtnGroupWidth({ 'Save', 'Load' })
+                        if Btn('Save', BTN_H, bw_settings) then
+                            SaveSettings()
+                            S.status = 'Settings saved to project.'
+                        end
+                        Tooltip(TIPS.save_settings)
+                        r.ImGui_SameLine(ctx)
+                        if Btn('Load', BTN_H, bw_settings) then
+                            if LoadSettings() then
+                                S.status = 'Settings loaded from project.'
+                            else
+                                S.status = 'No saved settings found in this project.'
+                            end
+                        end
+                        Tooltip(TIPS.load_settings)
+
+                        r.ImGui_EndTabItem(ctx)
+                    end
+
+                    r.ImGui_EndTabBar(ctx)
                 end
-                r.ImGui_SameLine(ctx)
-                if r.ImGui_RadioButton(ctx, 'Yes##wip', S.show_wip_tabs) then
-                    S.show_wip_tabs = true
-                end
-                Tooltip(TIPS.show_wip_tabs)
 
                 r.ImGui_EndTabItem(ctx)
             end
@@ -218,46 +237,73 @@ function Loop()
 
                 r.ImGui_Spacing(ctx)
                 SectionHeader('YIN Detection', 'Reset##yin_tur', ResetYIN, TIPS.reset_yin)
-                YINPresetCombo('##tur')
+                local lbl_col_tur = LabelColWidth({
+                    'Vocal style preset', 'YIN threshold', 'Min frequency (Hz)',
+                    'Max frequency (Hz)', 'Window (ms)', 'Min RMS level',
+                    'Min pitch', 'Max pitch',
+                })
+                YINPresetCombo('##tur', lbl_col_tur)
                 local _
-                _, S.yin_threshold = r.ImGui_SliderDouble(ctx, 'YIN threshold##tur',
+                r.ImGui_Text(ctx, 'YIN threshold')
+                r.ImGui_SameLine(ctx, lbl_col_tur)
+                r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
+                _, S.yin_threshold = r.ImGui_SliderDouble(ctx, '##yinthr_tur',
                     S.yin_threshold, 0.01, 0.5, '%.3f')
                 SliderTooltip(TIPS.yin_threshold)
-                _, S.yin_min_freq = r.ImGui_SliderInt(ctx, 'Min frequency (Hz)##tur',
+                r.ImGui_Text(ctx, 'Min frequency (Hz)')
+                r.ImGui_SameLine(ctx, lbl_col_tur)
+                r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
+                _, S.yin_min_freq = r.ImGui_SliderInt(ctx, '##yinminf_tur',
                     S.yin_min_freq, 40, 400)
                 SliderTooltip(TIPS.yin_min_freq)
-                _, S.yin_max_freq = r.ImGui_SliderInt(ctx, 'Max frequency (Hz)##tur',
+                r.ImGui_Text(ctx, 'Max frequency (Hz)')
+                r.ImGui_SameLine(ctx, lbl_col_tur)
+                r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
+                _, S.yin_max_freq = r.ImGui_SliderInt(ctx, '##yinmaxf_tur',
                     S.yin_max_freq, 200, 2000)
                 SliderTooltip(TIPS.yin_max_freq)
                 if S.yin_min_freq >= S.yin_max_freq then S.yin_max_freq = S.yin_min_freq + 1 end
-                _, S.yin_window_ms = r.ImGui_SliderInt(ctx, 'Window (ms)##tur',
+                r.ImGui_Text(ctx, 'Window (ms)')
+                r.ImGui_SameLine(ctx, lbl_col_tur)
+                r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
+                _, S.yin_window_ms = r.ImGui_SliderInt(ctx, '##yinwin_tur',
                     S.yin_window_ms, 10, 100)
                 SliderTooltip(TIPS.yin_window_ms)
-                _, S.tuner_rms_threshold = r.ImGui_SliderDouble(ctx, 'Min RMS level##tur',
+                r.ImGui_Text(ctx, 'Min RMS level')
+                r.ImGui_SameLine(ctx, lbl_col_tur)
+                r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
+                _, S.tuner_rms_threshold = r.ImGui_SliderDouble(ctx, '##turrms',
                     S.tuner_rms_threshold, 0.001, 0.1, '%.4f')
                 SliderTooltip(TIPS.tuner_rms_threshold)
 
                 r.ImGui_Spacing(ctx)
                 r.ImGui_Separator(ctx)
                 SectionHeader('Pitch Range')
+
+                r.ImGui_Text(ctx, 'Min pitch')
+                r.ImGui_SameLine(ctx, lbl_col_tur)
+                if not S.min_pitch_enabled then r.ImGui_BeginDisabled(ctx) end
+                local minfmt_tur = ('%%d  (%s)'):format(PitchName(S.min_pitch))
+                r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
+                _, S.min_pitch = r.ImGui_SliderInt(ctx, '##minpitch_tur', S.min_pitch, RB3_MIN_PITCH, RB3_MAX_PITCH, minfmt_tur)
+                SliderTooltip(TIPS.min_pitch)
+                if not S.min_pitch_enabled then r.ImGui_EndDisabled(ctx) end
+                r.ImGui_SameLine(ctx)
                 local cb_changed_tur
                 cb_changed_tur, S.min_pitch_enabled = r.ImGui_Checkbox(ctx, '##minpe_tur', S.min_pitch_enabled)
                 Tooltip(TIPS.min_pitch_enabled)
-                r.ImGui_SameLine(ctx)
-                if not S.min_pitch_enabled then r.ImGui_BeginDisabled(ctx) end
-                local minfmt_tur = ('%%d  (%s)'):format(PitchName(S.min_pitch))
-                _, S.min_pitch = r.ImGui_SliderInt(ctx, 'Min pitch##tur', S.min_pitch, RB3_MIN_PITCH, RB3_MAX_PITCH, minfmt_tur)
-                SliderTooltip(TIPS.min_pitch)
-                if not S.min_pitch_enabled then r.ImGui_EndDisabled(ctx) end
 
-                cb_changed_tur, S.max_pitch_enabled = r.ImGui_Checkbox(ctx, '##maxpe_tur', S.max_pitch_enabled)
-                Tooltip(TIPS.max_pitch_enabled)
-                r.ImGui_SameLine(ctx)
+                r.ImGui_Text(ctx, 'Max pitch')
+                r.ImGui_SameLine(ctx, lbl_col_tur)
                 if not S.max_pitch_enabled then r.ImGui_BeginDisabled(ctx) end
                 local maxfmt_tur = ('%%d  (%s)'):format(PitchName(S.max_pitch))
-                _, S.max_pitch = r.ImGui_SliderInt(ctx, 'Max pitch##tur', S.max_pitch, RB3_MIN_PITCH, RB3_MAX_PITCH, maxfmt_tur)
+                r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
+                _, S.max_pitch = r.ImGui_SliderInt(ctx, '##maxpitch_tur', S.max_pitch, RB3_MIN_PITCH, RB3_MAX_PITCH, maxfmt_tur)
                 SliderTooltip(TIPS.max_pitch)
                 if not S.max_pitch_enabled then r.ImGui_EndDisabled(ctx) end
+                r.ImGui_SameLine(ctx)
+                cb_changed_tur, S.max_pitch_enabled = r.ImGui_Checkbox(ctx, '##maxpe_tur', S.max_pitch_enabled)
+                Tooltip(TIPS.max_pitch_enabled)
 
                 if S.min_pitch_enabled and S.max_pitch_enabled and S.min_pitch > S.max_pitch then
                     S.max_pitch = S.min_pitch
@@ -268,9 +314,9 @@ function Loop()
                 SectionHeader('Pitch Tuner')
 
                 if S.tuner_active then
-                    if r.ImGui_Button(ctx, 'Stop Tuner', bw_tur, 24) then RunAction(StopTuner) end
+                    if Btn('Stop Tuner', BTN_H) then RunAction(StopTuner) end
                 else
-                    if r.ImGui_Button(ctx, 'Start Tuner', bw_tur, 24) then RunAction(StartTuner) end
+                    if Btn('Start Tuner', BTN_H) then RunAction(StartTuner) end
                 end
                 Tooltip(TIPS.tuner_toggle)
 
@@ -331,144 +377,7 @@ function Loop()
             ------------------------------------------------------------
             if r.ImGui_BeginTabItem(ctx, 'Pitch') then
                 _new_tab = 'Pitch'
-                r.ImGui_Spacing(ctx)
-                SectionHeader('Pitch', 'Reset##pitch', ResetPitch, TIPS.reset_pitch)
-
-                r.ImGui_Text(ctx, 'Pitch source:')
-                if r.ImGui_RadioButton(ctx, 'Built-in detection', S.pitch_mode == MODE_YIN) then
-                    S.pitch_mode = MODE_YIN
-                end
-                Tooltip(TIPS.pitch_mode_yin)
-                r.ImGui_SameLine(ctx)
-                if r.ImGui_RadioButton(ctx, 'Reference MIDI', S.pitch_mode == MODE_REFERENCE) then
-                    S.pitch_mode = MODE_REFERENCE
-                end
-                Tooltip(TIPS.pitch_mode_reference)
-
-                local yin_disabled = (S.pitch_mode ~= MODE_YIN)
-                if yin_disabled then r.ImGui_BeginDisabled(ctx) end
-
-                r.ImGui_Spacing(ctx)
-                r.ImGui_Text(ctx, 'Built-in detection settings')
-                if r.ImGui_Button(ctx, 'Auto-tune YIN from reference', bw_ayt, 24) then
-                    RunAction(RunAutoTuneYIN)
-                end
-                Tooltip(TIPS.autotune_yin)
-                r.ImGui_Spacing(ctx)
-
-                YINPresetCombo('')
-                local _
-                _, S.yin_threshold = r.ImGui_SliderDouble(ctx, 'YIN threshold',
-                    S.yin_threshold, 0.01, 0.5, '%.3f')
-                SliderTooltip(TIPS.yin_threshold)
-                _, S.yin_min_freq = r.ImGui_SliderInt(ctx, 'Min frequency (Hz)',
-                    S.yin_min_freq, 40, 400)
-                SliderTooltip(TIPS.yin_min_freq)
-                _, S.yin_max_freq = r.ImGui_SliderInt(ctx, 'Max frequency (Hz)',
-                    S.yin_max_freq, 200, 2000)
-                SliderTooltip(TIPS.yin_max_freq)
-                if S.yin_min_freq >= S.yin_max_freq then S.yin_max_freq = S.yin_min_freq + 1 end
-                _, S.yin_window_ms = r.ImGui_SliderDouble(ctx, 'YIN window (ms)',
-                    S.yin_window_ms, 10, 100, '%.0f')
-                SliderTooltip(TIPS.yin_window_ms)
-
-                if yin_disabled then r.ImGui_EndDisabled(ctx) end
-
-                local ref_disabled = (S.pitch_mode ~= MODE_REFERENCE)
-                if ref_disabled then r.ImGui_BeginDisabled(ctx) end
-
-                r.ImGui_Spacing(ctx)
-                r.ImGui_Text(ctx, 'Reference MIDI track')
-                S.ref_idx = FilteredTrackCombo('##refmidi', S.ref_idx, midi_tracks)
-                Tooltip(TIPS.ref_track)
-
-                _, S.ref_search_ms = r.ImGui_SliderDouble(ctx, 'Search tolerance (ms)',
-                    S.ref_search_ms, 50, 2000, '%.0f')
-                SliderTooltip(TIPS.ref_search)
-
-                if ref_disabled then r.ImGui_EndDisabled(ctx) end
-
-                r.ImGui_Spacing(ctx)
-                r.ImGui_Text(ctx, 'Pitch range constraints')
-
-                local cb_changed
-                cb_changed, S.min_pitch_enabled = r.ImGui_Checkbox(ctx, '##minpe', S.min_pitch_enabled)
-                Tooltip(TIPS.min_pitch_enabled)
-                r.ImGui_SameLine(ctx)
-                if not S.min_pitch_enabled then r.ImGui_BeginDisabled(ctx) end
-                local minfmt = ('%%d  (%s)'):format(PitchName(S.min_pitch))
-                _, S.min_pitch = r.ImGui_SliderInt(ctx, 'Min pitch', S.min_pitch, RB3_MIN_PITCH, RB3_MAX_PITCH, minfmt)
-                SliderTooltip(TIPS.min_pitch)
-                if not S.min_pitch_enabled then r.ImGui_EndDisabled(ctx) end
-
-                cb_changed, S.max_pitch_enabled = r.ImGui_Checkbox(ctx, '##maxpe', S.max_pitch_enabled)
-                Tooltip(TIPS.max_pitch_enabled)
-                r.ImGui_SameLine(ctx)
-                if not S.max_pitch_enabled then r.ImGui_BeginDisabled(ctx) end
-                local maxfmt = ('%%d  (%s)'):format(PitchName(S.max_pitch))
-                _, S.max_pitch = r.ImGui_SliderInt(ctx, 'Max pitch', S.max_pitch, RB3_MIN_PITCH, RB3_MAX_PITCH, maxfmt)
-                SliderTooltip(TIPS.max_pitch)
-                if not S.max_pitch_enabled then r.ImGui_EndDisabled(ctx) end
-
-                if S.min_pitch_enabled and S.max_pitch_enabled and S.min_pitch > S.max_pitch then
-                    S.max_pitch = S.min_pitch
-                end
-
-                r.ImGui_Separator(ctx)
-                if r.ImGui_Button(ctx, 'Apply pitch changes', bw_app, 24) then
-                    RunAction(ApplyPitchChangesAction)
-                end
-                Tooltip(TIPS.apply_pitch)
-
-                ---- Snap to Key Scale ----
-                r.ImGui_Spacing(ctx)
-                r.ImGui_Separator(ctx)
-                r.ImGui_Spacing(ctx)
-                r.ImGui_Text(ctx, 'Snap to Key Scale')
-                r.ImGui_Spacing(ctx)
-
-                r.ImGui_Text(ctx, 'Key')
-                Tooltip(TIPS.snap_key_root)
-                r.ImGui_SameLine(ctx)
-                r.ImGui_SetNextItemWidth(ctx, 80)
-                if r.ImGui_BeginCombo(ctx, '##snap_kr', HARM_NOTE_NAMES[S.snap_key_root + 1]) then
-                    for i, name in ipairs(HARM_NOTE_NAMES) do
-                        local is_sel = (i - 1 == S.snap_key_root)
-                        if r.ImGui_Selectable(ctx, name, is_sel) then S.snap_key_root = i - 1 end
-                        if is_sel then r.ImGui_SetItemDefaultFocus(ctx) end
-                    end
-                    r.ImGui_EndCombo(ctx)
-                end
-                Tooltip(TIPS.snap_key_root)
-                r.ImGui_SameLine(ctx)
-                if r.ImGui_RadioButton(ctx, 'Major##skq', S.snap_key_quality == 0) then
-                    S.snap_key_quality = 0
-                end
-                r.ImGui_SameLine(ctx)
-                if r.ImGui_RadioButton(ctx, 'Minor##skq', S.snap_key_quality == 1) then
-                    S.snap_key_quality = 1
-                end
-
-                local _, new_sac = r.ImGui_Checkbox(ctx,
-                    'Avoid matching neighbor (within phrase)##sac', S.snap_avoid_collision)
-                S.snap_avoid_collision = new_sac
-                Tooltip(TIPS.snap_avoid_collision)
-
-                r.ImGui_Spacing(ctx)
-                local snap_label = sel_s and 'Snap to Key (time sel)' or 'Snap to Key (full item)'
-                local bw_snap = r.ImGui_CalcTextSize(ctx, snap_label) + _bp
-                if r.ImGui_Button(ctx, snap_label, bw_snap, 24) then
-                    if not sel_s then
-                        local res = r.ShowMessageBox(
-                            'No time selection is active.\n\nAll notes in the full MIDI item will be snapped to the key.\n\nContinue?',
-                            'Snap to Key', 1)
-                        if res == 1 then RunAction(SnapToKeyAction) end
-                    else
-                        RunAction(SnapToKeyAction)
-                    end
-                end
-                Tooltip(TIPS.snap_apply)
-
+                DrawPitchTab(ctx)
                 r.ImGui_EndTabItem(ctx)
             end
 
@@ -479,13 +388,15 @@ function Loop()
                 _new_tab = 'Lyrics'
                 r.ImGui_Spacing(ctx)
 
+                SectionHeader('File')
                 local lyric_basename = S.lyrics_path ~= ''
                     and (S.lyrics_path:match('[/\\]([^/\\]+)$') or S.lyrics_path)
                     or '(no file selected)'
-                r.ImGui_TextDisabled(ctx, 'File: ' .. lyric_basename)
+                r.ImGui_Text(ctx, 'Selected: ' .. lyric_basename)
                 if S.lyrics_path ~= '' then Tooltip(S.lyrics_path) end
 
-                if r.ImGui_Button(ctx, 'Auto-detect', bw_lad, 24) then
+                local bw_lyrics_file = BtnGroupWidth({ 'Auto-detect', 'Browse...' })
+                if Btn('Auto-detect', BTN_H, bw_lyrics_file) then
                     local proj_path = r.GetProjectPath('')
                     if proj_path and proj_path ~= '' then
                         local sep = (proj_path:sub(-1) == '/' or proj_path:sub(-1) == '\\') and '' or '/'
@@ -508,7 +419,7 @@ function Loop()
                 Tooltip(TIPS.lyrics_auto_detect)
 
                 r.ImGui_SameLine(ctx)
-                if r.ImGui_Button(ctx, 'Browse...', bw_lbr, 24) then
+                if Btn('Browse...', BTN_H, bw_lyrics_file) then
                     _browse_tooltip_suppressed = true
                     local proj_path = r.GetProjectPath('')
                     local start = ''
@@ -534,8 +445,10 @@ function Loop()
                     _browse_tooltip_suppressed = false
                 end
 
-                r.ImGui_SameLine(ctx)
-                if r.ImGui_Button(ctx, 'Clear lyrics', bw_lcl, 24) then
+                r.ImGui_Separator(ctx)
+                SectionHeader('Actions')
+                local bw_lyrics_actions = BtnGroupWidth({ 'Clear lyrics', 'Assign lyrics' })
+                if Btn('Clear lyrics', BTN_H, bw_lyrics_actions) then
                     RunAction(ClearLyricsAction)
                 end
                 Tooltip(TIPS.lyrics_clear)
@@ -543,7 +456,7 @@ function Loop()
                 local assign_disabled = (S.lyrics_path == '')
                 r.ImGui_SameLine(ctx)
                 if assign_disabled then r.ImGui_BeginDisabled(ctx) end
-                if r.ImGui_Button(ctx, 'Assign lyrics', bw_las, 24) then
+                if Btn('Assign lyrics', BTN_H, bw_lyrics_actions) then
                     RunAction(AssignLyricsAction)
                 end
                 if assign_disabled then r.ImGui_EndDisabled(ctx) end
@@ -578,8 +491,7 @@ function Loop()
                 r.ImGui_Spacing(ctx)
                 r.ImGui_Text(ctx, 'Phrase validation')
                 r.ImGui_Spacing(ctx)
-                local bw_vp = r.ImGui_CalcTextSize(ctx, 'Validate phrases') + _bp
-                if r.ImGui_Button(ctx, 'Validate phrases', bw_vp, 24) then
+                if Btn('Validate phrases', BTN_H) then
                     RunAction(ValidatePhrases)
                 end
                 Tooltip(TIPS.validate_phrases)
@@ -589,18 +501,25 @@ function Loop()
                 r.ImGui_Text(ctx, 'Phrase Similarity Check')
                 r.ImGui_Spacing(ctx)
 
+                local lbl_col_val = LabelColWidth({
+                    'Similarity threshold (%)', 'Same key only (ignore transposition)',
+                })
+
                 local _
+                r.ImGui_Text(ctx, 'Similarity threshold (%)')
+                r.ImGui_SameLine(ctx, lbl_col_val)
+                r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
                 _, S.phrase_sim_threshold = r.ImGui_SliderInt(ctx,
-                    'Similarity threshold (%)', S.phrase_sim_threshold, 50, 100)
+                    '##psimthr', S.phrase_sim_threshold, 50, 100)
                 SliderTooltip(TIPS.phrase_sim_threshold)
 
-                _, S.phrase_same_key = r.ImGui_Checkbox(ctx,
-                    'Same key only (ignore transposition)##psk', S.phrase_same_key)
+                r.ImGui_Text(ctx, 'Same key only (ignore transposition)')
+                r.ImGui_SameLine(ctx, lbl_col_val)
+                _, S.phrase_same_key = r.ImGui_Checkbox(ctx, '##psk', S.phrase_same_key)
                 Tooltip(TIPS.phrase_same_key)
 
                 r.ImGui_Spacing(ctx)
-                local bw_psc = r.ImGui_CalcTextSize(ctx, 'Check Phrase Similarity') + _bp
-                if r.ImGui_Button(ctx, 'Check Phrase Similarity', bw_psc, 24) then
+                if Btn('Check Phrase Similarity', BTN_H) then
                     RunAction(PhraseSimilarityAction)
                 end
                 Tooltip(TIPS.phrase_sim_check)
@@ -633,7 +552,7 @@ function Loop()
                         r.ImGui_Separator(ctx)
                         SectionHeader('Detection', 'Reset##det', ResetDetection, TIPS.reset_detection)
 
-                        if r.ImGui_Button(ctx, 'Auto-tune from reference', bw_at, 24) then
+                        if Btn('Auto-tune from reference', BTN_H) then
                             RunAction(RunAutoTune)
                         end
                         Tooltip(TIPS.autotune)
@@ -675,19 +594,19 @@ function Loop()
                         end
 
                         r.ImGui_Separator(ctx)
-                        if r.ImGui_Button(ctx, 'Dry run', bw_dry, 24) then
+                        if Btn('Dry run', BTN_H) then
                             RunAction(Preview)
                         end
                         Tooltip(TIPS.preview)
 
                         r.ImGui_SameLine(ctx)
-                        if r.ImGui_Button(ctx, 'Generate (append)', bw_gen, 24) then
+                        if Btn('Generate (append)', BTN_H) then
                             RunAction(Generate)
                         end
                         Tooltip(TIPS.generate)
 
                         r.ImGui_SameLine(ctx)
-                        if r.ImGui_Button(ctx, 'Generate (replace)', bw_grp, 24) then
+                        if Btn('Generate (replace)', BTN_H) then
                             RunAction(function() Generate(true) end)
                         end
                         Tooltip(TIPS.generate_replace)
@@ -710,7 +629,7 @@ function Loop()
                         SliderTooltip(TIPS.draft_snap_window_ms)
 
                         r.ImGui_Separator(ctx)
-                        if r.ImGui_Button(ctx, 'Snap draft notes', bw_snap, 24) then
+                        if Btn('Snap draft notes', BTN_H) then
                             RunAction(SnapDraft)
                         end
                         Tooltip(TIPS.snap_draft)
@@ -745,7 +664,7 @@ function Loop()
             r.ImGui_SetCursorPosX(ctx, r.ImGui_GetCursorPosX(ctx) + (avail_x - bw_und))
         end
         if not can_undo then r.ImGui_BeginDisabled(ctx) end
-        if r.ImGui_Button(ctx, 'Undo', bw_und, 24) then r.Undo_DoUndo2(0) end
+        if Btn('Undo', BTN_H) then r.Undo_DoUndo2(0) end
         if not can_undo then r.ImGui_EndDisabled(ctx) end
         if can_undo then Tooltip('Undo: ' .. undo_str) end
         if S.last_result then

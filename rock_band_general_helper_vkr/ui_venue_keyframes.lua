@@ -1,11 +1,9 @@
--- Venue > Keyframes sub-tab
+﻿-- Venue > Keyframes sub-tab
 -- Bulk-regenerates [first]/[next] keyframes for every manual lighting event already on the
 -- VENUE track, respecting time selection.
 -- Requires globals: r, ctx, S, TIPS, Tooltip, SliderTooltip, RunAction, RegenerateVenueKeyframes
 
 function DrawVenueKeyframesTab()
-    local _bp = 40
-
     r.ImGui_Text(ctx,
         'Regenerate [first]/[next] keyframes for every manual lighting event already on the VENUE track')
     r.ImGui_Spacing(ctx)
@@ -15,7 +13,7 @@ function DrawVenueKeyframesTab()
         'Guitar notes', 'Bass notes', 'Keys notes',
         'Drum kicks', 'Drum snare',
     }
-    local _lbl_col = r.ImGui_CalcTextSize(ctx, 'Keyframe align') + 16
+    local _lbl_col = LabelColWidth({ 'Keyframe align', 'Keyframe rate' })
 
     r.ImGui_Text(ctx, 'Keyframe align')
     r.ImGui_SameLine(ctx, _lbl_col)
@@ -34,6 +32,8 @@ function DrawVenueKeyframesTab()
     Tooltip(TIPS.venue_keyframe_align)
 
     if S.venue_keyframe_align >= 3 then
+        r.ImGui_Spacing(ctx)
+        r.ImGui_Text(ctx, 'Subdivision    ')
         r.ImGui_SameLine(ctx)
         if r.ImGui_RadioButton(ctx, 'Every beat##vkf_kfis', S.venue_kf_inst_subdiv == 0) then
             S.venue_kf_inst_subdiv = 0
@@ -53,8 +53,7 @@ function DrawVenueKeyframesTab()
     SliderTooltip(TIPS.venue_sec_kr)
 
     r.ImGui_Spacing(ctx)
-    local bw_kf = r.ImGui_CalcTextSize(ctx, 'Regenerate keyframes') + _bp
-    if r.ImGui_Button(ctx, 'Regenerate keyframes', bw_kf, 24) then
+    if Btn('Regenerate keyframes', BTN_H) then
         RunAction(RegenerateVenueKeyframes)
     end
     Tooltip(TIPS.venue_kf_regenerate)
