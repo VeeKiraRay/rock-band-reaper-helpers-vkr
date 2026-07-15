@@ -1,6 +1,6 @@
 -- @description Rock Band General Helper
 -- @author VeeKiraRay
--- @version 0.9.7
+-- @version 0.9.12
 -- @about
 --   Utility actions for Rock Band authoring in REAPER.
 --
@@ -13,10 +13,70 @@
 --     Difficulty - suggest and validate Pro Keys + 5-Lane Keys difficulty tiers
 --     Tab Input  - guitar/keys/vocal tab entry guide
 --     MIDI       - MIDI alignment, length sync, pattern replace
---     Venue      - list and validate VENUE track events
+--     Venue      - list, validate, and generate VENUE and EVENTS track events
 --
 --   Built with Claude (Anthropic) - https://claude.ai
 --
+--   v0.9.12
+--     - Internal housekeeping, no behavior changes. ui_venue.lua split:
+--       Section gen and Manual gen sub-tabs moved to their own files
+--       (ui_venue_section_gen.lua, ui_venue_manual.lua); the shared camera
+--       pacing / keyframe align widgets became globals. Deduplicated
+--       shared logic (track+MIDI-take lookup, text-event delete loops,
+--       ticks-per-QN, camera-pacing resolution, instrument letter names)
+--       and removed dead code (unused preview track_end computation and a
+--       leftover tooltip).
+--   v0.9.11
+--     - Unified throttling for continuous MIDI reads in the Venue tab UI
+--       (new shared MakeProjectPoll helper: re-read only when the project
+--       changed, subject to a minimum interval, with a 5 s fallback).
+--       Events sub-tab no longer re-scans the EVENTS track every frame -
+--       it polls like the Active players row (1 s + project-change gate)
+--       and refreshes immediately after its own Add/bookends/Clear buttons.
+--       Players row: during playback the per-playhead dot lookup now
+--       updates ~2x/s instead of every frame (stopped-cursor moves still
+--       react instantly). Preview: the per-frame muted-instruments read
+--       now rides along with the existing event-cache refresh.
+--   v0.9.10
+--     - Venue > Events: with "Use letter suffix" on, Add now only inserts
+--       lettered forms ([prc_verse_1a] from the very first part - never the
+--       unlettered [prc_verse_1]), so lettered parts always merge cleanly in
+--       Section gen. Plain and lettered forms of one event must not be
+--       mixed: adding either is refused while the other exists. Events with
+--       no lettered variants (e.g. [prc_bre], entry cues) insert the plain
+--       form regardless of the checkbox.
+--     - Venue > Events: refusal reasons no longer print next to the row
+--       (they took too much horizontal space). The indicator shows a short
+--       "-> (blocked)" - hover it for the reason - and a refused Add reports
+--       the reason in the result section.
+--   v0.9.9
+--     - Venue > Events: insert validation. Adds refuse duplicates (with the
+--       existing event's location), bare and numbered variants of the same
+--       event may not co-exist, numbers/letters must be used in sequence and
+--       placed in timeline order (letter gaps are re-offered), and no two
+--       text events may share a position - crowd events are exempt and may
+--       stack anywhere. The row indicator shows the exact event the Add
+--       will insert, or why it would be refused, live at the playhead.
+--     - Venue > Events: new quick actions. "Insert bookends" places the
+--       minimal per-song event set ([prc_intro] + [crowd_normal] at m1,
+--       [music_start] at m3, [prc_outro]/[music_end]/[end] at E-5/E-2/E
+--       where E is the last full measure; skipped for items under 7
+--       measures), removing prior instances first. "Clear all" removes
+--       every text event from the EVENTS track (track name kept).
+--     - Venue > Events: "Use letter suffix" is now on by default.
+--     - Venue tab: sub-tab description lines use the default text color;
+--       Manual gen insert status now names its target track (VENUE).
+--   v0.9.8
+--     - Venue tab: new Events sub-tab. Inserts EVENTS-track text events at
+--       the playhead - [prc_*] section markers grouped by category (intro,
+--       structure, solo, break, tempo/energy, interlude, outro, misc,
+--       generic a-k), crowd events, and global markers ([music_start],
+--       [music_end], [end], [coda]). Each section row has a number stepper
+--       (bare or _1.._9) and an opt-in automatic letter suffix mode that
+--       reads the EVENTS track and appends the next free letter
+--       ([prc_verse_1] -> [prc_verse_1a] -> [prc_verse_1b]), capped to the
+--       valid RB3 event vocabulary. A read-only indicator shows the exact
+--       event the Add button will insert.
 --   v0.9.7
 --     - Venue tab: new "Active players" row shown under every sub-tab. A
 --       colored dot per instrument shows its state at the playhead - active
@@ -120,6 +180,7 @@ for _, _f in ipairs({
     _mdir .. 'helpers.lua',
     _mdir .. 'venue.lua',
     _mdir .. 'venue_awareness.lua',
+    _mdir .. 'section_events.lua',
     _mdir .. 'venue_themes.lua',
     _mdir .. 'venue_camera.lua',
     _mdir .. 'venue_sprites.lua',
@@ -127,6 +188,7 @@ for _, _f in ipairs({
     _mdir .. 'venue_generator.lua',
     _mdir .. 'actions_venue_section.lua',
     _mdir .. 'actions_venue_manual.lua',
+    _mdir .. 'actions_venue_events.lua',
     _mdir .. 'actions_venue_keyframes.lua',
     _mdir .. 'actions_venue_sing_along.lua',
     _mdir .. 'tempomap.lua',
@@ -145,6 +207,9 @@ for _, _f in ipairs({
     _mdir .. 'ui_keys.lua',
     _mdir .. 'ui_midi.lua',
     _mdir .. 'ui_venue.lua',
+    _mdir .. 'ui_venue_section_gen.lua',
+    _mdir .. 'ui_venue_manual.lua',
+    _mdir .. 'ui_venue_events.lua',
     _mdir .. 'ui_venue_preview.lua',
     _mdir .. 'ui_venue_keyframes.lua',
     _mdir .. 'ui_venue_players.lua',
@@ -167,6 +232,7 @@ dofile(_mdir .. 'settings.lua')
 dofile(_mdir .. 'helpers.lua')
 dofile(_mdir .. 'venue.lua')
 dofile(_mdir .. 'venue_awareness.lua')
+dofile(_mdir .. 'section_events.lua')
 dofile(_mdir .. 'venue_themes.lua')
 dofile(_mdir .. 'venue_camera.lua')
 dofile(_mdir .. 'venue_sprites.lua')
@@ -174,6 +240,7 @@ dofile(_mdir .. 'venue_lighting.lua')
 dofile(_mdir .. 'venue_generator.lua')
 dofile(_mdir .. 'actions_venue_section.lua')
 dofile(_mdir .. 'actions_venue_manual.lua')
+dofile(_mdir .. 'actions_venue_events.lua')
 dofile(_mdir .. 'actions_venue_keyframes.lua')
 dofile(_mdir .. 'actions_venue_sing_along.lua')
 dofile(_mdir .. 'tempomap.lua')
@@ -192,6 +259,9 @@ dofile(_mdir .. 'actions_difficulty_5k.lua')
 dofile(_mdir .. 'ui_keys.lua')
 dofile(_mdir .. 'ui_midi.lua')
 dofile(_mdir .. 'ui_venue.lua')
+dofile(_mdir .. 'ui_venue_section_gen.lua')
+dofile(_mdir .. 'ui_venue_manual.lua')
+dofile(_mdir .. 'ui_venue_events.lua')
 dofile(_mdir .. 'ui_venue_preview.lua')
 dofile(_mdir .. 'ui_venue_keyframes.lua')
 dofile(_mdir .. 'ui_venue_players.lua')

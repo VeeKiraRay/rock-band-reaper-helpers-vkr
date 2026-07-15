@@ -3,25 +3,24 @@
 -- state at the playhead - active, idle, muted/missing, or no play-state data.
 -- Uses the same inputs as the venue generation weights (venue_awareness.lua).
 -- Requires globals: r, ctx, TIPS, ReadInstrumentPlayStates, GetMutedInstruments,
---                   ComputePlayerStatesAt, GetInstrumentTrackName,
---                   FindTrackByName, Tooltip, FormatTime
+--                   ComputePlayerStatesAt, GetInstrumentTrackName, INST_LETTER_NAMES,
+--                   FindTrackByName, Tooltip, FormatTime, MakeProjectPoll
 
-local _POLL_SECS     = 1.0  -- minimum interval between PART-track MIDI re-scans
-local _FALLBACK_SECS = 5.0  -- safety-net re-scan when state count unchanged
-                            -- (e.g. project switch landing on an equal count)
+local _PLAY_LOOKUP_SECS = 0.5  -- playhead-lookup cadence while playback runs
 
--- Cached scan results; re-read at most every _POLL_SECS and only when the
--- project actually changed (GetProjectStateChangeCount covers MIDI edits and
--- track mute toggles). The per-playhead lookup is recomputed only when the
--- playhead moved or the scan refreshed.
+-- Cached scan results; re-read via MakeProjectPoll - at most every 1 s and
+-- only when the project actually changed (GetProjectStateChangeCount covers
+-- MIDI edits and track mute toggles), with an unconditional 5 s fallback.
+-- The per-playhead lookup is recomputed only when the playhead moved or the
+-- scan refreshed - immediately while stopped, at _PLAY_LOOKUP_SECS cadence
+-- while the transport is playing.
+local _poll = MakeProjectPoll(1.0, 5.0)
 local _states, _no_data, _muted, _missing
-local _cache_count   = -1
-local _cache_time    = 0
-local _row           = nil
-local _last_playhead = nil
+local _row              = nil
+local _last_playhead    = nil
+local _last_lookup_time = 0
 
 local _ROW_ORDER = { 'b', 'g', 'd', 'k', 'v' }
-local _ROW_NAMES = { b = 'Bass', g = 'Guitar', d = 'Drums', k = 'Keys', v = 'Vocals' }
 
 local _COLORS = {
     active = 0x44DD44FF,
@@ -39,8 +38,6 @@ local function _rescan()
             _missing[letter] = true
         end
     end
-    _cache_count = r.GetProjectStateChangeCount()
-    _cache_time  = r.time_precise()
 end
 
 local function _tooltip_for(letter, info)
@@ -72,17 +69,13 @@ function DrawActivePlayersRow()
     local playhead = playing and r.GetPlayPosition() or r.GetCursorPosition()
 
     local now = r.time_precise()
-    local rescanned = false
-    if not _states
-        or now - _cache_time >= _FALLBACK_SECS
-        or (now - _cache_time >= _POLL_SECS
-            and r.GetProjectStateChangeCount() ~= _cache_count) then
-        _rescan()
-        rescanned = true
-    end
-    if rescanned or playhead ~= _last_playhead then
+    local rescanned = _poll()
+    if rescanned then _rescan() end
+    if rescanned
+        or (playhead ~= _last_playhead
+            and (not playing or now - _last_lookup_time >= _PLAY_LOOKUP_SECS)) then
         _row = ComputePlayerStatesAt(playhead, _states, _no_data, _muted)
-        _last_playhead = playhead
+        _last_playhead, _last_lookup_time = playhead, now
     end
 
     r.ImGui_Separator(ctx)
@@ -94,7 +87,7 @@ function DrawActivePlayersRow()
         r.ImGui_BeginGroup(ctx)
         _draw_dot(_COLORS[info.state])
         r.ImGui_SameLine(ctx, 0, 4)
-        r.ImGui_Text(ctx, _ROW_NAMES[letter])
+        r.ImGui_Text(ctx, INST_LETTER_NAMES[letter])
         r.ImGui_EndGroup(ctx)
         Tooltip(_tooltip_for(letter, info))
     end

@@ -5,74 +5,61 @@
 --           ReadEventSections, ReadInstrumentPlayStates, GetSectionPreset,
 --           GetThemeCameraInterval, FindMusicStartTime, FindNextMeasureStartPpq, r, S (globals)
 
-function ClearVenueTextEventsInRange(take, start_ppq, end_ppq)
+-- Delete type-1 text events in [start_ppq, end_ppq). keep_fn(msg) -> true
+-- preserves an event; nil keep_fn deletes every text event in range.
+-- Returns the number of deleted events. Backs every venue clear function
+-- (and the Events tab's Clear all / Remove by type).
+function DeleteTextEventsInRange(take, start_ppq, end_ppq, keep_fn)
+    local count = 0
     local _, _, _, text_count = r.MIDI_CountEvts(take)
     for i = text_count - 1, 0, -1 do
-        local ok, _, _, ppq, evt_type = r.MIDI_GetTextSysexEvt(take, i)
-        if ok and evt_type == 1 and ppq >= start_ppq and ppq < end_ppq then
+        local ok, _, _, ppq, evt_type, msg = r.MIDI_GetTextSysexEvt(take, i)
+        if ok and evt_type == 1 and ppq >= start_ppq and ppq < end_ppq
+            and not (keep_fn and keep_fn(msg)) then
             r.MIDI_DeleteTextSysexEvt(take, i)
+            count = count + 1
         end
     end
+    return count
+end
+
+function ClearVenueTextEventsInRange(take, start_ppq, end_ppq)
+    DeleteTextEventsInRange(take, start_ppq, end_ppq, nil)
 end
 
 -- Clears everything except camera events ([coop_*] / [directed_*]).
 -- Use for the blendin zone before a section to preserve previous section's camera shots.
 function ClearVenueNonCameraEventsInRange(take, start_ppq, end_ppq)
-    local _, _, _, tc = r.MIDI_CountEvts(take)
-    for i = tc - 1, 0, -1 do
-        local ok, _, _, ppq, evt_type, msg = r.MIDI_GetTextSysexEvt(take, i)
-        if ok and evt_type == 1 and ppq >= start_ppq and ppq < end_ppq then
-            if not (msg:find('^%[coop_') or msg:find('^%[directed_')) then
-                r.MIDI_DeleteTextSysexEvt(take, i)
-            end
-        end
-    end
+    DeleteTextEventsInRange(take, start_ppq, end_ppq, function(msg)
+        return msg:find('^%[coop_') or msg:find('^%[directed_')
+    end)
 end
 
 -- Clears everything except lighting ([lighting *]) and postproc (*.pp]).
 -- Use for the section body to preserve adjacent section's blendin LP events.
 function ClearVenueExceptLPInRange(take, start_ppq, end_ppq)
-    local _, _, _, tc = r.MIDI_CountEvts(take)
-    for i = tc - 1, 0, -1 do
-        local ok, _, _, ppq, evt_type, msg = r.MIDI_GetTextSysexEvt(take, i)
-        if ok and evt_type == 1 and ppq >= start_ppq and ppq < end_ppq then
-            if not (msg:find('^%[lighting') or msg:find('%.pp%]$')) then
-                r.MIDI_DeleteTextSysexEvt(take, i)
-            end
-        end
-    end
+    DeleteTextEventsInRange(take, start_ppq, end_ppq, function(msg)
+        return msg:find('^%[lighting') or msg:find('%.pp%]$')
+    end)
 end
 
 -- Deletes only [first]/[next]/[previous] text events in range. Leaves camera, lighting,
 -- postproc, and bonusfx untouched.
 function ClearVenueKeyframesInRange(take, start_ppq, end_ppq)
-    local _, _, _, tc = r.MIDI_CountEvts(take)
-    for i = tc - 1, 0, -1 do
-        local ok, _, _, ppq, evt_type, msg = r.MIDI_GetTextSysexEvt(take, i)
-        if ok and evt_type == 1 and ppq >= start_ppq and ppq < end_ppq then
-            if msg == '[first]' or msg == '[next]' or msg == '[previous]' then
-                r.MIDI_DeleteTextSysexEvt(take, i)
-            end
-        end
-    end
+    DeleteTextEventsInRange(take, start_ppq, end_ppq, function(msg)
+        return msg ~= '[first]' and msg ~= '[next]' and msg ~= '[previous]'
+    end)
 end
 
 -- ---------------------------------------------------------------------------
 
 function GenerateVenueEvents()
-    local track = FindTrackByName('VENUE')
+    local track, item, take = FindNamedTrackMIDI('VENUE')
     if not track then
         S.status     = 'No VENUE track found.'
         S.last_result = 'Could not find a track named "VENUE".\n\n' ..
                         'Make sure your Rock Band project has a VENUE track.'
         return
-    end
-
-    local item, take = nil, nil
-    for i = 0, r.CountTrackMediaItems(track) - 1 do
-        local it = r.GetTrackMediaItem(track, i)
-        local tk = r.GetActiveTake(it)
-        if tk and r.TakeIsMIDI(tk) then item, take = it, tk; break end
     end
     if not item then
         S.status     = 'No MIDI item on VENUE track.'
@@ -102,9 +89,8 @@ function GenerateVenueEvents()
     local play_states_raw, no_data_letters = ReadInstrumentPlayStates()
 
     if #active_coop == 0 then
-        local letter_names = {d='Drums', v='Vocals', b='Bass', g='Guitar', k='Keys'}
-        local names        = {}
-        for letter in pairs(muted) do names[#names + 1] = letter_names[letter] or letter end
+        local names = {}
+        for letter in pairs(muted) do names[#names + 1] = INST_LETTER_NAMES[letter] or letter end
         table.sort(names)
         S.status      = 'All instrument tracks muted - no camera events available.'
         S.last_result = 'Muted/absent: ' .. table.concat(names, ', ') ..
@@ -115,10 +101,7 @@ function GenerateVenueEvents()
     local item_start_sec = r.GetMediaItemInfo_Value(item, 'D_POSITION')
     local item_end_sec   = item_start_sec + r.GetMediaItemInfo_Value(item, 'D_LENGTH')
 
-    local qn_start = r.MIDI_GetPPQPosFromProjQN(take, 0)
-    local qn_one   = r.MIDI_GetPPQPosFromProjQN(take, 1)
-    local ppq      = qn_one - qn_start
-    if ppq <= 0 then ppq = 960 end
+    local ppq             = GetTakePPQPerQN(take)
     local sixteenth_ticks = ppq / 4
 
     local range_start_sec = item_start_sec
@@ -175,14 +158,8 @@ function GenerateVenueEvents()
     local cam_interval     = theme and GetThemeCameraInterval(theme.camera_pacing, bpm) or nil
 
     -- User camera pacing override (0=theme default, 1-5=named presets, 6=custom 16ths)
-    local _user_cp_names = {nil, 'minimal', 'slow', 'medium', 'fast', 'crazy'}
-    local user_cam_pacing = _user_cp_names[S.venue_cam_pacing + 1]
-    if user_cam_pacing then
-        cam_interval = GetThemeCameraInterval(user_cam_pacing, bpm)
-    elseif S.venue_cam_pacing == 6 then
-        local base = S.venue_cam_pacing_custom
-        cam_interval = (bpm >= 150) and math.floor(base * 1.5 + 0.5) or base
-    end
+    local user_ci, user_cam_pacing = ResolveUserCamInterval(bpm)
+    if user_ci then cam_interval = user_ci end
 
     local forced_cuts      = nil
     local interval_changes = nil
@@ -394,9 +371,8 @@ function GenerateVenueEvents()
     r.PreventUIRefresh(-1)
     r.UpdateArrange()
 
-    local letter_names = {d='Drums', v='Vocals', b='Bass', g='Guitar', k='Keys'}
-    local muted_names  = {}
-    for letter in pairs(muted) do muted_names[#muted_names + 1] = letter_names[letter] or letter end
+    local muted_names = {}
+    for letter in pairs(muted) do muted_names[#muted_names + 1] = INST_LETTER_NAMES[letter] or letter end
     table.sort(muted_names)
     local muted_str = #muted_names > 0 and table.concat(muted_names, ', ') or 'None'
 
@@ -437,9 +413,8 @@ function GenerateVenueEvents()
         music_start_t and 'explicit [music_start] marker' or '~3s fallback (measure 3/4)')
     lines[#lines + 1] = ''
     local warn_no_data = {}
-    local nd_names_map = { d='Drums', v='Vocals', b='Bass', g='Guitar', k='Keys' }
     for _, l in ipairs(no_data_letters) do
-        if not muted[l] then warn_no_data[#warn_no_data + 1] = nd_names_map[l] or l end
+        if not muted[l] then warn_no_data[#warn_no_data + 1] = INST_LETTER_NAMES[l] or l end
     end
     table.sort(warn_no_data)
     if #warn_no_data > 0 then
@@ -447,11 +422,10 @@ function GenerateVenueEvents()
                             ' have no play-state events - treated as always active.'
         lines[#lines + 1] = ''
     end
-    local sing_letter_names = { b='Bass', d='Drums', g='Guitar' }
     local sing_active = {}
     for _, l in ipairs({ 'b', 'd', 'g' }) do
         if coop_opts.sing_states[l] then
-            sing_active[#sing_active + 1] = sing_letter_names[l]
+            sing_active[#sing_active + 1] = INST_LETTER_NAMES[l]
         end
     end
     if #sing_active > 0 then

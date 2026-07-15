@@ -699,3 +699,22 @@ function GenerateCameraEvents(active_coop, active_directed, total_16ths, ppq,
 
     return events
 end
+
+-- Resolve the user camera-pacing override (S.venue_cam_pacing) to an
+-- interval in 16ths. Returns interval|nil, is_named_preset:
+--   0 (theme default) -> nil, false
+--   1-5 (named preset) -> GetThemeCameraInterval(name, bpm), true
+--   6 (custom 16ths)   -> S.venue_cam_pacing_custom (x1.5 at >=150 bpm), false
+-- is_named_preset matters to the generator: only named presets suppress
+-- per-section theme pacing overrides (custom pacing does not).
+function ResolveUserCamInterval(bpm)
+    local names = {nil, 'minimal', 'slow', 'medium', 'fast', 'crazy'}
+    local name  = names[S.venue_cam_pacing + 1]
+    if name then
+        return GetThemeCameraInterval(name, bpm), true
+    elseif S.venue_cam_pacing == 6 then
+        local base = S.venue_cam_pacing_custom
+        return (bpm >= 150) and math.floor(base * 1.5 + 0.5) or base, false
+    end
+    return nil, false
+end

@@ -85,17 +85,11 @@ end
 -- ---------------------------------------------------------------------------
 
 function GenerateSingAlong()
-    local venue_track = FindTrackByName('VENUE')
+    local venue_track, venue_item, venue_take = FindNamedTrackMIDI('VENUE')
     if not venue_track then
         S.status = 'No VENUE track found.'
         S.last_result = nil
         return
-    end
-    local venue_item, venue_take
-    for i = 0, r.CountTrackMediaItems(venue_track) - 1 do
-        local it = r.GetTrackMediaItem(venue_track, i)
-        local tk = r.GetActiveTake(it)
-        if tk and r.TakeIsMIDI(tk) then venue_item, venue_take = it, tk; break end
     end
     if not venue_item then
         S.status = 'No MIDI item on VENUE track.'

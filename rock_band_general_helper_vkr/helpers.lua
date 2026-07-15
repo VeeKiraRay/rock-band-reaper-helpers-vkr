@@ -11,6 +11,31 @@ function FindTrackByName(name)
     return nil
 end
 
+-- Find a track by exact name plus its first MIDI item/take. Returns
+-- track, item, take - track is non-nil when the track exists even if it has
+-- no MIDI item, so callers can distinguish "no track" from "no MIDI item".
+-- Silent: callers own their status/error messages.
+-- Self-contained on purpose: the standalone rock_band_preview_vkr.lua loads
+-- helpers.lua but not lib/reaper_midi_helpers.lua (FindFirstMIDIItem).
+function FindNamedTrackMIDI(name)
+    local track = FindTrackByName(name)
+    if not track then return nil, nil, nil end
+    for i = 0, r.CountTrackMediaItems(track) - 1 do
+        local it = r.GetTrackMediaItem(track, i)
+        local tk = r.GetActiveTake(it)
+        if tk and r.TakeIsMIDI(tk) then return track, it, tk end
+    end
+    return track, nil, nil
+end
+
+-- MIDI ticks per quarter note for a take (defensive 960 fallback).
+function GetTakePPQPerQN(take)
+    local qn_start = r.MIDI_GetPPQPosFromProjQN(take, 0)
+    local qn_one   = r.MIDI_GetPPQPosFromProjQN(take, 1)
+    local ppq      = qn_one - qn_start
+    return ppq > 0 and ppq or 960
+end
+
 -- Scan track names and pre-select the drum audio tracks.
 -- Only sets a field when it is still -1 (not yet assigned).
 function SetDefaultTempoTracks()
@@ -144,6 +169,29 @@ function RunAction(fn)
         r.PreventUIRefresh(-1)
         S.status = 'Error'
         S.last_result = tostring(err)
+    end
+end
+
+-- Poll gate for cached project reads in per-frame draw code. Returns a
+-- check(force) function -> true when the caller should re-read its project
+-- data: on first call, when forced, when fallback_secs elapsed (safety net -
+-- covers state-count collisions across project switches), or when min_secs
+-- elapsed AND GetProjectStateChangeCount changed (MIDI edits, mute toggles,
+-- undo). min_secs > 0 protects heavy scans from per-frame state-count churn
+-- (e.g. dragging notes in a MIDI editor bumps the count every frame).
+function MakeProjectPoll(min_secs, fallback_secs)
+    local last_count, last_time
+    return function(force)
+        local now = r.time_precise()
+        if force or not last_count
+            or now - last_time >= fallback_secs
+            or (now - last_time >= min_secs
+                and r.GetProjectStateChangeCount() ~= last_count) then
+            last_count = r.GetProjectStateChangeCount()
+            last_time  = now
+            return true
+        end
+        return false
     end
 end
 

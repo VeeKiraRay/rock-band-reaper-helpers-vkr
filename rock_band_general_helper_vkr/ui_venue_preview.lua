@@ -4,7 +4,7 @@
 -- Requires globals: r, ctx, S, GetVenueEventsForPreview, DrawVenueInlineSprite,
 --                   VenueSpriteFoldersFound, SectionHeader
 
-local _preview_cache       = nil   -- { camera, lighting, postproc, track_end } or nil
+local _preview_cache       = nil   -- { camera, lighting, postproc } or nil
 local _preview_error       = nil   -- error string or nil
 local _preview_animate     = true  -- false = show middle frame only (no animation)
 local _last_state_count    = -1    -- r.GetProjectStateChangeCount() at last refresh
@@ -29,9 +29,13 @@ local _INST_NAMES    = { b='PART BASS', g='PART GUITAR', k='PART KEYS' }
 local _SHOW_CURRENT_ONLY = 0
 local _SHOW_SURROUNDING  = 1
 
+local _muted_cache = nil  -- GetMutedInstruments() result; mute toggles bump
+                          -- the project state count, so refreshes catch them
+
 local function _refresh_preview()
     local t0 = r.time_precise()
     _preview_cache, _preview_error = GetVenueEventsForPreview()
+    _muted_cache = GetMutedInstruments()
     local elapsed = r.time_precise() - t0
     _last_refresh_time = r.time_precise()
     _last_state_count  = r.GetProjectStateChangeCount()
@@ -217,7 +221,7 @@ function DrawVenuePreviewTab()
     end
     Tooltip(_t_vpc)
     do
-        local muted_real = GetMutedInstruments()
+        local muted_real = _muted_cache or GetMutedInstruments()
         local warn = {}
         for _, ltr in ipairs(_COMBO_LETTERS[S.venue_preview_combo]) do
             if muted_real[ltr] then warn[#warn + 1] = _INST_NAMES[ltr] end

@@ -1,24 +1,8 @@
 -- VENUE track parsing and validation
--- Requires: VENUE_VALID, DIRECTED_GAP_MIN, MIDI_META_NAMES, S, FormatTime, r (globals)
+-- Requires: VENUE_VALID, DIRECTED_GAP_MIN, MIDI_META_NAMES, S, FormatTime,
+--           FindNamedTrackMIDI, r (globals)
 
-local function FindVenueTrack()
-    for i = 0, r.CountTracks(0) - 1 do
-        local tr = r.GetTrack(0, i)
-        local _, name = r.GetTrackName(tr)
-        if name == 'VENUE' then return tr end
-    end
-    return nil
-end
-
-local function ReadVenueTextEvents(track)
-    local take = nil
-    for i = 0, r.CountTrackMediaItems(track) - 1 do
-        local item = r.GetTrackMediaItem(track, i)
-        local t = r.GetActiveTake(item)
-        if t and r.TakeIsMIDI(t) then take = t; break end
-    end
-    if not take then return nil, 'No MIDI item found on VENUE track.' end
-
+local function ReadVenueTextEvents(take)
     local events = {}
     local _, _, _, text_count = r.MIDI_CountEvts(take)
     for i = 0, text_count - 1 do
@@ -64,25 +48,13 @@ local function GapStats(gaps)
 end
 
 -- Read and categorize all VENUE text events for the Preview sub-tab.
--- Returns: { camera={}, lighting={}, postproc={}, track_end=<seconds> }
---      or: nil, err_string
+-- Returns: { camera={}, lighting={}, postproc={} } or nil, err_string
 function GetVenueEventsForPreview()
-    local track = FindVenueTrack()
+    local track, _, take = FindNamedTrackMIDI('VENUE')
     if not track then return nil, 'No VENUE track found.' end
+    if not take then return nil, 'No MIDI item found on VENUE track.' end
 
-    local events, err = ReadVenueTextEvents(track)
-    if not events then return nil, err end
-
-    local track_end = 0
-    for i = 0, r.CountTrackMediaItems(track) - 1 do
-        local item = r.GetTrackMediaItem(track, i)
-        local tk   = r.GetActiveTake(item)
-        if tk and r.TakeIsMIDI(tk) then
-            local e = r.GetMediaItemInfo_Value(item, 'D_POSITION')
-                    + r.GetMediaItemInfo_Value(item, 'D_LENGTH')
-            if e > track_end then track_end = e end
-        end
-    end
+    local events = ReadVenueTextEvents(take)
 
     local cam, lt, pp = {}, {}, {}
     for _, ev in ipairs(events) do
@@ -95,23 +67,23 @@ function GetVenueEventsForPreview()
         end
     end
 
-    return { camera = cam, lighting = lt, postproc = pp, track_end = track_end }
+    return { camera = cam, lighting = lt, postproc = pp }
 end
 
 function ListVenueEvents()
-    local track = FindVenueTrack()
+    local track, _, take = FindNamedTrackMIDI('VENUE')
     if not track then
         S.status = 'No VENUE track found.'
         S.last_result = 'No VENUE track detected.'
         return
     end
-
-    local all_events, err = ReadVenueTextEvents(track)
-    if not all_events then
+    if not take then
         S.status = 'Error reading VENUE track.'
-        S.last_result = err
+        S.last_result = 'No MIDI item found on VENUE track.'
         return
     end
+
+    local all_events = ReadVenueTextEvents(take)
 
     if #all_events == 0 then
         S.status = 'VENUE track has no text events.'

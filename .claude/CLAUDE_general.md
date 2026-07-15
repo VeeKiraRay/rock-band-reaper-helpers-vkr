@@ -69,12 +69,23 @@ Four WIP tabs appear only when **Show WIPs? = Yes** in the General tab (persiste
 - Move + Stretch: also adjusts the take playback rate so the last note lands at the time selection end.
 - Set a time selection first, then click **Align MIDI**. Fully undoable.
 
-**Venue tab** — VENUE MIDI track events. Contains five sub-tabs (plus Preview):
+**Venue tab** — VENUE and EVENTS MIDI track events. Contains six sub-tabs (plus Preview):
 
 *Analysis sub-tab* — inspection tools, plus one generation action.
 - **List venue events** — validates the VENUE track against the Rock Band Network spec: track name event, event type checks, unknown events, consecutive camera repeats, directed cut spacing, camera gap statistics, event usage frequency. Read-only.
 - **Show event sections** — reads `[prc_*]` markers from the EVENTS track and lists detected song sections with time ranges. Letter-suffix variants (`[prc_verse_1a]`, `[prc_verse_1b]`) are merged into a single section entry. Read-only.
 - **Generate sing along** — derives VENUE sing-along notes (pitch 87 guitarist from HARM2, pitch 85 bassist from HARM3) from each harmony track's vocal phrase content: a phrase (bounded by a pitch-105 marker note) qualifies when it has at least one vocal-range note (36-84); qualifying phrases less than a measure apart are merged into one continuous note. Only the pitch of a source track that is present and unmuted is cleared/replaced — a muted or missing source is skipped, leaving its existing notes untouched. If both HARM2 and HARM3 are unavailable, nothing is generated. Always processes the whole song (no time-selection scoping). Fully undoable.
+
+*Events sub-tab* — EVENTS-track text event insertion at the playhead (the only sub-tab that writes to EVENTS, not VENUE). One row per event group; vocabulary lives in `section_events.lua`, validated against `_external_docs/Text Events List - Events.txt` by `dev/tests/venue_events.lua`.
+- Section groups (Intro, Structure, Solo, Break, Tempo/Energy, Interlude/Jam, Outro/Ending, Misc) — base-name combo + number slider (`bare` or `_1`–`_9`) + **Add**. A read-only `->` indicator shows the exact event the next Add inserts live at the playhead, or `-> (blocked)` when it would be refused (reason on hover; a refused Add also reports the reason in the result section).
+- **Insert validation** (`NextSectionEvent` / `ValidatePlainInsert`, pure functions over a positional scan): duplicates refused with the existing event's location; bare and numbered variants of one base must not co-exist; plain and lettered forms of one (base, number) must not be mixed; numbers/letters must be used in sequence (`_2` needs a `_1`-family event) and placed in timeline order between their sequence neighbors; no two text events on one PPQ. `[crowd_*]` events are exempt from all rules and may stack anywhere.
+- **Use letter suffix** checkbox (default on) — Add inserts *only lettered forms*, starting at `a` (`[prc_verse_1a]` → `[prc_verse_1b]`; never the unlettered event, so parts always merge in Section gen; hand-deleted letters are re-offered as gaps), capped per base by the valid vocabulary. When off, Add only inserts the plain event and refuses when it exists. Bases with no lettered variants (`.` caps, e.g. `bre`, entry cues) insert the plain form in either mode.
+- **Insert bookends** — removes prior instances of the six bookend events, then inserts `[prc_intro]` + `[crowd_normal]` at measure 1, `[music_start]` at measure 3, and `[prc_outro]`/`[music_end]`/`[end]` at E−5/E−2/E where E = last measure fully contained in the MIDI item (`TimeMap_GetMeasureInfo` walk); items under 7 full measures skip the end trio. Occupied target spots are skipped and reported.
+- **Clear all** — removes every type-1 text event from the EVENTS take (track-name meta untouched).
+- Generic group — `[prc_a]`–`[prc_k]`, digits append with no underscore (`[prc_a3]`), no letters.
+- Crowd / Global groups — plain full-event combos (`[crowd_*]`, `[music_start]`, `[music_end]`, `[end]`, `[coda]`); Global gets duplicate/same-spot checks, Crowd does not.
+- Targets the EVENTS track by name (`FindEventsTake`); an inline hint is shown and all buttons are disabled when the track or its MIDI item is missing. `S.venue_ev_mode` is reserved for a phase-2 target-mode radio (see `SONG_SECTION.md`).
+- The take + scan feeding the indicator are cached via `MakeProjectPoll(1.0, 5.0)` (see the polling convention below), force-refreshed by the tab's own edit buttons, and pointer-validated each frame (`ValidatePtr2`); the cursor lookup + row validation over the cached scan are pure Lua and run per frame. The Add actions always re-scan, so the UI cache can never cause a wrong insert.
 
 *Themes gen sub-tab* — whole-song generation driven by a `.rbtheme` file.
 - **Theme combo** — select a `.rbtheme` file from the `resources/themes/` folder (themes are not shipped with the project; add `.rbtheme` files to enable). Shows `(select a theme)` when none loaded; Generate button is disabled until a theme is chosen. If the `resources/themes/` folder is empty a warning is displayed and all inputs are disabled.
@@ -113,14 +124,14 @@ Four WIP tabs appear only when **Show WIPs? = Yes** in the General tab (persiste
 | `rock_band_general_helper_vkr.lua` | Entry point: ReaImGui check, path derivation, dofile calls, startup |
 | `rock_band_general_helper_vkr/defaults.lua` | `VENUE_VALID`, `DIRECTED_GAP_MIN`, `MIDI_META_NAMES`, `S`, `TIPS` |
 | `rock_band_general_helper_vkr/settings.lua` | `SaveSettings`, `LoadSettings` (project key: `RBHelperVKR/settings_v1`) |
-| `rock_band_general_helper_vkr/helpers.lua` | `FindTrackByName`, `SetDefaultTempoTracks`, `SetDefaultMIDITracks`, `GetTempoContextBefore`, `GetMeasureStartTime`, `GetAudioItems` |
-| `rock_band_general_helper_vkr/venue.lua` | `ListVenueEvents` (global); `FindVenueTrack`, `ReadVenueTextEvents`, `BuildCameraGaps`, `GapStats` (local) |
-| `rock_band_general_helper_vkr/venue_awareness.lua` | `GetMutedInstruments`, `GetCoopRequiredInstruments`, `GetDirectedRequiredInstruments`, `FilterPool`, `ReadEventSections`, `ListEventSections`, `FindMusicStartTime` (global); `INST_TRACK_NAMES`, `ParsePrcEvent` (local) |
+| `rock_band_general_helper_vkr/helpers.lua` | `FindTrackByName`, `FindNamedTrackMIDI` (track + first MIDI item/take; self-contained for the standalone preview), `GetTakePPQPerQN`, `SetDefaultTempoTracks`, `SetDefaultMIDITracks`, `GetTempoContextBefore`, `GetMeasureStartTime`, `GetAudioItems`, `MakeProjectPoll` |
+| `rock_band_general_helper_vkr/venue.lua` | `ListVenueEvents`, `GetVenueEventsForPreview` (global); `ReadVenueTextEvents`, `BuildCameraGaps`, `GapStats` (local) |
+| `rock_band_general_helper_vkr/venue_awareness.lua` | `GetMutedInstruments`, `GetCoopRequiredInstruments`, `GetDirectedRequiredInstruments`, `FilterPool`, `ReadEventSections`, `ListEventSections`, `FindMusicStartTime`, `INST_LETTER_NAMES` (global); `INST_TRACK_NAMES`, `ParsePrcEvent` (local) |
 | `rock_band_general_helper_vkr/venue_themes.lua` | `ThemeDisplayLabel`, `LoadVenueThemes`, `GetSectionPreset`, `GetThemeCameraInterval`, `BuildLightingPool`, `BuildPostprocPool` (global); `POSTPROC_VALID_SET`, `LIGHTING_VALID_SET`, `CAMERA_PACING`, `Tokenize`, `ParseSexpr`, `ParseThemeFile`, `InterpretSectionPreset`, `InterpretTheme` (local) |
-| `rock_band_general_helper_vkr/venue_camera.lua` | `COOP_POOL`, `DIRECTED_POOL`, `PickRandom`, `JitteredInterval`, `CategorizeCoopPool`, `WeightedPickCoopEvent`, `FindCompanion`, `ComputeIdleState`, `GenerateCameraEvents` (global); camera constants (`CAM_INTERVAL_16THS` etc., partially global); `WeightedPickInstrument` (local) |
+| `rock_band_general_helper_vkr/venue_camera.lua` | `COOP_POOL`, `DIRECTED_POOL`, `PickRandom`, `JitteredInterval`, `CategorizeCoopPool`, `WeightedPickCoopEvent`, `FindCompanion`, `ComputeIdleState`, `GenerateCameraEvents`, `ResolveUserCamInterval` (global); camera constants (`CAM_INTERVAL_16THS` etc., partially global); `WeightedPickInstrument` (local) |
 | `rock_band_general_helper_vkr/venue_sprites.lua` | `LoadVenueSprite`, `DrawVenueTooltipSprite`, `BeginVenueTooltip`, `EndVenueTooltip`, `VenueSpriteFoldersFound` (global); `DIRECTED_SPRITE_NAMES`, `VENUE_SPRITE_ROOT` (module-level globals). JPEG-only. Checks `resources/img/spritesheets/{category}/` (large) then `resources/img/spritesheets/{category} small/` (small) — no third-party fallback. Frame count is read from the filename (`{key}_f{N}_spritesheet.jpg`). Display size scales by `S.venue_preview_scale` (1 or 2). Cache stores `{image, frame_count, cols, rows}` per sprite. |
 | `rock_band_general_helper_vkr/venue_lighting.lua` | `MANUAL_LIGHTING_SET`, `LIGHTING_OFFSET_16THS`, `INST_KF_MODES`, `FindNextMeasureStartPpq`, `CollectInstNotePositions`, `GenerateKeyframesForSpan`, `GenerateLightingEvents`, `GenerateThemedSectionEvents` (global); `MANUAL_LIGHTING_POOL`, `AUTO_LIGHTING_POOL`, lighting constants, `SnapPpqToNearestBeat`, `ProcessThemeSection` (local) |
-| `rock_band_general_helper_vkr/venue_generator.lua` | `GenerateVenueEvents`, `ClearVenueTextEventsInRange`, `ClearVenueNonCameraEventsInRange`, `ClearVenueExceptLPInRange`, `ClearVenueKeyframesInRange` (global) |
+| `rock_band_general_helper_vkr/venue_generator.lua` | `GenerateVenueEvents`, `DeleteTextEventsInRange` (predicate-driven deleter backing all clear functions), `ClearVenueTextEventsInRange`, `ClearVenueNonCameraEventsInRange`, `ClearVenueExceptLPInRange`, `ClearVenueKeyframesInRange` (global) |
 | `rock_band_general_helper_vkr/tempomap.lua` | `ComputeTempoRMSContour`, `DetectOnsets`, `EstimateBPM`, `GuessTimeSig`, `GetSourcesForRange`, `FitBeatGrid`, `RmsToOnsetFlux`, `FindLocalPeak` |
 | `rock_band_general_helper_vkr/actions.lua` | `AlignAudioTracks`, `AlignAllAudio`, `AlignCountIn`, `CreateSongFadeOut`; `CountInBeatSlots` (local) |
 | `rock_band_general_helper_vkr/actions_tempomap.lua` | `ShowTempoContext`, `EstimateInitialBPM`, `AutoTuneThreshold`, `ClearGeneratedTempoMarkers`, `GenerateTempoMap`; `BPM_MIN`, `BPM_MAX` (locals) |
@@ -137,22 +148,30 @@ Four WIP tabs appear only when **Show WIPs? = Yes** in the General tab (persiste
 | `rock_band_general_helper_vkr/ui_keys.lua` | `DrawKeysTab`, `DrawDifficultyTab` (global) — Keys and Difficulty tab rendering |
 | `rock_band_general_helper_vkr/ui_midi.lua` | `DrawTabInputTab`, `DrawMIDITab` (global) — Tab Input and MIDI tab rendering |
 | `rock_band_general_helper_vkr/actions_venue_manual.lua` | `InsertVenueEventAtPlayhead`, `AdvanceCameraPacing`, `GenerateManualKeyframes`, `RemoveVenueEventsByType` (global) — Manual gen actions |
+| `rock_band_general_helper_vkr/section_events.lua` | `SECTION_EVENT_GROUPS`, `SECTION_EVENT_BASE` — EVENTS-track event vocabulary (groups, per-base number/letter caps) for the Events sub-tab; data only, no S/REAPER deps |
+| `rock_band_general_helper_vkr/actions_venue_events.lua` | `FindEventsTake`, `ScanEventsTextEvents`, `NextSectionEvent` (pure), `ValidatePlainInsert` (pure), `InsertEventsEvent`, `AddSectionEvent`, `ClearAllEventsTexts`, `InsertEventsBookends` (global) — Events sub-tab actions + validation |
 | `rock_band_general_helper_vkr/actions_venue_keyframes.lua` | `RegenerateVenueKeyframes` (global) — Keyframes tab action: bulk-regenerates keyframes for every manual lighting event on the VENUE track |
 | `rock_band_general_helper_vkr/actions_venue_sing_along.lua` | `GenerateSingAlong` (global) — Analysis tab action: derives VENUE pitch 85/87 sing-along notes from HARM2/HARM3 vocal phrases; `AvailableHarmTake`, `ReadPhrasesAndVocalNotes`, `MeasureDurationAtTime`, `BuildSpans` (local) |
-| `rock_band_general_helper_vkr/ui_venue.lua` | `DrawVenueTab` (global) — Venue tab rendering (sub-tab bar: Analysis, Themes gen, Section gen, Manual gen, Keyframes, Preview; Keyframes and Preview delegate to their own files) |
-| `rock_band_general_helper_vkr/ui_venue_preview.lua` | `DrawVenuePreviewTab` (global) — Preview sub-tab rendering |
+| `rock_band_general_helper_vkr/ui_venue.lua` | `DrawVenueTab`, `RenderCamPacingRow`, `RenderKeyframeAlignCombo` (global) — Venue tab bar (Analysis, Events, Themes gen, Section gen, Manual gen, Keyframes, Preview; only Analysis and Themes gen are drawn inline — every other sub-tab delegates to its own file) plus the camera-pacing / keyframe-align widgets shared by the generation sub-tabs |
+| `rock_band_general_helper_vkr/ui_venue_section_gen.lua` | `DrawVenueSectionGenTab` (global) — Section gen sub-tab rendering |
+| `rock_band_general_helper_vkr/ui_venue_manual.lua` | `DrawVenueManualTab` (global) — Manual gen sub-tab rendering |
+| `rock_band_general_helper_vkr/ui_venue_events.lua` | `DrawVenueEventsTab` (global) — Events sub-tab rendering |
+| `rock_band_general_helper_vkr/ui_venue_preview.lua` | `DrawVenuePreviewTab` (global) — Preview sub-tab rendering; caches the VENUE event lists + muted instruments, refreshed on any project state change with a 5 s fallback and a self-pause when one read takes ≥ 0.15 s |
+| `rock_band_general_helper_vkr/ui_venue_players.lua` | `DrawActivePlayersRow` (global) — Active players dot row shown under every Venue sub-tab and in the standalone preview; PART-track play-state scan cached via `MakeProjectPoll(1.0, 5.0)`, playhead lookup recomputed on playhead change (≥ 0.5 s cadence during playback) |
 | `rock_band_general_helper_vkr/ui_venue_keyframes.lua` | `DrawVenueKeyframesTab` (global) — Keyframes sub-tab rendering |
 | `rock_band_general_helper_vkr/ui.lua` | `TrackCombo` (global override supporting `sel_idx=-1`), `Loop`, `r.defer(Loop)` |
 
 **Local-only functions:**
 - `settings.lua`: `SerializeSettings`, `DeserializeSettings`
-- `venue.lua`: `FindVenueTrack`, `ReadVenueTextEvents`, `BuildCameraGaps`, `GapStats`
+- `venue.lua`: `ReadVenueTextEvents`, `BuildCameraGaps`, `GapStats`
 - `venue_awareness.lua`: `INST_TRACK_NAMES`, `ParsePrcEvent`
 - `venue_themes.lua`: `POSTPROC_VALID_SET`, `LIGHTING_VALID_SET`, `CAMERA_PACING`, `Tokenize`, `ParseSexpr`, `ParseThemeFile`, `InterpretSectionPreset`, `InterpretTheme`
 - `venue_camera.lua`: `WeightedPickInstrument`; camera constants `CAM_DIRECTED_COOLDOWN`, `DIRECTED_MIN_COUNT`, `DIRECTED_MAX_COUNT`, `INST_WEIGHTS`, `INST_ORDER`, `IDLE_WEIGHT`
 - `venue_sprites.lua`: `_sprite_cache`, `_sprite_dirs_found`, `NormalizeSpriteKey`, `_try_load_from_dir`, `FindAndLoadSprite`, `_CAT_FOLDER`, `POSTPROC_SPRITE_NAMES`; `SPRITE_COLS`, `SPRITE_ROWS`, `SPRITE_FRAME_RATE`, `SPRITE_DISPLAY_W`, `SPRITE_DISPLAY_H`
 - `venue_lighting.lua`: `MANUAL_LIGHTING_POOL`, `AUTO_LIGHTING_POOL`, `LIGHTING_INTERVAL_16THS`, `LIGHTING_JITTER`, `KEYFRAME_MIN_BEATS`, `KEYFRAME_MAX_BEATS`, `SnapPpqToNearestBeat`, `ProcessThemeSection`
 - `actions_venue_sing_along.lua`: `RB3_VOCAL_MIN`, `RB3_VOCAL_MAX`, `RB3_PHRASE_PITCH` (module-level locals), `AvailableHarmTake`, `ReadPhrasesAndVocalNotes`, `MeasureDurationAtTime`, `BuildSpans`
+- `actions_venue_events.lua`: `_round_ppq`, `_is_crowd`, `_bare_form`, `_letter_form`, `_family_span`, `_spot_conflict`, `_require_take`, `_insert`, `_refuse`; `BOOKEND_EVENTS` (module-level local)
+- `ui_venue_events.lua`: `_draw_prc_row`, `_draw_plain_row`
 - `actions.lua`: `CountInBeatSlots`
 - `actions_tempomap.lua`: `BPM_MIN`, `BPM_MAX` (module-level locals)
 - `actions_drums.lua`: `BuildMap`, `ReadMIDINotes`, `ClearDrumNotes`, `BuildDrumOutput`, `BuildReport`
@@ -181,18 +200,22 @@ lib/reaper_dsp.lua             → (loaded; not currently used by general helper
 lib/reaper_midi_helpers.lua    → FindFirstMIDIItem, InsertNotes, ClearNotesAtPitchesInRange, …
 defaults.lua                   → S, VENUE_VALID, TIPS, constants
 settings.lua                   → SaveSettings, LoadSettings
-helpers.lua                    → FindTrackByName, SetDefaultTempoTracks, SetDefaultMIDITracks,
+helpers.lua                    → FindTrackByName, FindNamedTrackMIDI, GetTakePPQPerQN,
+                                  SetDefaultTempoTracks, SetDefaultMIDITracks,
                                   SetDefaultDifficultyTracks, GetTempoContextBefore,
-                                  GetMeasureStartTime, GetAudioItems
-venue.lua                      → ListVenueEvents
+                                  GetMeasureStartTime, GetAudioItems, MakeProjectPoll
+venue.lua                      → ListVenueEvents, GetVenueEventsForPreview
 venue_awareness.lua            → GetMutedInstruments, GetCoopRequiredInstruments,
                                   GetDirectedRequiredInstruments, FilterPool,
-                                  ReadEventSections, ListEventSections, FindMusicStartTime
+                                  ReadEventSections, ListEventSections, FindMusicStartTime,
+                                  INST_LETTER_NAMES
+section_events.lua             → SECTION_EVENT_GROUPS, SECTION_EVENT_BASE (data only)
 venue_themes.lua               → ThemeDisplayLabel, LoadVenueThemes, GetSectionPreset,
                                   GetThemeCameraInterval, BuildLightingPool, BuildPostprocPool
 venue_camera.lua               → COOP_POOL, DIRECTED_POOL, PickRandom, JitteredInterval,
                                   CategorizeCoopPool, WeightedPickCoopEvent, FindCompanion,
-                                  ComputeIdleState, GenerateCameraEvents; camera globals
+                                  ComputeIdleState, GenerateCameraEvents,
+                                  ResolveUserCamInterval; camera globals
                                   (CAM_INTERVAL_16THS etc.)
 venue_sprites.lua              → LoadVenueSprite, DrawVenueTooltipSprite, BeginVenueTooltip,
                                   EndVenueTooltip; VENUE_SPRITE_ROOT, VENUE_SPRITE_SELF_ROOT,
@@ -201,7 +224,7 @@ venue_lighting.lua             → MANUAL_LIGHTING_SET, LIGHTING_OFFSET_16THS, I
                                   FindNextMeasureStartPpq, CollectInstNotePositions,
                                   GenerateKeyframesForSpan, GenerateLightingEvents,
                                   GenerateThemedSectionEvents
-venue_generator.lua            → GenerateVenueEvents, ClearVenueTextEventsInRange,
+venue_generator.lua            → GenerateVenueEvents, DeleteTextEventsInRange, ClearVenueTextEventsInRange,
                                   ClearVenueNonCameraEventsInRange, ClearVenueExceptLPInRange,
                                   ClearVenueKeyframesInRange
 tempomap.lua                   → ComputeTempoRMSContour, DetectOnsets, EstimateBPM,
@@ -222,12 +245,19 @@ actions_difficulty.lua         → SuggestProKeysDiff, ValidateProKeysDiff, Vali
 actions_difficulty_5k.lua      → ValidateKeys5Diff, ValidateAllKeys5, SuggestKeys5Diff
 actions_venue_manual.lua       → InsertVenueEventAtPlayhead, AdvanceCameraPacing,
                                   GenerateManualKeyframes, RemoveVenueEventsByType
+actions_venue_events.lua       → FindEventsTake, ScanEventsTextEvents, NextSectionEvent,
+                                  ValidatePlainInsert, InsertEventsEvent, AddSectionEvent,
+                                  ClearAllEventsTexts, InsertEventsBookends
 actions_venue_keyframes.lua    → RegenerateVenueKeyframes
 actions_venue_sing_along.lua   → GenerateSingAlong
 ui_keys.lua                    → DrawKeysTab, DrawDifficultyTab
 ui_midi.lua                    → DrawTabInputTab, DrawMIDITab
-ui_venue.lua                   → DrawVenueTab
+ui_venue.lua                   → DrawVenueTab, RenderCamPacingRow, RenderKeyframeAlignCombo
+ui_venue_section_gen.lua       → DrawVenueSectionGenTab
+ui_venue_manual.lua            → DrawVenueManualTab
+ui_venue_events.lua            → DrawVenueEventsTab
 ui_venue_preview.lua           → DrawVenuePreviewTab
+ui_venue_players.lua           → DrawActivePlayersRow
 ui_venue_keyframes.lua         → DrawVenueKeyframesTab
 ui.lua                         → Loop (also calls r.defer(Loop))
 [entry point startup]          → LoadSettings(), SetDefaultTempoTracks(),
@@ -236,7 +266,9 @@ ui.lua                         → Loop (also calls r.defer(Loop))
 
 **`SCRIPT_MDIR` global.** The entry point sets `SCRIPT_MDIR = _mdir` (global) so dofile'd modules can access the module folder path for filesystem operations. The `local _mdir` variable is not accessible from dofile'd modules. **`SCRIPT_DIR` global.** The entry point also sets `SCRIPT_DIR = _dir` (repo root) for accessing shared resources under `resources/` (e.g. `resources/themes/`, `resources/img/spritesheets/`).
 
-**Second entry point: `rock_band_preview_vkr.lua` (repo root).** Standalone Venue Preview window. It has no module folder of its own — it dofiles a subset of this helper's modules: `lib/reaper_imgui_helpers.lua`, then `defaults.lua`, `settings.lua`, `helpers.lua`, `venue.lua`, `venue_awareness.lua`, `venue_sprites.lua`, `ui_venue_preview.lua`, and runs its own minimal `Loop` calling `DrawVenuePreviewTab()`. Consequences when editing those files:
+**Polling convention for continuous MIDI reads.** UI draw code that reads project MIDI every frame is forbidden — gate the read behind `MakeProjectPoll(min_secs, fallback_secs)` (helpers.lua): it fires when `GetProjectStateChangeCount` changed (subject to `min_secs`) or `fallback_secs` elapsed (safety net for count collisions across project switches). Heavy multi-track scans use `min_secs = 1.0` (protects against per-frame count churn while dragging notes in a MIDI editor). Only pure-Lua lookups over the cached data may run per frame; lookups that follow the *play* position during playback should recompute at a ~0.5 s cadence, while stopped-cursor moves recompute immediately (the lookup is cheap; a debounce would only add lag). Cached take pointers must be `ValidatePtr2`-checked before use. Note: `GetProjectStateChangeCount` only increments when an **undo point** is registered — bare API edits without an undo block are invisible to the count gate (they are still caught by the `fallback_secs` rescan). All helper edit paths create undo points (the mandatory undo-block pattern), as do user edits in REAPER, so in practice only undo-less test/script edits need care. Current adopters: `ui_venue_players.lua`, `ui_venue_events.lua`; `ui_venue_preview.lua` keeps its own immediate-on-change + self-pause variant; the vocal helper's tuner (audio, 100 ms + playhead gate) is intentionally separate.
+
+**Second entry point: `rock_band_preview_vkr.lua` (repo root).** Standalone Venue Preview window. It has no module folder of its own — it dofiles a subset of this helper's modules: `lib/reaper_imgui_helpers.lua`, then `defaults.lua`, `settings.lua`, `helpers.lua`, `venue.lua`, `venue_awareness.lua`, `venue_sprites.lua`, `ui_venue_preview.lua`, `ui_venue_players.lua`, and runs its own minimal `Loop` calling `DrawVenuePreviewTab()` + `DrawActivePlayersRow()`. Consequences when editing those files:
 - They must keep working without the rest of the general helper loaded — do not add load-time or call-time dependencies (from the preview code path) on modules outside this subset. `settings.lua` guards its `SaveSectionConfigs`/`LoadSectionConfigs` calls (`if X then X() end`) for this reason.
 - `venue_sprites.lua` reads `SCRIPT_DIR` at dofile time; both entry points set it before loading.
 - The standalone calls `LoadSettings()` at startup and on project switch, but never `SaveSettings()` (saving stays in the general helper's General tab).
@@ -587,7 +619,7 @@ Walking events sorted by time: if the current event has a letter suffix AND the 
 }
 ```
 
-`song_end_t` passed to `ReadEventSections` defaults to the VENUE item end (from `FindVenueTrack`), falling back to `r.GetProjectLength(0)`.
+`song_end_t` passed to `ReadEventSections` defaults to the VENUE item end (from `FindNamedTrackMIDI('VENUE')`), falling back to `r.GetProjectLength(0)`.
 
 ### Display output (`ListEventSections`)
 

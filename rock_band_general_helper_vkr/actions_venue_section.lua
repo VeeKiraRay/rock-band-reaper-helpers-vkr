@@ -74,20 +74,15 @@ end
 -- ---------------------------------------------------------------------------
 
 function LoadVenueSections()
-    local track = FindTrackByName('VENUE')
+    local track, item = FindNamedTrackMIDI('VENUE')
     if not track then
         S.status = 'No VENUE track found - cannot read sections.'
         return
     end
     local item_end = r.GetProjectLength(0)
-    for i = 0, r.CountTrackMediaItems(track) - 1 do
-        local it = r.GetTrackMediaItem(track, i)
-        local tk = r.GetActiveTake(it)
-        if tk and r.TakeIsMIDI(tk) then
-            item_end = r.GetMediaItemInfo_Value(it, 'D_POSITION') +
-                       r.GetMediaItemInfo_Value(it, 'D_LENGTH')
-            break
-        end
+    if item then
+        item_end = r.GetMediaItemInfo_Value(item, 'D_POSITION') +
+                   r.GetMediaItemInfo_Value(item, 'D_LENGTH')
     end
     local secs = ReadEventSections(item_end)
     if not secs or #secs == 0 then
@@ -115,17 +110,11 @@ function GenerateSectionEvent()
         return
     end
 
-    local track = FindTrackByName('VENUE')
+    local track, item, take = FindNamedTrackMIDI('VENUE')
     if not track then
         S.status     = 'No VENUE track found.'
         S.last_result = nil
         return
-    end
-    local item, take = nil, nil
-    for i = 0, r.CountTrackMediaItems(track) - 1 do
-        local it = r.GetTrackMediaItem(track, i)
-        local tk = r.GetActiveTake(it)
-        if tk and r.TakeIsMIDI(tk) then item, take = it, tk; break end
     end
     if not item then
         S.status     = 'No MIDI item on VENUE track.'
@@ -160,10 +149,7 @@ function GenerateSectionEvent()
 
     local item_start_sec = r.GetMediaItemInfo_Value(item, 'D_POSITION')
 
-    local qn_start = r.MIDI_GetPPQPosFromProjQN(take, 0)
-    local qn_one   = r.MIDI_GetPPQPosFromProjQN(take, 1)
-    local ppq      = qn_one - qn_start
-    if ppq <= 0 then ppq = 960 end
+    local ppq = GetTakePPQPerQN(take)
     local sixteenth_ticks = ppq / 4
 
     local sec_start_ppq = r.MIDI_GetPPQPosFromProjTime(take, sec.t_start)
@@ -221,17 +207,10 @@ function GenerateSectionEvent()
     end
     coop_opts.sing_states = sing_states_16ths
 
-    -- Camera interval
+    -- Camera interval: user override, else (template mode) the template theme's pacing
     local bpm = r.Master_GetTempo()
-    local cam_interval = nil
-    local _user_cp_names = {nil, 'minimal', 'slow', 'medium', 'fast', 'crazy'}
-    local user_cam_pacing = _user_cp_names[S.venue_cam_pacing + 1]
-    if user_cam_pacing then
-        cam_interval = GetThemeCameraInterval(user_cam_pacing, bpm)
-    elseif S.venue_cam_pacing == 6 then
-        local base = S.venue_cam_pacing_custom
-        cam_interval = (bpm >= 150) and math.floor(base * 1.5 + 0.5) or base
-    elseif S.venue_sec_mode == 1 then
+    local cam_interval = ResolveUserCamInterval(bpm)
+    if not cam_interval and S.venue_sec_mode == 1 then
         local _tmpl_th = S.venue_themes and S.venue_themes[S.venue_sec_tmpl_idx]
         if _tmpl_th and _tmpl_th.camera_pacing then
             cam_interval = GetThemeCameraInterval(_tmpl_th.camera_pacing, bpm)
@@ -453,11 +432,9 @@ function GenerateSectionEvent()
     end
     lines[#lines + 1] = ''
 
-    local letter_names = {d='Drums', v='Vocals', b='Bass', g='Guitar', k='Keys'}
     local warn_no_data = {}
-    local nd_names_map = { d='Drums', v='Vocals', b='Bass', g='Guitar', k='Keys' }
     for _, l in ipairs(no_data_letters) do
-        if not muted[l] then warn_no_data[#warn_no_data + 1] = nd_names_map[l] or l end
+        if not muted[l] then warn_no_data[#warn_no_data + 1] = INST_LETTER_NAMES[l] or l end
     end
     table.sort(warn_no_data)
     if #warn_no_data > 0 then
@@ -466,7 +443,7 @@ function GenerateSectionEvent()
     end
 
     local muted_names = {}
-    for letter in pairs(muted) do muted_names[#muted_names + 1] = letter_names[letter] or letter end
+    for letter in pairs(muted) do muted_names[#muted_names + 1] = INST_LETTER_NAMES[letter] or letter end
     table.sort(muted_names)
     if #muted_names > 0 then
         lines[#lines + 1] = 'Muted/absent: ' .. table.concat(muted_names, ', ')

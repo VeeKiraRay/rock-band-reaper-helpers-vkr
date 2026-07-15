@@ -194,6 +194,11 @@ S = {
     venue_mg_remove_type = 0,    -- 0=Camera 1=Lighting 2=PostProc 3=Special 4=All
     -- Keyframes tab (not persisted - session state only)
     venue_kf_rate        = 2,    -- keyframe rate in beats (1-8), independent of venue_mg_kf_rate
+    -- Events tab (not persisted - session state only)
+    venue_ev_sel         = {},   -- per-group selected base/event ('' = none), keyed by group key
+    venue_ev_num         = {},   -- per-group number 0-9 (0 = bare form), keyed by group key
+    venue_ev_letters     = true, -- 'Use letter suffix' checkbox
+    venue_ev_mode        = 0,    -- reserved: 0 = EVENTS target (phase-2 mode radio)
     -- UI visibility (persisted)
     show_wip_tabs           = false, -- show Tempo Map, Drums, Keys, Guitar tabs
 }
@@ -327,6 +332,46 @@ TIPS = {
                           "Respects an active time selection (only lighting events inside the\n" ..
                           "selection are regenerated); otherwise processes the whole song.\n\n" ..
                           "Fully undoable.",
+
+    -- Events tab
+    venue_ev_num     = "Section number: 'bare' inserts the unnumbered event ([prc_verse]),\n" ..
+                       "1-9 insert numbered variants ([prc_verse_1]).\n\n" ..
+                       "Use 'bare' when a section type occurs only once (e.g. a single\n" ..
+                       "guitar solo) and numbers when it repeats - bare and numbered\n" ..
+                       "variants of the same event must not co-exist, and numbers must\n" ..
+                       "be used in order ([prc_verse_2] needs [prc_verse_1] before it).\n\n" ..
+                       "Ctrl+click to type an exact value.",
+    venue_ev_letters = "Insert lettered part events - [prc_verse_1a], [prc_verse_1b], ...\n" ..
+                       "- used to split a long section into parts (they merge back into\n" ..
+                       "one section in Section gen). The next free letter is picked\n" ..
+                       "automatically; a letter deleted by hand is offered again, placed\n" ..
+                       "between its neighbors.\n\n" ..
+                       "On: Add only inserts lettered forms, never the plain event.\n" ..
+                       "Off: Add only inserts the plain event, and refuses when it\n" ..
+                       "already exists. Plain and lettered forms of the same event must\n" ..
+                       "not be mixed. Events with no lettered variants (e.g. [prc_bre])\n" ..
+                       "always insert the plain form.",
+    venue_ev_next    = "The exact event the Add button will insert at the current playhead\n" ..
+                       "position, based on the selection, number, letter mode, and the\n" ..
+                       "events already on the EVENTS track.\n\n" ..
+                       "Shows '(blocked)' when the Add would be refused (duplicate, mixed\n" ..
+                       "plain/lettered or bare/numbered forms, wrong order, or another\n" ..
+                       "event on the same spot; crowd events are exempt) - hover it for\n" ..
+                       "the reason, which is also reported in the result on Add.",
+    venue_ev_add     = "Insert the shown event at the exact playhead position on the\n" ..
+                       "EVENTS track.\n\nFully undoable.",
+    venue_ev_bookends = "Insert the minimal event set every song needs:\n" ..
+                        "  measure 1:  [prc_intro] + [crowd_normal]\n" ..
+                        "  measure 3:  [music_start]\n" ..
+                        "  measure E-5 / E-2 / E:  [prc_outro] / [music_end] / [end]\n" ..
+                        "where E is the last measure fully contained in the MIDI item.\n" ..
+                        "Items shorter than 7 full measures skip the three end events.\n\n" ..
+                        "Existing instances of these six events are removed first, so\n" ..
+                        "re-running recalculates their positions. A different event\n" ..
+                        "already sitting on a target measure makes that bookend be\n" ..
+                        "skipped (reported in the result).\n\nFully undoable.",
+    venue_ev_clear   = "Remove every text event from the EVENTS track.\n" ..
+                       "The track name event is left as is.\n\nFully undoable.",
 
     -- Active players row (bottom of the Venue tab and standalone preview window).
     -- venue_player_* entries are string.format templates filled in by
@@ -690,9 +735,6 @@ TIPS = {
                            "Current only       \xe2\x80\x93  one column showing the active event (started at or\n" ..
                            "                      before the playhead and not yet superseded).\n" ..
                            "Surrounding events \xe2\x80\x93  three columns: the previous, current, and next event.",
-    venue_preview_refresh ="Re-read all events from the VENUE track.\n\n" ..
-                           "Click this after editing the VENUE MIDI item so the preview\n" ..
-                           "reflects the latest state.",
     venue_preview_refresh_resume = "Auto-refresh was paused because the last VENUE MIDI read\n" ..
                            "took 150 ms or longer.\n\n" ..
                            "Click to re-enable automatic updates. If it pauses again,\n" ..

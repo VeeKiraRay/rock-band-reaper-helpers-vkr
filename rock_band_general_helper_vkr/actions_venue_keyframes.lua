@@ -1,29 +1,20 @@
 -- Keyframes tab: bulk regeneration of [first]/[next] keyframes for every manual lighting
 -- event already on the VENUE track.
--- Requires: FindTrackByName, GetTimeSelection, MANUAL_LIGHTING_SET, GenerateKeyframesForSpan,
---           ClearVenueKeyframesInRange, r, S (globals)
+-- Requires: FindNamedTrackMIDI, GetTakePPQPerQN, GetTimeSelection, MANUAL_LIGHTING_SET,
+--           GenerateKeyframesForSpan, ClearVenueKeyframesInRange, r, S (globals)
 
 function RegenerateVenueKeyframes()
-    local track = FindTrackByName('VENUE')
+    local track, item, take = FindNamedTrackMIDI('VENUE')
     if not track then
         S.status = 'No VENUE track found.'
         return
-    end
-    local item, take
-    for i = 0, r.CountTrackMediaItems(track) - 1 do
-        local it = r.GetTrackMediaItem(track, i)
-        local tk = r.GetActiveTake(it)
-        if tk and r.TakeIsMIDI(tk) then item, take = it, tk; break end
     end
     if not item then
         S.status = 'No MIDI item on VENUE track.'
         return
     end
 
-    local qn_start = r.MIDI_GetPPQPosFromProjQN(take, 0)
-    local qn_one   = r.MIDI_GetPPQPosFromProjQN(take, 1)
-    local ppq      = qn_one - qn_start
-    if ppq <= 0 then ppq = 960 end
+    local ppq       = GetTakePPQPerQN(take)
     local half_beat = math.floor(ppq / 2 + 0.5)
 
     local item_start_sec = r.GetMediaItemInfo_Value(item, 'D_POSITION')

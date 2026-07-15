@@ -6,7 +6,7 @@
 function DrawVenueKeyframesTab()
     local _bp = 40
 
-    r.ImGui_TextDisabled(ctx,
+    r.ImGui_Text(ctx,
         'Regenerate [first]/[next] keyframes for every manual lighting event already on the VENUE track')
     r.ImGui_Spacing(ctx)
 

@@ -1,7 +1,7 @@
 -- Venue track awareness: instrument mute detection, pool filtering,
 -- and [prc_*] section detection from the EVENTS track.
--- Requires: FindTrackByName, r, S, FormatTime (globals)
--- Globals exported here also include: FindMusicStartTime
+-- Requires: FindTrackByName, FindNamedTrackMIDI, r, S, FormatTime (globals)
+-- Globals exported here also include: FindMusicStartTime, INST_LETTER_NAMES
 
 local INST_TRACK_NAMES = {
     d = 'PART DRUMS',
@@ -9,6 +9,12 @@ local INST_TRACK_NAMES = {
     b = 'PART BASS',
     g = 'PART GUITAR',
     k = 'PART KEYS',
+}
+
+-- Display names for the instrument letters (shared by generator/section/UI
+-- result messages and the players row)
+INST_LETTER_NAMES = {
+    d = 'Drums', v = 'Vocals', b = 'Bass', g = 'Guitar', k = 'Keys',
 }
 
 -- A track is unavailable (muted[letter] = true) if it is muted OR absent.
@@ -225,16 +231,9 @@ end
 -- merged into one section. Events without a letter are always standalone.
 -- Returns nil, error_string on failure; returns {} when no prc events found.
 function ReadEventSections(song_end_t)
-    local track = FindTrackByName('EVENTS')
+    local track, item, take = FindNamedTrackMIDI('EVENTS')
     if not track then
         return nil, 'No track named "EVENTS" found in this project.'
-    end
-
-    local item, take = nil, nil
-    for i = 0, r.CountTrackMediaItems(track) - 1 do
-        local it = r.GetTrackMediaItem(track, i)
-        local tk = r.GetActiveTake(it)
-        if tk and r.TakeIsMIDI(tk) then item, take = it, tk; break end
     end
     if not item then
         return nil, 'Found the EVENTS track but it has no MIDI items.'
@@ -296,14 +295,7 @@ end
 -- venue generator to anchor the first generated camera cut and any [prc_*]
 -- section placed right at the song's literal start.
 function FindMusicStartTime()
-    local track = FindTrackByName('EVENTS')
-    if not track then return nil end
-    local item, take = nil, nil
-    for i = 0, r.CountTrackMediaItems(track) - 1 do
-        local it = r.GetTrackMediaItem(track, i)
-        local tk = r.GetActiveTake(it)
-        if tk and r.TakeIsMIDI(tk) then item, take = it, tk; break end
-    end
+    local _, _, take = FindNamedTrackMIDI('EVENTS')
     if not take then return nil end
     local best_ppq
     local _, _, _, text_count = r.MIDI_CountEvts(take)
@@ -319,18 +311,11 @@ end
 
 function ListEventSections()
     -- Use VENUE item end as song_end_t; fall back to project length
-    local song_end_t  = r.GetProjectLength(0)
-    local venue_track = FindTrackByName('VENUE')
-    if venue_track then
-        for i = 0, r.CountTrackMediaItems(venue_track) - 1 do
-            local it = r.GetTrackMediaItem(venue_track, i)
-            local tk = r.GetActiveTake(it)
-            if tk and r.TakeIsMIDI(tk) then
-                song_end_t = r.GetMediaItemInfo_Value(it, 'D_POSITION')
-                           + r.GetMediaItemInfo_Value(it, 'D_LENGTH')
-                break
-            end
-        end
+    local song_end_t = r.GetProjectLength(0)
+    local _, venue_item = FindNamedTrackMIDI('VENUE')
+    if venue_item then
+        song_end_t = r.GetMediaItemInfo_Value(venue_item, 'D_POSITION')
+                   + r.GetMediaItemInfo_Value(venue_item, 'D_LENGTH')
     end
 
     local sections, err = ReadEventSections(song_end_t)

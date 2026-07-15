@@ -1,34 +1,21 @@
 -- Manual gen actions: single-event insertion at the playhead, playhead advance,
 -- keyframe generation, and selective event removal.
--- Requires: FindTrackByName, MANUAL_LIGHTING_SET, INST_KF_MODES,
---           FindNextMeasureStartPpq, CollectInstNotePositions,
---           GetThemeCameraInterval, JitteredInterval, CAM_INTERVAL_16THS, CAM_JITTER,
---           r, S (globals)
+-- Requires: FindNamedTrackMIDI, GetTakePPQPerQN, MANUAL_LIGHTING_SET, INST_KF_MODES,
+--           FindNextMeasureStartPpq, CollectInstNotePositions, ResolveUserCamInterval,
+--           JitteredInterval, CAM_INTERVAL_16THS, CAM_JITTER,
+--           DeleteTextEventsInRange, ClearVenueKeyframesInRange, r, S (globals)
 
 local function _find_venue_track_and_take()
-    local track = FindTrackByName('VENUE')
+    local track, item, take = FindNamedTrackMIDI('VENUE')
     if not track then
         S.status = 'No VENUE track found.'
         return nil, nil, nil
-    end
-    local item, take
-    for i = 0, r.CountTrackMediaItems(track) - 1 do
-        local it = r.GetTrackMediaItem(track, i)
-        local tk = r.GetActiveTake(it)
-        if tk and r.TakeIsMIDI(tk) then item, take = it, tk; break end
     end
     if not item then
         S.status = 'No MIDI item on VENUE track.'
         return nil, nil, nil
     end
     return track, item, take
-end
-
-local function _get_ppq(take)
-    local qn_start = r.MIDI_GetPPQPosFromProjQN(take, 0)
-    local qn_one   = r.MIDI_GetPPQPosFromProjQN(take, 1)
-    local ppq      = qn_one - qn_start
-    return ppq > 0 and ppq or 960
 end
 
 -- ---------------------------------------------------------------------------
@@ -47,24 +34,14 @@ function InsertVenueEventAtPlayhead(text)
     r.PreventUIRefresh(-1)
     r.UpdateArrange()
 
-    S.status = 'Inserted ' .. text .. ' at playhead.'
+    S.status = 'Inserted ' .. text .. ' at playhead (VENUE).'
 end
 
 -- ---------------------------------------------------------------------------
 
 function AdvanceCameraPacing()
     local bpm = r.Master_GetTempo()
-    local _user_cp_names = {nil, 'minimal', 'slow', 'medium', 'fast', 'crazy'}
-    local user_cam_pacing = _user_cp_names[S.venue_cam_pacing + 1]
-    local cam_interval
-    if user_cam_pacing then
-        cam_interval = GetThemeCameraInterval(user_cam_pacing, bpm)
-    elseif S.venue_cam_pacing == 6 then
-        local base = S.venue_cam_pacing_custom
-        cam_interval = (bpm >= 150) and math.floor(base * 1.5 + 0.5) or base
-    else
-        cam_interval = CAM_INTERVAL_16THS
-    end
+    local cam_interval = ResolveUserCamInterval(bpm) or CAM_INTERVAL_16THS
 
     local actual_16ths = JitteredInterval(cam_interval, S.venue_cam_pacing_jitter and CAM_JITTER or 0)
     local delta_qn     = actual_16ths * 0.25  -- 1 sixteenth = 0.25 quarter notes
@@ -93,7 +70,7 @@ function GenerateManualKeyframes()
     local track, item, take = _find_venue_track_and_take()
     if not track then return end
 
-    local ppq       = _get_ppq(take)
+    local ppq       = GetTakePPQPerQN(take)
     local half_beat = math.floor(ppq / 2 + 0.5)
 
     local start_ppq = r.MIDI_GetPPQPosFromProjTime(take, r.GetCursorPosition())
@@ -201,15 +178,7 @@ function GenerateManualKeyframes()
     r.MarkTrackItemsDirty(track, item)
 
     -- Clear existing keyframe events in range
-    local _, _, _, text_count = r.MIDI_CountEvts(take)
-    for i = text_count - 1, 0, -1 do
-        local ok, _, _, ppq_pos, evt_type, msg = r.MIDI_GetTextSysexEvt(take, i)
-        if ok and evt_type == 1 and ppq_pos >= start_ppq and ppq_pos < end_ppq then
-            if msg == '[first]' or msg == '[next]' or msg == '[previous]' then
-                r.MIDI_DeleteTextSysexEvt(take, i)
-            end
-        end
-    end
+    ClearVenueKeyframesInRange(take, start_ppq, end_ppq)
 
     -- Insert new keyframe events (snap forward to nearest half-beat, never before computed position)
     for _, ev in ipairs(ctrl_events) do
@@ -262,16 +231,8 @@ function RemoveVenueEventsByType(remove_type)
     r.Undo_BeginBlock2(0)
     r.MarkTrackItemsDirty(track, item)
 
-    local _, _, _, tc = r.MIDI_CountEvts(take)
-    local count = 0
-    for i = tc - 1, 0, -1 do
-        local ok, _, _, ppq_pos, evt_type, msg = r.MIDI_GetTextSysexEvt(take, i)
-        if ok and evt_type == 1 and ppq_pos >= range_start_ppq and ppq_pos < range_end_ppq
-                and match(msg) then
-            r.MIDI_DeleteTextSysexEvt(take, i)
-            count = count + 1
-        end
-    end
+    local count = DeleteTextEventsInRange(take, range_start_ppq, range_end_ppq,
+                                          function(msg) return not match(msg) end)
 
     local type_names = { 'Camera', 'Lighting', 'Post proc', 'Special', 'All' }
     local tname      = type_names[remove_type + 1] or ''
