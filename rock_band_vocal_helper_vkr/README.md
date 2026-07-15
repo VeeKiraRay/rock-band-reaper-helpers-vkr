@@ -103,6 +103,23 @@ The Tuner tab shows its own **state indicator** ("Tuner: Active" in green, "Tune
 
 Dragging the playhead while playback is stopped is also detected — the tuner reads the edit cursor position, so clicking anywhere on the timeline immediately samples that point. The "Quiet — no pitch detected" message in the status bar also appears immediately when you scrub to a silent spot (no 1.5 s delay), giving instant feedback when stepping through the timeline manually.
 
+### Vocal style preset
+
+A **Vocal style preset** combo sits above the YIN sliders on this tab, on the Pitch tab's Built-in detection sub-tab, and on the Pitch slide tab — the same combo and preset list in all three places, since they all share the same underlying YIN settings. Picking a preset fills in a starting point in one click; the combo itself resets to "Apply preset..." afterward and every slider stays editable, so treat it as a starting point to fine-tune rather than a locked mode.
+
+| Preset                          | Sets                                                                                             |
+| -------------------------------- | -------------------------------------------------------------------------------------------------- |
+| **Low male (bass–baritone)**      | Threshold 0.12, 70–470 Hz, window 40 ms, pitch range E2–A4 (40–69)                                 |
+| **Male (tenor / typical rock)**   | Threshold 0.15, 100–620 Hz, window 30 ms, pitch range A2–C5 (45–72)                                |
+| **High male (high tenor / belt)** | Threshold 0.15, 130–700 Hz, window 30 ms, pitch range C3–E5 (48–76)                                |
+| **Female (alto–mezzo)**           | Threshold 0.15, 160–900 Hz, window 25 ms, pitch range F3–A5 (53–81)                                |
+| **High female / falsetto (soprano)** | Threshold 0.15, 220–1200 Hz, window 20 ms, pitch range C4–C6 (60–84)                             |
+| **Breathy / raspy (style only)**  | Threshold 0.25, window 45 ms — frequency range and pitch constraints untouched                     |
+| **Clean / sustained (style only)**| Threshold 0.10, window 30 ms — frequency range and pitch constraints untouched                     |
+| **Piano / keys (tuner, single notes)** | Threshold 0.10, 45–2000 Hz, window 50 ms, tuner Min RMS level 0.002 — no pitch-range constraint |
+
+The five voice-range presets (Low male through High female) also enable the Min/Max pitch range constraints at the listed values — useful as a first line of defense against YIN's octave-snap errors. The two style-only presets and Piano/keys leave pitch-range constraints as they were. Piano/keys additionally shows a soft warning if the selected tracks look vocal-named, since it's meant for a quiet single-note instrument stem instead.
+
 ### YIN Detection settings
 
 These are the same settings used by the Pitch tab's Built-in detection mode. Adjusting them here changes the behaviour of both the tuner and Apply pitch changes.
@@ -180,13 +197,15 @@ The Pitch tab controls how **Apply pitch changes** re-pitches existing notes on 
 
 ![Pitch tab](../assets/pitch.jpg)
 
-### Pitch source
+### Placement sub-tabs
 
-Two radio buttons select how existing notes are re-pitched when you click Apply pitch changes:
+Pitch source is chosen by which sub-tab is open when you click Apply pitch changes — **Placement - Built-in** or **Placement - Reference** — rather than a separate selector; opening a sub-tab makes it the active pitch source.
 
-#### Built-in detection (YIN)
+#### Placement - Built-in
 
 The script analyses the audio directly using the [YIN algorithm](http://audition.ens.fr/adc/pdf/2002_JASA_YIN.pdf) to estimate the fundamental frequency of each note. No external MIDI reference needed. This is the default.
+
+A **Vocal style preset** combo (see [Tuner tab](#vocal-style-preset)) sits above the sliders here too, sharing the same settings.
 
 | Slider            | Range         | Default | Notes                                                                                                                   |
 | ----------------- | ------------- | ------- | ----------------------------------------------------------------------------------------------------------------------- |
@@ -199,7 +218,7 @@ The algorithm samples audio starting at 30% into each note (to avoid the attack 
 
 > **Tip:** If YIN produces consistent pitch errors across a section, use **Auto-tune YIN from reference** to automatically search for better settings.
 
-#### Reference MIDI
+#### Placement - Reference
 
 Pitch is taken from an existing MIDI track. For each note, the script finds the nearest MIDI note on the reference track (within the **Search tolerance** window) and uses that pitch. Falls back to Default pitch when nothing is within range.
 
@@ -214,7 +233,7 @@ Auto-tune YIN automates finding better YIN parameter values when pitch detection
 1. Run **Generate (append)** to produce an initial set of notes.
 2. In REAPER's MIDI editor, manually correct the pitches of a representative handful of notes — keep their positions and lengths unchanged.
 3. Make a time selection covering those corrected notes.
-4. Click **Auto-tune YIN from reference** (the button appears above the YIN sliders, active only when Pitch source = Built-in detection).
+4. Click **Auto-tune YIN from reference** (the button appears above the YIN sliders, on the Placement - Built-in sub-tab).
 
 The script reads the existing note positions from the MIDI item, sweeps combinations of four YIN parameters (**YIN threshold**, **Min frequency**, **Max frequency**, **YIN window**), and scores each combination against the pitches you corrected. When it finishes, the YIN sliders update to the best-found values and the result panel shows accuracy statistics.
 
@@ -247,7 +266,7 @@ Two optional checkbox+slider pairs clamp or octave-shift pitches into a target r
 
 The button is always active. Both pitch sources are meaningful for re-pitching existing notes.
 
-### Snap to Key Scale
+### Snap sub-tab: Snap to Key Scale
 
 **Snap to Key Scale** shifts every vocal note in scope to the nearest pitch in a chosen key, moving each note by the fewest semitones needed to land on a scale degree. On a tie (a note equidistant between two scale degrees), the lower pitch wins.
 
@@ -417,9 +436,9 @@ The **Key** controls are active only when at least one destination uses a Diaton
 
 Neither detect button changes the key selector — they only display a suggestion.
 
-### Copy phrase markers
+### Copy phrase markers / overdrive
 
-The **Copy phrase markers & overdrive** checkbox copies notes outside the vocal pitch range (C1–C5) — phrase-boundary markers and overdrive notes — from the source to each enabled destination. Existing out-of-range notes in the destination are cleared within the scope before inserting.
+Two independent checkboxes copy notes outside the vocal pitch range (C1–C5) from the source to each enabled destination: **Copy phrase markers** (pitch 105) and **Copy overdrive** (pitch 116). Each clears only its own matching notes in the destination within the scope before inserting.
 
 ### Scope and applying
 
@@ -558,6 +577,19 @@ The opposite — usually a missed detection (try a lower RMS threshold) or two s
 
 **Phrase capitalization check reports violations.**
 A phrase marker note (pitch 105) is followed by a lyric that starts with a lowercase letter. Either capitalize the lyric in your file or move the phrase marker — the result panel gives you the measure number and timestamp so you can navigate directly.
+
+---
+
+## Quick actions
+
+`quick_actions/` contains four small scripts, separate from the main window, meant to be bound to hotkeys for fast note editing while a MIDI editor is open on a vocal-range take. Load each one individually (**Actions → Show action list → Load ReaScript**, or **New action... → Load ReaScript...**) and assign a keyboard shortcut. Each one no-ops silently (no undo point created) if no MIDI editor is open or no qualifying note is found, so they're safe to bind and press speculatively.
+
+| Script | What it does |
+| --- | --- |
+| **Vocal note snap to playhead (auto)** | Finds the vocal-range note (C1–C5) at the edit cursor, or the nearest one within 1s, selects it, and snaps whichever edge is closer to the cursor — start closer moves the note (length preserved), end closer stretches it. |
+| **Vocal note snap start to playhead** | Same note-finding, always moves the note to start at the cursor (length preserved). |
+| **Vocal note snap end to playhead** | Same note-finding, always stretches the note to end at the cursor. Ignores notes starting at or after the cursor. |
+| **Vocal note create at playhead** | Creates a new note at the cursor, one MIDI-editor grid unit long, pitch copied from the nearest vocal-range note (or C3 if none exists). Clamped so it never overlaps the next note; does nothing if the cursor is inside an existing note. |
 
 ---
 

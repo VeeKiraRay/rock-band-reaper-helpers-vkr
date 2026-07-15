@@ -19,6 +19,15 @@ Each script checks both on startup: if ReaImGui is missing it shows an install p
 
 ---
 
+## Additional tools
+
+Two smaller scripts round out the toolset, loaded the same way as the main scripts:
+
+- **[Standalone Venue Preview](rock_band_general_helper_vkr/README.md#standalone-venue-preview)** (`rock_band_preview_vkr.lua`) — the General Helper's Venue → Preview sub-tab in its own window, so it can sit next to the generation tabs.
+- **[Quick actions](rock_band_vocal_helper_vkr/README.md#quick-actions)** (`quick_actions/`) — four no-UI hotkey scripts for fast vocal-note editing in the MIDI editor.
+
+---
+
 ## Installation
 
 1. Download and extract `rb_helper_scripts_vkr.zip` into your REAPER Scripts folder (or any folder you use for ReaScripts).
