@@ -204,6 +204,9 @@ end
 -- Parses a [prc_*] event name into {name, num, letter}.
 -- Returns nil for anything that is not a [prc_*] event.
 -- letter is nil (not empty string) when no letter suffix is present.
+-- Three forms: numbered+optionally-lettered (verse_1, verse_1a), letter-only
+-- (verse_a - used when there's only one instance of the section but it's
+-- split into practice-mode parts), and bare (verse - single, unsplit).
 local function ParsePrcEvent(event_name)
     local inner = event_name:match('^%[prc_(.+)%]$')
     if not inner then return nil end
@@ -215,9 +218,16 @@ local function ParsePrcEvent(event_name)
         name = inner:sub(1, #inner - #num_str - #letter - 1)
         if #letter == 0 then letter = nil end
     else
-        name   = inner
-        num    = nil
-        letter = nil
+        local letter_only = inner:match('_([a-z])$')
+        if letter_only then
+            name   = inner:sub(1, #inner - #letter_only - 1)
+            num    = nil
+            letter = letter_only
+        else
+            name   = inner
+            num    = nil
+            letter = nil
+        end
     end
 
     return { name = name, num = num, letter = letter }

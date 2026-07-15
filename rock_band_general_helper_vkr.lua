@@ -1,6 +1,6 @@
 -- @description Rock Band General Helper
 -- @author VeeKiraRay
--- @version 0.9.12
+-- @version 0.9.13
 -- @about
 --   Utility actions for Rock Band authoring in REAPER.
 --
@@ -17,6 +17,19 @@
 --
 --   Built with Claude (Anthropic) - https://claude.ai
 --
+--   v0.9.13
+--     - Fix: [prc_*] section grouping (List event sections, and the
+--       section-aware generator) failed to merge letter-only suffix variants
+--       with no number (e.g. [prc_verse_a]/[prc_verse_b]/[prc_verse_c]) -
+--       each was read as an unrelated standalone section instead of one
+--       merged section. Numbered-letter variants ([prc_verse_1a]) and bare
+--       forms ([prc_verse]) were unaffected.
+--     - Venue tab: "Analysis" sub-tab renamed to "Actions". "Show event
+--       sections" renamed to "List event sections" for consistency with the
+--       tab's other buttons.
+--     - Venue > Actions: new "List lighting/postproc" action. Lists every
+--       [lighting*] and *.pp] (postproc) text event on the VENUE track, in
+--       timeline order of appearance, each with its measure/timestamp.
 --   v0.9.12
 --     - Internal housekeeping, no behavior changes. ui_venue.lua split:
 --       Section gen and Manual gen sub-tabs moved to their own files
