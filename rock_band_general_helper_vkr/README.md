@@ -331,7 +331,7 @@ Inspection and utility actions that don't fit the generation sub-tabs.
 - **Camera gap statistics** — average, slowest, and fastest cut durations for coop→any and directed→coop transitions.
 - **Event frequency count** — how many times each event is used, sorted by frequency.
 
-**Show event sections** reads `[prc_*]` markers from the EVENTS track and lists all detected song sections with time ranges. Letter-suffix variants (`[prc_verse_1a]`, `[prc_verse_1b]`) are merged into a single section entry.
+**List event sections** reads `[prc_*]` markers from the EVENTS track and lists all detected song sections with time ranges. Letter-suffix variants (`[prc_verse_1a]`, `[prc_verse_1b]`) are merged into a single section entry.
 
 **List lighting/postproc** finds every `[lighting*]` and `*.pp]` (postproc) text event on the VENUE track and lists them in timeline order of appearance, each with its measure/timestamp location.
 
