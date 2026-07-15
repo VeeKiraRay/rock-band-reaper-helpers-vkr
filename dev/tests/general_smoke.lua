@@ -91,6 +91,7 @@ smoke('FillRange',           function() FillRange() end)
 
 Test.section('Venue')
 smoke('ListVenueEvents',    function() ListVenueEvents() end)
+smoke('ListLightingPostProcEvents', function() ListLightingPostProcEvents() end)
 smoke('ListEventSections',  function() ListEventSections() end)
 smoke('LoadVenueSections',  function() LoadVenueSections() end)
 smoke('GenerateVenueEvents', function() GenerateVenueEvents() end)

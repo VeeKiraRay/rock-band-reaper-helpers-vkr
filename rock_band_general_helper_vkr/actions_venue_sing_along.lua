@@ -1,4 +1,4 @@
--- Analysis tab action: derives VENUE sing-along notes (pitch 87 = guitarist, pitch 85 =
+-- Actions tab action: derives VENUE sing-along notes (pitch 87 = guitarist, pitch 85 =
 -- bassist - same SING_PITCH_MAP convention as ReadSingNoteTimelines in venue_awareness.lua)
 -- from HARM2/HARM3 vocal harmony content.
 -- Requires: FindTrackByName, FindFirstMIDIItem, ClearNotesAtPitchesInRange, InsertNotes,

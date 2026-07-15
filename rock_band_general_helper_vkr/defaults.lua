@@ -227,6 +227,8 @@ TIPS = {
     list_venue      = "Find the VENUE track (by name) and read all its text events.\n\n" ..
                       "Reports: unknown events, consecutive camera repeats, directed cut spacing,\n" ..
                       "and a frequency count of every event used.",
+    venue_lighting_postproc = "Find the VENUE track and list every [lighting*] and *.pp] (postproc)\n" ..
+                      "text event, in timeline order, each with its measure/timestamp.",
     venue_sections  = "Read [prc_*] section markers from the EVENTS track and list the\n" ..
                       "detected song sections with their time ranges.\n\n" ..
                       "Letter-suffix events ([prc_verse_1a], [prc_verse_1b], ...) are grouped\n" ..

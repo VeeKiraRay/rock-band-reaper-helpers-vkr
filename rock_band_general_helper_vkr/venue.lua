@@ -250,3 +250,53 @@ function ListVenueEvents()
     S.status = ('VENUE: %d events, %d unique.'):format(#venue_events, #freq_keys)
     S.last_result = table.concat(lines, '\n')
 end
+
+-- Lists all [lighting*] and *.pp] (postproc) text events on the VENUE track,
+-- in timeline order of appearance, each with its measure/timestamp location.
+function ListLightingPostProcEvents()
+    local track, _, take = FindNamedTrackMIDI('VENUE')
+    if not track then
+        S.status = 'No VENUE track found.'
+        S.last_result = 'No VENUE track detected.'
+        return
+    end
+    if not take then
+        S.status = 'Error reading VENUE track.'
+        S.last_result = 'No MIDI item found on VENUE track.'
+        return
+    end
+
+    local all_events = ReadVenueTextEvents(take)
+    table.sort(all_events, function(a, b) return a.t < b.t end)
+
+    local events = {}
+    local lighting_count, postproc_count = 0, 0
+    for _, ev in ipairs(all_events) do
+        if ev.evtype == 1 then
+            if ev.msg:find('^%[lighting') then
+                events[#events + 1] = ev
+                lighting_count = lighting_count + 1
+            elseif ev.msg:find('%.pp%]$') then
+                events[#events + 1] = ev
+                postproc_count = postproc_count + 1
+            end
+        end
+    end
+
+    if #events == 0 then
+        S.status = 'No lighting or post-proc events found.'
+        S.last_result = 'The VENUE track has no [lighting*] or *.pp] text events.'
+        return
+    end
+
+    local lines = {}
+    lines[#lines + 1] = ('Lighting/postproc events: %d total (%d lighting, %d postproc)')
+                        :format(#events, lighting_count, postproc_count)
+    lines[#lines + 1] = ''
+    for i, ev in ipairs(events) do
+        lines[#lines + 1] = ('%3d.  %s  %s'):format(i, ev.msg, FormatTime(ev.t))
+    end
+
+    S.status = ('%d lighting/postproc events found.'):format(#events)
+    S.last_result = table.concat(lines, '\n')
+end

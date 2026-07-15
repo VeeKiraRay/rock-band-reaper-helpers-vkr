@@ -318,9 +318,9 @@ The result panel reports the shift amount in milliseconds and, when stretching, 
 
 The Venue tab contains five sub-tabs. The script finds the VENUE track automatically by name — no dropdown needed.
 
-### Analysis sub-tab
+### Actions sub-tab
 
-Read-only inspection tools.
+Inspection and utility actions that don't fit the generation sub-tabs.
 
 **List venue events** audits all MIDI text events on the VENUE track against the Rock Band Network specification. It reports:
 
@@ -332,6 +332,8 @@ Read-only inspection tools.
 - **Event frequency count** — how many times each event is used, sorted by frequency.
 
 **Show event sections** reads `[prc_*]` markers from the EVENTS track and lists all detected song sections with time ranges. Letter-suffix variants (`[prc_verse_1a]`, `[prc_verse_1b]`) are merged into a single section entry.
+
+**List lighting/postproc** finds every `[lighting*]` and `*.pp]` (postproc) text event on the VENUE track and lists them in timeline order of appearance, each with its measure/timestamp location.
 
 ### Themes gen sub-tab
 

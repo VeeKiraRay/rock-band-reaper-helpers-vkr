@@ -470,6 +470,29 @@ else
         end)
     end)
 
+    Test.it('letter-only parts (no number) merge cleanly in ReadEventSections', function()
+        WithEventsFixture(true, function(take)
+            r.SetEditCurPos(2.0, false, false)
+            AddSectionEvent('verse', 0, V, false, true)   -- [prc_verse_a]
+            r.SetEditCurPos(4.0, false, false)
+            AddSectionEvent('verse', 0, V, false, true)   -- [prc_verse_b]
+            r.SetEditCurPos(6.0, false, false)
+            AddSectionEvent('verse', 0, V, false, true)   -- [prc_verse_c]
+            r.SetEditCurPos(8.0, false, false)
+            AddSectionEvent('chorus', 0, SECTION_EVENT_BASE.chorus.caps, false, false)  -- [prc_chorus]
+            local sections = ReadEventSections(10.0)
+            Test.expect(sections, 'ReadEventSections succeeded')
+            -- _a/_b/_c (no number) merge into one lettered section; bare
+            -- chorus stays standalone
+            Test.expect(#sections == 2, #sections .. ' sections (want 2)')
+            Test.expect(sections[1].is_lettered and sections[1].sub_count == 3
+                        and sections[1].num == nil,
+                        'letter-only parts merged (num=nil, sub_count=3)')
+            Test.expect(not sections[2].is_lettered and sections[2].sub_count == 1,
+                        'bare chorus is standalone')
+        end)
+    end)
+
     Test.it('Clear all removes every text event', function()
         WithEventsFixture(true, function(take)
             r.SetEditCurPos(2.0, false, false)
