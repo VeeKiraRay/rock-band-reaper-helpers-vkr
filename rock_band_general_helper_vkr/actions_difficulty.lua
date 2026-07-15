@@ -76,9 +76,12 @@ local function GroupIntoEvents(notes)
     for _, n in ipairs(notes) do
         if PK_LANE_SHIFT_PITCHES[n.pitch] then
             lane_shifts[#lane_shifts + 1] = n
-        elseif n.pitch >= 12 then
+        elseif n.pitch >= PK_MIN and n.pitch <= PK_MAX then
             playable[#playable + 1] = n
         end
+        -- Anything else (overdrive 116, glissando 126, trill 127, or other stray
+        -- pitches) is not a playable Pro Keys note - excluded from chord/span/
+        -- jump/spacing/overlap checks so it can't produce false positives there.
     end
 
     local events = {}
@@ -219,19 +222,6 @@ end
 ----------------------------------------------------------------------
 -- Check functions - each returns an array of issue strings
 ----------------------------------------------------------------------
-
-local function CheckRange(events)
-    local issues = {}
-    for _, ev in ipairs(events) do
-        for _, p in ipairs(ev.pitches) do
-            if p < PK_MIN or p > PK_MAX then
-                issues[#issues + 1] = ('%s: %s (pitch %d) is outside C2\xe2\x80\x93C4 (48\xe2\x80\x9372)'):format(
-                    FormatTime(ev.s), PitchName(p), p)
-            end
-        end
-    end
-    return issues
-end
 
 local function CheckChordCount(events, max_notes, max_span)
     local issues = {}
@@ -587,8 +577,6 @@ end
 -- Returns (report_text, total_issue_count)
 local function RunPKValidation(diff_label, events, lane_shifts, exp_events, sel_s, header)
     local cats = {}
-
-    cats[#cats + 1] = { name = 'Note range (C2\xe2\x80\x93C4)', issues = CheckRange(events) }
 
     local clabel = diff_label == 'E' and 'Chord count (single notes only)'
                 or ('Chord count (max ' .. PK_MAX_CHORD[diff_label] .. ')')

@@ -59,8 +59,9 @@ Four WIP tabs appear only when **Show WIPs? = Yes** in the General tab (persiste
 
 *Pro Keys sub-tab* — validates PART REAL_KEYS_X/H/M/E (one track per difficulty).
 - **Suggest Hard / Medium / Easy** — analyze Expert, report what changes are needed for each difficulty (read-only).
-- **Validate Expert / Hard / Medium / Easy / All** — check against RBN Pro Keys authoring rules: note range, chord count/span, interval jumps, spacing (M/E), lane range markers.
+- **Validate Expert / Hard / Medium / Easy / All** — check against RBN Pro Keys authoring rules: chord count/span, interval jumps, spacing (M/E), lane range markers.
 - Track indices auto-detected by name (PART REAL_KEYS_X/H/M/E).
+- Only notes in the playable Pro Keys range (48–72, C2–C4) are read as chord/gem events; reserved marker pitches (overdrive 116, glissando 126, trill 127) and any other out-of-range note are excluded before chord/span/jump/spacing/overlap grouping, so they can never masquerade as huge chords/jumps (`GroupIntoEvents` in `actions_difficulty.lua`). There is no longer a standalone "note range" check — filtering happens before events are built, so nothing outside 48–72 ever reaches a check.
 
 *5-Lane Keys sub-tab* — validates PART KEYS (all four difficulties on one track in separate pitch ranges).
 - Expert: 96–100 | Hard: 84–88 | Medium: 72–75 | Easy: 60–62.
@@ -196,7 +197,7 @@ Four WIP tabs appear only when **Show WIPs? = Yes** in the General tab (persiste
 - `actions_keys_guides.lua`: `PkEventLabel`, `ParseTabToRaws`
 - `actions_guitar.lua`: `ReadGuitarMIDI`, `GroupIntoEvents`, `IsIllegalGO`, `AssignGems`, `BuildPreviewReport`, `BuildOutNotes`, `ClearGuitarGems`
 - `actions_guitar_guide.lua`: `AssignGemsForGuide`
-- `actions_difficulty.lua`: `EventLabel`, `ReadPKNotes`, `GroupIntoEvents`, `GetBeatDurAt`, `QNAt`, `CheckRange`, `CheckChordCount`, `CheckChordSpan`, `CheckIntervalJumps`, `CheckSpacing`, `CheckLaneShifts`, `CheckNotesAboveExpert`, `BuildReport`, `RunPKValidation`
+- `actions_difficulty.lua`: `EventLabel`, `ReadPKNotes`, `GroupIntoEvents`, `GetBeatDurAt`, `QNAt`, `CheckChordCount`, `CheckChordSpan`, `CheckIntervalJumps`, `CheckSpacing`, `CheckLaneShifts`, `CheckNotesAboveExpert`, `BuildReport`, `RunPKValidation`
 - `actions_difficulty_5k.lua`: `ReadK5Notes`, `GroupK5Chords`, `GetK5BeatDur`, `QNAt`, `K5Label`, `CheckK5ChordCount`, `CheckK5Spacing`, `CheckK5NoteLength`, `CheckK5SustainGaps`, `BuildK5Report`, `RunK5Checks`
 
 Beat-fraction rules in both difficulty files (spacing, sustain gaps, note length)

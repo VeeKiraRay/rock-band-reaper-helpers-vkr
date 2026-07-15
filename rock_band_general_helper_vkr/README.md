@@ -279,7 +279,7 @@ Contains two sub-tabs for difficulty reduction guidance and validation.
 Analyzes PART REAL_KEYS_X/H/M/E tracks (auto-detected by name from the project).
 
 - **Suggest Hard / Medium / Easy** — read-only report of what changes are needed to meet RBN density and chord rules at that difficulty.
-- **Validate Expert / Hard / Medium / Easy / All** — checks note range, chord count and span, interval jumps, spacing (Medium/Easy), and lane range markers against RBN Pro Keys rules.
+- **Validate Expert / Hard / Medium / Easy / All** — checks chord count and span, interval jumps, spacing (Medium/Easy), and lane range markers against RBN Pro Keys rules. Only notes in the playable C2–C4 range are validated; overdrive, glissando, and trill markers are ignored.
 
 ### 5-Lane Keys sub-tab
 

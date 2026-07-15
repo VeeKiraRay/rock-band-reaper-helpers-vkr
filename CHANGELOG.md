@@ -9,6 +9,20 @@ over 5. See `CLAUDE.md` → "Changelog / `@about` trimming" for the rule.
 
 `rock_band_general_helper_vkr.lua`
 
+**v0.9.15**
+- Related buttons (Align all audio/Align count-in, Save/Load, the
+  Suggest/Validate rows on the Difficulty tab, Add note/Run guide,
+  the Pattern Replace row, Venue > Actions, Venue > Events quick
+  actions) now share a uniform width per group (BtnGroupWidth(), new
+  in lib/reaper_imgui_helpers.lua) instead of each sizing to its own
+  label.
+- General tab: "Refresh tracks" moved out of Settings into its own
+  "General actions" section at the top (it wasn't really a setting).
+- Venue > Events: "Use letter suffix" moved to its own row below the
+  quick-action buttons, restyled as a label + checkbox aligned to the
+  same column as the section rows below it (was a same-line checkbox
+  with an inline label).
+
 **v0.9.14**
 - Internal housekeeping, no behavior changes. Every button in every tab
   now goes through a shared Btn(label, height) helper (new, in

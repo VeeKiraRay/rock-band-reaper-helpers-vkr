@@ -689,8 +689,10 @@ TIPS = {
                       "Read-only - no project changes are made.\n" ..
                       "Respects time selection if active.",
     diff_validate   = "Validate this difficulty track against RBN Pro Keys authoring rules:\n" ..
-                      "note range, chord count/span, interval jumps, spacing, lane range markers,\n" ..
+                      "chord count/span, interval jumps, spacing, lane range markers,\n" ..
                       "and whether any notes exceed what is in Expert.\n\n" ..
+                      "Only notes in the playable C2-C4 range are validated; overdrive,\n" ..
+                      "glissando, and trill markers are ignored.\n\n" ..
                       "Read-only - no project changes are made.\n" ..
                       "Respects time selection if active.",
     diff_validate_all = "Validate all four Pro Keys difficulty tracks in one combined report.\n" ..

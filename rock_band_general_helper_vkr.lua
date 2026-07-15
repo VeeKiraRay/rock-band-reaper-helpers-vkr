@@ -1,6 +1,6 @@
 -- @description Rock Band General Helper
 -- @author VeeKiraRay
--- @version 0.9.19
+-- @version 0.9.20
 -- @about
 --   Utility actions for Rock Band authoring in REAPER.
 --
@@ -20,6 +20,16 @@
 --   This @about block keeps only the 5 most recent versions.
 --   Full history: CHANGELOG.md in the repo.
 --
+--   v0.9.20
+--     - Fix: Difficulty > Pro Keys validation (Suggest/Validate) misclassified
+--       reserved marker pitches - overdrive (116), glissando (126), trill
+--       (127) - as playable notes, so they could be merged into a chord with
+--       a real note or fed into interval-jump/spacing/overlap checks,
+--       producing false-positive issues (e.g. a huge chord span or jump
+--       measured against an overdrive marker). Only notes in the playable
+--       C2-C4 range (48-72) are now treated as chord/gem events. The
+--       standalone "note range" check is removed since it can no longer
+--       trigger - filtering now happens before events are built.
 --   v0.9.19
 --     - Fix: RadioGroupWidth()'s per-option padding was a fixed pixel guess
 --       that could undershoot the real rendered width of a radio button at
@@ -88,19 +98,6 @@
 --       (matching RenderCamPacingRow()) so it can join a tab's column.
 --       Also replaced two remaining hardcoded-longest-label guesses (Venue
 --       > Events, Venue > Keyframes) with the same helper for consistency.
---   v0.9.15
---     - Related buttons (Align all audio/Align count-in, Save/Load, the
---       Suggest/Validate rows on the Difficulty tab, Add note/Run guide,
---       the Pattern Replace row, Venue > Actions, Venue > Events quick
---       actions) now share a uniform width per group (BtnGroupWidth(), new
---       in lib/reaper_imgui_helpers.lua) instead of each sizing to its own
---       label.
---     - General tab: "Refresh tracks" moved out of Settings into its own
---       "General actions" section at the top (it wasn't really a setting).
---     - Venue > Events: "Use letter suffix" moved to its own row below the
---       quick-action buttons, restyled as a label + checkbox aligned to the
---       same column as the section rows below it (was a same-line checkbox
---       with an inline label).
 
 r = reaper  -- global so all dofile'd modules can use it
 
