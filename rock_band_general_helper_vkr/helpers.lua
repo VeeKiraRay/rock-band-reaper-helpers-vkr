@@ -141,8 +141,8 @@ function RefreshTrackLists()
     S.midi_track_list  = midi
 end
 
--- Scan track names and pre-select Pro Keys and 5-Lane Keys difficulty tracks.
--- Only sets a field when it is still -1 (not yet assigned).
+-- Scan track names and pre-select Pro Keys, Keys, Guitar/Bass, and Drums
+-- difficulty tracks. Only sets a field when it is still -1 (not yet assigned).
 function SetDefaultDifficultyTracks()
     local name_to_field = {
         ['PART REAL_KEYS_X'] = 'diff_pk_x_idx',
@@ -150,6 +150,9 @@ function SetDefaultDifficultyTracks()
         ['PART REAL_KEYS_M'] = 'diff_pk_m_idx',
         ['PART REAL_KEYS_E'] = 'diff_pk_e_idx',
         ['PART KEYS']        = 'diff_5k_idx',
+        ['PART GUITAR']      = 'diff_gtr_idx',
+        ['PART BASS']        = 'diff_bass_idx',
+        ['PART DRUMS']       = 'diff_drums_idx',
     }
     for i = 0, r.CountTracks(0) - 1 do
         local tr = r.GetTrack(0, i)

@@ -63,6 +63,9 @@ local function Loop()
         S.diff_pk_m_idx      = -1
         S.diff_pk_e_idx      = -1
         S.diff_5k_idx        = -1
+        S.diff_gtr_idx       = -1
+        S.diff_bass_idx      = -1
+        S.diff_drums_idx     = -1
         local loaded = LoadSettings()
         S.status = loaded and 'Project switched: loaded saved settings.'
                            or 'Project switched.'
@@ -555,6 +558,7 @@ local function Loop()
         if can_undo then Tooltip('Undo: ' .. undo_str) end
         if S.last_result then
             r.ImGui_Separator(ctx)
+            r.ImGui_PushTextWrapPos(ctx, 0)
             for line in (S.last_result .. '\n'):gmatch('([^\n]*)\n') do
                 if line ~= '' then
                     local left, right = line:match('^([^\t]*)\t(.*)$')
@@ -569,6 +573,7 @@ local function Loop()
                     r.ImGui_Spacing(ctx)
                 end
             end
+            r.ImGui_PopTextWrapPos(ctx)
         end
 
         r.ImGui_End(ctx)

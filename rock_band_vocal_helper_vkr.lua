@@ -1,6 +1,6 @@
 -- @description Rock Band Vocal Helper
 -- @author VeeKiraRay
--- @version 1.12
+-- @version 1.13
 -- @about
 --   Analyses a vocal audio track and appends MIDI notes to an existing MIDI
 --   item on a destination track, one note per detected syllable or phrase.
@@ -13,6 +13,10 @@
 --   This @about block keeps only the 5 most recent versions.
 --   Full history: CHANGELOG.md in the repo.
 --
+--   v1.13
+--     - Result panel (bottom of every tab): long lines now wrap to the
+--       window's current width (ImGui_PushTextWrapPos(ctx, 0)) instead of
+--       overflowing and requiring the window to be stretched to read them.
 --   v1.12
 --     - Sliders and combo boxes now use a fixed pixel width
 --       (SetNextItemWidth(ctx, 200), matching the general helper's
@@ -57,14 +61,6 @@
 --       (BtnGroupWidth(), from lib/reaper_imgui_helpers.lua) instead of each
 --       sizing to its own label: Save/Load (General tab) and
 --       Auto-detect/Browse.../Clear lyrics/Assign lyrics (Lyrics tab).
---
---   v1.8
---     - Internal housekeeping, no behavior changes. Every button in every tab
---       now goes through a shared Btn(label, height) helper (new, in
---       lib/reaper_imgui_helpers.lua) instead of a manual CalcTextSize+Button
---       pair, so each label string appears once instead of twice. Also fixes
---       a pre-existing hardcoded button width (Save/Load, General tab) to
---       compute from its label like every other button.
 --
 --   Workflow:
 --     1. Pick the audio source track and the MIDI destination track.

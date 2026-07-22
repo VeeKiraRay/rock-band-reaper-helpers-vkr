@@ -40,6 +40,8 @@ local function SerializeSettings()
         'mcgtf='  .. S.mc_gtr_tab_format,
         'mcgtor=' .. (S.mc_gtr_tab_ordered and '1' or '0'),
         'tabim='  .. S.tab_input_mode,
+        -- Difficulty tab: Guitar/Bass instrument selector
+        'dgbi='   .. S.diff_gb_instrument,
         -- MIDI alignment
         'mama='  .. S.ma_mode,
         -- Venue theme
@@ -94,6 +96,8 @@ local function DeserializeSettings(str)
         elseif k == 'mcgtf'  then S.mc_gtr_tab_format  = tonumber(v) or 0
         elseif k == 'mcgtor' then S.mc_gtr_tab_ordered = (v == '1')
         elseif k == 'tabim'  then S.tab_input_mode     = tonumber(v) or 0
+        -- Difficulty tab: Guitar/Bass instrument selector
+        elseif k == 'dgbi'   then S.diff_gb_instrument = (v == 'bass') and 'bass' or 'gtr'
         -- MIDI alignment
         elseif k == 'mama'  then S.ma_mode             = tonumber(v) or 0
         -- Venue theme

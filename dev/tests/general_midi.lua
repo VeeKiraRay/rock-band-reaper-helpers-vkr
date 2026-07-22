@@ -133,16 +133,17 @@ Test.it('ConvertProKeys preview: copies Expert C2-C4 notes to animation track', 
     Test.expect(S.status:find('preview'), 'expected "preview" in status, got: ' .. S.status)
 end)
 
-Test.it('SuggestProKeysDiff H: analyzes Expert and lists needed changes', function()
+Test.it('CopyProKeysDiff H: copies Expert notes onto the Hard track', function()
     reset()
     local base, n = LoadFixture('rb_pro_keys.mid')
     Test.expect(n > 0, 'rb_pro_keys.mid created no tracks')
-    local x_idx = FindFixtureTrack('REAL_KEYS_X', base)
-    Test.expect(x_idx ~= nil, 'no PART REAL_KEYS_X track found')
-    S.diff_pk_x_idx = x_idx
-    SuggestProKeysDiff('H')
+    S.diff_pk_x_idx = FindFixtureTrack('REAL_KEYS_X', base)
+    S.diff_pk_h_idx = FindFixtureTrack('REAL_KEYS_H', base)
+    Test.expect(S.diff_pk_x_idx ~= nil, 'no PART REAL_KEYS_X track found')
+    Test.expect(S.diff_pk_h_idx ~= nil, 'no PART REAL_KEYS_H track found')
+    CopyProKeysDiff('H', true)  -- force: skip the overwrite-confirmation popup for this test
     CleanupFixture(base)
-    Test.expect(not S.status:find('^Error'), 'SuggestProKeysDiff(H) errored: ' .. S.status)
+    Test.expect(not S.status:find('^Error'), 'CopyProKeysDiff(H) errored: ' .. S.status)
 end)
 
 Test.it('ValidateProKeysDiff X: validates Expert against RBN rules', function()
@@ -154,6 +155,17 @@ Test.it('ValidateProKeysDiff X: validates Expert against RBN rules', function()
     ValidateProKeysDiff('X')
     CleanupFixture(base)
     Test.expect(not S.status:find('^Error'), 'ValidateProKeysDiff(X) errored: ' .. S.status)
+end)
+
+Test.it('ValidateProKeysDiff H: runs the cross-difficulty progression check vs Expert', function()
+    reset()
+    local base, n = LoadFixture('rb_pro_keys.mid')
+    Test.expect(n > 0, 'rb_pro_keys.mid created no tracks')
+    S.diff_pk_x_idx = FindFixtureTrack('REAL_KEYS_X', base)
+    S.diff_pk_h_idx = FindFixtureTrack('REAL_KEYS_H', base)
+    ValidateProKeysDiff('H')
+    CleanupFixture(base)
+    Test.expect(not S.status:find('^Error'), 'ValidateProKeysDiff(H) errored: ' .. S.status)
 end)
 
 Test.it('ValidateAllProKeys: validates all four difficulty tracks', function()
@@ -175,14 +187,24 @@ end)
 ----------------------------------------------------------------------
 Test.section('5-Lane Keys — rb_keys.mid')
 
-Test.it('SuggestKeys5Diff H: analyzes Expert gems and lists reductions', function()
+Test.it('CopyKeys5Diff H: copies Expert notes onto the Hard range', function()
     reset()
     local base, n = LoadFixture('rb_keys.mid')
     Test.expect(n > 0, 'rb_keys.mid created no tracks')
     S.diff_5k_idx = base
-    SuggestKeys5Diff('H')
+    CopyKeys5Diff('H', true)  -- force: skip the overwrite-confirmation popup for this test
     CleanupFixture(base)
-    Test.expect(not S.status:find('^Error'), 'SuggestKeys5Diff(H) errored: ' .. S.status)
+    Test.expect(not S.status:find('^Error'), 'CopyKeys5Diff(H) errored: ' .. S.status)
+end)
+
+Test.it('CopyKeys5Diff M: copies Hard notes onto Medium, exercising color compression', function()
+    reset()
+    local base, n = LoadFixture('rb_keys.mid')
+    Test.expect(n > 0, 'rb_keys.mid created no tracks')
+    S.diff_5k_idx = base
+    CopyKeys5Diff('M', true)  -- force: skip the overwrite-confirmation popup for this test
+    CleanupFixture(base)
+    Test.expect(not S.status:find('^Error'), 'CopyKeys5Diff(M) errored: ' .. S.status)
 end)
 
 Test.it('ValidateKeys5Diff X: validates Expert pitch range (96-100)', function()
@@ -194,6 +216,15 @@ Test.it('ValidateKeys5Diff X: validates Expert pitch range (96-100)', function()
     Test.expect(not S.status:find('^Error'), 'ValidateKeys5Diff(X) errored: ' .. S.status)
 end)
 
+Test.it('ValidateKeys5Diff H: runs the cross-difficulty progression check vs Expert', function()
+    reset()
+    local base, n = LoadFixture('rb_keys.mid')
+    S.diff_5k_idx = base
+    ValidateKeys5Diff('H')
+    CleanupFixture(base)
+    Test.expect(not S.status:find('^Error'), 'ValidateKeys5Diff(H) errored: ' .. S.status)
+end)
+
 Test.it('ValidateAllKeys5: validates all four difficulty pitch ranges', function()
     reset()
     local base, n = LoadFixture('rb_keys.mid')
@@ -201,6 +232,132 @@ Test.it('ValidateAllKeys5: validates all four difficulty pitch ranges', function
     ValidateAllKeys5()
     CleanupFixture(base)
     Test.expect(not S.status:find('^Error'), 'ValidateAllKeys5 errored: ' .. S.status)
+end)
+
+----------------------------------------------------------------------
+-- Guitar/Bass — rb_guitar.mid / rb_bass.mid (single track, all difficulties
+-- by pitch range, same shape as rb_keys.mid)
+-- Expert 96-100 | Hard 84-88 | Medium 72-75 | Easy 60-62
+----------------------------------------------------------------------
+Test.section('Guitar/Bass difficulty — rb_guitar.mid / rb_bass.mid')
+
+Test.it('CopyGtrBassDiff gtr H: copies Expert notes onto the Hard range', function()
+    reset()
+    local base, n = LoadFixture('rb_guitar.mid')
+    Test.expect(n > 0, 'rb_guitar.mid created no tracks')
+    S.diff_gtr_idx = base
+    CopyGtrBassDiff('gtr', 'H', true)  -- force: skip the overwrite-confirmation popup for this test
+    CleanupFixture(base)
+    Test.expect(not S.status:find('^Error'), 'CopyGtrBassDiff(gtr, H) errored: ' .. S.status)
+end)
+
+Test.it('ValidateGtrBassDiff gtr X: validates Expert pitch range (96-100)', function()
+    reset()
+    local base, n = LoadFixture('rb_guitar.mid')
+    S.diff_gtr_idx = base
+    ValidateGtrBassDiff('gtr', 'X')
+    CleanupFixture(base)
+    Test.expect(not S.status:find('^Error'), 'ValidateGtrBassDiff(gtr, X) errored: ' .. S.status)
+end)
+
+Test.it('ValidateGtrBassDiff gtr H: runs the cross-difficulty progression check vs Expert', function()
+    reset()
+    local base, n = LoadFixture('rb_guitar.mid')
+    S.diff_gtr_idx = base
+    ValidateGtrBassDiff('gtr', 'H')
+    CleanupFixture(base)
+    Test.expect(not S.status:find('^Error'), 'ValidateGtrBassDiff(gtr, H) errored: ' .. S.status)
+end)
+
+Test.it('ValidateAllGtrBass gtr: validates all four difficulty pitch ranges', function()
+    reset()
+    local base, n = LoadFixture('rb_guitar.mid')
+    S.diff_gtr_idx = base
+    ValidateAllGtrBass('gtr')
+    CleanupFixture(base)
+    Test.expect(not S.status:find('^Error'), 'ValidateAllGtrBass(gtr) errored: ' .. S.status)
+end)
+
+Test.it('CopyGtrBassDiff bass H: copies Expert notes onto the Hard range', function()
+    reset()
+    local base, n = LoadFixture('rb_bass.mid')
+    Test.expect(n > 0, 'rb_bass.mid created no tracks')
+    S.diff_bass_idx = base
+    CopyGtrBassDiff('bass', 'H', true)  -- force: skip the overwrite-confirmation popup for this test
+    CleanupFixture(base)
+    Test.expect(not S.status:find('^Error'), 'CopyGtrBassDiff(bass, H) errored: ' .. S.status)
+end)
+
+Test.it('CopyGtrBassDiff gtr M: copies Hard notes onto Medium, exercising color compression', function()
+    reset()
+    local base, n = LoadFixture('rb_guitar.mid')
+    Test.expect(n > 0, 'rb_guitar.mid created no tracks')
+    S.diff_gtr_idx = base
+    CopyGtrBassDiff('gtr', 'M', true)  -- force: skip the overwrite-confirmation popup for this test
+    CleanupFixture(base)
+    Test.expect(not S.status:find('^Error'), 'CopyGtrBassDiff(gtr, M) errored: ' .. S.status)
+end)
+
+Test.it('ValidateGtrBassDiff bass X: validates Expert pitch range (96-100)', function()
+    reset()
+    local base, n = LoadFixture('rb_bass.mid')
+    S.diff_bass_idx = base
+    ValidateGtrBassDiff('bass', 'X')
+    CleanupFixture(base)
+    Test.expect(not S.status:find('^Error'), 'ValidateGtrBassDiff(bass, X) errored: ' .. S.status)
+end)
+
+Test.it('ValidateGtrBassDiff bass H: runs the cross-difficulty progression check vs Expert', function()
+    reset()
+    local base, n = LoadFixture('rb_bass.mid')
+    S.diff_bass_idx = base
+    ValidateGtrBassDiff('bass', 'H')
+    CleanupFixture(base)
+    Test.expect(not S.status:find('^Error'), 'ValidateGtrBassDiff(bass, H) errored: ' .. S.status)
+end)
+
+----------------------------------------------------------------------
+-- Drums difficulty — rb_drums.mid (single track, all difficulties by
+-- pitch range, same shape as rb_keys.mid)
+-- Expert 96-100 | Hard 84-88 | Medium 72-76 | Easy 60-64
+----------------------------------------------------------------------
+Test.section('Drums difficulty — rb_drums.mid')
+
+Test.it('CopyDrumsDiff H: copies Expert notes onto the Hard range', function()
+    reset()
+    local base, n = LoadFixture('rb_drums.mid')
+    Test.expect(n > 0, 'rb_drums.mid created no tracks')
+    S.diff_drums_idx = base
+    CopyDrumsDiff('H', true)  -- force: skip the overwrite-confirmation popup for this test
+    CleanupFixture(base)
+    Test.expect(not S.status:find('^Error'), 'CopyDrumsDiff(H) errored: ' .. S.status)
+end)
+
+Test.it('ValidateDrumsDiff X: validates Expert pitch range (96-100)', function()
+    reset()
+    local base, n = LoadFixture('rb_drums.mid')
+    S.diff_drums_idx = base
+    ValidateDrumsDiff('X')
+    CleanupFixture(base)
+    Test.expect(not S.status:find('^Error'), 'ValidateDrumsDiff(X) errored: ' .. S.status)
+end)
+
+Test.it('ValidateDrumsDiff H: runs the cross-difficulty progression check vs Expert (also exercises the roll/trill velocity check)', function()
+    reset()
+    local base, n = LoadFixture('rb_drums.mid')
+    S.diff_drums_idx = base
+    ValidateDrumsDiff('H')
+    CleanupFixture(base)
+    Test.expect(not S.status:find('^Error'), 'ValidateDrumsDiff(H) errored: ' .. S.status)
+end)
+
+Test.it('ValidateAllDrums: validates all four difficulty pitch ranges', function()
+    reset()
+    local base, n = LoadFixture('rb_drums.mid')
+    S.diff_drums_idx = base
+    ValidateAllDrums()
+    CleanupFixture(base)
+    Test.expect(not S.status:find('^Error'), 'ValidateAllDrums errored: ' .. S.status)
 end)
 
 ----------------------------------------------------------------------

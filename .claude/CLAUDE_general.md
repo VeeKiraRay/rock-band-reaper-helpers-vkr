@@ -55,20 +55,41 @@ Four WIP tabs appear only when **Show WIPs? = Yes** in the General tab (persiste
 - Workflow: Preview (reasoning report only) or Auto-insert (writes gems, fully undoable).
 - Validate Guitar: check existing gems on the target track against authoring rules.
 
-**Difficulty tab** — difficulty validation and reduction guidance. Contains two sub-tabs:
+**Difficulty tab** — difficulty validation and copy-to-next-tier tools. Contains four sub-tabs. Each sub-tab has the same two rows: **Copy to Hard / Medium / Easy** actually writes notes (see below), and **Validate Expert / Hard / Medium / Easy / All** checks the actual authored notes in that difficulty's own pitch range (read-only). All actions respect time selection.
+
+**Copy to X** (`Copy*Diff(diff_label, force)` in each module) replaces the tab's former read-only "Suggest" preview — it copies notes from the *immediately higher* adjacent tier (Copy to Hard ← Expert, Copy to Medium ← Hard, Copy to Easy ← Medium — the same `ADJACENT_HIGHER` mapping the progression check below uses) onto the target tier's own track/range, giving the user a real starting point to hand-edit down. Two safeguards: if the source has no notes, it early-exits with a status/report message and writes nothing; if the target already has notes, it sets `S.diff_copy_pending = { message, on_confirm }` instead of writing, which opens a shared confirm-overwrite modal popup (`ConfirmCopyOverwrite`, rendered once at the end of `DrawDifficultyTab` regardless of which sub-tab triggered it — the first modal popup in this codebase) with "Clear and Copy" (re-calls the same function with `force = true`) / "Cancel" buttons. Copies gem/playable notes only — no force-HOPO/trill/roll/fill/disco-mix markers, since those either don't apply to the target tier or are shared fixed-pitch overlays not meant to be duplicated per difficulty. **Pro Keys is the one exception**: since its lane-shift markers (0–9) are essential for the track to make sense at all (not an optional overlay), it copies its entire note set — gems and markers alike — verbatim between tracks (no pitch transform needed either, since its range doesn't shift between tiers). Fully undoable.
+
+**Keys and Guitar/Bass color compression**: both narrow their gem count at Medium/Easy by RBN convention (all 5 colors exist at every tier internally; Medium/Easy just don't use the upper ones). `CompressChordOffsets` (`actions_difficulty_shared.lua`) handles a source chord that uses a color above the target's ceiling: a single note or 2-note chord is shifted down as a whole (preserving its interval) when every note stays ≥ offset 0 — e.g. Hard's Orange+Blue → Medium's Blue+Yellow; otherwise (3+ note chords, or a 2-note chord that would go negative) any note above the ceiling is simply dropped. Drums doesn't need this (every tier has the same 5 lanes, hi-lo=4 always, so the function is a no-op there) but calls it anyway for consistency with Keys/Guitar-Bass's copy functions.
+
+Every Validate action (all four sub-tabs, H/M/E only — never Expert) also runs a shared cross-difficulty progression check (`CheckDifficultyProgression` in `actions_difficulty_shared.lua`) against the immediately higher adjacent tier: flags an unedited copy (identical event count, timing, and normalized pitch shape — i.e. no reduction was actually authored; this is the case right after a fresh "Copy to X" with no further edits, by design), and reports the two tiers' individual note counts, requiring the lower tier to have fewer notes (e.g. `"Expert has 500 notes and Hard has 450 notes: OK"` / `"...: NOT REDUCED"`). Both findings count toward the report's issue total and are prepended right after the header, before the rule-by-rule breakdown. Skipped gracefully when the higher tier's track/range has no notes (nothing to compare against).
 
 *Pro Keys sub-tab* — validates PART REAL_KEYS_X/H/M/E (one track per difficulty).
-- **Suggest Hard / Medium / Easy** — analyze Expert, report what changes are needed for each difficulty (read-only).
 - **Validate Expert / Hard / Medium / Easy / All** — check against RBN Pro Keys authoring rules: chord count/span, interval jumps, spacing (M/E), lane range markers.
 - Track indices auto-detected by name (PART REAL_KEYS_X/H/M/E).
 - Only notes in the playable Pro Keys range (48–72, C2–C4) are read as chord/gem events; reserved marker pitches (overdrive 116, glissando 126, trill 127) and any other out-of-range note are excluded before chord/span/jump/spacing/overlap grouping, so they can never masquerade as huge chords/jumps (`GroupIntoEvents` in `actions_difficulty.lua`). There is no longer a standalone "note range" check — filtering happens before events are built, so nothing outside 48–72 ever reaches a check.
 
-*5-Lane Keys sub-tab* — validates PART KEYS (all four difficulties on one track in separate pitch ranges).
+*Keys sub-tab* (formerly "5-Lane Keys") — validates PART KEYS (all four difficulties on one track in separate pitch ranges).
 - Expert: 96–100 | Hard: 84–88 | Medium: 72–75 | Easy: 60–62.
-- **Suggest Hard / Medium / Easy** — analyze Expert range, report changes needed for lower diffs (read-only).
 - **Validate Expert / Hard / Medium / Easy / All** — check chord count, spacing (M/E), note length, sustain gaps.
 - Track index auto-detected by name (PART KEYS).
-- All actions respect time selection.
+
+*Guitar/Bass sub-tab* — validates PART GUITAR or PART BASS (instrument radio switch; Guitar and Bass share one RBN rule set — the doc treats them as one spec with only cosmetic differences — so this sub-tab and `actions_difficulty_gtrbass.lua` are shared between both, parameterized by `instrument` ∈ `'gtr'`/`'bass'`).
+- Expert: 96–100 | Hard: 84–88 | Medium: 72–75 (no Orange) | Easy: 60–62 (Green/Red/Yellow only).
+- **Validate Expert / Hard / Medium / Easy / All** — chord count; chord shape (illegal 3-note Green+Orange on Expert, per-difficulty max span — no Green+Orange on Hard, no Green+Blue on Medium, no chords on Easy; a 2-note Green+Orange chord on Expert is an advisory, not a hard failure); note length (min 1/64, reuses `SustainThresholds` from `actions_guitar_validate.lua`); overlap; sustain gaps (1/32 min on Expert/Hard, 1/4 note on Medium/Easy); an advisory-only note-density grid (quarter-note target on Medium, half-note on Easy — qualitative in the source doc, not chart-breaking); force-HOPO markers (notes F/F#, offset `lo+5`/`lo+6` — disallowed on Medium/Easy); and trill/tremolo marker velocity (pitches 126/127, fixed regardless of difficulty — velocity ≤40 is flagged only when validating Hard, since that's the only tier the doc gives a numeric threshold for: 41–50 required for Hard eligibility, else Magma reports a spacing error).
+- Track fields (`diff_gtr_idx`/`diff_bass_idx`) auto-detected by name (PART GUITAR/PART BASS) — independent of the Guitar tab's own conversion target-track field.
+
+*Drums sub-tab* — validates PART DRUMS (single track, four pitch ranges, same shape as Keys).
+- Expert: 96–100 | Hard: 84–88 | Medium: 72–76 | Easy: 60–64. Gem order matches `actions_drums.lua`'s `LANE_NAMES`: offset 0=Kick, 1=Red(snare), 2=Yellow, 3=Blue, 4=Green.
+- **Validate Expert / Hard / Medium / Easy / All** — base rules: max 2 simultaneous notes on Medium (cascades to Easy — replaces an earlier, narrower "kick+snare+cymbal 3-limb" reading of the RBN doc with the more concrete external-source rule); no gems paired with kick at all on Easy; roll/trill marker velocity (pitches 126/127 — ≤40 flagged only when validating Hard).
+- Layered external-source rules (Hard/Medium/Easy), each a real Check function unless noted as a hint. Cascade direction: a higher tier's rule applies to an easier one too unless that tier defines its own override.
+  - **Cascades H→M→E** (no tier-specific override below Hard): no kick starts inside a drum-fill marker (pitch 120–124, fixed like the trill markers); roll/trill markers start on an 8th/quarter-note grid line; a roll covers an even number of gem hits; roll/fill density (Hard: no 16th-rate rolls ≥140 BPM; Medium: never faster than 8th-rate at any tempo — its own blanket rule; Easy: quarter-rate required ≥120 BPM, else inherits Medium's 8th-rate cap below that); general timekeeping density — runs of ≥4 consecutive 8th-note-paced hits (Hard: flagged ≥170 BPM; Medium: ≥140 BPM, its own stricter rule; Easy: inherits Medium's 140 BPM, no own general override); a Green+Yellow/Green+Blue double crash needs a quarter-note gap before it or should reduce to a single Green.
+  - **Cascades M→E**: kicks on quarter-grid only above 100 BPM; max 1 kick per measure at ≥170 BPM.
+  - **Medium-only** (Easy's existing kick-pairing rule already makes these redundant there): a kick or snare falling between two Yellow/Blue hits; a kick+Green(crash) chord is fine on-beat but not off-beat/syncopated.
+  - **Hard-only** (tier-specific by nature, not cascaded): Hard should have fewer kicks than Expert; the Hard-tier (`diff_idx==2`) `[mix N drums<config>]` event should use the un-flipped/base config, not the disco (`d`) variant.
+- **Authoring hints** — a fixed, non-pass/fail block (`DrumsAuthoringHints`) for rules too qualitative to check deterministically ("try removing kicks from adjacent notes", "remove about half the snare accents", "trim a note or two from a fast roll's start", "reduce hand motion" on Hard; "reduce triplets to quarter notes" on Medium; "favor crash over kick" on Easy). Always shown on H/M/E; never counted as an issue.
+- Pro Drums tom markers (110–112) are never read by these checks (they fall outside every difficulty's 5-note pitch window) rather than validated against an unstated per-difficulty rule.
+- Every Validate report ends with an informational (non-pass/fail) scan of `[mix N drums<config>]` disco-flip text events, listing which difficulty tiers have one authored — correctness of the flip depends on the surrounding beat pattern, which can't be judged from note data alone (the Hard-only un-flip check above is the one exception that *is* checkable).
+- Track field (`diff_drums_idx`) auto-detected by name (PART DRUMS) — independent of the Drums tab's own conversion target-track field.
 
 **MIDI tab** — MIDI alignment, length sync, and pattern replace. Contains three sub-tabs:
 
@@ -161,9 +182,13 @@ Four WIP tabs appear only when **Show WIPs? = Yes** in the General tab (persiste
 | `rock_band_general_helper_vkr/actions_guitar_validate.lua` | `SustainThresholds`, `ReadRBGuitarNotes`, `RunValidation` (global) — validation helpers called by `ValidateGuitar` |
 | `rock_band_general_helper_vkr/actions_midi_align.lua` | `AlignMIDI`, `ResizeAllMIDI` (global) |
 | `rock_band_general_helper_vkr/actions_midi_replace.lua` | `SetSearchPattern`, `SetReplacePattern`, `FillRange`, `DoMIDIPatternReplace` (global); `MeasureLabel`, `NoteLabel`, `PatternsMatch`, `ClearPatternWindow`, `GetTrackAndTake` (local) |
-| `rock_band_general_helper_vkr/actions_difficulty.lua` | `SuggestProKeysDiff`, `ValidateProKeysDiff`, `ValidateAllProKeys` (global) — Pro Keys difficulty rules |
-| `rock_band_general_helper_vkr/actions_difficulty_5k.lua` | `ValidateKeys5Diff`, `ValidateAllKeys5`, `SuggestKeys5Diff` (global) — 5-Lane Keys difficulty rules |
-| `rock_band_general_helper_vkr/ui_keys.lua` | `DrawKeysTab`, `DrawDifficultyTab` (global) — Keys and Difficulty tab rendering |
+| `rock_band_general_helper_vkr/actions_difficulty_shared.lua` | `CheckDifficultyProgression`, `CompressChordOffsets` (global) — cross-difficulty identical-chart + note-count reduction checks, and the color-compression helper used by Keys/Guitar-Bass's Copy functions, shared by all four difficulty modules below |
+| `rock_band_general_helper_vkr/actions_difficulty.lua` | `CopyProKeysDiff`, `ValidateProKeysDiff`, `ValidateAllProKeys` (global) — Pro Keys difficulty rules |
+| `rock_band_general_helper_vkr/actions_difficulty_5k.lua` | `ValidateKeys5Diff`, `ValidateAllKeys5`, `CopyKeys5Diff` (global) — Keys (formerly "5-Lane Keys") difficulty rules |
+| `rock_band_general_helper_vkr/actions_difficulty_gtrbass.lua` | `CopyGtrBassDiff`, `ValidateGtrBassDiff`, `ValidateAllGtrBass` (global; take `instrument` = `'gtr'`\|`'bass'` as first param) — shared Guitar/Bass difficulty rules |
+| `rock_band_general_helper_vkr/actions_difficulty_drums.lua` | `CopyDrumsDiff`, `ValidateDrumsDiff`, `ValidateAllDrums` (global) — Drums difficulty rules |
+| `rock_band_general_helper_vkr/ui_keys.lua` | `DrawKeysTab` (global) — Keys tab rendering |
+| `rock_band_general_helper_vkr/ui_difficulty.lua` | `DrawDifficultyTab` (global) — Difficulty tab rendering (Pro Keys, Keys, Guitar/Bass, Drums sub-tabs) |
 | `rock_band_general_helper_vkr/ui_midi.lua` | `DrawTabInputTab`, `DrawMIDITab` (global) — Tab Input and MIDI tab rendering |
 | `rock_band_general_helper_vkr/actions_venue_manual.lua` | `InsertVenueEventAtPlayhead`, `AdvanceCameraPacing`, `GenerateManualKeyframes`, `RemoveVenueEventsByType` (global) — Manual gen actions |
 | `rock_band_general_helper_vkr/section_events.lua` | `SECTION_EVENT_GROUPS`, `SECTION_EVENT_BASE` — EVENTS-track event vocabulary (groups, per-base number/letter caps) for the Events sub-tab; data only, no S/REAPER deps |
@@ -197,15 +222,21 @@ Four WIP tabs appear only when **Show WIPs? = Yes** in the General tab (persiste
 - `actions_keys_guides.lua`: `PkEventLabel`, `ParseTabToRaws`
 - `actions_guitar.lua`: `ReadGuitarMIDI`, `GroupIntoEvents`, `IsIllegalGO`, `AssignGems`, `BuildPreviewReport`, `BuildOutNotes`, `ClearGuitarGems`
 - `actions_guitar_guide.lua`: `AssignGemsForGuide`
-- `actions_difficulty.lua`: `EventLabel`, `ReadPKNotes`, `GroupIntoEvents`, `GetBeatDurAt`, `QNAt`, `CheckChordCount`, `CheckChordSpan`, `CheckIntervalJumps`, `CheckSpacing`, `CheckLaneShifts`, `CheckNotesAboveExpert`, `BuildReport`, `RunPKValidation`
-- `actions_difficulty_5k.lua`: `ReadK5Notes`, `GroupK5Chords`, `GetK5BeatDur`, `QNAt`, `K5Label`, `CheckK5ChordCount`, `CheckK5Spacing`, `CheckK5NoteLength`, `CheckK5SustainGaps`, `BuildK5Report`, `RunK5Checks`
+- `actions_difficulty_shared.lua`: `ChartsAreIdentical`
+- `actions_difficulty.lua`: `ADJACENT_HIGHER` (module-level local); `EventLabel`, `ReadPKNotes`, `GroupIntoEvents`, `GetBeatDurAt`, `QNAt`, `CountNotes`, `CheckChordCount`, `CheckChordSpan`, `CheckIntervalJumps`, `CheckSpacing`, `CheckLaneShifts`, `CheckNotesAboveExpert`, `BuildReport`, `RunPKValidation`
+- `actions_difficulty_5k.lua`: `ADJACENT_HIGHER` (module-level local); `ReadK5Notes`, `GroupK5Chords`, `GetK5BeatDur`, `QNAt`, `CountNotes`, `K5Label`, `CheckK5ChordCount`, `CheckK5Spacing`, `CheckK5NoteLength`, `CheckK5SustainGaps`, `BuildK5Report`, `RunK5Checks`
+- `actions_difficulty_gtrbass.lua`: `GB_RANGE`, `GB_MAX_CHORD`, `GB_MAX_SPAN`, `GB_FORCE_HOPO_ALLOWED`, `GB_ADV_SP`, `DIFF_NAMES`, `GEM_NAMES`, `INSTRUMENTS`, `ADJACENT_HIGHER` (module-level locals); `ReadGBNotes`, `GroupGBChords`, `QNAt`, `CountNotes`, `GBGemName`, `GBLabel`, `CheckGBChordCount`, `CheckGBChordSpan`, `CheckGBNoteLength`, `CheckGBOverlap`, `CheckGBSustainGaps`, `CheckGBSpacingAdvisory`, `CheckGBOutOfRange`, `CheckGBForceHopo`, `CheckGBTrillVelocity`, `BuildGBReport`, `RunGBChecks`
+- `actions_difficulty_drums.lua`: `DRUMS_RANGE`, `DIFF_NAMES`, `GEM_NAMES`, `DIFF_BY_MIX_IDX`, `ADJACENT_HIGHER`, `GRACE`, `EPS_QN`, `ROLL_HARD_16TH_BPM`, `ROLL_MEDIUM_MAX_QN`, `ROLL_EASY_QUARTER_BPM`, `GENERAL_HARD_8TH_BPM`, `GENERAL_MEDIUM_8TH_BPM`, `KICK_GRID_BPM`, `KICK_PER_MEASURE_BPM`, `MIN_RUN_LEN`, `DRUMS_HINTS` (module-level locals); `CountNotes`, `GetDrumsBeatDur`, `QNAt`, `GetMeasureAt`, `ReadDrumsNotes`, `GroupDrumsHits`, `DrumGemName`, `DrumLabel`, `CheckDrumsMaxChord`, `CheckDrumsKickPairing`, `CheckDrumsYellowBlueInterleave`, `CheckDrumsKickGrid`, `CheckDrumsKickPerMeasure`, `CheckDrumsOnBeatCrashKick`, `CheckDrumsDoubleCrash`, `CheckDrumsFillKicks`, `CheckDrumsRollGrid`, `CheckDrumsRollEvenCount`, `RollAvgGapQN`, `CheckDrumsRollDensity`, `CheckDrumsGeneralDensity`, `CheckDrumsOutOfRange`, `CheckDrumsRollVelocity`, `CheckDrumsKickCountVsHigher`, `CheckDrumsDiscoUnflip`, `ScanDiscoFlipStatus`, `DrumsAuthoringHints`, `BuildDrumsReport`, `RunDrumsChecks`
 
-Beat-fraction rules in both difficulty files (spacing, sustain gaps, note length)
+Beat-fraction rules in all three difficulty files (spacing, sustain gaps, note length)
 are measured in quarter notes via `TimeMap2_timeToQN`, never as seconds against
 one sampled BPM — with a fluctuating tempo map the seconds-length of a 1/4 note
 varies inside the gap, so even grid-quantized notes fail by a few ms otherwise.
 Minimum-gap rules get a 5% grace (`GRACE`) for hand-placed notes; classification
 thresholds (is-sustained, sustain gray zone) use a small `EPS_QN` epsilon instead.
+`actions_difficulty_gtrbass.lua` reuses `SustainThresholds` (global, defined in
+`actions_guitar_validate.lua`, loaded earlier) for its Expert/Hard note-length
+and sustain-gap thresholds instead of re-deriving them.
 - `actions_midi_replace.lua`: `MeasureLabel`, `NoteLabel`, `PatternsMatch`, `ClearPatternWindow`, `GetTrackAndTake`
 - `ui.lua`: `Loop`
 
@@ -259,8 +290,11 @@ actions_guitar_guide.lua       → ParseTabHorizontal, ParseTabVertical, Reforma
 actions_guitar_validate.lua    → SustainThresholds, ReadRBGuitarNotes, RunValidation
 actions_midi_align.lua         → AlignMIDI, ResizeAllMIDI
 actions_midi_replace.lua       → SetSearchPattern, SetReplacePattern, FillRange, DoMIDIPatternReplace
-actions_difficulty.lua         → SuggestProKeysDiff, ValidateProKeysDiff, ValidateAllProKeys
-actions_difficulty_5k.lua      → ValidateKeys5Diff, ValidateAllKeys5, SuggestKeys5Diff
+actions_difficulty_shared.lua  → CheckDifficultyProgression
+actions_difficulty.lua         → CopyProKeysDiff, ValidateProKeysDiff, ValidateAllProKeys
+actions_difficulty_5k.lua      → ValidateKeys5Diff, ValidateAllKeys5, CopyKeys5Diff
+actions_difficulty_gtrbass.lua → CopyGtrBassDiff, ValidateGtrBassDiff, ValidateAllGtrBass
+actions_difficulty_drums.lua   → CopyDrumsDiff, ValidateDrumsDiff, ValidateAllDrums
 actions_venue_manual.lua       → InsertVenueEventAtPlayhead, AdvanceCameraPacing,
                                   GenerateManualKeyframes, RemoveVenueEventsByType
 actions_venue_events.lua       → FindEventsTake, ScanEventsTextEvents, NextSectionEvent,
@@ -268,7 +302,8 @@ actions_venue_events.lua       → FindEventsTake, ScanEventsTextEvents, NextSec
                                   ClearAllEventsTexts, InsertEventsBookends
 actions_venue_keyframes.lua    → RegenerateVenueKeyframes
 actions_venue_sing_along.lua   → GenerateSingAlong
-ui_keys.lua                    → DrawKeysTab, DrawDifficultyTab
+ui_keys.lua                    → DrawKeysTab
+ui_difficulty.lua              → DrawDifficultyTab
 ui_midi.lua                    → DrawTabInputTab, DrawMIDITab
 ui_venue.lua                   → DrawVenueTab, RenderCamPacingRow, RenderKeyframeAlignCombo
 ui_venue_section_gen.lua       → DrawVenueSectionGenTab
@@ -297,8 +332,8 @@ ui.lua                         → Loop (also calls r.defer(Loop))
 
 Section `RBHelperVKR`, key `settings_v1`. Auto-loads on script open.
 
-**Saved:** all tempo map sliders — primary source (`tm_rms_threshold`, `tm_rms_window_ms`, `tm_search_window_ms`, `tm_drift_threshold_ms`, `tm_bpm_failsafe`, `tm_first_measure`, `tm_timesig_num`, `tm_override_failsafe`), fallback source (`tm_fb_rms_threshold`, `tm_fb_rms_window_ms`, `tm_fb_use_flux`), and auto-tune (`tm_autotune_density`).
-**Not saved:** track indices — positional, brittle. `SetDefaultTempoTracks` re-detects tempo map tracks by name; `SetDefaultMIDITracks` re-detects PART DRUMS and PART GUITAR target tracks by name. Both only assign fields that are still -1 (do not override saved state).
+**Saved:** all tempo map sliders — primary source (`tm_rms_threshold`, `tm_rms_window_ms`, `tm_search_window_ms`, `tm_drift_threshold_ms`, `tm_bpm_failsafe`, `tm_first_measure`, `tm_timesig_num`, `tm_override_failsafe`), fallback source (`tm_fb_rms_threshold`, `tm_fb_rms_window_ms`, `tm_fb_use_flux`), auto-tune (`tm_autotune_density`), and the Difficulty tab's Guitar/Bass instrument radio (`diff_gb_instrument`).
+**Not saved:** track indices — positional, brittle. `SetDefaultTempoTracks` re-detects tempo map tracks by name; `SetDefaultMIDITracks` re-detects PART DRUMS and PART GUITAR target tracks by name; `SetDefaultDifficultyTracks` re-detects all Difficulty-tab tracks (Pro Keys, Keys, Guitar/Bass, Drums) by name. All only assign fields that are still -1 (do not override saved state).
 
 ---
 

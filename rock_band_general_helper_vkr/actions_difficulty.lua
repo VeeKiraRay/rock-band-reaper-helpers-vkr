@@ -1,5 +1,6 @@
--- Pro Keys difficulty validation and reduction-suggestion tools
--- Requires: S, r, GetTimeSelection, GetTempoContextBefore, FormatTime, PitchName (globals)
+-- Pro Keys difficulty validation and copy-to-next-tier tools
+-- Requires: S, r, GetTimeSelection, GetTempoContextBefore, FormatTime, PitchName,
+--           FindFirstMIDIItem, InsertNotes, ClearNotesInRange (globals)
 
 local PK_MIN = 48  -- C2 (Rock Band convention) = MIDI 48
 local PK_MAX = 72  -- C4 (Rock Band convention) = MIDI 72
@@ -24,6 +25,17 @@ local PK_RANGE_NAMES = {
 }
 
 local DIFF_NAMES = { X='Expert', H='Hard', M='Medium', E='Easy' }
+
+-- Immediately-higher adjacent tier, for the cross-difficulty progression
+-- check (CheckDifficultyProgression in actions_difficulty_shared.lua).
+local ADJACENT_HIGHER = { H='X', M='H', E='M' }
+
+-- Sum of individual notes across all chord events (not chord/event count).
+local function CountNotes(events)
+    local n = 0
+    for _, ev in ipairs(events) do n = n + #ev.pitches end
+    return n
+end
 
 ----------------------------------------------------------------------
 -- Local helpers
@@ -631,44 +643,84 @@ end
 -- Global action functions
 ----------------------------------------------------------------------
 
--- Analyze Expert and report what changes are needed to create diff_label ('H', 'M', 'E').
-function SuggestProKeysDiff(diff_label)
-    if S.diff_pk_x_idx < 0 then
-        S.status     = 'Error: Expert track not selected.'
-        S.last_result = 'Select the PART REAL_KEYS_X track in the Difficulty tab.'
+-- Copy notes from the immediately higher Pro Keys tier onto diff_label's own
+-- track. A literal duplicate - Pro Keys' playable range (C2-C4) doesn't
+-- shift between tiers, so no pitch transform is needed - and copies
+-- everything (playable gems AND lane-shift markers), since the markers are
+-- essential for the track to make sense, not an optional overlay.
+-- force: skip the "target already has notes" confirmation and overwrite
+-- directly (set true when called again from the confirm popup).
+function CopyProKeysDiff(diff_label, force)
+    local idx_fields = { X='diff_pk_x_idx', H='diff_pk_h_idx', M='diff_pk_m_idx', E='diff_pk_e_idx' }
+    local src_dl = ADJACENT_HIGHER[diff_label]
+    if not src_dl then
+        S.status = 'Copy: unknown difficulty ' .. tostring(diff_label)
         return
     end
-    local exp_tr = r.GetTrack(0, S.diff_pk_x_idx)
-    if not exp_tr then
-        S.status      = 'Error: Expert track no longer exists - refresh tracks.'
+
+    local src_idx, tgt_idx = S[idx_fields[src_dl]], S[idx_fields[diff_label]]
+    if src_idx < 0 then
+        S.status      = ('Error: %s track not selected.'):format(DIFF_NAMES[src_dl])
+        S.last_result = ('Select the PART REAL_KEYS_%s track in the Difficulty tab.'):format(src_dl)
+        return
+    end
+    if tgt_idx < 0 then
+        S.status      = ('Error: %s track not selected.'):format(DIFF_NAMES[diff_label])
+        S.last_result = ('Select the PART REAL_KEYS_%s track in the Difficulty tab.'):format(diff_label)
+        return
+    end
+    local src_tr, tgt_tr = r.GetTrack(0, src_idx), r.GetTrack(0, tgt_idx)
+    if not src_tr or not tgt_tr then
+        S.status      = 'Error: a selected track no longer exists \xe2\x80\x94 refresh tracks.'
         S.last_result = nil
         return
     end
 
     local sel_s, sel_e = GetTimeSelection()
-    local all_notes    = ReadPKNotes(exp_tr, sel_s, sel_e)
-    local lane_shifts, events = GroupIntoEvents(all_notes)
-
-    if #events == 0 then
-        S.status = ('Suggest %s: no Expert playable notes found.'):format(diff_label)
-        S.last_result = sel_s
-            and 'No playable notes (C2\xe2\x80\x93C4) on Expert track in the current time selection.'
-            or  'Expert track has no playable notes (C2\xe2\x80\x93C4).'
+    local src_notes = ReadPKNotes(src_tr, sel_s, sel_e)
+    if #src_notes == 0 then
+        S.status      = ('Copy to %s: no notes on %s to copy.'):format(DIFF_NAMES[diff_label], DIFF_NAMES[src_dl])
+        S.last_result = ('%s track has no notes%s.'):format(
+            DIFF_NAMES[src_dl], sel_s and ' in the current time selection' or '')
         return
     end
 
-    local scope   = sel_s and ' [time selection]' or ''
-    local header  = ('Expert \xe2\x86\x92 %s: changes needed%s'):format(DIFF_NAMES[diff_label] or diff_label, scope)
-    local report, total = RunPKValidation(diff_label, events, lane_shifts, nil, sel_s, header)
-
-    if total == 0 then
-        S.status = ('Suggest %s: Expert is already %s-compliant%s.'):format(
-            diff_label, DIFF_NAMES[diff_label], scope)
-    else
-        S.status = ('Suggest %s: %d change%s needed for %s%s.'):format(
-            diff_label, total, total == 1 and '' or 's', DIFF_NAMES[diff_label], scope)
+    local tgt_notes = ReadPKNotes(tgt_tr, sel_s, sel_e)
+    if #tgt_notes > 0 and not force then
+        S.diff_copy_pending = {
+            message = ('PART REAL_KEYS_%s already has notes. Clear them and overwrite with a copy of PART REAL_KEYS_%s?'):format(
+                diff_label, src_dl),
+            on_confirm = function() CopyProKeysDiff(diff_label, true) end,
+        }
+        return
     end
-    S.last_result = report
+
+    local tgt_item, tgt_take = FindFirstMIDIItem(tgt_tr)
+    if not tgt_item then
+        S.status      = ('Error: %s track has no MIDI item.'):format(DIFF_NAMES[diff_label])
+        S.last_result = ('Create a MIDI item on the PART REAL_KEYS_%s track first.'):format(diff_label)
+        return
+    end
+
+    local clear_s = sel_s or 0
+    local clear_e = sel_e or (r.GetMediaItemInfo_Value(tgt_item, 'D_POSITION') + r.GetMediaItemInfo_Value(tgt_item, 'D_LENGTH'))
+
+    r.PreventUIRefresh(1)
+    r.Undo_BeginBlock2(0)
+    r.MarkTrackItemsDirty(tgt_tr, tgt_item)
+    ClearNotesInRange(tgt_take, clear_s, clear_e, 0, 9)
+    ClearNotesInRange(tgt_take, clear_s, clear_e, PK_MIN, PK_MAX)
+    local out_notes = {}
+    for _, n in ipairs(src_notes) do
+        out_notes[#out_notes + 1] = { s = n.s, e = n.e, pitch = n.pitch }
+    end
+    InsertNotes(tgt_take, out_notes, 100)
+    r.Undo_EndBlock2(0, ('Copy Pro Keys %s to %s'):format(src_dl, diff_label), -1)
+    r.PreventUIRefresh(-1)
+    r.UpdateArrange()
+
+    S.status      = ('Copy to %s: copied %d notes from %s.'):format(DIFF_NAMES[diff_label], #src_notes, DIFF_NAMES[src_dl])
+    S.last_result = nil
 end
 
 -- Validate PART REAL_KEYS_{diff_label} against RBN authoring rules.
@@ -724,6 +776,28 @@ function ValidateProKeysDiff(diff_label)
     local header = ('Pro Keys %s Validation%s'):format(DIFF_NAMES[diff_label], scope)
     local report, total = RunPKValidation(diff_label, events, lane_shifts, exp_events, sel_s, header)
 
+    -- Cross-difficulty progression check (vs the immediately higher tier,
+    -- not always Expert - separate concern from exp_events above).
+    local higher_dl = ADJACENT_HIGHER[diff_label]
+    if higher_dl then
+        local higher_events, higher_count = {}, 0
+        local higher_idx = S[idx_fields[higher_dl]]
+        if higher_idx >= 0 then
+            local higher_tr = r.GetTrack(0, higher_idx)
+            if higher_tr then
+                local higher_notes = ReadPKNotes(higher_tr, sel_s, sel_e)
+                local _, hevs = GroupIntoEvents(higher_notes)
+                higher_events, higher_count = hevs, CountNotes(hevs)
+            end
+        end
+        local block, extra = CheckDifficultyProgression(
+            DIFF_NAMES[diff_label], DIFF_NAMES[higher_dl],
+            events, higher_events, PK_MIN, PK_MIN,
+            CountNotes(events), higher_count)
+        report = block .. report
+        total  = total + extra
+    end
+
     if total == 0 then
         S.status = ('Validate %s: all checks passed%s.'):format(diff_label, scope)
     else
@@ -754,14 +828,20 @@ function ValidateAllProKeys()
     local diff_order   = { 'X', 'H', 'M', 'E' }
     local idx_fields   = { X='diff_pk_x_idx', H='diff_pk_h_idx', M='diff_pk_m_idx', E='diff_pk_e_idx' }
 
+    -- Carried forward from the previous (higher) tier for the cross-difficulty
+    -- progression check - avoids re-reading a track already read this loop.
+    local prev_dl, prev_events, prev_count = nil, {}, 0
+
     for _, dl in ipairs(diff_order) do
         local tgt_idx = S[idx_fields[dl]]
         if tgt_idx < 0 then
             summary[#summary + 1] = dl .. ':(none)'
+            prev_dl, prev_events, prev_count = dl, {}, 0
         else
             local tgt_tr = r.GetTrack(0, tgt_idx)
             if not tgt_tr then
                 summary[#summary + 1] = dl .. ':missing'
+                prev_dl, prev_events, prev_count = dl, {}, 0
             else
                 local notes            = ReadPKNotes(tgt_tr, sel_s, sel_e)
                 local lane_shifts, evs = GroupIntoEvents(notes)
@@ -770,10 +850,20 @@ function ValidateAllProKeys()
                     summary[#summary + 1] = dl .. ':empty'
                     all_lines[#all_lines + 1] = ('=== %s ===  (track is empty)'):format(DIFF_NAMES[dl])
                     all_lines[#all_lines + 1] = ''
+                    prev_dl, prev_events, prev_count = dl, {}, 0
                 else
                     local use_exp = (dl ~= 'X') and exp_events or nil
                     local header  = ('=== Pro Keys %s ==='):format(DIFF_NAMES[dl])
                     local report, total = RunPKValidation(dl, evs, lane_shifts, use_exp, sel_s, header)
+
+                    if dl ~= 'X' and prev_dl == ADJACENT_HIGHER[dl] then
+                        local block, extra = CheckDifficultyProgression(
+                            DIFF_NAMES[dl], DIFF_NAMES[prev_dl],
+                            evs, prev_events, PK_MIN, PK_MIN,
+                            CountNotes(evs), prev_count)
+                        report = block .. report
+                        total  = total + extra
+                    end
 
                     if total == 0 then
                         summary[#summary + 1] = dl .. ':OK'
@@ -784,6 +874,7 @@ function ValidateAllProKeys()
                     for line in (report .. '\n'):gmatch('([^\n]*)\n') do
                         all_lines[#all_lines + 1] = line
                     end
+                    prev_dl, prev_events, prev_count = dl, evs, CountNotes(evs)
                 end
             end
         end

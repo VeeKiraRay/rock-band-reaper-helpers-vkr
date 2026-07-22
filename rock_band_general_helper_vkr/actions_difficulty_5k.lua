@@ -1,5 +1,6 @@
--- 5-Lane Keys difficulty validation and reduction-suggestion tools
--- Requires: S, r, GetTimeSelection, GetTempoContextBefore, FormatTime, PitchName (globals)
+-- Keys (5-Lane) difficulty validation and copy-to-next-tier tools
+-- Requires: S, r, GetTimeSelection, GetTempoContextBefore, FormatTime, PitchName,
+--           FindFirstMIDIItem, InsertNotes, ClearNotesInRange (globals)
 
 -- Per-difficulty pitch ranges on PART KEYS
 local K5_RANGE = {
@@ -20,6 +21,17 @@ local K5_ADV_SP = { E = 2.0 }             -- 2 beats = 1/2 note
 local DIFF_NAMES = { X = 'Expert', H = 'Hard', M = 'Medium', E = 'Easy' }
 
 local GEM_NAMES = { 'Green', 'Red', 'Yellow', 'Blue', 'Orange' }
+
+-- Immediately-higher adjacent tier, for the cross-difficulty progression
+-- check (CheckDifficultyProgression in actions_difficulty_shared.lua).
+local ADJACENT_HIGHER = { H = 'X', M = 'H', E = 'M' }
+
+-- Sum of individual notes across all chord events (not chord/event count).
+local function CountNotes(events)
+    local n = 0
+    for _, ev in ipairs(events) do n = n + #ev.pitches end
+    return n
+end
 
 ----------------------------------------------------------------------
 -- Local helpers
@@ -273,16 +285,12 @@ local function BuildK5Report(header, cats)
     return table.concat(lines, '\n'), total
 end
 
--- rng_hi: when not nil, add an out-of-range check. Pass nil for Suggest
--- (Expert pitches are deliberately outside lower-diff pitch ranges).
 local function RunK5Checks(diff_label, events, header, rng_hi)
     local max_ch = K5_MAX_CHORD[diff_label]
     local min_sp = K5_MIN_SP[diff_label]
     local cats   = {}
 
-    if rng_hi then
-        cats[#cats + 1] = { name = 'Notes outside valid range', issues = CheckK5OutOfRange(events, rng_hi) }
-    end
+    cats[#cats + 1] = { name = 'Notes outside valid range', issues = CheckK5OutOfRange(events, rng_hi) }
 
     local chord_name
     if diff_label == 'E' then
@@ -355,6 +363,20 @@ function ValidateKeys5Diff(diff_label)
         DIFF_NAMES[diff_label], PitchName(rng.lo), PitchName(rng.hi), rng.lo, rng.hi, scope)
     local report, total = RunK5Checks(diff_label, events, header, rng.hi)
 
+    -- Cross-difficulty progression check (vs the immediately higher tier).
+    local higher_dl = ADJACENT_HIGHER[diff_label]
+    if higher_dl then
+        local higher_rng    = K5_RANGE[higher_dl]
+        local higher_notes  = ReadK5Notes(track, higher_rng.lo, higher_rng.lo + 4, sel_s, sel_e)
+        local higher_events = GroupK5Chords(higher_notes)
+        local block, extra = CheckDifficultyProgression(
+            DIFF_NAMES[diff_label], DIFF_NAMES[higher_dl],
+            events, higher_events, rng.lo, higher_rng.lo,
+            CountNotes(events), CountNotes(higher_events))
+        report = block .. report
+        total  = total + extra
+    end
+
     if total == 0 then
         S.status = ('Validate 5-Key %s: all checks passed%s.'):format(diff_label, scope)
     else
@@ -384,6 +406,10 @@ function ValidateAllKeys5()
     local all_lines    = { ('5-Lane Keys Validate All%s'):format(scope), '' }
     local summary      = {}
 
+    -- Carried forward from the previous (higher) tier for the cross-difficulty
+    -- progression check - avoids re-reading a range already read this loop.
+    local prev_dl, prev_events, prev_count = nil, {}, 0
+
     for _, dl in ipairs(diff_order) do
         local rng    = K5_RANGE[dl]
         local notes  = ReadK5Notes(track, rng.lo, rng.lo + 4, sel_s, sel_e)
@@ -394,13 +420,25 @@ function ValidateAllKeys5()
             all_lines[#all_lines + 1] = ('=== %s ===  (no notes in range %d\xe2\x80\x93%d)'):format(
                 DIFF_NAMES[dl], rng.lo, rng.hi)
             all_lines[#all_lines + 1] = ''
+            prev_dl, prev_events, prev_count = dl, {}, 0
         else
             local header        = ('=== 5-Lane Keys %s  [%d\xe2\x80\x93%d] ==='):format(DIFF_NAMES[dl], rng.lo, rng.hi)
             local report, total = RunK5Checks(dl, events, header, rng.hi)
+
+            if dl ~= 'X' and prev_dl == ADJACENT_HIGHER[dl] then
+                local block, extra = CheckDifficultyProgression(
+                    DIFF_NAMES[dl], DIFF_NAMES[prev_dl],
+                    events, prev_events, rng.lo, K5_RANGE[prev_dl].lo,
+                    CountNotes(events), prev_count)
+                report = block .. report
+                total  = total + extra
+            end
+
             summary[#summary + 1] = total == 0 and (dl .. ':OK') or ('%s:%d'):format(dl, total)
             for line in (report .. '\n'):gmatch('([^\n]*)\n') do
                 all_lines[#all_lines + 1] = line
             end
+            prev_dl, prev_events, prev_count = dl, events, CountNotes(events)
         end
     end
 
@@ -408,12 +446,16 @@ function ValidateAllKeys5()
     S.last_result = table.concat(all_lines, '\n')
 end
 
--- Read Expert range (96-100) and report what would need to change for diff_label.
--- Read-only - no project changes made.
-function SuggestKeys5Diff(diff_label)
+-- Copy notes from the immediately higher tier's range onto diff_label's own
+-- range on PART KEYS. Colors above the target tier's ceiling are compressed
+-- down via CompressChordOffsets (actions_difficulty_shared.lua) rather than
+-- dropped outright or left out-of-range.
+-- force: skip the "target already has notes" confirmation and overwrite
+-- directly (set true when called again from the confirm popup).
+function CopyKeys5Diff(diff_label, force)
     if S.diff_5k_idx < 0 then
         S.status      = 'Error: PART KEYS track not selected.'
-        S.last_result = 'Select the PART KEYS track in the Difficulty \xe2\x86\x92 5-Lane Keys tab.'
+        S.last_result = 'Select the PART KEYS track in the Difficulty \xe2\x86\x92 Keys tab.'
         return
     end
     local track = r.GetTrack(0, S.diff_5k_idx)
@@ -423,29 +465,64 @@ function SuggestKeys5Diff(diff_label)
         return
     end
 
-    local exp_rng      = K5_RANGE['X']
-    local sel_s, sel_e = GetTimeSelection()
-    local exp_notes    = ReadK5Notes(track, exp_rng.lo, exp_rng.hi, sel_s, sel_e)
-    local exp_events   = GroupK5Chords(exp_notes)
-
-    if #exp_events == 0 then
-        S.status = ('Suggest 5-Key %s: no Expert notes found.'):format(diff_label)
-        S.last_result = sel_s
-            and ('No Expert notes (%d\xe2\x80\x93%d) in the current time selection.'):format(exp_rng.lo, exp_rng.hi)
-            or  ('No Expert notes (%d\xe2\x80\x93%d) on PART KEYS track.'):format(exp_rng.lo, exp_rng.hi)
+    local src_dl = ADJACENT_HIGHER[diff_label]
+    if not src_dl then
+        S.status = 'Copy: unknown difficulty ' .. tostring(diff_label)
         return
     end
 
-    local scope  = sel_s and ' [time selection]' or ''
-    local header = ('Expert \xe2\x86\x92 %s: changes needed%s'):format(DIFF_NAMES[diff_label], scope)
-    local report, total = RunK5Checks(diff_label, exp_events, header)
+    local src_rng, tgt_rng = K5_RANGE[src_dl], K5_RANGE[diff_label]
+    local sel_s, sel_e = GetTimeSelection()
+    local src_notes  = ReadK5Notes(track, src_rng.lo, src_rng.lo + 4, sel_s, sel_e)
+    local src_events = GroupK5Chords(src_notes)
 
-    if total == 0 then
-        S.status = ('Suggest 5-Key %s: Expert is already %s-compliant%s.'):format(
-            diff_label, DIFF_NAMES[diff_label], scope)
-    else
-        S.status = ('Suggest 5-Key %s: %d change%s needed for %s%s.'):format(
-            diff_label, total, total == 1 and '' or 's', DIFF_NAMES[diff_label], scope)
+    if #src_notes == 0 then
+        S.status      = ('Copy to %s: no notes on %s to copy.'):format(DIFF_NAMES[diff_label], DIFF_NAMES[src_dl])
+        S.last_result = ('%s range (%d\xe2\x80\x93%d) has no notes%s.'):format(
+            DIFF_NAMES[src_dl], src_rng.lo, src_rng.hi, sel_s and ' in the current time selection' or '')
+        return
     end
-    S.last_result = report
+
+    local tgt_notes = ReadK5Notes(track, tgt_rng.lo, tgt_rng.lo + 4, sel_s, sel_e)
+    if #tgt_notes > 0 and not force then
+        S.diff_copy_pending = {
+            message = ('%s range already has notes. Clear them and overwrite with a copy of %s?'):format(
+                DIFF_NAMES[diff_label], DIFF_NAMES[src_dl]),
+            on_confirm = function() CopyKeys5Diff(diff_label, true) end,
+        }
+        return
+    end
+
+    local item, take = FindFirstMIDIItem(track)
+    if not item then
+        S.status      = 'Error: PART KEYS track has no MIDI item.'
+        S.last_result = 'Create a MIDI item on the PART KEYS track first.'
+        return
+    end
+
+    local clear_s = sel_s or 0
+    local clear_e = sel_e or (r.GetMediaItemInfo_Value(item, 'D_POSITION') + r.GetMediaItemInfo_Value(item, 'D_LENGTH'))
+
+    local target_max_offset = tgt_rng.hi - tgt_rng.lo
+    local out_notes = {}
+    for _, ev in ipairs(src_events) do
+        local offsets = {}
+        for _, p in ipairs(ev.pitches) do offsets[#offsets + 1] = p - src_rng.lo end
+        local new_offsets = CompressChordOffsets(offsets, target_max_offset)
+        for _, o in ipairs(new_offsets) do
+            out_notes[#out_notes + 1] = { s = ev.s, e = ev.e, pitch = tgt_rng.lo + o }
+        end
+    end
+
+    r.PreventUIRefresh(1)
+    r.Undo_BeginBlock2(0)
+    r.MarkTrackItemsDirty(track, item)
+    ClearNotesInRange(take, clear_s, clear_e, tgt_rng.lo, tgt_rng.lo + 4)
+    InsertNotes(take, out_notes, 100)
+    r.Undo_EndBlock2(0, ('Copy Keys %s to %s'):format(src_dl, diff_label), -1)
+    r.PreventUIRefresh(-1)
+    r.UpdateArrange()
+
+    S.status      = ('Copy to %s: copied %d notes from %s.'):format(DIFF_NAMES[diff_label], #out_notes, DIFF_NAMES[src_dl])
+    S.last_result = nil
 end

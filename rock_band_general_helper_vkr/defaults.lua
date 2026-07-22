@@ -159,6 +159,17 @@ S = {
     diff_pk_e_idx         = -1,
     -- 5-Lane Keys difficulty (not persisted - auto-detected by name)
     diff_5k_idx           = -1,
+    -- Guitar/Bass difficulty (not persisted - auto-detected by name)
+    diff_gtr_idx          = -1,
+    diff_bass_idx         = -1,
+    diff_gb_instrument    = 'gtr',  -- 'gtr' or 'bass' (persisted)
+    -- Drums difficulty (not persisted - auto-detected by name)
+    diff_drums_idx        = -1,
+    -- Difficulty tab: pending "Copy to X" overwrite confirmation (not persisted,
+    -- transient UI state). nil = no popup. Otherwise: { message = string,
+    -- on_confirm = function() ... end } - set by a Copy*Diff call when the
+    -- target already has notes; consumed by the confirm popup in ui_difficulty.lua.
+    diff_copy_pending     = nil,
     -- Cached filtered track lists (not persisted - rebuilt by RefreshTrackLists)
     all_track_list        = nil,
     audio_track_list      = nil,
@@ -675,7 +686,7 @@ TIPS = {
 
     -- Difficulty tab - Pro Keys
     diff_pk_x       = "Expert Pro Keys track (PART REAL_KEYS_X).\n" ..
-                      "Source for Suggest reduction and cross-difficulty validation.",
+                      "Source for Copy to Hard and cross-difficulty validation.",
     diff_pk_h       = "Hard Pro Keys track (PART REAL_KEYS_H).\n" ..
                       "Validated against Hard authoring rules and compared to Expert.",
     diff_pk_m       = "Medium Pro Keys track (PART REAL_KEYS_M).\n" ..
@@ -684,10 +695,14 @@ TIPS = {
                       "Validated against Easy authoring rules and compared to Expert.",
     diff_autodetect = "Search for PART REAL_KEYS_X/H/M/E tracks by exact name and assign them.\n" ..
                       "Resets existing selections before scanning.",
-    diff_suggest    = "Analyze Expert and list what changes are needed to produce a compliant\n" ..
-                      "version of this difficulty.\n\n" ..
-                      "Read-only - no project changes are made.\n" ..
-                      "Respects time selection if active.",
+    diff_pk_copy    = "Copy notes from the tier above (Expert\xe2\x86\x92Hard, Hard\xe2\x86\x92Medium,\n" ..
+                      "Medium\xe2\x86\x92Easy) onto this difficulty's own track, verbatim -\n" ..
+                      "including lane-shift markers. A starting point to hand-edit down,\n" ..
+                      "not an automatic reduction.\n\n" ..
+                      "If the source track has no notes, nothing is copied and the result\n" ..
+                      "panel reports it. If the target track already has notes, a\n" ..
+                      "confirmation popup asks before clearing and overwriting them.\n\n" ..
+                      "Fully undoable. Respects time selection if active.",
     diff_validate   = "Validate this difficulty track against RBN Pro Keys authoring rules:\n" ..
                       "chord count/span, interval jumps, spacing, lane range markers,\n" ..
                       "and whether any notes exceed what is in Expert.\n\n" ..
@@ -706,10 +721,15 @@ TIPS = {
                         "Expert 96\xe2\x80\x93100 | Hard 84\xe2\x80\x9388 | Medium 72\xe2\x80\x9375 | Easy 60\xe2\x80\x9362",
     diff_5k_autodetect = "Search for a track named PART KEYS and assign it.\n" ..
                          "Resets the current selection before scanning.",
-    diff_5k_suggest   = "Analyze Expert notes (96\xe2\x80\x93100) and list what changes are needed\n" ..
-                        "to produce a compliant version of this difficulty.\n\n" ..
-                        "Read-only - no project changes are made.\n" ..
-                        "Respects time selection if active.",
+    diff_5k_copy      = "Copy notes from the tier above (Expert\xe2\x86\x92Hard, Hard\xe2\x86\x92Medium,\n" ..
+                        "Medium\xe2\x86\x92Easy) onto this difficulty's own pitch range. Colors\n" ..
+                        "above this tier's ceiling (e.g. Orange copied down to Medium) are\n" ..
+                        "pulled down a color instead of dropped - a starting point to\n" ..
+                        "hand-edit down, not an automatic reduction.\n\n" ..
+                        "If the source range has no notes, nothing is copied and the result\n" ..
+                        "panel reports it. If the target range already has notes, a\n" ..
+                        "confirmation popup asks before clearing and overwriting them.\n\n" ..
+                        "Fully undoable. Respects time selection if active.",
     diff_5k_validate  = "Validate the notes in this difficulty's pitch range against\n" ..
                         "5-Lane Keys authoring rules: chord count, note spacing, note\n" ..
                         "length, and sustain gaps.\n\n" ..
@@ -718,6 +738,64 @@ TIPS = {
     diff_5k_validate_all = "Validate all four 5-Lane Keys difficulty ranges in one combined report.\n\n" ..
                            "Read-only - no project changes are made.\n" ..
                            "Respects time selection if active.",
+
+    -- Difficulty tab - Guitar/Bass
+    diff_gb_instrument = "Switch which instrument's track and difficulty ranges are shown below.\n\n" ..
+                         "Guitar and Bass share identical RBN authoring rules (ranges, chord\n" ..
+                         "legality, sustain/HOPO rules) - only the track differs.",
+    diff_gb_track      = "Guitar/Bass difficulty track (PART GUITAR or PART BASS, matching the\n" ..
+                         "instrument selected above).\n" ..
+                         "All four difficulties live on this single track in separate pitch ranges:\n" ..
+                         "Expert 96\xe2\x80\x93100 | Hard 84\xe2\x80\x9388 | Medium 72\xe2\x80\x9375 | Easy 60\xe2\x80\x9362",
+    diff_gb_autodetect = "Search for tracks named PART GUITAR and PART BASS by exact name and\n" ..
+                         "assign them. Resets both selections before scanning.",
+    diff_gb_copy       = "Copy notes from the tier above (Expert\xe2\x86\x92Hard, Hard\xe2\x86\x92Medium,\n" ..
+                         "Medium\xe2\x86\x92Easy) onto this difficulty's own pitch range, for the\n" ..
+                         "instrument selected above. Colors above this tier's ceiling (e.g.\n" ..
+                         "Orange copied down to Medium) are pulled down a color instead of\n" ..
+                         "dropped - a starting point to hand-edit down, not an automatic\n" ..
+                         "reduction.\n\n" ..
+                         "If the source range has no notes, nothing is copied and the result\n" ..
+                         "panel reports it. If the target range already has notes, a\n" ..
+                         "confirmation popup asks before clearing and overwriting them.\n\n" ..
+                         "Fully undoable. Respects time selection if active.",
+    diff_gb_validate   = "Validate the notes in this difficulty's pitch range against RBN\n" ..
+                         "Guitar/Bass authoring rules: chord count, chord shape (illegal\n" ..
+                         "Green+Orange combinations, span limits), note length, overlap,\n" ..
+                         "sustain gaps, force-HOPO markers (not allowed on Medium/Easy), and\n" ..
+                         "trill/tremolo marker velocity (Hard eligibility).\n\n" ..
+                         "Read-only - no project changes are made.\n" ..
+                         "Respects time selection if active.",
+    diff_gb_validate_all = "Validate all four Guitar/Bass difficulty ranges in one combined report.\n\n" ..
+                           "Read-only - no project changes are made.\n" ..
+                           "Respects time selection if active.",
+
+    -- Difficulty tab - Drums
+    diff_drums_track      = "Drums difficulty track (PART DRUMS).\n" ..
+                            "All four difficulties live on this single track in separate pitch ranges:\n" ..
+                            "Expert 96\xe2\x80\x93100 | Hard 84\xe2\x80\x9388 | Medium 72\xe2\x80\x9376 | Easy 60\xe2\x80\x9364",
+    diff_drums_autodetect = "Search for a track named PART DRUMS and assign it.\n" ..
+                            "Resets the current selection before scanning.",
+    diff_drums_copy       = "Copy notes from the tier above (Expert\xe2\x86\x92Hard, Hard\xe2\x86\x92Medium,\n" ..
+                            "Medium\xe2\x86\x92Easy) onto this difficulty's own pitch range - a\n" ..
+                            "starting point to hand-edit down, not an automatic reduction.\n\n" ..
+                            "If the source range has no notes, nothing is copied and the result\n" ..
+                            "panel reports it. If the target range already has notes, a\n" ..
+                            "confirmation popup asks before clearing and overwriting them.\n\n" ..
+                            "Fully undoable. Respects time selection if active.",
+    diff_drums_validate   = "Validate the notes in this difficulty's pitch range against RBN\n" ..
+                            "Drums authoring rules: no 3-limb hits on Medium (kick+snare+cymbal/tom\n" ..
+                            "together), no gems paired with kick on Easy, and roll/trill marker\n" ..
+                            "velocity on Hard (41-50 required for Hard eligibility).\n\n" ..
+                            "Also reports [mix N drums...] disco-flip event status as an\n" ..
+                            "informational note - not a pass/fail check, since correctness\n" ..
+                            "depends on the surrounding beat pattern.\n\n" ..
+                            "Read-only - no project changes are made.\n" ..
+                            "Respects time selection if active.",
+    diff_drums_validate_all = "Validate all four Drums difficulty ranges in one combined report.\n\n" ..
+                              "Read-only - no project changes are made.\n" ..
+                              "Respects time selection if active.",
+
     venue_preview_scale  = "Scale for venue event sprite previews shown in tooltips.\n\n" ..
                            "1\xc3\x97 \xe2\x80\x93 smaller display (213\xc3\x97120 px).\n" ..
                            "2\xc3\x97 \xe2\x80\x93 larger display (426\xc3\x97240 px).\n\n" ..

@@ -669,6 +669,7 @@ function Loop()
         if can_undo then Tooltip('Undo: ' .. undo_str) end
         if S.last_result then
             r.ImGui_Separator(ctx)
+            r.ImGui_PushTextWrapPos(ctx, 0)
             for line in (S.last_result .. '\n'):gmatch('([^\n]*)\n') do
                 if line ~= '' then
                     r.ImGui_Text(ctx, line)
@@ -676,6 +677,7 @@ function Loop()
                     r.ImGui_Spacing(ctx)
                 end
             end
+            r.ImGui_PopTextWrapPos(ctx)
         end
 
         r.ImGui_End(ctx)
