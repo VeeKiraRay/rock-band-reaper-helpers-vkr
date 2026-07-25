@@ -240,6 +240,73 @@ local function CheckK5SustainLength(events)
     return issues
 end
 
+-- Pro Keys' own constants (self-contained duplicate of the equivalent locals
+-- in actions_difficulty.lua - light per-file duplication, matching this
+-- codebase's existing convention, rather than a cross-file dependency for a
+-- couple of small constants/helpers).
+local PK_LANE_SHIFT_PITCHES = { [0]=true,[2]=true,[4]=true,[5]=true,[7]=true,[9]=true }
+local PK_PLAYABLE_LO, PK_PLAYABLE_HI = 48, 72  -- Pro Keys' constant C2-C4 range
+local PK_REDUCE_TOLERANCE_QN = 0.125  -- 1/32 note, for the auto-reduce-with-Pro-Keys feature
+
+-- Pro Keys' playable note events (lane-shift markers 0-9 excluded), grouped
+-- into chord events by start time (same 2 ms tolerance as GroupK5Chords) -
+-- used by CopyKeys5Diff's optional Pro-Keys-guided reduction: a copied Keys
+-- event is kept only if the same-tier Pro Keys track has an event starting
+-- at approximately the same time, and (when kept) its sustain length is
+-- matched to that Pro Keys event's length rather than the copied source
+-- tier's own length - sustain-gap rules require the two charts to agree on
+-- note length, not just onset placement, since Pro Keys is the master chart
+-- both are reduced from.
+local function ReadProKeysEvents(track, t_s, t_e)
+    local notes = {}
+    for i = 0, r.CountTrackMediaItems(track) - 1 do
+        local item = r.GetTrackMediaItem(track, i)
+        local take = r.GetActiveTake(item)
+        if take and r.TakeIsMIDI(take) then
+            local _, notecnt = r.MIDI_CountEvts(take)
+            for j = 0, notecnt - 1 do
+                local ok, _, muted, sppq, eppq, _, pitch = r.MIDI_GetNote(take, j)
+                if ok and not muted and not PK_LANE_SHIFT_PITCHES[pitch]
+                   and pitch >= PK_PLAYABLE_LO and pitch <= PK_PLAYABLE_HI then
+                    local s = r.MIDI_GetProjTimeFromPPQPos(take, sppq)
+                    if (not t_s or s >= t_s - 0.001) and (not t_e or s < t_e + 0.001) then
+                        notes[#notes + 1] = { s = s, e = r.MIDI_GetProjTimeFromPPQPos(take, eppq) }
+                    end
+                end
+            end
+        end
+    end
+    table.sort(notes, function(a, b) return a.s < b.s end)
+
+    local events = {}
+    local i = 1
+    while i <= #notes do
+        local ev = { s = notes[i].s, e = notes[i].e }
+        local j  = i + 1
+        while j <= #notes and notes[j].s - ev.s <= 0.002 do
+            if notes[j].e > ev.e then ev.e = notes[j].e end
+            j = j + 1
+        end
+        events[#events + 1] = ev
+        i = j
+    end
+    return events
+end
+
+-- Closest entry in events[] (each { s, e }, project time) to target_s within
+-- tolerance_qn (quarter-note space), or nil if none qualify.
+local function FindNearbyPKEvent(events, target_s, tolerance_qn)
+    local target_qn = QNAt(target_s)
+    local best, best_diff = nil, nil
+    for _, ev in ipairs(events) do
+        local diff = math.abs(QNAt(ev.s) - target_qn)
+        if diff <= tolerance_qn and (not best_diff or diff < best_diff) then
+            best, best_diff = ev, diff
+        end
+    end
+    return best
+end
+
 -- Notes with pitches above the valid hi for this difficulty (authoring error).
 -- rng_hi: K5_RANGE[diff].hi - the highest valid pitch for the diff being validated.
 local function CheckK5OutOfRange(events, rng_hi)
@@ -503,14 +570,54 @@ function CopyKeys5Diff(diff_label, force)
     local clear_s = sel_s or 0
     local clear_e = sel_e or (r.GetMediaItemInfo_Value(item, 'D_POSITION') + r.GetMediaItemInfo_Value(item, 'D_LENGTH'))
 
+    -- Optional: keep only events that land on a note in the same-tier Pro
+    -- Keys track (already hand-reduced), mirroring that reduction onto Keys
+    -- instead of copying every event from the higher tier unfiltered. Kept
+    -- events also get their sustain length matched to the Pro Keys event's
+    -- length (see FindNearbyPKEvent) so both charts agree on note length,
+    -- not just onset placement.
+    local pk_events, pk_skip_reason = nil, nil
+    if S.diff_5k_pk_reduce then
+        local pk_field_by_diff = { H = 'diff_pk_h_idx', M = 'diff_pk_m_idx', E = 'diff_pk_e_idx' }
+        local pk_field = pk_field_by_diff[diff_label]
+        local pk_idx   = pk_field and S[pk_field]
+        if not pk_idx or pk_idx < 0 then
+            pk_skip_reason = ('PART REAL_KEYS_%s not selected'):format(diff_label)
+        else
+            local pk_tr = r.GetTrack(0, pk_idx)
+            if not pk_tr then
+                pk_skip_reason = ('PART REAL_KEYS_%s no longer exists'):format(diff_label)
+            else
+                pk_events = ReadProKeysEvents(pk_tr, sel_s, sel_e)
+                if #pk_events == 0 then
+                    pk_events = nil
+                    pk_skip_reason = ('PART REAL_KEYS_%s has no notes'):format(diff_label)
+                end
+            end
+        end
+    end
+
     local target_max_offset = tgt_rng.hi - tgt_rng.lo
     local out_notes = {}
+    local kept_events, dropped_events = 0, 0
     for _, ev in ipairs(src_events) do
-        local offsets = {}
-        for _, p in ipairs(ev.pitches) do offsets[#offsets + 1] = p - src_rng.lo end
-        local new_offsets = CompressChordOffsets(offsets, target_max_offset)
-        for _, o in ipairs(new_offsets) do
-            out_notes[#out_notes + 1] = { s = ev.s, e = ev.e, pitch = tgt_rng.lo + o }
+        local pk_match = pk_events and FindNearbyPKEvent(pk_events, ev.s, PK_REDUCE_TOLERANCE_QN) or nil
+        local keep = (not pk_events) or (pk_match ~= nil)
+        if keep then
+            kept_events = kept_events + 1
+            local offsets = {}
+            for _, p in ipairs(ev.pitches) do offsets[#offsets + 1] = p - src_rng.lo end
+            local new_offsets = CompressChordOffsets(offsets, target_max_offset)
+            local ev_e = ev.e
+            if pk_match then
+                local pk_dur_qn = QNAt(pk_match.e) - QNAt(pk_match.s)
+                ev_e = r.TimeMap2_QNToTime(0, QNAt(ev.s) + pk_dur_qn)
+            end
+            for _, o in ipairs(new_offsets) do
+                out_notes[#out_notes + 1] = { s = ev.s, e = ev_e, pitch = tgt_rng.lo + o }
+            end
+        else
+            dropped_events = dropped_events + 1
         end
     end
 
@@ -523,6 +630,16 @@ function CopyKeys5Diff(diff_label, force)
     r.PreventUIRefresh(-1)
     r.UpdateArrange()
 
-    S.status      = ('Copy to %s: copied %d notes from %s.'):format(DIFF_NAMES[diff_label], #out_notes, DIFF_NAMES[src_dl])
+    local reduce_note = ''
+    if S.diff_5k_pk_reduce then
+        if pk_qns then
+            reduce_note = (' (%d of %d events kept using PART REAL_KEYS_%s as a guide)'):format(
+                kept_events, kept_events + dropped_events, diff_label)
+        else
+            reduce_note = (' (Pro Keys reduction skipped - %s)'):format(pk_skip_reason)
+        end
+    end
+    S.status      = ('Copy to %s: copied %d notes from %s%s.'):format(
+        DIFF_NAMES[diff_label], #out_notes, DIFF_NAMES[src_dl], reduce_note)
     S.last_result = nil
 end

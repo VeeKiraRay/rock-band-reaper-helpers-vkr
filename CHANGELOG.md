@@ -9,6 +9,179 @@ over 5. See `CLAUDE.md` → "Changelog / `@about` trimming" for the rule.
 
 `rock_band_general_helper_vkr.lua`
 
+**v0.9.23**
+- Difficulty tab: replaced the read-only "Suggest Hard/Medium/Easy"
+  preview (all four sub-tabs) with "Copy to Hard/Medium/Easy", which
+  actually copies notes from the immediately higher tier onto the
+  target tier's own track/range - a real starting point to hand-edit
+  down instead of just a report of what would need to change.
+  Two safeguards: if the source tier has no notes, it early-exits and
+  reports that, writing nothing; if the target tier already has
+  notes, a confirmation popup (the first modal in this codebase) asks
+  before clearing and overwriting them.
+  Keys and Guitar/Bass narrow their gem count at Medium/Easy by
+  convention (all 5 colors exist at every tier internally) - copying
+  down now compresses a chord using a color above the target's
+  ceiling instead of leaving it out-of-range or dropping it outright:
+  a single note or 2-note chord shifts down as a whole (e.g. Hard's
+  Orange+Blue -> Medium's Blue+Yellow), otherwise (3+ note chords, or
+  a shift that would go negative) the offending note is simply
+  dropped. New shared CompressChordOffsets in
+  actions_difficulty_shared.lua. Pro Keys copies verbatim (gems and
+  lane-shift markers alike) between tracks, since its range doesn't
+  shift between tiers.
+  SuggestProKeysDiff/SuggestKeys5Diff/SuggestGtrBassDiff/
+  SuggestDrumsDiff and their tooltips are removed, not just hidden.
+
+**v0.9.22**
+- Difficulty > Drums: layered a batch of concrete external RBN
+  authoring rules on top of the existing base rules, cascading down
+  from a higher difficulty to an easier one that doesn't define its
+  own override:
+  Cascades Hard->Medium->Easy: no kick inside a drum-fill marker
+  (120-124); roll/trill markers start on an 8th/quarter-note grid
+  line; a roll covers an even hit count; roll/fill density (no
+  16th-rate rolls >=140 BPM on Hard, never faster than 8th-rate on
+  Medium, quarter-rate required >=120 BPM on Easy else inherits
+  Medium's cap); general timekeeping density - runs of constant 8th
+  notes flagged >=170 BPM (Hard) / >=140 BPM (Medium, own; Easy
+  inherits); a Green+Yellow/Blue double crash needs a quarter-note
+  gap before it or should reduce to a single Green.
+  Cascades Medium->Easy: kicks on the quarter-grid only above 100
+  BPM; max 1 kick per measure at >=170 BPM. Medium's earlier
+  kick+snare+cymbal-specific "3-limb hit" rule is replaced by a
+  blanket max-2-simultaneous-notes rule (also cascades to Easy).
+  Medium-only: a kick/snare falling between two Yellow/Blue hits;
+  on-beat crash+kick is fine, off-beat/syncopated is not.
+  Hard-only: Hard should have fewer kicks than Expert; the Hard-tier
+  [mix N drums<config>] event should use the un-flipped/base config,
+  not the disco variant.
+  New "Authoring hints" block (non-pass/fail, always shown on H/M/E)
+  covers the rules too qualitative to check deterministically (e.g.
+  "try removing kicks from adjacent notes", "favor crash over kick").
+  Fix: offset-dependent checks (identifying which pitch is the kick/
+  snare/cymbal) used the simulated target tier's range even during
+  Suggest, where the notes being checked are always Expert's raw
+  pitches - so no offset-dependent check ever fired during Suggest.
+  Now resolves against Expert's range whenever validating in Suggest
+  mode.
+
+**v0.9.21**
+- Difficulty tab: added Guitar/Bass and Drums sub-tabs, matching the
+  existing Pro Keys/Keys suggest-and-validate workflow. "5-Lane Keys"
+  sub-tab renamed to "Keys".
+  Guitar/Bass share one sub-tab (instrument radio switch, since the
+  RBN authoring rules are identical between the two) validating
+  PART GUITAR/PART BASS: chord count/shape (illegal Green+Orange
+  combos, per-difficulty span limits), note length, overlap, sustain
+  gaps, force-HOPO markers (disallowed on Medium/Easy), and
+  trill/tremolo marker velocity (Hard eligibility).
+  Drums gets its own sub-tab validating PART DRUMS: no 3-limb hits on
+  Medium (kick+snare+cymbal/tom together), no gems paired with kick
+  on Easy, roll/trill marker velocity on Hard, and an informational
+  (non-pass/fail) scan of [mix N drums...] disco-flip events.
+  New track fields (diff_gtr_idx, diff_bass_idx, diff_drums_idx) are
+  independent of the Guitar/Drums conversion tabs' own target-track
+  fields and auto-detected by name, same as the existing Pro
+  Keys/Keys difficulty tracks.
+  Every Validate action (all four sub-tabs) now also runs a shared
+  cross-difficulty sanity check against the immediately higher tier
+  (Hard vs Expert, Medium vs Hard, Easy vs Medium): flags an unedited
+  copy (identical timing/shape - no reduction actually authored), and
+  reports individual note counts, requiring the lower tier to have
+  fewer notes than the one above it (e.g. "Expert has 500 notes and
+  Hard has 450 notes: OK"). Both count toward the report's issue
+  total. Not run for Expert (nothing above it) or for Suggest (which
+  only ever reads Expert - there's no second authored track to
+  compare against). Shared logic lives in the new
+  actions_difficulty_shared.lua, reused by all four difficulty
+  modules. Also fixes a latent crash in Drums > Validate Hard/All
+  (roll/trill velocity issues were concatenated as a table instead of
+  formatted into the report).
+
+**v0.9.20**
+- Fix: Difficulty > Pro Keys validation (Suggest/Validate) misclassified
+  reserved marker pitches - overdrive (116), glissando (126), trill
+  (127) - as playable notes, so they could be merged into a chord with
+  a real note or fed into interval-jump/spacing/overlap checks,
+  producing false-positive issues (e.g. a huge chord span or jump
+  measured against an overdrive marker). Only notes in the playable
+  C2-C4 range (48-72) are now treated as chord/gem events. The
+  standalone "note range" check is removed since it can no longer
+  trigger - filtering now happens before events are built.
+
+**v0.9.19**
+- Fix: RadioGroupWidth()'s per-option padding was a fixed pixel guess
+  that could undershoot the real rendered width of a radio button at
+  larger REAPER UI scales, causing the second option to overlap the
+  first's label when the group's labels were short (surfaced by the
+  Tab Input tab's Horizontal/Vertical row after its width group
+  shrank from 5 labels to 2). Now derives padding from
+  ImGui_GetFrameHeight() + the real ItemSpacing style value (tracks
+  font size / UI scale) plus a fixed cushion, instead of a flat guess;
+  falls back to the old fixed constant if GetFrameHeight isn't
+  available. (First pass still left Horizontal/Vertical visibly tight
+  - the flat "+10" buffer wasn't enough headroom on the group's widest
+  label; this revision widens it.)
+- General tab: "Song fade out" moved back to the Actions sub-tab
+  (it's an action, not a setting).
+- Venue > Actions: "List venue events"/"List event sections"/"List
+  lighting/postproc" grouped under an "Analyze" label; "Generate sing
+  along" under its own "Quick actions" label - same pattern as the
+  General tab's "General actions"/"Audio alignment" split.
+- Venue > Section gen and Manual gen: the Keyframe align dropdown is
+  now the same width as the Lighting dropdown in the same sub-tab
+  (was narrower than Lighting in both).
+
+**v0.9.18**
+- General tab: split into Actions (General actions, Audio alignment)
+  and Settings (Song fade out, Venue preview, WIP tabs, Settings)
+  sub-tabs. Save/Load moved to the end of Settings, after the values
+  they persist.
+- Difficulty tab: Validate row now wraps at 3 buttons per row (Expert/
+  Hard/Medium, then Easy/All) instead of 4+1, since the button text is
+  long. Applies to both Pro Keys and 5-Lane Keys sub-tabs.
+- Tab Input tab: the Guitar/Bass, Keys/Pro Keys, and Vocal instrument
+  modes are now sub-tabs instead of radio buttons. The Horizontal/
+  Vertical format selector's column width no longer factors in the
+  old mode-selector labels.
+- MIDI tab: MIDI Alignment, MIDI Length Sync, and Pattern Replace are
+  now sub-tabs (Alignment / Length / Pattern) instead of stacked
+  sections.
+- Venue > Section gen: the Custom/Template selector now has a "Mode"
+  label, aligned with the rest of the tab's inputs.
+- Venue > Manual gen: the Keyframes button moved next to the Keyframe
+  align dropdown and renamed to "Add" (was on the Lighting row).
+  Subdivision (Every beat/Every half beat) moved to its own labeled
+  row, matching Section gen and Themes gen's style, instead of sitting
+  inline after the Keyframe align dropdown.
+- Venue > Keyframes: Subdivision moved to its own labeled row, same
+  change as Manual gen.
+
+**v0.9.17**
+- Radio button options now align into columns within each tab view via
+  a new RadioGroupWidth() helper (in lib/reaper_imgui_helpers.lua,
+  same idea as BtnGroupWidth()/LabelColWidth() but for radio option
+  spacing): General tab (Preview size/Sprites/Show WIPs?), Guitar WIP
+  tab (Max chord/Workflow - also gained its first row-label column),
+  Tab Input tab (instrument mode/format selector), Keys tab (Split
+  by/Max chord/Workflow - also gained a row-label column), and Venue >
+  Preview (Players/Preview size/Sprites/Show).
+
+**v0.9.16**
+- Row labels (the text before a dropdown/slider/radio group) now align
+  within each tab or sub-tab via a new LabelColWidth() helper (in
+  lib/reaper_imgui_helpers.lua), same idea as BtnGroupWidth() but for
+  label columns instead of button widths: General tab (Preview size/
+  Sprites/Show WIPs?), Difficulty > Pro Keys (Expert/Hard/Medium/
+  Easy), MIDI tab (Source track/Reference track), Venue > Themes gen,
+  Section gen, and Manual gen (Remove folded into the existing
+  column), Venue > Preview (Players/Preview size/Sprites/Show).
+  RenderKeyframeAlignCombo() gained an optional col_offset param
+  (matching RenderCamPacingRow()) so it can join a tab's column.
+  Also replaced two remaining hardcoded-longest-label guesses (Venue
+  > Events, Venue > Keyframes) with the same helper for consistency.
+
 **v0.9.15**
 - Related buttons (Align all audio/Align count-in, Save/Load, the
   Suggest/Validate rows on the Difficulty tab, Add note/Run guide,
@@ -185,6 +358,14 @@ over 5. See `CLAUDE.md` → "Changelog / `@about` trimming" for the rule.
 ## Rock Band Vocal Helper
 
 `rock_band_vocal_helper_vkr.lua`
+
+**v1.8**
+- Internal housekeeping, no behavior changes. Every button in every tab
+  now goes through a shared Btn(label, height) helper (new, in
+  lib/reaper_imgui_helpers.lua) instead of a manual CalcTextSize+Button
+  pair, so each label string appears once instead of twice. Also fixes
+  a pre-existing hardcoded button width (Save/Load, General tab) to
+  compute from its label like every other button.
 
 **v1.7**
 - Vocal style presets: one-click combo on the Pitch, Tuner and Pitch

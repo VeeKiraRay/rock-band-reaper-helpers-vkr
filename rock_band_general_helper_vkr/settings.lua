@@ -42,6 +42,8 @@ local function SerializeSettings()
         'tabim='  .. S.tab_input_mode,
         -- Difficulty tab: Guitar/Bass instrument selector
         'dgbi='   .. S.diff_gb_instrument,
+        -- Difficulty tab: Keys Copy reduced-using-Pro-Keys checkbox
+        'd5kpkr=' .. (S.diff_5k_pk_reduce and '1' or '0'),
         -- MIDI alignment
         'mama='  .. S.ma_mode,
         -- Venue theme
@@ -98,6 +100,8 @@ local function DeserializeSettings(str)
         elseif k == 'tabim'  then S.tab_input_mode     = tonumber(v) or 0
         -- Difficulty tab: Guitar/Bass instrument selector
         elseif k == 'dgbi'   then S.diff_gb_instrument = (v == 'bass') and 'bass' or 'gtr'
+        -- Difficulty tab: Keys Copy reduced-using-Pro-Keys checkbox
+        elseif k == 'd5kpkr' then S.diff_5k_pk_reduce  = (v == '1')
         -- MIDI alignment
         elseif k == 'mama'  then S.ma_mode             = tonumber(v) or 0
         -- Venue theme

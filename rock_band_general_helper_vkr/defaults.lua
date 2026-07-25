@@ -145,6 +145,7 @@ S = {
     ms_ref_idx            = -1,
     -- Pattern Replace (session-only - not persisted)
     mr_midi_src_idx       = -1,
+    mr_diff_idx           = 0,     -- 0=All, 1=Expert, 2=Hard, 3=Medium, 4=Easy
     mr_search_notes       = nil,   -- array of {rel_s, rel_e, pitch} or nil
     mr_search_label       = '',
     mr_search_dur_ppq     = 0,
@@ -159,6 +160,7 @@ S = {
     diff_pk_e_idx         = -1,
     -- 5-Lane Keys difficulty (not persisted - auto-detected by name)
     diff_5k_idx           = -1,
+    diff_5k_pk_reduce     = true,  -- Copy to X: keep only events matching a same-tier Pro Keys note (persisted)
     -- Guitar/Bass difficulty (not persisted - auto-detected by name)
     diff_gtr_idx          = -1,
     diff_bass_idx         = -1,
@@ -660,6 +662,12 @@ TIPS = {
     mr_midi_src    = "MIDI track to search and replace patterns within.\n\n" ..
                      "All four actions (Set Search, Set Replace, Replace All, Fill Range)\n" ..
                      "read from and write to this track.",
+    mr_diff        = "Restricts Pattern actions to one difficulty tier's pitch range.\n\n" ..
+                     "PART DRUMS/GUITAR/BASS/KEYS: All=60-100, or the single tier's band\n" ..
+                     "(Expert 96-100, Hard 84-88, Medium 72-76, Easy 60-64).\n\n" ..
+                     "PART VOCALS/HARM1-3 and PART REAL_KEYS*/PART KEYS_ANIM* always use\n" ..
+                     "their own fixed range regardless of this selector.\n\n" ..
+                     "Any other track: no filtering, full MIDI note range.",
     mr_set_search  = "Capture the current time selection as the pattern to search for.\n\n" ..
                      "Both patterns must cover exactly the same duration.\n" ..
                      "Setting a new Search pattern with a different length clears the Replace pattern.",
@@ -724,12 +732,24 @@ TIPS = {
     diff_5k_copy      = "Copy notes from the tier above (Expert\xe2\x86\x92Hard, Hard\xe2\x86\x92Medium,\n" ..
                         "Medium\xe2\x86\x92Easy) onto this difficulty's own pitch range. Colors\n" ..
                         "above this tier's ceiling (e.g. Orange copied down to Medium) are\n" ..
-                        "pulled down a color instead of dropped - a starting point to\n" ..
-                        "hand-edit down, not an automatic reduction.\n\n" ..
+                        "pulled down a color instead of dropped.\n\n" ..
+                        "See \"Reduce using Pro Keys\" below for optional rhythm reduction\n" ..
+                        "guided by the same-tier Pro Keys track; with it off, this is a\n" ..
+                        "starting point to hand-edit down, not an automatic reduction.\n\n" ..
                         "If the source range has no notes, nothing is copied and the result\n" ..
                         "panel reports it. If the target range already has notes, a\n" ..
                         "confirmation popup asks before clearing and overwriting them.\n\n" ..
                         "Fully undoable. Respects time selection if active.",
+    diff_5k_pk_reduce = "When copying to Hard/Medium/Easy, keep only events that land on a\n" ..
+                        "note in the matching-tier Pro Keys track (PART REAL_KEYS_H/M/E) -\n" ..
+                        "mirrors whatever rhythm reduction was already hand-charted on Pro\n" ..
+                        "Keys onto the Keys copy, instead of copying every event from the\n" ..
+                        "tier above unfiltered. Match tolerance: 1/32 note. Kept events also\n" ..
+                        "have their sustain length matched to the Pro Keys note's length, so\n" ..
+                        "both charts agree on note length (not just onset) - Pro Keys is the\n" ..
+                        "master chart both are reduced from.\n\n" ..
+                        "If the matching Pro Keys track isn't selected, missing, or empty,\n" ..
+                        "Copy falls back to an unfiltered copy and says so in the result.",
     diff_5k_validate  = "Validate the notes in this difficulty's pitch range against\n" ..
                         "5-Lane Keys authoring rules: chord count, note spacing, note\n" ..
                         "length, and sustain gaps.\n\n" ..

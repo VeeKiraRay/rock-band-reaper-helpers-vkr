@@ -1,6 +1,6 @@
 -- @description Rock Band General Helper
 -- @author VeeKiraRay
--- @version 0.9.24
+-- @version 0.9.28
 -- @about
 --   Utility actions for Rock Band authoring in REAPER.
 --
@@ -20,107 +20,67 @@
 --   This @about block keeps only the 5 most recent versions.
 --   Full history: CHANGELOG.md in the repo.
 --
+--   v0.9.28
+--     - Difficulty > Keys: the "Reduce using Pro Keys (same tier)" reduction
+--       (v0.9.27) now also matches sustain length, not just which events
+--       survive. A kept event's length is set to the matching Pro Keys
+--       event's length (re-anchored at the Keys event's own start), instead
+--       of keeping whatever length it had on the copied source tier - Pro
+--       Keys is the master chart both are reduced from, and sustain-gap
+--       rules require the two charts to agree on note length as well as
+--       onset. No change when the checkbox is off or Pro Keys data is
+--       unavailable (falls back to the source tier's own length, as
+--       before). ReadProKeysEventQNs/HasNearbyQN in actions_difficulty_5k.lua
+--       replaced by ReadProKeysEvents/FindNearbyPKEvent (event-based, so
+--       length is available alongside timing).
+--   v0.9.27
+--     - Difficulty > Keys: new "Reduce using Pro Keys (same tier)" checkbox
+--       above the Copy row, checked by default. When on, Copy to Hard/
+--       Medium/Easy keeps only copied events that land on a note in the
+--       matching-tier Pro Keys track (PART REAL_KEYS_H/M/E) - mirrors a
+--       rhythm reduction already hand-charted on Pro Keys onto the Keys
+--       copy (e.g. Expert has 12 notes, Pro Keys Hard was reduced to 8 -
+--       Copy to Hard on Keys now keeps only the 8 matching slots), instead
+--       of copying every event from the tier above unfiltered. Match
+--       tolerance: 1/32 note in quarter-note space (tightened from an
+--       initial 1/16 note, which left too many events kept at faster
+--       tempos). Falls back to an unfiltered copy (with a status note
+--       explaining why) when the matching Pro Keys track isn't selected,
+--       missing, or empty - the button never refuses to run. New
+--       persisted S.diff_5k_pk_reduce. Keys-only - Guitar/Bass, Drums,
+--       and Pro Keys itself don't have this option.
+--   v0.9.26
+--     - Difficulty > Drums: "Kick/snare between Yellow/Blue" (Medium) is
+--       disabled - as implemented it doesn't match the intended rule (too
+--       strong). CheckDrumsYellowBlueInterleave is left defined but no
+--       longer wired into RunDrumsChecks, to be revisited once the rule is
+--       better understood.
+--     - Fix: CompressChordOffsets (actions_difficulty_shared.lua, used by
+--       Keys/Guitar-Bass's Copy to Hard/Medium/Easy) only shifted a chord
+--       down when it had exactly 2 notes - a lone note above the target
+--       tier's color ceiling (e.g. a single Orange note copied to Medium)
+--       fell through to the drop branch instead of shifting down (e.g. to
+--       Blue), silently losing the note instead of relocating it. Now
+--       shifts whenever there are 1 or 2 notes and the shift keeps every
+--       note >= offset 0.
+--   v0.9.25
+--     - MIDI > Pattern: new Difficulty dropdown (All/Expert/Hard/Medium/Easy,
+--       default All) scopes Set Search/Set Replace/Replace All/Fill Range to
+--       one difficulty tier's pitch range on PART DRUMS/GUITAR/BASS/KEYS
+--       (Expert 96-100, Hard 84-88, Medium 72-76, Easy 60-64; All = 60-100)
+--       instead of touching every tier packed into the same track/time
+--       window. PART VOCALS/HARM1-3 (36-84) and PART REAL_KEYS*/PART
+--       KEYS_ANIM* (48-72) always use their own fixed range regardless of
+--       the dropdown; any other track keeps the previous unfiltered (0-127)
+--       behavior. A disabled-style "Pitch range: lo-hi" readout under the
+--       dropdown shows the range currently in effect. New global
+--       GetPatternPitchRange in actions_midi_replace.lua; ReadMIDIPatternFromTake
+--       (lib/reaper_midi_helpers.lua) and the local ClearPatternWindow gained
+--       optional min/max pitch params.
 --   v0.9.24
 --     - Result panel (bottom of every tab): long lines now wrap to the
 --       window's current width (ImGui_PushTextWrapPos(ctx, 0)) instead of
 --       overflowing and requiring the window to be stretched to read them.
---   v0.9.23
---     - Difficulty tab: replaced the read-only "Suggest Hard/Medium/Easy"
---       preview (all four sub-tabs) with "Copy to Hard/Medium/Easy", which
---       actually copies notes from the immediately higher tier onto the
---       target tier's own track/range - a real starting point to hand-edit
---       down instead of just a report of what would need to change.
---       Two safeguards: if the source tier has no notes, it early-exits and
---       reports that, writing nothing; if the target tier already has
---       notes, a confirmation popup (the first modal in this codebase) asks
---       before clearing and overwriting them.
---       Keys and Guitar/Bass narrow their gem count at Medium/Easy by
---       convention (all 5 colors exist at every tier internally) - copying
---       down now compresses a chord using a color above the target's
---       ceiling instead of leaving it out-of-range or dropping it outright:
---       a single note or 2-note chord shifts down as a whole (e.g. Hard's
---       Orange+Blue -> Medium's Blue+Yellow), otherwise (3+ note chords, or
---       a shift that would go negative) the offending note is simply
---       dropped. New shared CompressChordOffsets in
---       actions_difficulty_shared.lua. Pro Keys copies verbatim (gems and
---       lane-shift markers alike) between tracks, since its range doesn't
---       shift between tiers.
---       SuggestProKeysDiff/SuggestKeys5Diff/SuggestGtrBassDiff/
---       SuggestDrumsDiff and their tooltips are removed, not just hidden.
---   v0.9.22
---     - Difficulty > Drums: layered a batch of concrete external RBN
---       authoring rules on top of the existing base rules, cascading down
---       from a higher difficulty to an easier one that doesn't define its
---       own override:
---       Cascades Hard->Medium->Easy: no kick inside a drum-fill marker
---       (120-124); roll/trill markers start on an 8th/quarter-note grid
---       line; a roll covers an even hit count; roll/fill density (no
---       16th-rate rolls >=140 BPM on Hard, never faster than 8th-rate on
---       Medium, quarter-rate required >=120 BPM on Easy else inherits
---       Medium's cap); general timekeeping density - runs of constant 8th
---       notes flagged >=170 BPM (Hard) / >=140 BPM (Medium, own; Easy
---       inherits); a Green+Yellow/Blue double crash needs a quarter-note
---       gap before it or should reduce to a single Green.
---       Cascades Medium->Easy: kicks on the quarter-grid only above 100
---       BPM; max 1 kick per measure at >=170 BPM. Medium's earlier
---       kick+snare+cymbal-specific "3-limb hit" rule is replaced by a
---       blanket max-2-simultaneous-notes rule (also cascades to Easy).
---       Medium-only: a kick/snare falling between two Yellow/Blue hits;
---       on-beat crash+kick is fine, off-beat/syncopated is not.
---       Hard-only: Hard should have fewer kicks than Expert; the Hard-tier
---       [mix N drums<config>] event should use the un-flipped/base config,
---       not the disco variant.
---       New "Authoring hints" block (non-pass/fail, always shown on H/M/E)
---       covers the rules too qualitative to check deterministically (e.g.
---       "try removing kicks from adjacent notes", "favor crash over kick").
---       Fix: offset-dependent checks (identifying which pitch is the kick/
---       snare/cymbal) used the simulated target tier's range even during
---       Suggest, where the notes being checked are always Expert's raw
---       pitches - so no offset-dependent check ever fired during Suggest.
---       Now resolves against Expert's range whenever validating in Suggest
---       mode.
---   v0.9.21
---     - Difficulty tab: added Guitar/Bass and Drums sub-tabs, matching the
---       existing Pro Keys/Keys suggest-and-validate workflow. "5-Lane Keys"
---       sub-tab renamed to "Keys".
---       Guitar/Bass share one sub-tab (instrument radio switch, since the
---       RBN authoring rules are identical between the two) validating
---       PART GUITAR/PART BASS: chord count/shape (illegal Green+Orange
---       combos, per-difficulty span limits), note length, overlap, sustain
---       gaps, force-HOPO markers (disallowed on Medium/Easy), and
---       trill/tremolo marker velocity (Hard eligibility).
---       Drums gets its own sub-tab validating PART DRUMS: no 3-limb hits on
---       Medium (kick+snare+cymbal/tom together), no gems paired with kick
---       on Easy, roll/trill marker velocity on Hard, and an informational
---       (non-pass/fail) scan of [mix N drums...] disco-flip events.
---       New track fields (diff_gtr_idx, diff_bass_idx, diff_drums_idx) are
---       independent of the Guitar/Drums conversion tabs' own target-track
---       fields and auto-detected by name, same as the existing Pro
---       Keys/Keys difficulty tracks.
---       Every Validate action (all four sub-tabs) now also runs a shared
---       cross-difficulty sanity check against the immediately higher tier
---       (Hard vs Expert, Medium vs Hard, Easy vs Medium): flags an unedited
---       copy (identical timing/shape - no reduction actually authored), and
---       reports individual note counts, requiring the lower tier to have
---       fewer notes than the one above it (e.g. "Expert has 500 notes and
---       Hard has 450 notes: OK"). Both count toward the report's issue
---       total. Not run for Expert (nothing above it) or for Suggest (which
---       only ever reads Expert - there's no second authored track to
---       compare against). Shared logic lives in the new
---       actions_difficulty_shared.lua, reused by all four difficulty
---       modules. Also fixes a latent crash in Drums > Validate Hard/All
---       (roll/trill velocity issues were concatenated as a table instead of
---       formatted into the report).
---   v0.9.20
---     - Fix: Difficulty > Pro Keys validation (Suggest/Validate) misclassified
---       reserved marker pitches - overdrive (116), glissando (126), trill
---       (127) - as playable notes, so they could be merged into a chord with
---       a real note or fed into interval-jump/spacing/overlap checks,
---       producing false-positive issues (e.g. a huge chord span or jump
---       measured against an overdrive marker). Only notes in the playable
---       C2-C4 range (48-72) are now treated as chord/gem events. The
---       standalone "note range" check is removed since it can no longer
---       trigger - filtering now happens before events are built.
 r = reaper  -- global so all dofile'd modules can use it
 
 if not r.ImGui_CreateContext then

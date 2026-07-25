@@ -1,5 +1,14 @@
 ﻿-- Tab Input and MIDI tab rendering
 
+-- MIDI > Pattern: Difficulty filter dropdown options (S.mr_diff_idx).
+local MR_DIFF_OPTIONS = {
+    { idx = 0, label = 'All' },
+    { idx = 1, label = 'Expert' },
+    { idx = 2, label = 'Hard' },
+    { idx = 3, label = 'Medium' },
+    { idx = 4, label = 'Easy' },
+}
+
 -- Shared body for each Tab Input mode sub-tab: format selector, mode-specific
 -- option, textarea, and Add note / Run guide. mode: 0=Guitar/Bass, 1=Keys/Pro
 -- Keys, 2=Vocal (mirrors S.tab_input_mode, kept in sync for persistence).
@@ -159,8 +168,10 @@ function DrawMIDITab(ctx)
         -- MIDI > Pattern sub-tab
         ------------------------------------------------
         if r.ImGui_BeginTabItem(ctx, 'Pattern') then
+            local lbl_col_pat = LabelColWidth({ 'Source track', 'Difficulty' })
+
             r.ImGui_Text(ctx, 'Source track')
-            r.ImGui_SameLine(ctx)
+            r.ImGui_SameLine(ctx, lbl_col_pat)
             r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
             S.mr_midi_src_idx = TrackCombo('##mr_src', S.mr_midi_src_idx, midi_tracks)
             Tooltip(TIPS.mr_midi_src)
@@ -170,6 +181,20 @@ function DrawMIDITab(ctx)
                 local _ed_tr   = _ed_take and r.GetMediaItemTake_Track(_ed_take)
                 if _ed_tr and _ed_tr ~= r.GetTrack(0, S.mr_midi_src_idx) then
                     r.ImGui_TextColored(ctx, 0xFFAA00FF, '! Source track not open in the MIDI editor.')
+                end
+            end
+
+            r.ImGui_Text(ctx, 'Difficulty')
+            r.ImGui_SameLine(ctx, lbl_col_pat)
+            r.ImGui_SetNextItemWidth(ctx, WIDTH_SHORT)
+            S.mr_diff_idx = TrackCombo('##mr_diff', S.mr_diff_idx, MR_DIFF_OPTIONS)
+            Tooltip(TIPS.mr_diff)
+            if S.mr_midi_src_idx >= 0 then
+                local _tr = r.GetTrack(0, S.mr_midi_src_idx)
+                if _tr then
+                    local _, _trname = r.GetTrackName(_tr)
+                    local _lo, _hi = GetPatternPitchRange(_trname, S.mr_diff_idx)
+                    r.ImGui_TextDisabled(ctx, ('Pitch range: %d\xe2\x80\x93%d'):format(_lo, _hi))
                 end
             end
 

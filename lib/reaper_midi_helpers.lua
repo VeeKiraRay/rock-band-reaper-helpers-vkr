@@ -150,16 +150,19 @@ function ClearNotesInRange(midi_take, range_start, range_end, min_pitch, max_pit
 end
 
 ----------------------------------------------------------------------
--- Read all notes in a PPQ range from a take (no pitch filtering).
+-- Read all notes in a PPQ range from a take, optionally restricted to a
+-- pitch range (min_pitch/max_pitch default to 0/127 - no filtering).
 -- Returns array of {rel_s, rel_e, pitch} sorted by rel_s,
 -- where rel_s/rel_e are PPQ offsets from start_ppq.
 ----------------------------------------------------------------------
-function ReadMIDIPatternFromTake(take, start_ppq, end_ppq)
+function ReadMIDIPatternFromTake(take, start_ppq, end_ppq, min_pitch, max_pitch)
+    min_pitch = min_pitch or 0
+    max_pitch = max_pitch or 127
     local notes = {}
     local _, n = r.MIDI_CountEvts(take)
     for i = 0, n - 1 do
         local ok, _, _, sppq, eppq, _, p = r.MIDI_GetNote(take, i)
-        if ok and sppq >= start_ppq and sppq < end_ppq then
+        if ok and sppq >= start_ppq and sppq < end_ppq and p >= min_pitch and p <= max_pitch then
             notes[#notes + 1] = { rel_s = sppq - start_ppq, rel_e = eppq - start_ppq, pitch = p }
         end
     end

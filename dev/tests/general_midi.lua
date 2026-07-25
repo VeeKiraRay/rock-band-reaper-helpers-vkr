@@ -207,6 +207,22 @@ Test.it('CopyKeys5Diff M: copies Hard notes onto Medium, exercising color compre
     Test.expect(not S.status:find('^Error'), 'CopyKeys5Diff(M) errored: ' .. S.status)
 end)
 
+Test.it('CopyKeys5Diff H: reduces using Pro Keys Hard as a guide', function()
+    reset()
+    local keys_base, keys_n = LoadFixture('rb_keys.mid')
+    Test.expect(keys_n > 0, 'rb_keys.mid created no tracks')
+    local pk_base, pk_n = LoadFixture('rb_pro_keys.mid')
+    Test.expect(pk_n > 0, 'rb_pro_keys.mid created no tracks')
+    local pk_h_idx = FindFixtureTrack('REAL_KEYS_H', pk_base)
+    Test.expect(pk_h_idx ~= nil, 'no PART REAL_KEYS_H track found in rb_pro_keys.mid')
+    S.diff_5k_idx       = keys_base
+    S.diff_pk_h_idx     = pk_h_idx
+    S.diff_5k_pk_reduce = true
+    CopyKeys5Diff('H', true)  -- force: skip the overwrite-confirmation popup for this test
+    CleanupFixture(keys_base)  -- removes both fixtures' tracks (keys_base..end)
+    Test.expect(not S.status:find('^Error'), 'CopyKeys5Diff(H) with Pro Keys reduction errored: ' .. S.status)
+end)
+
 Test.it('ValidateKeys5Diff X: validates Expert pitch range (96-100)', function()
     reset()
     local base, n = LoadFixture('rb_keys.mid')
@@ -358,6 +374,99 @@ Test.it('ValidateAllDrums: validates all four difficulty pitch ranges', function
     ValidateAllDrums()
     CleanupFixture(base)
     Test.expect(not S.status:find('^Error'), 'ValidateAllDrums errored: ' .. S.status)
+end)
+
+----------------------------------------------------------------------
+-- Pattern Replace difficulty filter — GetPatternPitchRange + SetSearchPattern
+----------------------------------------------------------------------
+Test.section('Pattern Replace difficulty filter')
+
+Test.it('GetPatternPitchRange resolves tiered ranges for PART DRUMS/GUITAR/BASS/KEYS', function()
+    reset()
+    local expected = {
+        [0] = { 60, 100 }, [1] = { 96, 100 }, [2] = { 84, 88 }, [3] = { 72, 76 }, [4] = { 60, 64 },
+    }
+    for _, tn in ipairs({ 'PART DRUMS', 'PART GUITAR', 'PART BASS', 'PART KEYS' }) do
+        for diff_idx, exp in pairs(expected) do
+            local lo, hi = GetPatternPitchRange(tn, diff_idx)
+            Test.expect(lo == exp[1] and hi == exp[2],
+                ('%s diff %d: expected %d-%d, got %d-%d'):format(tn, diff_idx, exp[1], exp[2], lo, hi))
+        end
+    end
+end)
+
+Test.it('GetPatternPitchRange uses a fixed 36-84 range for vocal/harmony tracks regardless of Difficulty', function()
+    reset()
+    for _, tn in ipairs({ 'PART VOCALS', 'HARM1', 'HARM2', 'HARM3' }) do
+        for diff_idx = 0, 4 do
+            local lo, hi = GetPatternPitchRange(tn, diff_idx)
+            Test.expect(lo == 36 and hi == 84,
+                ('%s diff %d: expected 36-84, got %d-%d'):format(tn, diff_idx, lo, hi))
+        end
+    end
+end)
+
+Test.it('GetPatternPitchRange uses a fixed 48-72 range for PART REAL_KEYS*/PART KEYS_ANIM* tracks regardless of Difficulty', function()
+    reset()
+    for _, tn in ipairs({ 'PART REAL_KEYS_X', 'PART REAL_KEYS_H', 'PART KEYS_ANIM_RH', 'PART KEYS_ANIM_LH' }) do
+        for diff_idx = 0, 4 do
+            local lo, hi = GetPatternPitchRange(tn, diff_idx)
+            Test.expect(lo == 48 and hi == 72,
+                ('%s diff %d: expected 48-72, got %d-%d'):format(tn, diff_idx, lo, hi))
+        end
+    end
+end)
+
+Test.it('GetPatternPitchRange has no filtering for unrecognized track names', function()
+    reset()
+    local lo, hi = GetPatternPitchRange('SOME OTHER TRACK', 2)
+    Test.expect(lo == 0 and hi == 127, ('expected 0-127, got %d-%d'):format(lo, hi))
+end)
+
+Test.it('SetSearchPattern restricts captured notes to the selected tier on PART DRUMS (Hard)', function()
+    reset()
+    local base, n = LoadFixture('rb_drums.mid')
+    Test.expect(n > 0, 'rb_drums.mid created no tracks')
+    local track = r.GetTrack(0, base)
+    local item = FindFirstMIDIItem(track)
+    Test.expect(item ~= nil, 'no MIDI item on rb_drums.mid track')
+    local pos = r.GetMediaItemInfo_Value(item, 'D_POSITION')
+    local len = r.GetMediaItemInfo_Value(item, 'D_LENGTH')
+    r.GetSet_LoopTimeRange(true, false, pos, pos + len, false)
+    S.mr_midi_src_idx = base
+    S.mr_diff_idx     = 2  -- Hard
+    SetSearchPattern()
+    r.GetSet_LoopTimeRange(true, false, 0, 0, false)
+    CleanupFixture(base)
+    Test.expect(S.mr_search_notes ~= nil and #S.mr_search_notes > 0,
+        'expected at least one Hard-tier note captured from rb_drums.mid')
+    for _, note in ipairs(S.mr_search_notes) do
+        Test.expect(note.pitch >= 84 and note.pitch <= 88,
+            'note pitch ' .. note.pitch .. ' outside Hard range 84-88')
+    end
+end)
+
+Test.it('SetSearchPattern with Difficulty=All spans every tier on PART DRUMS', function()
+    reset()
+    local base, n = LoadFixture('rb_drums.mid')
+    Test.expect(n > 0, 'rb_drums.mid created no tracks')
+    local track = r.GetTrack(0, base)
+    local item = FindFirstMIDIItem(track)
+    Test.expect(item ~= nil, 'no MIDI item on rb_drums.mid track')
+    local pos = r.GetMediaItemInfo_Value(item, 'D_POSITION')
+    local len = r.GetMediaItemInfo_Value(item, 'D_LENGTH')
+    r.GetSet_LoopTimeRange(true, false, pos, pos + len, false)
+    S.mr_midi_src_idx = base
+    S.mr_diff_idx     = 0  -- All
+    SetSearchPattern()
+    r.GetSet_LoopTimeRange(true, false, 0, 0, false)
+    CleanupFixture(base)
+    Test.expect(S.mr_search_notes ~= nil and #S.mr_search_notes > 0,
+        'expected notes captured with Difficulty=All')
+    for _, note in ipairs(S.mr_search_notes) do
+        Test.expect(note.pitch >= 60 and note.pitch <= 100,
+            'note pitch ' .. note.pitch .. ' outside All range 60-100')
+    end
 end)
 
 ----------------------------------------------------------------------

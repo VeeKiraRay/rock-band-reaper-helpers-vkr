@@ -1,6 +1,48 @@
 -- MIDI Pattern Replace: find-and-replace and fill-range for recurring note patterns.
 -- Requires: S, r, GetTimeSelection, FindFirstMIDIItem, ReadMIDIPatternFromTake (globals)
 
+-- Per-difficulty pitch ranges on tracks that pack all four tiers into one
+-- track at different pitch bands (matches DRUMS_RANGE in
+-- actions_difficulty_drums.lua - the wider scan boundary, not the narrower
+-- gem-legality ranges in GB_RANGE/K5_RANGE).
+local DIFF_TIER_RANGE = {
+    [1] = { lo = 96, hi = 100 }, -- Expert
+    [2] = { lo = 84, hi = 88  }, -- Hard
+    [3] = { lo = 72, hi = 76  }, -- Medium
+    [4] = { lo = 60, hi = 64  }, -- Easy
+}
+local TIERED_TRACK_NAMES = {
+    ['PART DRUMS'] = true, ['PART GUITAR'] = true,
+    ['PART BASS']  = true, ['PART KEYS']   = true,
+}
+local FIXED_RANGE_TRACK_NAMES = {
+    ['PART VOCALS'] = { lo = 36, hi = 84 }, ['HARM1'] = { lo = 36, hi = 84 },
+    ['HARM2']       = { lo = 36, hi = 84 }, ['HARM3'] = { lo = 36, hi = 84 },
+}
+local FIXED_RANGE_PREFIXES = {
+    { prefix = 'PART REAL_KEYS', lo = 48, hi = 72 },
+    { prefix = 'PART KEYS_ANIM', lo = 48, hi = 72 },
+}
+
+-- Resolve the pitch range Pattern actions should be confined to for a given
+-- track name + Difficulty selector (S.mr_diff_idx: 0=All, 1=X, 2=H, 3=M, 4=E).
+-- Global: also used by ui_midi.lua for the resolved-range readout.
+function GetPatternPitchRange(track_name, diff_idx)
+    if TIERED_TRACK_NAMES[track_name] then
+        if diff_idx and diff_idx >= 1 and diff_idx <= 4 then
+            local rg = DIFF_TIER_RANGE[diff_idx]
+            return rg.lo, rg.hi
+        end
+        return 60, 100  -- All: Easy's floor through Expert's ceiling
+    end
+    local fixed = FIXED_RANGE_TRACK_NAMES[track_name]
+    if fixed then return fixed.lo, fixed.hi end
+    for _, p in ipairs(FIXED_RANGE_PREFIXES) do
+        if track_name:sub(1, #p.prefix) == p.prefix then return p.lo, p.hi end
+    end
+    return 0, 127  -- unrecognized track: no filtering
+end
+
 local function BuildPatternLabel(sel_s, sel_e, note_count)
     local s_m   = tonumber(r.format_timestr_pos(sel_s, '', 1):match('^(%d+)')) or 0
     local e_m   = tonumber(r.format_timestr_pos(sel_e, '', 1):match('^(%d+)')) or 0
@@ -21,12 +63,15 @@ local function PatternsMatch(a, b)
     return true
 end
 
--- Delete all notes whose start PPQ is in [start_ppq, end_ppq).
-local function ClearPatternWindow(take, start_ppq, end_ppq)
+-- Delete all notes whose start PPQ is in [start_ppq, end_ppq) and whose
+-- pitch is in [min_pitch, max_pitch] (defaults to 0/127 - no filtering).
+local function ClearPatternWindow(take, start_ppq, end_ppq, min_pitch, max_pitch)
+    min_pitch = min_pitch or 0
+    max_pitch = max_pitch or 127
     local _, n = r.MIDI_CountEvts(take)
     for i = n - 1, 0, -1 do
-        local ok, _, _, sppq = r.MIDI_GetNote(take, i)
-        if ok and sppq >= start_ppq and sppq < end_ppq then
+        local ok, _, _, sppq, _, _, p = r.MIDI_GetNote(take, i)
+        if ok and sppq >= start_ppq and sppq < end_ppq and p >= min_pitch and p <= max_pitch then
             r.MIDI_DeleteNote(take, i)
         end
     end
@@ -53,12 +98,15 @@ function SetSearchPattern()
     local track, item, take, err = GetTrackAndTake(S.mr_midi_src_idx)
     if err then S.status = err; return end
 
+    local _, track_name = r.GetTrackName(track)
+    local lo, hi = GetPatternPitchRange(track_name, S.mr_diff_idx)
+
     local spq = r.MIDI_GetPPQPosFromProjTime(take, sel_s)
     local epq = r.MIDI_GetPPQPosFromProjTime(take, sel_e)
     local dur = epq - spq
     if dur < 1 then S.status = 'Time selection too short.'; return end
 
-    local notes = ReadMIDIPatternFromTake(take, spq, epq)
+    local notes = ReadMIDIPatternFromTake(take, spq, epq, lo, hi)
     local s_m   = tonumber(r.format_timestr_pos(sel_s, '', 1):match('^(%d+)')) or 0
     local e_m   = tonumber(r.format_timestr_pos(sel_e, '', 1):match('^(%d+)')) or 0
     local m_cnt = e_m - s_m
@@ -83,12 +131,15 @@ function SetReplacePattern()
     local track, item, take, err = GetTrackAndTake(S.mr_midi_src_idx)
     if err then S.status = err; return end
 
+    local _, track_name = r.GetTrackName(track)
+    local lo, hi = GetPatternPitchRange(track_name, S.mr_diff_idx)
+
     local spq = r.MIDI_GetPPQPosFromProjTime(take, sel_s)
     local epq = r.MIDI_GetPPQPosFromProjTime(take, sel_e)
     local dur = epq - spq
     if dur < 1 then S.status = 'Time selection too short.'; return end
 
-    local notes = ReadMIDIPatternFromTake(take, spq, epq)
+    local notes = ReadMIDIPatternFromTake(take, spq, epq, lo, hi)
 
     S.mr_replace_notes   = notes
     S.mr_replace_dur_ppq = dur
@@ -112,6 +163,9 @@ function FillRange()
     local track, item, take, err = GetTrackAndTake(S.mr_midi_src_idx)
     if err then S.status = err; return end
 
+    local _, track_name = r.GetTrackName(track)
+    local lo, hi = GetPatternPitchRange(track_name, S.mr_diff_idx)
+
     local spq = r.MIDI_GetPPQPosFromProjTime(take, sel_s)
     local epq = r.MIDI_GetPPQPosFromProjTime(take, sel_e)
     local dur = S.mr_replace_dur_ppq
@@ -126,7 +180,7 @@ function FillRange()
 
     for i = 0, n - 1 do
         local w = spq + i * dur
-        ClearPatternWindow(take, w, w + dur)
+        ClearPatternWindow(take, w, w + dur, lo, hi)
         for _, note in ipairs(S.mr_replace_notes) do
             r.MIDI_InsertNote(take, false, false, w + note.rel_s, w + note.rel_e, 0, note.pitch, 100, false)
         end
@@ -160,6 +214,9 @@ function DoMIDIPatternReplace()
     local track, item, take, err = GetTrackAndTake(S.mr_midi_src_idx)
     if err then S.status = err; return end
 
+    local _, track_name = r.GetTrackName(track)
+    local lo, hi = GetPatternPitchRange(track_name, S.mr_diff_idx)
+
     -- Scan scope: time selection or full MIDI item
     local sel_s, sel_e = GetTimeSelection()
     local dur = S.mr_search_dur_ppq
@@ -182,9 +239,9 @@ function DoMIDIPatternReplace()
 
     local w = spq
     while w + dur <= epq do
-        local cand = ReadMIDIPatternFromTake(take, w, w + dur)
+        local cand = ReadMIDIPatternFromTake(take, w, w + dur, lo, hi)
         if PatternsMatch(S.mr_search_notes, cand) then
-            ClearPatternWindow(take, w, w + dur)
+            ClearPatternWindow(take, w, w + dur, lo, hi)
             for _, note in ipairs(S.mr_replace_notes) do
                 r.MIDI_InsertNote(take, false, false, w + note.rel_s, w + note.rel_e, 0, note.pitch, 100, false)
             end

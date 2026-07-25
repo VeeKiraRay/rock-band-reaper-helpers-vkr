@@ -138,6 +138,10 @@ function DrawDifficultyTab(ctx)
             r.ImGui_TextDisabled(ctx, 'Copy notes from the tier above onto this one\'s own range:')
             r.ImGui_Spacing(ctx)
 
+            _, S.diff_5k_pk_reduce = r.ImGui_Checkbox(ctx, 'Reduce using Pro Keys (same tier)', S.diff_5k_pk_reduce)
+            Tooltip(TIPS.diff_5k_pk_reduce)
+            r.ImGui_Spacing(ctx)
+
             local bw_5k_copy = BtnGroupWidth({ 'Copy to Hard', 'Copy to Medium', 'Copy to Easy' })
             if no_5k then r.ImGui_BeginDisabled(ctx) end
             if Btn('Copy to Hard',   BTN_H, bw_5k_copy) then RunAction(function() CopyKeys5Diff('H') end) end

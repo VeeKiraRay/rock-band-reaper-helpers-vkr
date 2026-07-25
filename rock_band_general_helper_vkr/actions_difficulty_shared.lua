@@ -79,8 +79,10 @@ function CompressChordOffsets(offsets, target_max_offset)
     if max_o <= target_max_offset then return offsets end
 
     local shift = max_o - target_max_offset
-    if #offsets == 2 and (offsets[1] - shift) >= 0 then
-        return { offsets[1] - shift, offsets[2] - shift }
+    if #offsets <= 2 and (offsets[1] - shift) >= 0 then
+        local shifted = {}
+        for i, o in ipairs(offsets) do shifted[i] = o - shift end
+        return shifted
     end
 
     local kept = {}

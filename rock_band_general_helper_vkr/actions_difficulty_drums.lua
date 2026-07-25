@@ -662,7 +662,10 @@ local function RunDrumsChecks(diff_label, events, header, rng, track, sel_s, sel
     end
 
     if diff_label == 'M' then
-        cats[#cats + 1] = { name = 'Kick/snare between Yellow/Blue', issues = CheckDrumsYellowBlueInterleave(events, offset_rng) }
+        -- CheckDrumsYellowBlueInterleave is disabled for now: as currently
+        -- written it doesn't match the intended rule (too strong). Left
+        -- defined above, just not wired in, so it can be tuned once the
+        -- rule is better understood without touching the rest of the module.
         cats[#cats + 1] = { name = 'On-beat crash+kick only', issues = CheckDrumsOnBeatCrashKick(events, offset_rng) }
     elseif diff_label == 'E' then
         cats[#cats + 1] = { name = 'No gems paired with kick (Easy)', issues = CheckDrumsKickPairing(events, offset_rng) }
