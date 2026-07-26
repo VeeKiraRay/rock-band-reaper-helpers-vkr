@@ -177,6 +177,48 @@ function DrawVenueTab(ctx)
             end
             Tooltip(TIPS.venue_sing_along)
 
+            r.ImGui_Separator(ctx)
+            SectionHeader('Sub VENUE tracks')
+            local bw_st_bulk = BtnGroupWidth({ 'Copy all to subtracks', 'Copy all to main track' })
+            if Btn('Copy all to subtracks', BTN_H, bw_st_bulk) then
+                RunAction(CopyVenueToSubtracks)
+            end
+            Tooltip(TIPS.venue_subtrack_copy_to_all)
+            r.ImGui_SameLine(ctx)
+            if Btn('Copy all to main track', BTN_H, bw_st_bulk) then
+                RunAction(function() CopyAllSubtracksToMain(false) end)
+            end
+            Tooltip(TIPS.venue_subtrack_copy_from_all)
+
+            r.ImGui_Spacing(ctx)
+            local lbl_col_st = LabelColWidth({ 'Subtrack' })
+            r.ImGui_Text(ctx, 'Subtrack')
+            r.ImGui_SameLine(ctx, lbl_col_st)
+            r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
+            local _st_preview = VENUE_SUBTRACKS[S.venue_subtrack_idx + 1].label
+            if r.ImGui_BeginCombo(ctx, '##venue_subtrack', _st_preview) then
+                for i, cat in ipairs(VENUE_SUBTRACKS) do
+                    local is_sel = (i - 1 == S.venue_subtrack_idx)
+                    if r.ImGui_Selectable(ctx, cat.label, is_sel) then
+                        S.venue_subtrack_idx = i - 1
+                    end
+                    if is_sel then r.ImGui_SetItemDefaultFocus(ctx) end
+                end
+                r.ImGui_EndCombo(ctx)
+            end
+            Tooltip(TIPS.venue_subtrack_select)
+            r.ImGui_SameLine(ctx)
+            local bw_st_single = BtnGroupWidth({ 'Copy to', 'Copy from' })
+            if Btn('Copy to', BTN_H, bw_st_single) then
+                RunAction(CopySelectedSubtrackTo)
+            end
+            Tooltip(TIPS.venue_subtrack_copy_to_one)
+            r.ImGui_SameLine(ctx)
+            if Btn('Copy from', BTN_H, bw_st_single) then
+                RunAction(CopySelectedSubtrackFrom)
+            end
+            Tooltip(TIPS.venue_subtrack_copy_from_one)
+
             r.ImGui_EndTabItem(ctx)
         end
 
@@ -282,5 +324,28 @@ function DrawVenueTab(ctx)
 
         r.ImGui_EndTabBar(ctx)
         DrawActivePlayersRow()
+    end
+
+    -- "Copy all to main track" overwrite confirmation, set by CopyAllSubtracksToMain when
+    -- VENUE already has events. Rendered once here regardless of which sub-tab triggered it.
+    if S.venue_subtrack_copy_pending then
+        r.ImGui_OpenPopup(ctx, 'ConfirmVenueSubtrackCopy')
+    end
+    if r.ImGui_BeginPopupModal(ctx, 'ConfirmVenueSubtrackCopy', nil, r.ImGui_WindowFlags_AlwaysAutoResize()) then
+        if S.venue_subtrack_copy_pending then
+            r.ImGui_Text(ctx, S.venue_subtrack_copy_pending.message)
+        end
+        r.ImGui_Spacing(ctx)
+        if Btn('Clear and Copy', BTN_H) then
+            if S.venue_subtrack_copy_pending then RunAction(S.venue_subtrack_copy_pending.on_confirm) end
+            S.venue_subtrack_copy_pending = nil
+            r.ImGui_CloseCurrentPopup(ctx)
+        end
+        r.ImGui_SameLine(ctx)
+        if Btn('Cancel', BTN_H) then
+            S.venue_subtrack_copy_pending = nil
+            r.ImGui_CloseCurrentPopup(ctx)
+        end
+        r.ImGui_EndPopup(ctx)
     end
 end

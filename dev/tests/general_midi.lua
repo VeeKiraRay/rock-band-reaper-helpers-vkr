@@ -428,6 +428,12 @@ Test.it('SetSearchPattern restricts captured notes to the selected tier on PART 
     local base, n = LoadFixture('rb_drums.mid')
     Test.expect(n > 0, 'rb_drums.mid created no tracks')
     local track = r.GetTrack(0, base)
+    -- rb_drums.mid carries two SMF track-name events (conductor "rb_drums",
+    -- then "PART DRUMS"); REAPER's import collapses them to one track and
+    -- keeps the first, so the fixture lands named "rb_drums". Rename to match
+    -- the real-world precondition (an already-correctly-named PART DRUMS
+    -- track) that GetPatternPitchRange's tier lookup depends on.
+    r.GetSetMediaTrackInfo_String(track, 'P_NAME', 'PART DRUMS', true)
     local item = FindFirstMIDIItem(track)
     Test.expect(item ~= nil, 'no MIDI item on rb_drums.mid track')
     local pos = r.GetMediaItemInfo_Value(item, 'D_POSITION')
@@ -451,6 +457,9 @@ Test.it('SetSearchPattern with Difficulty=All spans every tier on PART DRUMS', f
     local base, n = LoadFixture('rb_drums.mid')
     Test.expect(n > 0, 'rb_drums.mid created no tracks')
     local track = r.GetTrack(0, base)
+    -- See the Hard-tier test above: rename past the conductor-track name
+    -- REAPER's import keeps by default.
+    r.GetSetMediaTrackInfo_String(track, 'P_NAME', 'PART DRUMS', true)
     local item = FindFirstMIDIItem(track)
     Test.expect(item ~= nil, 'no MIDI item on rb_drums.mid track')
     local pos = r.GetMediaItemInfo_Value(item, 'D_POSITION')

@@ -212,6 +212,11 @@ S = {
     venue_ev_num         = {},   -- per-group number 0-9 (0 = bare form), keyed by group key
     venue_ev_letters     = true, -- 'Use letter suffix' checkbox
     venue_ev_mode        = 0,    -- reserved: 0 = EVENTS target (phase-2 mode radio)
+    -- Sub VENUE tracks (not persisted - session state only)
+    venue_subtrack_idx     = 0,    -- 0-based index into VENUE_SUBTRACKS (Actions tab dropdown)
+    -- { message=.., on_confirm=function() ... end } - set by CopyAllSubtracksToMain when
+    -- VENUE already has events; consumed by the confirm popup in ui_venue.lua.
+    venue_subtrack_copy_pending = nil,
     -- UI visibility (persisted)
     show_wip_tabs           = false, -- show Tempo Map, Drums, Keys, Guitar tabs
 }
@@ -256,6 +261,40 @@ TIPS = {
                       "If only one of HARM2/HARM3 is muted or missing, that instrument is\n" ..
                       "skipped - its existing notes are left untouched. If both are muted or\n" ..
                       "missing, nothing is generated. Pitch 86 (drummer) is never touched.\n\n" ..
+                      "Always processes the whole song. Fully undoable.",
+    venue_subtrack_copy_to_all = "Create (if missing) 6 tracks - \"VENUE normal camera\",\n" ..
+                      "\"VENUE directed camera\", \"VENUE lighting\", \"VENUE keyevents\",\n" ..
+                      "\"VENUE post proc\", \"VENUE special\" - each with a MIDI item matching\n" ..
+                      "the VENUE item's position/length. Newly created tracks start muted (this\n" ..
+                      "editing-only split shouldn't reach the final export), inherit VENUE's\n" ..
+                      "custom MIDI note names, and get their take named after the track so open\n" ..
+                      "MIDI editor tabs are identifiable instead of all showing as \"MIDI take\".\n\n" ..
+                      "Clears each subtrack and re-copies the matching category of events from\n" ..
+                      "VENUE - safe to re-run any time to re-sync after editing VENUE directly.\n" ..
+                      "VENUE's own MIDI notes (e.g. the sing-cue notes at pitches 85-87) are\n" ..
+                      "copied to \"VENUE special\" alongside its text events - the only category\n" ..
+                      "that ever carries notes.\n\n" ..
+                      "Always processes the whole song. Fully undoable.",
+    venue_subtrack_copy_from_all = "Clear the VENUE track and replace its events with the\n" ..
+                      "combined contents of all 6 subtracks (however many currently exist).\n" ..
+                      "Does nothing (with a status message) if none of the subtracks exist yet -\n" ..
+                      "run \"Copy all to subtracks\" first.\n\n" ..
+                      "Prompts for confirmation first, since this overwrites the VENUE track\n" ..
+                      "that authoring actually reads from.\n\n" ..
+                      "Always processes the whole song. Fully undoable.",
+    venue_subtrack_select = "Which of the 6 subtrack categories the Copy to/from buttons act on.",
+    venue_subtrack_copy_to_one = "Clear just the selected subtrack and copy that category's\n" ..
+                      "events from VENUE into it. Creates the subtrack (muted) if it doesn't\n" ..
+                      "exist yet.\n\n" ..
+                      "Always processes the whole song. Fully undoable.",
+    venue_subtrack_copy_from_one = "Clear only the selected category's events from VENUE, then\n" ..
+                      "copy everything from that one subtrack into VENUE. For Special, this\n" ..
+                      "also clears and replaces VENUE's own MIDI notes with whatever notes are\n" ..
+                      "on \"VENUE special\".\n\n" ..
+                      "Unlike \"Copy to\", this does not create the subtrack if it's missing -\n" ..
+                      "run \"Copy all to subtracks\" or \"Copy to\" at least once first.\n\n" ..
+                      "Assumes the subtrack only contains its own category's events -\n" ..
+                      "hand-edited off-category events won't be swept out of VENUE by this.\n\n" ..
                       "Always processes the whole song. Fully undoable.",
     venue_generate  = "Generate random camera and lighting events on the VENUE track.\n\n" ..
                       "Camera events are filtered by instrument availability: if a PART track is\n" ..

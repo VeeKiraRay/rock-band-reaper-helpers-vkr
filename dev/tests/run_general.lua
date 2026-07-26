@@ -55,8 +55,11 @@ dofile(_mdir .. 'actions_guitar_guide.lua')
 dofile(_mdir .. 'actions_guitar_validate.lua')
 dofile(_mdir .. 'actions_midi_align.lua')
 dofile(_mdir .. 'actions_midi_replace.lua')
+dofile(_mdir .. 'actions_difficulty_shared.lua')
 dofile(_mdir .. 'actions_difficulty.lua')
 dofile(_mdir .. 'actions_difficulty_5k.lua')
+dofile(_mdir .. 'actions_difficulty_gtrbass.lua')
+dofile(_mdir .. 'actions_difficulty_drums.lua')
 -- ui*.lua intentionally omitted: it calls r.defer(Loop) which starts the ImGui loop
 
 dofile(_tdir .. 'general_smoke.lua')

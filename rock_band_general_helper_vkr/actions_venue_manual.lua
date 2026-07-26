@@ -3,7 +3,8 @@
 -- Requires: FindNamedTrackMIDI, GetTakePPQPerQN, MANUAL_LIGHTING_SET, INST_KF_MODES,
 --           FindNextMeasureStartPpq, CollectInstNotePositions, ResolveUserCamInterval,
 --           JitteredInterval, CAM_INTERVAL_16THS, CAM_JITTER, KeyframeSubdivQN,
---           DeleteTextEventsInRange, ClearVenueKeyframesInRange, r, S (globals)
+--           DeleteTextEventsInRange, ClearVenueKeyframesInRange, CategorizeVenueEvent,
+--           r, S (globals)
 
 local function _find_venue_track_and_take()
     local track, item, take = FindNamedTrackMIDI('VENUE')
@@ -208,24 +209,22 @@ function RemoveVenueEventsByType(remove_type)
     local range_start_ppq = r.MIDI_GetPPQPosFromProjTime(take, has_sel and sel_s or item_start_sec)
     local range_end_ppq   = r.MIDI_GetPPQPosFromProjTime(take, has_sel and sel_e or item_end_sec)
 
+    -- Category membership per remove_type, in terms of CategorizeVenueEvent's output
+    -- (actions_venue_subtracks.lua) - the single shared classifier also used by the Sub VENUE
+    -- tracks split. "Camera" = coop or directed; "Special" = special (bonusfx + anything
+    -- unrecognized) or keyframe, matching the previous pattern-based groupings exactly.
+    -- "All" is unconditionally true since the classifier's categories are exhaustive.
     local match
     if remove_type == 0 then
-        match = function(msg) return msg:find('^%[coop_') or msg:find('^%[directed_') end
+        match = function(msg) local c = CategorizeVenueEvent(msg); return c == 'coop' or c == 'directed' end
     elseif remove_type == 1 then
-        match = function(msg) return msg:find('^%[lighting') end
+        match = function(msg) return CategorizeVenueEvent(msg) == 'lighting' end
     elseif remove_type == 2 then
-        match = function(msg) return msg:find('%.pp%]$') end
+        match = function(msg) return CategorizeVenueEvent(msg) == 'postproc' end
     elseif remove_type == 3 then
-        match = function(msg)
-            return msg:find('^%[bonusfx') or msg == '[first]' or msg == '[next]' or msg == '[previous]'
-        end
+        match = function(msg) local c = CategorizeVenueEvent(msg); return c == 'special' or c == 'keyframe' end
     else  -- 4 = All
-        match = function(msg)
-            return msg:find('^%[coop_') or msg:find('^%[directed_')
-                or msg:find('^%[lighting')
-                or msg:find('%.pp%]$')
-                or msg:find('^%[bonusfx') or msg == '[first]' or msg == '[next]' or msg == '[previous]'
-        end
+        match = function(msg) return true end
     end
 
     r.PreventUIRefresh(1)

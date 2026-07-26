@@ -1,6 +1,6 @@
 -- @description Rock Band General Helper
 -- @author VeeKiraRay
--- @version 0.9.30
+-- @version 0.9.31
 -- @about
 --   Utility actions for Rock Band authoring in REAPER.
 --
@@ -20,6 +20,30 @@
 --   This @about block keeps only the 5 most recent versions.
 --   Full history: CHANGELOG.md in the repo.
 --
+--   v0.9.31
+--     - Venue > Actions: new "Sub VENUE tracks" group splits VENUE's events
+--       across 6 category tracks - "VENUE normal camera", "VENUE directed
+--       camera", "VENUE lighting", "VENUE keyevents", "VENUE post proc",
+--       "VENUE special" - for easier authoring once a song has accumulated
+--       a lot of keyframes, then merges them back. "Copy all to subtracks"
+--       creates (if missing, muted by default - an editing-only split that
+--       shouldn't reach the final export) and re-syncs all 6; new tracks
+--       inherit VENUE's custom MIDI note names and get their take named
+--       after the track so open MIDI editor tabs are identifiable instead
+--       of all showing as "MIDI take". VENUE's own MIDI notes (e.g. the
+--       sing-cue notes at pitches 85-87) travel with "VENUE special"
+--       alongside its text events. "Copy all to main track" early-exits
+--       with a status message if no subtracks exist yet; otherwise clears
+--       VENUE and replaces it with their combined contents, notes included
+--       (confirmation popup first, mirrors the Difficulty tab's overwrite
+--       modal). A Subtrack dropdown plus Copy to/Copy from work on one
+--       category at a time
+--       (Copy to auto-creates the subtrack, Copy from does not; for
+--       Special both directions also carry VENUE's notes). New
+--       CategorizeVenueEvent in new actions_venue_subtracks.lua is the
+--       first unified 6-way VENUE event classifier - also now backs
+--       RemoveVenueEventsByType (actions_venue_manual.lua), replacing its
+--       three duplicated pattern checks with one shared classification.
 --   v0.9.30
 --     - Venue > Themes gen: song end is now resolved from the EVENTS
 --       track's [end] marker, not the VENUE MIDI item's own length -
@@ -90,20 +114,6 @@
 --       missing, or empty - the button never refuses to run. New
 --       persisted S.diff_5k_pk_reduce. Keys-only - Guitar/Bass, Drums,
 --       and Pro Keys itself don't have this option.
---   v0.9.26
---     - Difficulty > Drums: "Kick/snare between Yellow/Blue" (Medium) is
---       disabled - as implemented it doesn't match the intended rule (too
---       strong). CheckDrumsYellowBlueInterleave is left defined but no
---       longer wired into RunDrumsChecks, to be revisited once the rule is
---       better understood.
---     - Fix: CompressChordOffsets (actions_difficulty_shared.lua, used by
---       Keys/Guitar-Bass's Copy to Hard/Medium/Easy) only shifted a chord
---       down when it had exactly 2 notes - a lone note above the target
---       tier's color ceiling (e.g. a single Orange note copied to Medium)
---       fell through to the drop branch instead of shifting down (e.g. to
---       Blue), silently losing the note instead of relocating it. Now
---       shifts whenever there are 1 or 2 notes and the shift keeps every
---       note >= offset 0.
 r = reaper  -- global so all dofile'd modules can use it
 
 if not r.ImGui_CreateContext then
@@ -212,6 +222,7 @@ dofile(_mdir .. 'actions_venue_manual.lua')
 dofile(_mdir .. 'actions_venue_events.lua')
 dofile(_mdir .. 'actions_venue_keyframes.lua')
 dofile(_mdir .. 'actions_venue_sing_along.lua')
+dofile(_mdir .. 'actions_venue_subtracks.lua')
 dofile(_mdir .. 'tempomap.lua')
 dofile(_mdir .. 'actions.lua')
 dofile(_mdir .. 'actions_tempomap.lua')
