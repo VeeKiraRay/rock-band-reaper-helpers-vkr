@@ -9,6 +9,58 @@ over 5. See `CLAUDE.md` → "Changelog / `@about` trimming" for the rule.
 
 `rock_band_general_helper_vkr.lua`
 
+**v0.9.27**
+- Difficulty > Keys: new "Reduce using Pro Keys (same tier)" checkbox
+  above the Copy row, checked by default. When on, Copy to Hard/
+  Medium/Easy keeps only copied events that land on a note in the
+  matching-tier Pro Keys track (PART REAL_KEYS_H/M/E) - mirrors a
+  rhythm reduction already hand-charted on Pro Keys onto the Keys
+  copy (e.g. Expert has 12 notes, Pro Keys Hard was reduced to 8 -
+  Copy to Hard on Keys now keeps only the 8 matching slots), instead
+  of copying every event from the tier above unfiltered. Match
+  tolerance: 1/32 note in quarter-note space (tightened from an
+  initial 1/16 note, which left too many events kept at faster
+  tempos). Falls back to an unfiltered copy (with a status note
+  explaining why) when the matching Pro Keys track isn't selected,
+  missing, or empty - the button never refuses to run. New
+  persisted S.diff_5k_pk_reduce. Keys-only - Guitar/Bass, Drums,
+  and Pro Keys itself don't have this option.
+
+**v0.9.26**
+- Difficulty > Drums: "Kick/snare between Yellow/Blue" (Medium) is
+  disabled - as implemented it doesn't match the intended rule (too
+  strong). CheckDrumsYellowBlueInterleave is left defined but no
+  longer wired into RunDrumsChecks, to be revisited once the rule is
+  better understood.
+- Fix: CompressChordOffsets (actions_difficulty_shared.lua, used by
+  Keys/Guitar-Bass's Copy to Hard/Medium/Easy) only shifted a chord
+  down when it had exactly 2 notes - a lone note above the target
+  tier's color ceiling (e.g. a single Orange note copied to Medium)
+  fell through to the drop branch instead of shifting down (e.g. to
+  Blue), silently losing the note instead of relocating it. Now
+  shifts whenever there are 1 or 2 notes and the shift keeps every
+  note >= offset 0.
+
+**v0.9.25**
+- MIDI > Pattern: new Difficulty dropdown (All/Expert/Hard/Medium/Easy,
+  default All) scopes Set Search/Set Replace/Replace All/Fill Range to
+  one difficulty tier's pitch range on PART DRUMS/GUITAR/BASS/KEYS
+  (Expert 96-100, Hard 84-88, Medium 72-76, Easy 60-64; All = 60-100)
+  instead of touching every tier packed into the same track/time
+  window. PART VOCALS/HARM1-3 (36-84) and PART REAL_KEYS*/PART
+  KEYS_ANIM* (48-72) always use their own fixed range regardless of
+  the dropdown; any other track keeps the previous unfiltered (0-127)
+  behavior. A disabled-style "Pitch range: lo-hi" readout under the
+  dropdown shows the range currently in effect. New global
+  GetPatternPitchRange in actions_midi_replace.lua; ReadMIDIPatternFromTake
+  (lib/reaper_midi_helpers.lua) and the local ClearPatternWindow gained
+  optional min/max pitch params.
+
+**v0.9.24**
+- Result panel (bottom of every tab): long lines now wrap to the
+  window's current width (ImGui_PushTextWrapPos(ctx, 0)) instead of
+  overflowing and requiring the window to be stretched to read them.
+
 **v0.9.23**
 - Difficulty tab: replaced the read-only "Suggest Hard/Medium/Easy"
   preview (all four sub-tabs) with "Copy to Hard/Medium/Easy", which

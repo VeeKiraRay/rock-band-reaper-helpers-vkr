@@ -12,7 +12,7 @@ Five stable tabs are always visible: **General | Difficulty | Tab Input | MIDI |
 
 Four WIP tabs appear only when **Show WIPs? = Yes** in the General tab (persisted setting, default No): **Tempo Map | Drums | Keys | Guitar**. These tabs function at a basic level but have known issues and are not ready for general users.
 
-**General tab** — audio alignment and settings persistence. Contains two sub-tabs:
+**General tab** — audio alignment and settings persistence. Contains three sub-tabs:
 
 *Actions sub-tab*
 - **Refresh tracks** — re-scans the project's track list.
@@ -23,6 +23,14 @@ Four WIP tabs appear only when **Show WIPs? = Yes** in the General tab (persiste
 *Settings sub-tab*
 - Venue preview size/sprite display options, Show WIPs? toggle.
 - Save / Load buttons for project-scoped settings (placed last, since they persist the settings above them).
+
+*Workflow sub-tab* — per-project authoring checklist, sourced from a user-editable `.txt` template.
+- **Template combo** — select a `.txt` file from `resources/workflow/` (ships with one starter template, `Default.txt`, based on a typical full-band song's steps). Empty folder shows a disabled hint instead of a combo. When no persisted selection matches (first use, or the previously selected file was removed), a template named `Default` is auto-selected if present, else the first template alphabetically.
+- Template markup: `[Section Name]` lines are non-checkable headers (rendered via `SectionHeader`); plain lines are checkable items; a trailing `{tooltip text}` on an item line (or a `{...}` line of its own, which attaches to the previous item) becomes that item's hover tooltip. An item that picks up more than one tooltip source (same-line + a following own-line block, or two same-line groups) drops the tooltip entirely rather than guessing which wins.
+- Checking an item stamps `os.time()` and immediately autosaves (its own `workflow_v1` project ExtState key, independent of this tab's own Save/Load buttons); unchecking clears the timestamp. A **Show completion timestamp** checkbox (off by default, persisted) controls whether "Completed on dd.MM.yyyy at hh:mm" is displayed under a checked item — the timestamp is always recorded regardless of the checkbox; only its display is optional.
+- Checked state is keyed by **(section, item label)**, not label alone — the same item text can appear under multiple different `[section]` headers (e.g. "Guitar" under both "Instruments Expert" and "Difficulty reductions" in the starter template) without sharing state. Switching to a different template file only requires both the section and label text to match exactly for a checked item to carry over; anything else starts unchecked.
+- Parse-time validation (shown as warnings above the checklist, non-blocking): duplicate `(section, label)` pairs within one file, and unbalanced `[`/`]` or `{`/`}` bracket counts in the file.
+- If saved checklist state across all templates would exceed `WORKFLOW_MAX_ITEMS` (100), the next save auto-purges entries whose `(section, label)` no longer appears in any currently-loaded `.txt` file before writing — no confirmation prompt, since this only prunes state that's already unreachable from any template.
 
 **Tempo Map tab** — generate a REAPER tempo map from drum audio analysis.
 1. Set the four source track dropdowns (KICK, SNARE, KIT, Fallback). Any can be left as "(none)".
@@ -177,6 +185,8 @@ Every Validate action (all four sub-tabs, H/M/E only — never Expert) also runs
 | `rock_band_general_helper_vkr/venue_sprites.lua` | `LoadVenueSprite`, `DrawVenueTooltipSprite`, `BeginVenueTooltip`, `EndVenueTooltip`, `VenueSpriteFoldersFound` (global); `DIRECTED_SPRITE_NAMES`, `VENUE_SPRITE_ROOT` (module-level globals). JPEG-only. Checks `resources/img/spritesheets/{category}/` (large) then `resources/img/spritesheets/{category} small/` (small) — no third-party fallback. Frame count is read from the filename (`{key}_f{N}_spritesheet.jpg`). Display size scales by `S.venue_preview_scale` (1 or 2). Cache stores `{image, frame_count, cols, rows}` per sprite. |
 | `rock_band_general_helper_vkr/venue_lighting.lua` | `MANUAL_LIGHTING_SET`, `LIGHTING_OFFSET_16THS`, `INST_KF_MODES`, `FindNextMeasureStartPpq`, `CollectInstNotePositions`, `GenerateKeyframesForSpan`, `GenerateLightingEvents`, `GenerateThemedSectionEvents` (global); `MANUAL_LIGHTING_POOL`, `AUTO_LIGHTING_POOL`, lighting constants, `SnapPpqToNearestBeat`, `ProcessThemeSection` (local) |
 | `rock_band_general_helper_vkr/venue_generator.lua` | `GenerateVenueEvents`, `DeleteTextEventsInRange` (predicate-driven deleter backing all clear functions), `ClearVenueTextEventsInRange`, `ClearVenueNonCameraEventsInRange`, `ClearVenueExceptLPInRange`, `ClearVenueKeyframesInRange` (global) |
+| `rock_band_general_helper_vkr/workflow.lua` | `WORKFLOW_MAX_ITEMS`, `ParseWorkflowContent`, `ParseWorkflowFile`, `LoadWorkflowFiles`, `EscapeWF`, `UnescapeWF` (global); `FindBraceGroups`, `StripBraceGroups` (local) — Workflow sub-tab's `.txt` template parser (pure over string content) + `resources/workflow/` folder scanner |
+| `rock_band_general_helper_vkr/actions_workflow.lua` | `CompositeKey`, `PurgeStaleWorkflowEntries`, `SaveWorkflowState`, `LoadWorkflowState`, `ToggleWorkflowItem` (global); `CountTable` (local) — Workflow checklist state, persistence (`workflow_v1` ExtState key), and the item-count-cap purge |
 | `rock_band_general_helper_vkr/tempomap.lua` | `ComputeTempoRMSContour`, `DetectOnsets`, `EstimateBPM`, `GuessTimeSig`, `GetSourcesForRange`, `FitBeatGrid`, `RmsToOnsetFlux`, `FindLocalPeak` |
 | `rock_band_general_helper_vkr/actions.lua` | `AlignAudioTracks`, `AlignAllAudio`, `AlignCountIn`, `CreateSongFadeOut`; `CountInBeatSlots` (local) |
 | `rock_band_general_helper_vkr/actions_tempomap.lua` | `ShowTempoContext`, `EstimateInitialBPM`, `AutoTuneThreshold`, `ClearGeneratedTempoMarkers`, `GenerateTempoMap`; `BPM_MIN`, `BPM_MAX` (locals) |
@@ -209,6 +219,7 @@ Every Validate action (all four sub-tabs, H/M/E only — never Expert) also runs
 | `rock_band_general_helper_vkr/ui_venue_preview.lua` | `DrawVenuePreviewTab` (global) — Preview sub-tab rendering; caches the VENUE event lists + muted instruments, refreshed on any project state change with a 5 s fallback and a self-pause when one read takes ≥ 0.15 s |
 | `rock_band_general_helper_vkr/ui_venue_players.lua` | `DrawActivePlayersRow` (global) — Active players dot row shown under every Venue sub-tab and in the standalone preview; PART-track play-state scan cached via `MakeProjectPoll(1.0, 5.0)`, playhead lookup recomputed on playhead change (≥ 0.5 s cadence during playback) |
 | `rock_band_general_helper_vkr/ui_venue_keyframes.lua` | `DrawVenueKeyframesTab` (global) — Keyframes sub-tab rendering |
+| `rock_band_general_helper_vkr/ui_workflow.lua` | `DrawGeneralWorkflowTab` (global) — General > Workflow sub-tab rendering |
 | `rock_band_general_helper_vkr/ui.lua` | `TrackCombo` (global override supporting `sel_idx=-1`), `Loop`, `r.defer(Loop)` |
 
 **Local-only functions:**
@@ -221,6 +232,8 @@ Every Validate action (all four sub-tabs, H/M/E only — never Expert) also runs
 - `venue_lighting.lua`: `MANUAL_LIGHTING_POOL`, `AUTO_LIGHTING_POOL`, `LIGHTING_INTERVAL_16THS`, `LIGHTING_JITTER`, `KEYFRAME_MIN_BEATS`, `KEYFRAME_MAX_BEATS`, `SnapPpqToNearestBeat`, `ProcessThemeSection`
 - `actions_venue_sing_along.lua`: `RB3_VOCAL_MIN`, `RB3_VOCAL_MAX`, `RB3_PHRASE_PITCH` (module-level locals), `AvailableHarmTake`, `ReadPhrasesAndVocalNotes`, `MeasureDurationAtTime`, `BuildSpans`
 - `actions_venue_events.lua`: `_round_ppq`, `_is_crowd`, `_bare_form`, `_letter_form`, `_family_span`, `_spot_conflict`, `_require_take`, `_insert`, `_refuse`; `BOOKEND_EVENTS` (module-level local)
+- `workflow.lua`: `FindBraceGroups`, `StripBraceGroups`
+- `actions_workflow.lua`: `CountTable`
 - `ui_venue_events.lua`: `_draw_prc_row`, `_draw_plain_row`
 - `actions.lua`: `CountInBeatSlots`
 - `actions_tempomap.lua`: `BPM_MIN`, `BPM_MAX` (module-level locals)
@@ -283,6 +296,10 @@ venue_lighting.lua             → MANUAL_LIGHTING_SET, LIGHTING_OFFSET_16THS, I
 venue_generator.lua            → GenerateVenueEvents, DeleteTextEventsInRange, ClearVenueTextEventsInRange,
                                   ClearVenueNonCameraEventsInRange, ClearVenueExceptLPInRange,
                                   ClearVenueKeyframesInRange
+workflow.lua                   → WORKFLOW_MAX_ITEMS, ParseWorkflowContent, ParseWorkflowFile,
+                                  LoadWorkflowFiles, EscapeWF, UnescapeWF
+actions_workflow.lua           → CompositeKey, PurgeStaleWorkflowEntries, SaveWorkflowState,
+                                  LoadWorkflowState, ToggleWorkflowItem
 tempomap.lua                   → ComputeTempoRMSContour, DetectOnsets, EstimateBPM,
                                   GuessTimeSig, GetSourcesForRange, FitBeatGrid,
                                   RmsToOnsetFlux, FindLocalPeak
@@ -323,6 +340,7 @@ ui_venue_events.lua            → DrawVenueEventsTab
 ui_venue_preview.lua           → DrawVenuePreviewTab
 ui_venue_players.lua           → DrawActivePlayersRow
 ui_venue_keyframes.lua         → DrawVenueKeyframesTab
+ui_workflow.lua                → DrawGeneralWorkflowTab
 ui.lua                         → Loop (also calls r.defer(Loop))
 [entry point startup]          → LoadSettings(), SetDefaultTempoTracks(),
                                   SetDefaultMIDITracks(), SetDefaultDifficultyTracks()
@@ -343,8 +361,10 @@ ui.lua                         → Loop (also calls r.defer(Loop))
 
 Section `RBHelperVKR`, key `settings_v1`. Auto-loads on script open.
 
-**Saved:** all tempo map sliders — primary source (`tm_rms_threshold`, `tm_rms_window_ms`, `tm_search_window_ms`, `tm_drift_threshold_ms`, `tm_bpm_failsafe`, `tm_first_measure`, `tm_timesig_num`, `tm_override_failsafe`), fallback source (`tm_fb_rms_threshold`, `tm_fb_rms_window_ms`, `tm_fb_use_flux`), auto-tune (`tm_autotune_density`), the Difficulty tab's Guitar/Bass instrument radio (`diff_gb_instrument`), and the Keys sub-tab's "Reduce using Pro Keys" checkbox (`diff_5k_pk_reduce`).
+**Saved:** all tempo map sliders — primary source (`tm_rms_threshold`, `tm_rms_window_ms`, `tm_search_window_ms`, `tm_drift_threshold_ms`, `tm_bpm_failsafe`, `tm_first_measure`, `tm_timesig_num`, `tm_override_failsafe`), fallback source (`tm_fb_rms_threshold`, `tm_fb_rms_window_ms`, `tm_fb_use_flux`), auto-tune (`tm_autotune_density`), the Difficulty tab's Guitar/Bass instrument radio (`diff_gb_instrument`), the Keys sub-tab's "Reduce using Pro Keys" checkbox (`diff_5k_pk_reduce`), and the Workflow sub-tab's selected template name (`workflow_file_name`) and "Show completion timestamp" checkbox (`workflow_show_ts`).
 **Not saved:** track indices — positional, brittle. `SetDefaultTempoTracks` re-detects tempo map tracks by name; `SetDefaultMIDITracks` re-detects PART DRUMS and PART GUITAR target tracks by name; `SetDefaultDifficultyTracks` re-detects all Difficulty-tab tracks (Pro Keys, Keys, Guitar/Bass, Drums) by name. All only assign fields that are still -1 (do not override saved state).
+
+**Own ExtState keys, guarded through `SaveSettings`/`LoadSettings`:** the Section gen sub-tab's per-section configs (`vsec_v1`, `actions_venue_section.lua`) and the Workflow sub-tab's checklist state (`workflow_v1`, `actions_workflow.lua`) each live under their own key rather than the `settings_v1` scalar blob — both hold a variable-length, dynamically-keyed collection rather than a small fixed set of fields.
 
 ---
 

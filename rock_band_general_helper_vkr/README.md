@@ -23,7 +23,7 @@ The window is organized into tabs plus a status panel at the bottom. Five tabs a
 
 | Tab            | Purpose                                                                              |
 | -------------- | ------------------------------------------------------------------------------------ |
-| **General**    | Audio alignment, song fade out, and settings save/load                              |
+| **General**    | Audio alignment, song fade out, settings save/load, and a workflow checklist        |
 | **Difficulty** | Validate Pro Keys and 5-Lane Keys tracks at each difficulty level                   |
 | **Tab Input**  | Reference guide: parse ASCII tab notation for Guitar/Bass, Keys/Pro Keys, or Vocal  |
 | **MIDI**       | Align, length-sync, or find-and-replace patterns on MIDI items                      |
@@ -48,7 +48,7 @@ The bottom of the window always shows the active time selection (or "No time sel
 
 ![General tab](../assets/g_general.jpg)
 
-Contains two sub-tabs: **Actions** and **Settings**.
+Contains three sub-tabs: **Actions**, **Settings**, and **Workflow**.
 
 ### Actions sub-tab
 
@@ -96,6 +96,44 @@ The result panel adds a heads-up if the selected range looks unusual for a game 
 **What is saved:** all Tempo Map sliders and the override checkbox.
 
 **What is not saved:** track selections. The script re-detects KICK, SNARE, KIT, and Fallback tracks by name on each open and project switch.
+
+### Workflow sub-tab
+
+A per-project authoring checklist: a list of steps, grouped into sections, that you check off as you finish them — handy for picking up where you left off after a break, or when juggling several songs at once. The checklist comes from a plain-text template file, so you can tailor the list of steps to how you actually work (e.g. a shorter checklist for an instrumental song with no vocals).
+
+#### Choosing a template
+
+**Workflow** combo — pick a `.txt` file from `resources/workflow/`. The script ships with one starter template, `Default.txt`, covering a typical full-band song end to end. If the folder has no `.txt` files, the tab shows a disabled hint instead. If your saved project doesn't have a template selected yet (first use, or the file it had selected was deleted), a template literally named `Default` is picked automatically; if there's no `Default`, the first template alphabetically is used instead.
+
+**Show completion timestamp** — checkbox, off by default. When on, a checked item shows "Completed on dd.MM.yyyy at hh:mm" underneath it. The timestamp is recorded the moment you check an item either way — this checkbox only controls whether it's displayed.
+
+#### Checking off items
+
+Click the checkbox or the item's label text to toggle it — both work. Checking an item saves immediately to the project (its own save slot, independent of this tab's own Save/Load buttons below), so you don't need to remember to hit Save before closing REAPER. Unchecking an item clears its recorded time.
+
+Checked state is tracked per **section + item**, not by the item's text alone — so if two different sections both have a step called "Guitar" (as the starter template does, under both "Instruments Expert" and "Difficulty reductions"), checking one doesn't check the other.
+
+If you switch to a different template, any step whose section heading *and* step text match exactly what you had checked before carries its checked state and timestamp over. Anything reworded, moved to a different section, or new to the template starts unchecked — you decide whether to re-check it.
+
+#### Writing your own template
+
+A template is a plain `.txt` file in `resources/workflow/`, one entry per line:
+
+| Line looks like            | Becomes                                                                 |
+| --------------------------- | ------------------------------------------------------------------------ |
+| `[Section Name]`            | A section heading — not checkable, just groups the steps under it.      |
+| `Some step`                 | A checkable step.                                                        |
+| `Some step {a hint}`        | A checkable step with a hover tooltip ("a hint"), stripped from the label. |
+| `{a hint}` on its own line  | Attaches as the tooltip to the step on the line right above it.         |
+
+Copy `Default.txt` as a starting point and rename/reorder/add/remove lines freely — the checklist rebuilds from whatever's in the file the next time you select it.
+
+A couple of edge cases are handled predictably rather than guessed at:
+
+- If a step somehow ends up with more than one tooltip attached (e.g. it already has a same-line `{...}` *and* a `{...}` line follows it, or it has two `{...}` groups on the same line), the tooltip is dropped rather than picking one arbitrarily.
+- The tab warns you (above the checklist) if a template file has the same step repeated twice under the same section — almost always a copy-paste slip — or if its `[` / `]` or `{` / `}` brackets don't balance, which usually means a bracket got deleted or mistyped somewhere in the file. Both are just warnings; the rest of the file still loads.
+
+Checked-item history is capped at roughly 100 entries across everything you've ever checked in a project; if you're well past that, the next time you check something the script quietly drops any entries that no longer match a step in *any* template currently in `resources/workflow/`, so leftover checkmarks from templates you've since edited or removed don't pile up forever.
 
 ---
 

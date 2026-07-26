@@ -1,11 +1,12 @@
 -- @description Rock Band General Helper
 -- @author VeeKiraRay
--- @version 0.9.31
+-- @version 0.9.32
 -- @about
 --   Utility actions for Rock Band authoring in REAPER.
 --
 --   Tabs:
---     General    - audio alignment, count-in positioning, song fade out, settings
+--     General    - audio alignment, count-in positioning, song fade out, settings,
+--                  per-project authoring workflow checklist
 --     Tempo Map  - audio-driven tempo map generation from drum stems
 --     Drums      - convert GM MIDI to Rock Band 5-lane drum notation
 --     Keys       - hand split, Pro Keys conversion + animation, 5-Lane Keys conversion
@@ -20,6 +21,33 @@
 --   This @about block keeps only the 5 most recent versions.
 --   Full history: CHANGELOG.md in the repo.
 --
+--   v0.9.32
+--     - General tab: new "Workflow" sub-tab - a per-project authoring
+--       checklist sourced from a user-editable .txt template
+--       (resources/workflow/, one starter template "Default" included -
+--       selected automatically on first use if present, else the first
+--       template alphabetically). [Section] lines group items under a
+--       header; plain lines are checkable steps; a trailing {tooltip}
+--       (same line, or its own line right after) attaches a hover tooltip -
+--       an item with more than one tooltip source drops the tooltip rather
+--       than guessing which wins. Checking an item stamps the time and
+--       autosaves immediately under its own workflow_v1 project key
+--       (independent of this tab's own Save/Load); unchecking clears the
+--       timestamp. A "Show completion timestamp" checkbox (off by default,
+--       persisted) controls whether "Completed on dd.MM.yyyy at hh:mm" is
+--       displayed under checked items - the timestamp is always recorded
+--       regardless of the checkbox, only its display is optional. Checked
+--       state is keyed by (section, item label), not label alone, so
+--       identical item text under two different section headers (e.g.
+--       "Guitar" under both "Instruments Expert" and "Difficulty
+--       reductions") tracks separately. Switching templates carries over
+--       any item whose section+label matches exactly; anything else starts
+--       unchecked. Parse-time warnings (shown above the checklist) flag
+--       duplicate (section,label) pairs and unbalanced [ ] / { } bracket
+--       counts in a template file. Saved state auto-purges entries no
+--       longer present in any loaded template once the total exceeds 100
+--       items. New workflow.lua (parser) and actions_workflow.lua
+--       (persistence) modules.
 --   v0.9.31
 --     - Venue > Actions: new "Sub VENUE tracks" group splits VENUE's events
 --       across 6 category tracks - "VENUE normal camera", "VENUE directed
@@ -98,22 +126,6 @@
 --       before). ReadProKeysEventQNs/HasNearbyQN in actions_difficulty_5k.lua
 --       replaced by ReadProKeysEvents/FindNearbyPKEvent (event-based, so
 --       length is available alongside timing).
---   v0.9.27
---     - Difficulty > Keys: new "Reduce using Pro Keys (same tier)" checkbox
---       above the Copy row, checked by default. When on, Copy to Hard/
---       Medium/Easy keeps only copied events that land on a note in the
---       matching-tier Pro Keys track (PART REAL_KEYS_H/M/E) - mirrors a
---       rhythm reduction already hand-charted on Pro Keys onto the Keys
---       copy (e.g. Expert has 12 notes, Pro Keys Hard was reduced to 8 -
---       Copy to Hard on Keys now keeps only the 8 matching slots), instead
---       of copying every event from the tier above unfiltered. Match
---       tolerance: 1/32 note in quarter-note space (tightened from an
---       initial 1/16 note, which left too many events kept at faster
---       tempos). Falls back to an unfiltered copy (with a status note
---       explaining why) when the matching Pro Keys track isn't selected,
---       missing, or empty - the button never refuses to run. New
---       persisted S.diff_5k_pk_reduce. Keys-only - Guitar/Bass, Drums,
---       and Pro Keys itself don't have this option.
 r = reaper  -- global so all dofile'd modules can use it
 
 if not r.ImGui_CreateContext then
@@ -166,6 +178,8 @@ for _, _f in ipairs({
     _mdir .. 'actions_venue_events.lua',
     _mdir .. 'actions_venue_keyframes.lua',
     _mdir .. 'actions_venue_sing_along.lua',
+    _mdir .. 'workflow.lua',
+    _mdir .. 'actions_workflow.lua',
     _mdir .. 'tempomap.lua',
     _mdir .. 'actions.lua',
     _mdir .. 'actions_tempomap.lua',
@@ -192,6 +206,7 @@ for _, _f in ipairs({
     _mdir .. 'ui_venue_preview.lua',
     _mdir .. 'ui_venue_keyframes.lua',
     _mdir .. 'ui_venue_players.lua',
+    _mdir .. 'ui_workflow.lua',
     _mdir .. 'ui.lua',
 }) do
     if not r.file_exists(_f) then
@@ -223,6 +238,8 @@ dofile(_mdir .. 'actions_venue_events.lua')
 dofile(_mdir .. 'actions_venue_keyframes.lua')
 dofile(_mdir .. 'actions_venue_sing_along.lua')
 dofile(_mdir .. 'actions_venue_subtracks.lua')
+dofile(_mdir .. 'workflow.lua')
+dofile(_mdir .. 'actions_workflow.lua')
 dofile(_mdir .. 'tempomap.lua')
 dofile(_mdir .. 'actions.lua')
 dofile(_mdir .. 'actions_tempomap.lua')
@@ -249,6 +266,7 @@ dofile(_mdir .. 'ui_venue_events.lua')
 dofile(_mdir .. 'ui_venue_preview.lua')
 dofile(_mdir .. 'ui_venue_keyframes.lua')
 dofile(_mdir .. 'ui_venue_players.lua')
+dofile(_mdir .. 'ui_workflow.lua')
 dofile(_mdir .. 'ui.lua')  -- also calls r.defer(Loop) at end
 
 -- Startup initialisation (runs after all modules are loaded)

@@ -219,6 +219,12 @@ S = {
     venue_subtrack_copy_pending = nil,
     -- UI visibility (persisted)
     show_wip_tabs           = false, -- show Tempo Map, Drums, Keys, Guitar tabs
+    -- Workflow checklist (General > Workflow)
+    workflow_files      = nil,  -- lazy-loaded from resources/workflow/ folder; NOT persisted
+    workflow_file_idx   = 0,    -- 0 = none selected; 1..n indexes workflow_files; NOT persisted
+    workflow_file_name  = '',   -- persisted (scalar blob): selected template's stem filename
+    workflow_state      = {},   -- persisted via workflow_v1; keyed by CompositeKey(section, label)
+    workflow_show_ts    = false, -- persisted (scalar blob): show "Completed on ..." under checked items
 }
 
 ----------------------------------------------------------------------
@@ -884,4 +890,11 @@ TIPS = {
     show_wip_tabs        = "Show work-in-progress tabs (Tempo Map, Drums, Keys, Guitar).\n\n" ..
                            "These tabs work at a basic level but have known issues and are\n" ..
                            "not ready for general use. Set to No to hide them from the tab bar.",
+    workflow_file        = "Pick a workflow checklist template from resources/workflow/.\n\n" ..
+                           "Add or edit .txt files there to tailor the checklist to your\n" ..
+                           "own process - each file can use a different set of steps\n" ..
+                           "(e.g. a shorter list for instrumental songs).",
+    workflow_show_ts     = "Show the completion date/time under each checked item.\n\n" ..
+                           "The timestamp is always recorded when you check an item -\n" ..
+                           "this only controls whether it's displayed.",
 }

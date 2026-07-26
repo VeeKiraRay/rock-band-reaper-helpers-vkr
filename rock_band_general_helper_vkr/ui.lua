@@ -79,6 +79,11 @@ local function Loop()
                 end
             end
         end
+        -- Workflow templates are project-independent, but re-scan the folder
+        -- fresh and re-resolve the selected index from the new project's
+        -- persisted name (workflow_state itself is repopulated by LoadSettings above)
+        S.workflow_files    = nil
+        S.workflow_file_idx = 0
         SetDefaultTempoTracks()
         SetDefaultMIDITracks()
         SetDefaultDifficultyTracks()
@@ -212,6 +217,14 @@ local function Loop()
                         end
                         Tooltip(TIPS.load)
 
+                        r.ImGui_EndTabItem(ctx)
+                    end
+
+                    ------------------------------------------------
+                    -- General > Workflow sub-tab
+                    ------------------------------------------------
+                    if r.ImGui_BeginTabItem(ctx, 'Workflow') then
+                        DrawGeneralWorkflowTab()
                         r.ImGui_EndTabItem(ctx)
                     end
 

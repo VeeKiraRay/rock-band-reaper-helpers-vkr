@@ -30,7 +30,7 @@ local _tdir   = _dir .. 'tests/'
 local results = { vocal = nil, general = nil, vocal_midi = nil, general_midi = nil,
                   dsp_algo = nil, vocal_algo = nil, general_algo = nil,
                   quick_actions = nil, spritesheet = nil, venue_events = nil,
-                  venue_subtracks = nil }
+                  venue_subtracks = nil, workflow = nil }
 
 local COL_OK  = 0x55DD55FF
 local COL_ERR = 0xFF5555FF
@@ -162,6 +162,14 @@ function Loop()
         end
         r.ImGui_SameLine(ctx)
         draw_status(results.venue_subtracks)
+
+        r.ImGui_Spacing(ctx)
+
+        if r.ImGui_Button(ctx, 'Workflow Tests', 155, 24) then
+            run('run_workflow.lua', 'workflow')
+        end
+        r.ImGui_SameLine(ctx)
+        draw_status(results.workflow)
 
         r.ImGui_Spacing(ctx)
         r.ImGui_Separator(ctx)

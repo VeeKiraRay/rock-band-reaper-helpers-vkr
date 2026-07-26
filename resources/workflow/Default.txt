@@ -1,0 +1,76 @@
+[Getting started]
+Get initial BPM (example Tunebat)
+Check time signature
+Get audio stems
+Align full song audio to either measure 3 or 4 {The 3 will work for most songs, but for really fast songs measure 4 might be required to not have notes before 2.5s of song start}
+Align audio stems with full song audio {Double check that you do not have mismatch with the audio because of either empty padding (iTunes .m4a vs. stem mp3) or from different sample rates}
+Tempo map song
+
+[Instruments Expert]
+Drums
+Bass
+Guitar
+Keys
+
+[Pro instruments Expert]
+Pro keys
+Pro bass
+Pro guitar
+
+[Vocals]
+Lyrics fetched and hyphenated
+Note placement
+Pitch verified
+Lyrics placed
+Phrases placed
+Capitalization verified
+Harmony 1
+Harmony 2
+Harmony 3
+
+[Difficulty reductions]
+Drums
+Bass
+Guitar
+Keys
+
+[Pro difficulty reductions]
+Pro keys
+Pro bass
+Pro guitar
+
+[Animations]
+Play, Mellow, Intense, Idle events
+Drum animations
+Guitar hand animation
+Bass hand animations
+Pro keys animations
+
+[Sections]
+Music start and end set
+Practice events set
+Crowd events
+
+[Venue]
+Camera events
+Directed cut events
+Lighting events
+Post proc events
+Manual lighting keyframe events
+Sing-along notes for harmonies
+
+[Overdrive]
+Overdrive Vocals
+Overdrive Drums
+Drum fills for overdrive activation
+Overdrive Bass
+Overdrive Guitar
+Overdrive Keys
+
+[Finishing touches]
+Export midi {Remember to mute all tracks not needed for song}
+Render full song audio
+Render dry vocals for lip sync
+Magma project created
+Magma compile succeeds
+Song released

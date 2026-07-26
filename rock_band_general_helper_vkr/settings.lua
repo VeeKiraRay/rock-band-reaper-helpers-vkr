@@ -60,6 +60,9 @@ local function SerializeSettings()
         'vpcombo=' .. S.venue_preview_combo,
         'vpshwm=' .. S.venue_preview_show_mode,
         'swip='   .. (S.show_wip_tabs and '1' or '0'),
+        -- Workflow checklist
+        'wffn=' .. S.workflow_file_name,
+        'wfsts=' .. (S.workflow_show_ts and '1' or '0'),
     }, ';')
 end
 
@@ -118,16 +121,21 @@ local function DeserializeSettings(str)
         elseif k == 'vpcombo' then S.venue_preview_combo     = tonumber(v) or 0
         elseif k == 'vpshwm' then S.venue_preview_show_mode = tonumber(v) or 0
         elseif k == 'swip'   then S.show_wip_tabs           = (v == '1')
+        -- Workflow checklist
+        elseif k == 'wffn'   then S.workflow_file_name      = v
+        elseif k == 'wfsts'  then S.workflow_show_ts        = (v == '1')
         end
     end
 end
 
--- Save/LoadSectionConfigs live in actions_venue_section.lua, which the slim
--- standalone preview entry point (rock_band_preview_vkr.lua) does not load —
--- guard the calls so this file works in both entry points.
+-- Save/LoadSectionConfigs (actions_venue_section.lua) and Save/LoadWorkflowState
+-- (actions_workflow.lua) aren't loaded by the slim standalone preview entry
+-- point (rock_band_preview_vkr.lua) — guard the calls so this file works in
+-- both entry points.
 function SaveSettings()
     r.SetProjExtState(0, PROJ_KEY_SECTION, PROJ_KEY_NAME, SerializeSettings())
     if SaveSectionConfigs then SaveSectionConfigs() end
+    if SaveWorkflowState then SaveWorkflowState() end
     r.MarkProjectDirty(0)
 end
 
@@ -141,8 +149,10 @@ function LoadSettings()
             S.tm_timesig_text = S.tm_timesig_num .. '/' .. S.tm_timesig_denom
         end
         if LoadSectionConfigs then LoadSectionConfigs() end
+        if LoadWorkflowState then LoadWorkflowState() end
         return true
     end
     if LoadSectionConfigs then LoadSectionConfigs() end
+    if LoadWorkflowState then LoadWorkflowState() end
     return false
 end
