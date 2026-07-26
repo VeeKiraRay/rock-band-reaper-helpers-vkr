@@ -4,7 +4,7 @@
 -- Requires globals: r, ctx, S, TIPS, Tooltip, SliderTooltip, RunAction, RegenerateVenueKeyframes
 
 function DrawVenueKeyframesTab()
-    r.ImGui_Text(ctx,
+    r.ImGui_TextWrapped(ctx,
         'Regenerate [first]/[next] keyframes for every manual lighting event already on the VENUE track')
     r.ImGui_Spacing(ctx)
 

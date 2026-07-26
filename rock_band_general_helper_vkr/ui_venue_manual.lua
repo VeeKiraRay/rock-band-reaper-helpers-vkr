@@ -13,7 +13,7 @@
 --                   EndVenueTooltip
 
 function DrawVenueManualTab()
-    r.ImGui_Text(ctx, 'Insert individual venue events at the playhead position')
+    r.ImGui_TextWrapped(ctx, 'Insert individual venue events at the playhead position')
     r.ImGui_Spacing(ctx)
 
     -- Build directed name list including bre/brej (excluded from auto-gen DIRECTED_POOL)

@@ -15,7 +15,7 @@ function DrawVenueSectionGenTab()
         'Bonus FX', 'Camera pacing',
     })
 
-    r.ImGui_Text(ctx, 'Generate venue events for a single section by defining the style or using a theme')
+    r.ImGui_TextWrapped(ctx, 'Generate venue events for a single section by defining the style or using a theme')
     r.ImGui_Spacing(ctx)
 
     -- Helper: section display label with measure range

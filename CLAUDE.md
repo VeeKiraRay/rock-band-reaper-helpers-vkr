@@ -226,6 +226,17 @@ width is what leaves room for the trailing widget in the first place. Use a
 bare pixel literal only for a genuinely one-off, context-specific width (e.g.
 a camera-pacing column) that isn't the shared convention.
 
+### Wrapped text for descriptions and alerts
+Any newly-added description, warning, or status text long enough to
+plausibly exceed one line at a normal window width — a tab/section intro
+sentence, a `TextDisabled` empty-state message, an inline warning — should
+use `r.ImGui_TextWrapped` instead of `r.ImGui_Text` / `r.ImGui_TextDisabled`
+from the start, so it flows to a new line instead of clipping when the
+window is narrow (the same treatment the result panel already gets via
+`PushTextWrapPos`/`PopTextWrapPos` in both `ui.lua` files). Reserve plain
+`Text`/`TextDisabled` for short labels (section titles, single words, widget
+labels) that aren't at risk of overflowing.
+
 ### `BeginDisabled` / `EndDisabled` balance
 Snapshot any state flag that drives a `BeginDisabled` guard once before widget calls — a button click mid-frame can change `S.busy`, breaking the paired `EndDisabled`:
 ```lua

@@ -1,6 +1,6 @@
 -- @description Rock Band General Helper
 -- @author VeeKiraRay
--- @version 0.9.32
+-- @version 0.9.33
 -- @about
 --   Utility actions for Rock Band authoring in REAPER.
 --
@@ -21,6 +21,12 @@
 --   This @about block keeps only the 5 most recent versions.
 --   Full history: CHANGELOG.md in the repo.
 --
+--   v0.9.33
+--     - Venue subtab intro descriptions (Keyframes, Themes gen, Events,
+--       Manual gen, Section gen) now wrap to a new line instead of
+--       clipping when the window is narrower than the text - same
+--       treatment the result panel already got in v0.9.24, applied to
+--       these five r.ImGui_Text calls (now r.ImGui_TextWrapped).
 --   v0.9.32
 --     - General tab: new "Workflow" sub-tab - a per-project authoring
 --       checklist sourced from a user-editable .txt template
@@ -113,19 +119,6 @@
 --       unaffected. Also incidentally corrects "Section start" mode
 --       (align 0), which was being pulled onto the half-beat grid instead
 --       of landing exactly on the section marker as documented.
---   v0.9.28
---     - Difficulty > Keys: the "Reduce using Pro Keys (same tier)" reduction
---       (v0.9.27) now also matches sustain length, not just which events
---       survive. A kept event's length is set to the matching Pro Keys
---       event's length (re-anchored at the Keys event's own start), instead
---       of keeping whatever length it had on the copied source tier - Pro
---       Keys is the master chart both are reduced from, and sustain-gap
---       rules require the two charts to agree on note length as well as
---       onset. No change when the checkbox is off or Pro Keys data is
---       unavailable (falls back to the source tier's own length, as
---       before). ReadProKeysEventQNs/HasNearbyQN in actions_difficulty_5k.lua
---       replaced by ReadProKeysEvents/FindNearbyPKEvent (event-based, so
---       length is available alongside timing).
 r = reaper  -- global so all dofile'd modules can use it
 
 if not r.ImGui_CreateContext then

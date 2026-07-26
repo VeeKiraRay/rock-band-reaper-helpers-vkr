@@ -234,7 +234,7 @@ function DrawVenueTab(ctx)
         -- Venue > Themes gen sub-tab
         ------------------------------------------------
         if r.ImGui_BeginTabItem(ctx, 'Themes gen') then
-            r.ImGui_Text(ctx, 'Generate venue events using a .rbtheme for the whole song')
+            r.ImGui_TextWrapped(ctx, 'Generate venue events using a .rbtheme for the whole song')
             r.ImGui_Spacing(ctx)
 
             local _no_themes = #S.venue_themes == 0

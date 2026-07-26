@@ -130,7 +130,7 @@ function DrawVenueEventsTab()
     local lbl_col = LabelColWidth(_group_labels)
     local item_sp = r.ImGui_GetStyleVar(ctx, r.ImGui_StyleVar_ItemSpacing())
 
-    r.ImGui_Text(ctx,
+    r.ImGui_TextWrapped(ctx,
         'Insert section, crowd, and global events on the EVENTS track at the playhead')
     r.ImGui_Spacing(ctx)
 
