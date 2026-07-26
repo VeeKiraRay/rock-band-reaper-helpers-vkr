@@ -35,6 +35,8 @@ dofile(_root .. 'lib/reaper_imgui_helpers.lua')   -- FormatTime (venue_awareness
 dofile(_gdir .. 'defaults.lua')                   -- S
 dofile(_gdir .. 'helpers.lua')                    -- FindTrackByName
 dofile(_gdir .. 'venue_awareness.lua')            -- ReadEventSections (merge test)
+dofile(_gdir .. 'venue_lighting.lua')             -- FindNextMeasureStartPpq (final anchor)
+dofile(_gdir .. 'venue_generator.lua')            -- ResolveSongEndAndAnchor
 dofile(_gdir .. 'section_events.lua')
 dofile(_gdir .. 'actions_venue_events.lua')
 

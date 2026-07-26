@@ -3,7 +3,8 @@
 -- Requires: GetMutedInstruments, FilterPool, GetCoopRequiredInstruments,
 --           GetDirectedRequiredInstruments, FindTrackByName, FindCompanion,
 --           ReadEventSections, ReadInstrumentPlayStates, GetSectionPreset,
---           GetThemeCameraInterval, FindMusicStartTime, FindNextMeasureStartPpq, r, S (globals)
+--           GetThemeCameraInterval, FindEventTime, FindMusicStartTime,
+--           FindNextMeasureStartPpq, r, S (globals)
 
 -- Delete type-1 text events in [start_ppq, end_ppq). keep_fn(msg) -> true
 -- preserves an event; nil keep_fn deletes every text event in range.
@@ -49,6 +50,45 @@ function ClearVenueKeyframesInRange(take, start_ppq, end_ppq)
     DeleteTextEventsInRange(take, start_ppq, end_ppq, function(msg)
         return msg ~= '[first]' and msg ~= '[next]' and msg ~= '[previous]'
     end)
+end
+
+-- Resolves the generation range end from EVENTS-track markers, plus the "final anchor"
+-- position used to keep the outro lighting bookend and the last scripted camera cut clear
+-- of the game's own forced camera cut at [end]. Pure function of the EVENTS track + the
+-- VENUE item's own bounds - see CLAUDE_venue_theme_generation.md's "Song end and the final
+-- anchor" for the full rationale.
+-- Returns:
+--   range_end_sec      - [end] marker time when one falls inside the item, else item_end_sec
+--   end_in_range       - true when a valid [end] marker was used for range_end_sec
+--   trailing_slack_sec - item_end_sec - range_end_sec (0 when end_in_range is false)
+--   final_anchor_ppq   - take-PPQ position of [music_end] when it is within 10 measures of
+--                         [end] (measured via FindNextMeasureStartPpq), else nil
+function ResolveSongEndAndAnchor(take, ppq, item_start_sec, item_end_sec)
+    local end_marker_t = FindEventTime('[end]')
+    local end_in_range = end_marker_t ~= nil
+                       and end_marker_t > item_start_sec
+                       and end_marker_t <= item_end_sec
+    local range_end_sec      = end_in_range and end_marker_t or item_end_sec
+    local trailing_slack_sec = end_in_range and (item_end_sec - end_marker_t) or 0
+
+    local final_anchor_ppq = nil
+    if end_in_range then
+        local music_end_t = FindEventTime('[music_end]')
+        if music_end_t and music_end_t > item_start_sec and music_end_t < range_end_sec then
+            local range_end_ppq = r.MIDI_GetPPQPosFromProjTime(take, range_end_sec)
+            local music_end_ppq = r.MIDI_GetPPQPosFromProjTime(take, music_end_t)
+            local pos, measures = music_end_ppq, 0
+            while pos < range_end_ppq and measures < 999 do
+                pos = FindNextMeasureStartPpq(take, pos, ppq)
+                measures = measures + 1
+            end
+            if measures <= 10 then
+                final_anchor_ppq = music_end_ppq
+            end
+        end
+    end
+
+    return range_end_sec, end_in_range, trailing_slack_sec, final_anchor_ppq
 end
 
 -- ---------------------------------------------------------------------------
@@ -104,13 +144,24 @@ function GenerateVenueEvents()
     local ppq             = GetTakePPQPerQN(take)
     local sixteenth_ticks = ppq / 4
 
+    -- [end] on the EVENTS track is the absolute song end - the VENUE MIDI item is free to
+    -- run past it (harmless in-game) but nothing should be generated at or after that point.
+    -- Falls back to the item's own length (with a result-panel warning) when no [end] marker
+    -- is present. final_anchor_ppq additionally resolves [music_end] when it's close enough
+    -- to [end] to anchor the outro bookend and last camera cut there instead - see
+    -- ResolveSongEndAndAnchor above.
     local range_start_sec = item_start_sec
-    local range_end_sec   = item_end_sec
+    local range_end_sec, end_in_range, trailing_slack_sec, final_anchor_ppq =
+        ResolveSongEndAndAnchor(take, ppq, item_start_sec, item_end_sec)
+    local used_end_fallback = not end_in_range
 
     local range_start_ppq = r.MIDI_GetPPQPosFromProjTime(take, range_start_sec)
     local range_end_ppq   = r.MIDI_GetPPQPosFromProjTime(take, range_end_sec)
     local range_ticks     = range_end_ppq - range_start_ppq
     local total_16ths     = math.floor(range_ticks / sixteenth_ticks)
+
+    local final_anchor_16ths = final_anchor_ppq
+        and (final_anchor_ppq - range_start_ppq) / sixteenth_ticks or nil
 
     -- Resolve active theme
     local theme = nil
@@ -327,8 +378,13 @@ function GenerateVenueEvents()
         cam_start_max = math.floor(last_bookend_16ths + CAM_INTERVAL_16THS * (1 + _cj))
     end
 
-    local cam_dir        = {}
-    local cam_events     = GenerateCameraEvents(active_coop, cam_dir, total_16ths, ppq,
+    local cam_dir         = {}
+    -- The last scripted camera cut lands 8 sixteenths before whichever end this call is
+    -- given - anchoring to final_anchor_16ths (the [music_end] position) when set keeps that
+    -- last cut away from [end]'s own forced in-game camera cut instead of landing right next
+    -- to it. See "Final anchor" above.
+    local cam_total_16ths = final_anchor_16ths or total_16ths
+    local cam_events      = GenerateCameraEvents(active_coop, cam_dir, cam_total_16ths, ppq,
                                                 cam_interval, forced_cuts, interval_changes,
                                                 cam_start_min, cam_start_max, coop_opts, last_spot)
     local directed_count  = 0
@@ -366,7 +422,11 @@ function GenerateVenueEvents()
         for _, ev in ipairs(ctrl_events) do insert_text(lt_offset_ticks + ev.tick, ev.text) end
     end
 
-    local blackout_offset = range_ticks - math.floor(32 * sixteenth_ticks)
+    -- Outro bookend: at the final anchor ([music_end]) when one was resolved above,
+    -- otherwise 2 measures (32 sixteenths) before the song end (see "Final anchor" above).
+    local blackout_offset = final_anchor_ppq
+        and (final_anchor_ppq - range_start_ppq)
+        or (range_ticks - math.floor(32 * sixteenth_ticks))
     if blackout_offset > 0 then
         insert_text(blackout_offset, '[lighting (blackout_spot)]')
     end
@@ -415,7 +475,20 @@ function GenerateVenueEvents()
     lines[#lines + 1] = ('Bookend events:     %d'):format(bookend_count)
     lines[#lines + 1] = ('Music start anchor: %s'):format(
         music_start_t and 'explicit [music_start] marker' or '~3s fallback (measure 3/4)')
+    lines[#lines + 1] = ('Song end:           %s'):format(
+        end_in_range and 'explicit [end] marker' or 'MIDI item length (fallback)')
+    if final_anchor_ppq then
+        lines[#lines + 1] = 'Final anchor:       [music_end] marker (outro bookend + last camera cut)'
+    end
     lines[#lines + 1] = ''
+    if used_end_fallback then
+        lines[#lines + 1] = "Didn't find [end] event, used MIDI length as end."
+        lines[#lines + 1] = ''
+    elseif trailing_slack_sec > 1.0 then
+        lines[#lines + 1] = ('Note: VENUE item runs %.1fs past [end] - trimming it to [end] is safe ' ..
+                             '(no in-game effect) and keeps the item tidy.'):format(trailing_slack_sec)
+        lines[#lines + 1] = ''
+    end
     local warn_no_data = {}
     for _, l in ipairs(no_data_letters) do
         if not muted[l] then warn_no_data[#warn_no_data + 1] = INST_LETTER_NAMES[l] or l end

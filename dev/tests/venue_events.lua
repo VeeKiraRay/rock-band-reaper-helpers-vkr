@@ -555,4 +555,89 @@ else
         end, 120, true)
     end)
 
+    ------------------------------------------------------------------
+    Test.section('FindEventTime / ResolveSongEndAndAnchor (venue song end)')
+    ------------------------------------------------------------------
+
+    Test.it('FindEventTime: nil when absent, earliest when duplicated', function()
+        WithEventsFixture(true, function(take)
+            Test.expect(FindEventTime('[end]') == nil, 'nil when no [end] event exists')
+            local p_late  = r.MIDI_GetPPQPosFromProjTime(take, MeasureStart(5))
+            local p_early = r.MIDI_GetPPQPosFromProjTime(take, MeasureStart(3))
+            r.MIDI_InsertTextSysexEvt(take, false, false, p_late,  1, '[end]')
+            r.MIDI_InsertTextSysexEvt(take, false, false, p_early, 1, '[end]')
+            local t = FindEventTime('[end]')
+            Test.expect(t and math.abs(t - MeasureStart(3)) < 0.01,
+                        'earliest occurrence returned, got ' .. tostring(t))
+        end, 120, true)
+    end)
+
+    -- 120 QN item = 30 measures in 4/4 (same convention as the bookends tests above).
+    local function ItemBounds(take)
+        local item = r.GetMediaItemTake_Item(take)
+        local item_start = r.GetMediaItemInfo_Value(item, 'D_POSITION')
+        local item_end    = item_start + r.GetMediaItemInfo_Value(item, 'D_LENGTH')
+        return item_start, item_end
+    end
+
+    Test.it('ResolveSongEndAndAnchor: no [end] -> item length fallback, no anchor', function()
+        WithEventsFixture(true, function(take)
+            local item_start, item_end = ItemBounds(take)
+            local range_end, end_in_range, slack, anchor =
+                ResolveSongEndAndAnchor(take, GetTakePPQPerQN(take), item_start, item_end)
+            Test.expect(not end_in_range, 'no [end] -> fallback')
+            Test.expect(math.abs(range_end - item_end) < 0.01, 'range end = item end')
+            Test.expect(slack == 0, 'no slack when falling back')
+            Test.expect(anchor == nil, 'no final anchor without [end]')
+        end, 120, true)
+    end)
+
+    Test.it('ResolveSongEndAndAnchor: [end] present, no [music_end] -> anchor nil, slack measured', function()
+        WithEventsFixture(true, function(take)
+            local item_start, item_end = ItemBounds(take)
+            local end_t = MeasureStart(25)  -- inside the 30-measure item, leaves trailing slack
+            r.MIDI_InsertTextSysexEvt(take, false, false,
+                r.MIDI_GetPPQPosFromProjTime(take, end_t), 1, '[end]')
+            local range_end, end_in_range, slack, anchor =
+                ResolveSongEndAndAnchor(take, GetTakePPQPerQN(take), item_start, item_end)
+            Test.expect(end_in_range, '[end] found and used')
+            Test.expect(math.abs(range_end - end_t) < 0.01, 'range end = [end] marker time')
+            Test.expect(slack > 0.01, 'trailing slack measured (item runs past [end])')
+            Test.expect(anchor == nil, 'no [music_end] -> no final anchor')
+        end, 120, true)
+    end)
+
+    Test.it('ResolveSongEndAndAnchor: [music_end] within 10 measures of [end] -> final anchor', function()
+        WithEventsFixture(true, function(take)
+            local item_start, item_end = ItemBounds(take)
+            local end_t        = MeasureStart(30)
+            local music_end_t  = MeasureStart(28)  -- 2 measures before [end] (default bookend spacing)
+            r.MIDI_InsertTextSysexEvt(take, false, false,
+                r.MIDI_GetPPQPosFromProjTime(take, end_t), 1, '[end]')
+            r.MIDI_InsertTextSysexEvt(take, false, false,
+                r.MIDI_GetPPQPosFromProjTime(take, music_end_t), 1, '[music_end]')
+            local _, end_in_range, _, anchor =
+                ResolveSongEndAndAnchor(take, GetTakePPQPerQN(take), item_start, item_end)
+            Test.expect(end_in_range, '[end] found')
+            local anchor_t = anchor and r.MIDI_GetProjTimeFromPPQPos(take, anchor)
+            Test.expect(anchor_t and math.abs(anchor_t - music_end_t) < 0.01,
+                        'final anchor = [music_end] position, got ' .. tostring(anchor_t))
+        end, 120, true)
+    end)
+
+    Test.it('ResolveSongEndAndAnchor: [music_end] more than 10 measures before [end] -> no anchor', function()
+        WithEventsFixture(true, function(take)
+            local item_start, item_end = ItemBounds(take)
+            local end_t       = MeasureStart(30)
+            local music_end_t = MeasureStart(15)  -- far from [end] - a long instrumental outro
+            r.MIDI_InsertTextSysexEvt(take, false, false,
+                r.MIDI_GetPPQPosFromProjTime(take, end_t), 1, '[end]')
+            r.MIDI_InsertTextSysexEvt(take, false, false,
+                r.MIDI_GetPPQPosFromProjTime(take, music_end_t), 1, '[music_end]')
+            local _, _, _, anchor =
+                ResolveSongEndAndAnchor(take, GetTakePPQPerQN(take), item_start, item_end)
+            Test.expect(anchor == nil, 'far [music_end] does not become the final anchor')
+        end, 120, true)
+    end)
+
 end

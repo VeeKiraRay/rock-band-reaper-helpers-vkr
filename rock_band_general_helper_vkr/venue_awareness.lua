@@ -1,7 +1,7 @@
 -- Venue track awareness: instrument mute detection, pool filtering,
 -- and [prc_*] section detection from the EVENTS track.
 -- Requires: FindTrackByName, FindNamedTrackMIDI, r, S, FormatTime (globals)
--- Globals exported here also include: FindMusicStartTime, INST_LETTER_NAMES
+-- Globals exported here also include: FindEventTime, FindMusicStartTime, INST_LETTER_NAMES
 
 local INST_TRACK_NAMES = {
     d = 'PART DRUMS',
@@ -300,23 +300,30 @@ function ReadEventSections(song_end_t)
     return sections
 end
 
--- Returns the project time of the earliest "[music_start]" text event on the
--- EVENTS track, or nil if the track/item/event doesn't exist. Used by the
--- venue generator to anchor the first generated camera cut and any [prc_*]
--- section placed right at the song's literal start.
-function FindMusicStartTime()
+-- Returns the project time of the earliest occurrence of a given type-1 text event
+-- on the EVENTS track, or nil if the track/item/event doesn't exist. Backs
+-- FindMusicStartTime and the venue generator's [end]/[music_end] song-end lookups.
+function FindEventTime(msg)
     local _, _, take = FindNamedTrackMIDI('EVENTS')
     if not take then return nil end
     local best_ppq
     local _, _, _, text_count = r.MIDI_CountEvts(take)
     for i = 0, text_count - 1 do
-        local ok, _, _, ppq, evt_type, msg = r.MIDI_GetTextSysexEvt(take, i)
-        if ok and evt_type == 1 and msg == '[music_start]' then
+        local ok, _, _, ppq, evt_type, m = r.MIDI_GetTextSysexEvt(take, i)
+        if ok and evt_type == 1 and m == msg then
             if not best_ppq or ppq < best_ppq then best_ppq = ppq end
         end
     end
     if not best_ppq then return nil end
     return r.MIDI_GetProjTimeFromPPQPos(take, best_ppq)
+end
+
+-- Returns the project time of the earliest "[music_start]" text event on the
+-- EVENTS track, or nil if the track/item/event doesn't exist. Used by the
+-- venue generator to anchor the first generated camera cut and any [prc_*]
+-- section placed right at the song's literal start.
+function FindMusicStartTime()
+    return FindEventTime('[music_start]')
 end
 
 function ListEventSections()

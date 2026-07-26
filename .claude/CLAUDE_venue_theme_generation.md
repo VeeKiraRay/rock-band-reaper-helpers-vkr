@@ -130,12 +130,19 @@ At ≥ 150 BPM all intervals are scaled by ×1.5 (rounded) — `crazy` at 160 BP
 
 ```
 1.  Find VENUE track + MIDI item
-2.  Resolve time range (time selection → use_full_item flag)
+2.  ResolveSongEndAndAnchor(take, ppq, item_start_sec, item_end_sec) → range_end_sec,
+    end_in_range, trailing_slack_sec, final_anchor_ppq (extracted, pure — see below)
+      range_end_sec: [end] EVENTS-track marker when one falls inside the item, else the
+        item's own length (fallback — flagged in the result panel as used_end_fallback,
+        with a "Didn't find [end] event, used MIDI length as end" note)
+      final_anchor_ppq: the [music_end] EVENTS-track marker, but only when it is within
+        10 measures of [end] (counted via repeated FindNextMeasureStartPpq calls) —
+        otherwise nil, meaning "use the literal range end" everywhere below
 3.  Detect muted instruments → filter COOP and DIRECTED pools
 4.  Build weighted coop opts (CategorizeCoopPool, active_coop_set, keys_failsafe)
 5.  ReadInstrumentPlayStates() → per-instrument play/idle timelines (converted to 16ths)
 6.  Resolve active theme (S.venue_theme_idx)
-7.  If theme: ReadEventSections() → sections[]
+7.  If theme: ReadEventSections(range_end_sec) → sections[]
 8.  Resolve the music-start anchor (FindMusicStartTime, else measure-3/4-nearest-3s fallback);
     if sections[1] sits at the song's literal start, re-anchor its t_start to this position
 9.  Build forced_cuts[] (dircut_at_start per section) and interval_changes[] (camera_pacing overrides)
@@ -148,15 +155,42 @@ At ≥ 150 BPM all intervals are scaled by ×1.5 (rounded) — `crazy` at 160 BP
       cam_dir = theme active → {} (no random directed)
               = no theme     → filtered DIRECTED_POOL
       first cut = one camera interval after last bookend (or default start range)
-      GenerateCameraEvents(active_coop, cam_dir, ..., forced_cuts, interval_changes, coop_opts)
+      cam_total_16ths = final anchor's 16ths position if resolved, else the full range
+      GenerateCameraEvents(active_coop, cam_dir, cam_total_16ths, ..., forced_cuts, interval_changes, coop_opts)
         → per-tick play-state cursors advance; idle instruments get weight 5; all-idle shifts groups
+        → last scripted coop cut lands 8 sixteenths before cam_total_16ths (see venue_camera.lua)
 15. Lighting + keyframes:
       theme + sections → GenerateThemedSectionEvents (per-section presets)
       theme, no sections → GenerateLightingEvents with default preset pool
       no theme → GenerateLightingEvents (full random MANUAL+AUTO pool)
-16. Bookend outro: [lighting (blackout_spot)] 2 measures before end — full-item only
+16. Bookend outro: [lighting (blackout_spot)] at the final anchor if resolved, else 2 measures
+    (32 sixteenths) before the range end
 17. Undo block, UpdateArrange
 ```
+
+### Song end and the final anchor
+
+The VENUE MIDI item's own length is not authoritative for where the song ends — authors
+routinely leave trailing slack after the last real event, and that's harmless in-game. The
+`[end]` text event on the EVENTS track is the actual song end: nothing is generated at or
+after it, regardless of how much longer the item runs.
+
+- **`[end]` present and inside the item** (`end_in_range`): `range_end_sec` is clamped to it.
+  If the item runs meaningfully longer than `[end]` (`trailing_slack_sec > 1.0`), the result
+  panel adds a non-blocking note suggesting the item be trimmed to `[end]` — purely cosmetic,
+  never required.
+- **`[end]` missing (or outside the item)**: falls back to the item's own length, exactly as
+  before this feature existed, plus a `"Didn't find [end] event, used MIDI length as end."`
+  note in the result panel.
+
+The **final anchor** (`final_anchor_ppq` / `final_anchor_16ths` in `venue_generator.lua`)
+additionally resolves the `[music_end]` marker when it sits within 10 measures of `[end]`.
+`[end]` triggers the game's own forced camera cut, so a scripted cut or the outro lighting
+bookend landing right on top of it doubles up as a jump cut — anchoring both to `[music_end]`
+instead keeps them clear of it. When `[music_end]` is absent, or more than 10 measures before
+`[end]` (e.g. a long instrumental/crowd-noise outro that still wants normal generation for its
+whole length), the final anchor is nil and every step below falls back to the literal range end
+— identical to pre-`[music_end]` behavior.
 
 ### `GenerateCameraEvents` — randomness constants
 

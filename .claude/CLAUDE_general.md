@@ -166,7 +166,7 @@ Every Validate action (all four sub-tabs, H/M/E only — never Expert) also runs
 | `rock_band_general_helper_vkr/settings.lua` | `SaveSettings`, `LoadSettings` (project key: `RBHelperVKR/settings_v1`) |
 | `rock_band_general_helper_vkr/helpers.lua` | `FindTrackByName`, `FindNamedTrackMIDI` (track + first MIDI item/take; self-contained for the standalone preview), `GetTakePPQPerQN`, `SetDefaultTempoTracks`, `SetDefaultMIDITracks`, `GetTempoContextBefore`, `GetMeasureStartTime`, `GetAudioItems`, `MakeProjectPoll` |
 | `rock_band_general_helper_vkr/venue.lua` | `ListVenueEvents`, `GetVenueEventsForPreview` (global); `ReadVenueTextEvents`, `BuildCameraGaps`, `GapStats` (local) |
-| `rock_band_general_helper_vkr/venue_awareness.lua` | `GetMutedInstruments`, `GetCoopRequiredInstruments`, `GetDirectedRequiredInstruments`, `FilterPool`, `ReadEventSections`, `ListEventSections`, `FindMusicStartTime`, `INST_LETTER_NAMES` (global); `INST_TRACK_NAMES`, `ParsePrcEvent` (local) |
+| `rock_band_general_helper_vkr/venue_awareness.lua` | `GetMutedInstruments`, `GetCoopRequiredInstruments`, `GetDirectedRequiredInstruments`, `FilterPool`, `ReadEventSections`, `ListEventSections`, `FindEventTime` (generic EVENTS-track text-event lookup), `FindMusicStartTime` (thin wrapper over `FindEventTime`), `INST_LETTER_NAMES` (global); `INST_TRACK_NAMES`, `ParsePrcEvent` (local) |
 | `rock_band_general_helper_vkr/venue_themes.lua` | `ThemeDisplayLabel`, `LoadVenueThemes`, `GetSectionPreset`, `GetThemeCameraInterval`, `BuildLightingPool`, `BuildPostprocPool` (global); `POSTPROC_VALID_SET`, `LIGHTING_VALID_SET`, `CAMERA_PACING`, `Tokenize`, `ParseSexpr`, `ParseThemeFile`, `InterpretSectionPreset`, `InterpretTheme` (local) |
 | `rock_band_general_helper_vkr/venue_camera.lua` | `COOP_POOL`, `DIRECTED_POOL`, `PickRandom`, `JitteredInterval`, `CategorizeCoopPool`, `WeightedPickCoopEvent`, `FindCompanion`, `ComputeIdleState`, `GenerateCameraEvents`, `ResolveUserCamInterval` (global); camera constants (`CAM_INTERVAL_16THS` etc., partially global); `WeightedPickInstrument` (local) |
 | `rock_band_general_helper_vkr/venue_sprites.lua` | `LoadVenueSprite`, `DrawVenueTooltipSprite`, `BeginVenueTooltip`, `EndVenueTooltip`, `VenueSpriteFoldersFound` (global); `DIRECTED_SPRITE_NAMES`, `VENUE_SPRITE_ROOT` (module-level globals). JPEG-only. Checks `resources/img/spritesheets/{category}/` (large) then `resources/img/spritesheets/{category} small/` (small) — no third-party fallback. Frame count is read from the filename (`{key}_f{N}_spritesheet.jpg`). Display size scales by `S.venue_preview_scale` (1 or 2). Cache stores `{image, frame_count, cols, rows}` per sprite. |
@@ -581,12 +581,12 @@ Camera events that require an unavailable instrument are removed from the pool b
 
 1. **Forced song-start trio** — `[coop_all_far]`, `[lighting (intro)]`, `[ProFilm_a.pp]`, all placed at tick 0 (the VENUE item's literal start). Fixed, not randomised, and fires **regardless of theme state** — see "Song-start bookends and the music-start anchor" below.
 2. **First generated camera cut (coop)** — a weighted pick (not a fixed measure) anchored to the resolved **music-start position**: an explicit `[music_start]` EVENTS-track marker if present, else whichever of measure 3/4 lands closer to the 3-second mark from song start.
-3. **Camera cuts (coop)** — placed at jittered intervals from one interval after the music-start anchor onward, up to the blackout position.
-4. **Camera cuts (directed)** — 1–4 cuts placed at random positions in the middle 80% of the range, each followed by a 2× cooldown before the next coop cut.
-5. **Final coop cut** — placed at the blackout position (32 sixteenths before range end).
-6. **Lighting changes** — placed from 32 sixteenths in, at jittered intervals. Each picks from the combined manual + auto pool.
+3. **Camera cuts (coop)** — placed at jittered intervals from one interval after the music-start anchor onward, up to the camera end bound (the **final anchor** when one is resolved, else the range end — see "Song end and the final anchor" below).
+4. **Camera cuts (directed)** — 1–4 cuts placed at random positions in the middle 80% of the camera end bound, each followed by a 2× cooldown before the next coop cut.
+5. **Final coop cut** — placed 8 sixteenths before the camera end bound.
+6. **Lighting changes** — placed from 32 sixteenths in, at jittered intervals, up to the range end. Each picks from the combined manual + auto pool.
 7. **Control keyframes (`[first]`/`[next]`)** — generated only for manual lighting events. `[first]` at the lighting event position, then `[next]` every 1–4 beats until the next lighting change.
-8. **Bookend: `[lighting (blackout_spot)]`** — placed 32 sixteenths before range end.
+8. **Bookend: `[lighting (blackout_spot)]`** — placed at the final anchor when one is resolved, else 32 sixteenths (2 measures) before the range end.
 
 ### Song-start bookends and the music-start anchor
 
@@ -606,6 +606,25 @@ a measure-3/4 fallback computed in `venue_generator.lua`) and uses it in two pla
 
 The forced song-start trio (tick 0) is independent of this anchor and always fires — see
 "Generated event types" above.
+
+### Song end and the final anchor
+
+The VENUE MIDI item's own length is not authoritative for the song end — the `[end]`
+EVENTS-track marker is. `GenerateVenueEvents` clamps `range_end_sec` to `[end]` when it falls
+inside the item; nothing is generated at or after it, regardless of how much longer the item
+runs. No `[end]` marker (or one outside the item) falls back to the item's own length, exactly
+as before this existed, with a `"Didn't find [end] event, used MIDI length as end."` note in
+the result panel. When the item runs meaningfully longer than a found `[end]`, the result panel
+adds a non-blocking trim suggestion instead (no in-game effect either way).
+
+Additionally, when `[music_end]` sits within 10 measures of `[end]`, it becomes the **final
+anchor**: the outro `[lighting (blackout_spot)]` bookend and the last scripted coop camera cut
+both target it instead of the literal range end. `[end]` triggers the game's own forced camera
+cut, so ending our own generation right on top of it would double up as a jump cut. No
+`[music_end]`, or one more than 10 measures before `[end]`, leaves the final anchor unresolved
+and every generation step falls back to the literal range end. Full detail (including the
+measure-counting method) is in `CLAUDE_venue_theme_generation.md`'s "Song end and the final
+anchor" section.
 
 ### Timing constants (local in `venue_generator.lua`, future S-field candidates)
 

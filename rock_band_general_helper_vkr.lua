@@ -1,6 +1,6 @@
 -- @description Rock Band General Helper
 -- @author VeeKiraRay
--- @version 0.9.29
+-- @version 0.9.30
 -- @about
 --   Utility actions for Rock Band authoring in REAPER.
 --
@@ -20,6 +20,23 @@
 --   This @about block keeps only the 5 most recent versions.
 --   Full history: CHANGELOG.md in the repo.
 --
+--   v0.9.30
+--     - Venue > Themes gen: song end is now resolved from the EVENTS
+--       track's [end] marker, not the VENUE MIDI item's own length -
+--       nothing is generated at or after it even if the item runs
+--       longer (harmless in-game; the result panel suggests trimming
+--       the item to [end] when it runs meaningfully past it, purely
+--       cosmetic, never required). Falls back to the item's length,
+--       with a "Didn't find [end] event, used MIDI length as end."
+--       note, when no [end] marker is present. When [music_end] sits
+--       within 10 measures of [end], the outro [lighting
+--       (blackout_spot)] bookend and the last scripted coop camera
+--       cut both target it instead of the literal end - [end]
+--       triggers the game's own forced camera cut, so landing our
+--       own cut right beside it doubled up as a jump cut. New shared
+--       FindEventTime in venue_awareness.lua generalizes the
+--       existing [music_start] lookup; FindMusicStartTime is now a
+--       thin wrapper over it.
 --   v0.9.29
 --     - Venue > Keyframe align: instrument-aware modes (Guitar/Bass/Keys
 --       notes, Drum kicks/snare) gain a third Subdivision option, "Every
@@ -87,20 +104,6 @@
 --       Blue), silently losing the note instead of relocating it. Now
 --       shifts whenever there are 1 or 2 notes and the shift keeps every
 --       note >= offset 0.
---   v0.9.25
---     - MIDI > Pattern: new Difficulty dropdown (All/Expert/Hard/Medium/Easy,
---       default All) scopes Set Search/Set Replace/Replace All/Fill Range to
---       one difficulty tier's pitch range on PART DRUMS/GUITAR/BASS/KEYS
---       (Expert 96-100, Hard 84-88, Medium 72-76, Easy 60-64; All = 60-100)
---       instead of touching every tier packed into the same track/time
---       window. PART VOCALS/HARM1-3 (36-84) and PART REAL_KEYS*/PART
---       KEYS_ANIM* (48-72) always use their own fixed range regardless of
---       the dropdown; any other track keeps the previous unfiltered (0-127)
---       behavior. A disabled-style "Pitch range: lo-hi" readout under the
---       dropdown shows the range currently in effect. New global
---       GetPatternPitchRange in actions_midi_replace.lua; ReadMIDIPatternFromTake
---       (lib/reaper_midi_helpers.lua) and the local ClearPatternWindow gained
---       optional min/max pitch params.
 r = reaper  -- global so all dofile'd modules can use it
 
 if not r.ImGui_CreateContext then
