@@ -14,8 +14,7 @@ function RegenerateVenueKeyframes()
         return
     end
 
-    local ppq       = GetTakePPQPerQN(take)
-    local half_beat = math.floor(ppq / 2 + 0.5)
+    local ppq = GetTakePPQPerQN(take)
 
     local item_start_sec = r.GetMediaItemInfo_Value(item, 'D_POSITION')
     local item_end_sec   = item_start_sec + r.GetMediaItemInfo_Value(item, 'D_LENGTH')
@@ -71,8 +70,10 @@ function RegenerateVenueKeyframes()
 
         local ctrl_events = GenerateKeyframesForSpan(take, span.start_ppq, span.end_ppq, ppq, S.venue_kf_rate)
         for _, ev in ipairs(ctrl_events) do
-            local snapped = math.max(ev.ppq, math.floor(ev.ppq / half_beat + 0.5) * half_beat)
-            r.MIDI_InsertTextSysexEvt(take, false, false, snapped, 1, ev.text)
+            -- Already placed on its alignment grid (beat/half-beat/quarter-beat, etc.) by
+            -- GenerateKeyframesForSpan - no further snapping, or a coarser half-beat re-snap
+            -- would collapse finer instrument-aware positions onto the nearest half-beat/beat.
+            r.MIDI_InsertTextSysexEvt(take, false, false, ev.ppq, 1, ev.text)
             total = total + 1
         end
     end

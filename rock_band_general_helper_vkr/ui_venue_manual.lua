@@ -211,7 +211,7 @@ function DrawVenueManualTab()
             'Playhead:      [first] at the current edit cursor position.\n' ..
             'Closest beat:  snapped to the nearest beat boundary.\n' ..
             'Downbeat:      [first] at cursor; [next] from the next measure start.\n\n' ..
-            'Instrument modes emit [next] only at beats (or half-beats) where\n' ..
+            'Instrument modes emit [next] only at beat/half-beat/quarter-beat grid points where\n' ..
             'qualifying notes actually exist on the named track:\n' ..
             '  Guitar notes \xe2\x80\x93 PART GUITAR (pitches 96\xe2\x80\x93100)\n' ..
             '  Bass notes   \xe2\x80\x93 PART BASS   (pitches 96\xe2\x80\x93100)\n' ..
@@ -238,6 +238,10 @@ function DrawVenueManualTab()
         r.ImGui_SameLine(ctx)
         if r.ImGui_RadioButton(ctx, 'Every half beat##mg_kfis', S.venue_kf_inst_subdiv == 1) then
             S.venue_kf_inst_subdiv = 1
+        end
+        r.ImGui_SameLine(ctx)
+        if r.ImGui_RadioButton(ctx, 'Every quarter beat##mg_kfis', S.venue_kf_inst_subdiv == 2) then
+            S.venue_kf_inst_subdiv = 2
         end
     end
 

@@ -454,7 +454,7 @@ Shot-by-shot event insertion at the edit cursor.
 Bulk-regenerates `[first]`/`[next]` keyframes for every manual lighting event already sitting on the VENUE track — useful after moving or retiming a section rather than re-adding keyframes by hand.
 
 - **Keyframe align** — alignment mode: **Lighting start** (default, anchors at the lighting event itself), **Closest beat**, **Downbeat**, or five instrument-aware modes (**Guitar notes**, **Bass notes**, **Keys notes**, **Drum kicks**, **Drum snare**) that place `[next]` only at beats where notes exist on the corresponding PART track.
-- **Subdivision** — Every beat / Every half beat, shown only for the instrument-aware align modes.
+- **Subdivision** — Every beat / Every half beat / Every quarter beat, shown only for the instrument-aware align modes.
 - **Keyframe rate** — this tab's own rate (beats), independent of Section gen's and Manual gen's.
 - **Regenerate keyframes** — finds every manual lighting event on VENUE (`verse`, `chorus`, `manual_cool`, `manual_warm`, `dischord`, `stomp`), and for each one inside the processing range, clears and regenerates its `[first]`/`[next]` running from that lighting event to the next lighting event of any kind. Only keyframe events are touched — camera, lighting, postproc, and bonus FX are left alone. Respects time selection (a section already in progress from before the selection is left untouched); otherwise processes the whole song. Fully undoable.
 

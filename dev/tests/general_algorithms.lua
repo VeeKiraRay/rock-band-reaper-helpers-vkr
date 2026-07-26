@@ -168,3 +168,23 @@ Test.it('all five instruments are always present in the result', function()
         Test.expect(res[letter].state == 'active', letter .. ' defaults to active')
     end
 end)
+
+----------------------------------------------------------------------
+Test.section('KeyframeSubdivQN')
+
+Test.it('mode 0 (every beat) -> 1.0 QN', function()
+    Test.expect(KeyframeSubdivQN(0) == 1.0, 'mode 0 -> 1.0')
+end)
+
+Test.it('mode 1 (every half beat) -> 0.5 QN', function()
+    Test.expect(KeyframeSubdivQN(1) == 0.5, 'mode 1 -> 0.5')
+end)
+
+Test.it('mode 2 (every quarter beat) -> 0.25 QN', function()
+    Test.expect(KeyframeSubdivQN(2) == 0.25, 'mode 2 -> 0.25')
+end)
+
+Test.it('unrecognized mode falls back to 1.0 QN', function()
+    Test.expect(KeyframeSubdivQN(99) == 1.0, 'unknown mode -> 1.0')
+    Test.expect(KeyframeSubdivQN(nil) == 1.0, 'nil mode -> 1.0')
+end)

@@ -181,7 +181,7 @@ S = {
     venue_themes          = nil,  -- lazy-loaded from resources/themes/ folder; NOT persisted
     venue_theme_name      = '',   -- persisted: empty = no theme, else stem filename
     venue_keyframe_align  = 0,    -- 0=section start, 1=closest beat, 2=downbeat; 3-7=instrument-aware
-    venue_kf_inst_subdiv  = 0,    -- 0=every beat, 1=every half beat (instrument modes 3-7 only)
+    venue_kf_inst_subdiv  = 0,    -- 0=every beat, 1=every half beat, 2=every quarter beat (instrument modes 3-7 only)
     venue_cam_pacing        = 0,    -- 0=theme default, 1=minimal, 2=slow, 3=medium, 4=fast, 5=crazy, 6=custom
     venue_cam_pacing_custom = 16,   -- custom camera interval in 16ths; only used when venue_cam_pacing==6
     venue_cam_pacing_jitter = true,  -- include ±20% randomisation in camera cut intervals
@@ -269,7 +269,7 @@ TIPS = {
                            "Closest beat:  snapped to the nearest beat boundary.\n" ..
                            "Downbeat:      [first] at section start; [next] from the next measure boundary.\n\n" ..
                            "Instrument modes ignore the theme's keyframe_rate and emit [next]\n" ..
-                           "only at beats (or half-beats) where notes actually exist:\n" ..
+                           "only at subdivision grid points (beat/half-beat/quarter-beat) where notes actually exist:\n" ..
                            "  Guitar notes - reads PART GUITAR (pitches 96-100)\n" ..
                            "  Bass notes   - reads PART BASS   (pitches 96-100)\n" ..
                            "  Keys notes   - reads PART KEYS   (pitches 96-100)\n" ..
@@ -277,8 +277,9 @@ TIPS = {
                            "  Drum snare   - reads PART DRUMS  (pitch 97 only)",
 
     venue_kf_inst_subdiv = "Subdivision grid for instrument-aware keyframe alignment.\n\n" ..
-                           "Every beat:      check each beat boundary (max 4 [next] per measure in 4/4).\n" ..
-                           "Every half beat: check each 8th-note boundary (max 8 [next] per measure in 4/4).\n\n" ..
+                           "Every beat:         check each beat boundary (max 4 [next] per measure in 4/4).\n" ..
+                           "Every half beat:    check each 8th-note boundary (max 8 [next] per measure in 4/4).\n" ..
+                           "Every quarter beat: check each 16th-note boundary (max 16 [next] per measure in 4/4).\n\n" ..
                            "Grid positions with no qualifying notes are skipped; no [next] is emitted.",
 
     venue_theme     = "Select a venue theme to guide lighting and camera generation.\n\n" ..

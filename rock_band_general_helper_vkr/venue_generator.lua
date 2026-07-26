@@ -248,9 +248,13 @@ function GenerateVenueEvents()
 
     local count     = 0
     local half_beat = math.floor(ppq / 2 + 0.5)  -- ticks per half-beat (snap grid)
-    local function insert_text(tick_offset, text)
+    -- no_snap: skip snapping - keyframe ctrl_events from GenerateThemedSectionEvents are
+    -- already placed on their own alignment grid (possibly finer than half-beat, e.g.
+    -- quarter-beat instrument-aware modes); re-snapping would collapse those positions
+    -- onto the nearest half-beat/beat.
+    local function insert_text(tick_offset, text, no_snap)
         local abs_ppq = range_start_ppq + tick_offset
-        local snapped = math.floor(abs_ppq / half_beat + 0.5) * half_beat
+        local snapped = no_snap and abs_ppq or (math.floor(abs_ppq / half_beat + 0.5) * half_beat)
         r.MIDI_InsertTextSysexEvt(take, false, false, snapped, 1, text)
         count = count + 1
     end
@@ -351,7 +355,7 @@ function GenerateVenueEvents()
         lt_events, ctrl_events, pp_events = GenerateThemedSectionEvents(
             sections, theme, take, range_start_ppq, range_end_ppq, ppq)
         for _, ev in ipairs(lt_events)   do insert_text(ev.tick, ev.text) end
-        for _, ev in ipairs(ctrl_events) do insert_text(ev.tick, ev.text) end
+        for _, ev in ipairs(ctrl_events) do insert_text(ev.tick, ev.text, true) end
         for _, ev in ipairs(pp_events)   do insert_text(ev.tick, ev.text) end
     else
         local def  = theme and theme.section_presets and theme.section_presets['default']

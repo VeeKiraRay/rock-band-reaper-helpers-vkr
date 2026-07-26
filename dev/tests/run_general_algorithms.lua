@@ -1,8 +1,8 @@
 -- @description Rock Band General Helper — Algorithm Unit Tests
 -- @author VeeKiraRay
 -- @about
---   Algorithm unit tests for EstimateBPM, GuessTimeSig, FitBeatGrid, and
---   ComputePlayerStatesAt.
+--   Algorithm unit tests for EstimateBPM, GuessTimeSig, FitBeatGrid,
+--   ComputePlayerStatesAt, and KeyframeSubdivQN.
 --   These functions operate on plain Lua tables with no REAPER API calls.
 --   Run from the REAPER Actions list or triggered via the test launcher.
 --   Results appear in the REAPER console (View > Show REAPER console).
@@ -34,6 +34,8 @@ dofile(_mdir .. 'defaults.lua')        -- S and constants
 dofile(_mdir .. 'tempomap.lua')        -- EstimateBPM, GuessTimeSig, FitBeatGrid
 dofile(_mdir .. 'venue_awareness.lua') -- ComputePlayerStatesAt (pure; REAPER-facing
                                        -- functions in this file are not exercised)
+dofile(_mdir .. 'venue_lighting.lua')  -- KeyframeSubdivQN (pure; other functions in
+                                       -- this file are not exercised)
 
 dofile(_tdir .. 'general_algorithms.lua')
 Test.report()

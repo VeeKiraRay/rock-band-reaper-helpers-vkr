@@ -105,6 +105,11 @@ function RenderKeyframeAlignCombo(col_offset)
             S.venue_kf_inst_subdiv = 1
         end
         Tooltip(_t_kfis)
+        r.ImGui_SameLine(ctx)
+        if r.ImGui_RadioButton(ctx, 'Every quarter beat##kfis', S.venue_kf_inst_subdiv == 2) then
+            S.venue_kf_inst_subdiv = 2
+        end
+        Tooltip(_t_kfis)
     end
 end
 

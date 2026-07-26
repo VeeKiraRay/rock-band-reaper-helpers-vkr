@@ -3,7 +3,7 @@
 --           PickRandom, JitteredInterval, r, S (globals from venue_camera.lua and venue_themes.lua)
 -- Globals exported: MANUAL_LIGHTING_SET, LIGHTING_OFFSET_16THS, INST_KF_MODES,
 --   FindNextMeasureStartPpq, CollectInstNotePositions, GenerateKeyframesForSpan,
---   GenerateLightingEvents, GenerateThemedSectionEvents
+--   GenerateLightingEvents, GenerateThemedSectionEvents, KeyframeSubdivQN
 
 local MANUAL_LIGHTING_POOL = {
     '[lighting (verse)]', '[lighting (chorus)]',
@@ -41,6 +41,14 @@ local KEYFRAME_MIN_BEATS      = 1     -- manual lighting [next] min interval (be
 local KEYFRAME_MAX_BEATS      = 4     -- manual lighting [next] max interval (beats)
 
 -- ---------------------------------------------------------------------------
+
+-- Converts S.venue_kf_inst_subdiv (0=every beat, 1=every half beat, 2=every quarter
+-- beat) to a quarter-note fraction, for instrument-aware keyframe alignment (modes 3-7).
+function KeyframeSubdivQN(mode)
+    if mode == 2 then return 0.25 end
+    if mode == 1 then return 0.5 end
+    return 1.0
+end
 
 local function SnapPpqToNearestBeat(ppq_pos, ppq)
     return math.floor(ppq_pos / ppq + 0.5) * ppq
@@ -112,12 +120,12 @@ function GenerateKeyframesForSpan(take, start_ppq, end_ppq, ppq, kf_rate_beats)
         local inst_pos     = CollectInstNotePositions(
             inst_info.track_name, inst_info.pitch_min, inst_info.pitch_max,
             take, start_ppq, end_ppq)
-        local subdiv_ticks = math.floor(S.venue_kf_inst_subdiv == 1 and ppq / 2 or ppq)
+        local subdiv_qn    = KeyframeSubdivQN(S.venue_kf_inst_subdiv)
+        local subdiv_ticks = math.floor(subdiv_qn * ppq)
 
         ctrl_events[#ctrl_events + 1] = { ppq = start_ppq, text = '[first]' }
 
         local sec_qn    = r.TimeMap_timeToQN(r.MIDI_GetProjTimeFromPPQPos(take, start_ppq))
-        local subdiv_qn = S.venue_kf_inst_subdiv == 1 and 0.5 or 1.0
         local grid_qn   = math.ceil(sec_qn / subdiv_qn + 1e-6) * subdiv_qn
         local pos_ppq   = r.MIDI_GetPPQPosFromProjTime(take, r.TimeMap_QNToTime(grid_qn))
         local tolerance = math.floor(ppq / 32)
@@ -246,8 +254,8 @@ local function ProcessThemeSection(sec, theme, take, range_start_ppq, range_end_
             if align >= 3 and inst_note_positions then
                 -- Instrument-aware mode: [first] at section start; [next] only at
                 -- beat or half-beat grid positions that have at least one qualifying note.
-                local subdiv_ticks = math.floor(
-                    S.venue_kf_inst_subdiv == 1 and ppq / 2 or ppq)
+                local subdiv_qn    = KeyframeSubdivQN(S.venue_kf_inst_subdiv)
+                local subdiv_ticks = math.floor(subdiv_qn * ppq)
                 if sec_ppq < kf_end then
                     ctrl_events[#ctrl_events + 1] = {
                         tick = math.floor(sec_ppq - range_start_ppq + 0.5),
@@ -259,7 +267,6 @@ local function ProcessThemeSection(sec, theme, take, range_start_ppq, range_end_
                 -- starts are all handled correctly (same pattern as FindNextMeasureStartPpq).
                 local sec_proj_t = r.MIDI_GetProjTimeFromPPQPos(take, sec_ppq)
                 local sec_qn     = r.TimeMap_timeToQN(sec_proj_t)
-                local subdiv_qn  = S.venue_kf_inst_subdiv == 1 and 0.5 or 1.0
                 local grid_qn    = math.ceil(sec_qn / subdiv_qn + 1e-6) * subdiv_qn
                 local grid_t     = r.TimeMap_QNToTime(grid_qn)
                 local pos_ppq    = r.MIDI_GetPPQPosFromProjTime(take, grid_t)

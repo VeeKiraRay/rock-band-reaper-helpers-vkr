@@ -44,6 +44,11 @@ function DrawVenueKeyframesTab()
             S.venue_kf_inst_subdiv = 1
         end
         Tooltip(TIPS.venue_kf_inst_subdiv)
+        r.ImGui_SameLine(ctx)
+        if r.ImGui_RadioButton(ctx, 'Every quarter beat##vkf_kfis', S.venue_kf_inst_subdiv == 2) then
+            S.venue_kf_inst_subdiv = 2
+        end
+        Tooltip(TIPS.venue_kf_inst_subdiv)
     end
 
     r.ImGui_Text(ctx, 'Keyframe rate')

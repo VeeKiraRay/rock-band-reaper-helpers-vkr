@@ -2,7 +2,7 @@
 -- keyframe generation, and selective event removal.
 -- Requires: FindNamedTrackMIDI, GetTakePPQPerQN, MANUAL_LIGHTING_SET, INST_KF_MODES,
 --           FindNextMeasureStartPpq, CollectInstNotePositions, ResolveUserCamInterval,
---           JitteredInterval, CAM_INTERVAL_16THS, CAM_JITTER,
+--           JitteredInterval, CAM_INTERVAL_16THS, CAM_JITTER, KeyframeSubdivQN,
 --           DeleteTextEventsInRange, ClearVenueKeyframesInRange, r, S (globals)
 
 local function _find_venue_track_and_take()
@@ -116,12 +116,12 @@ function GenerateManualKeyframes()
         local inst_pos     = CollectInstNotePositions(
             inst_info.track_name, inst_info.pitch_min, inst_info.pitch_max,
             take, start_ppq, end_ppq)
-        local subdiv_ticks = math.floor(S.venue_kf_inst_subdiv == 1 and ppq / 2 or ppq)
+        local subdiv_qn    = KeyframeSubdivQN(S.venue_kf_inst_subdiv)
+        local subdiv_ticks = math.floor(subdiv_qn * ppq)
 
         ctrl_events[#ctrl_events + 1] = { ppq = start_ppq, text = '[first]' }
 
         local sec_qn    = r.TimeMap_timeToQN(r.MIDI_GetProjTimeFromPPQPos(take, start_ppq))
-        local subdiv_qn = S.venue_kf_inst_subdiv == 1 and 0.5 or 1.0
         local grid_qn   = math.ceil(sec_qn / subdiv_qn + 1e-6) * subdiv_qn
         local pos_ppq   = r.MIDI_GetPPQPosFromProjTime(take, r.TimeMap_QNToTime(grid_qn))
         local tolerance = math.floor(ppq / 32)
@@ -180,10 +180,11 @@ function GenerateManualKeyframes()
     -- Clear existing keyframe events in range
     ClearVenueKeyframesInRange(take, start_ppq, end_ppq)
 
-    -- Insert new keyframe events (snap forward to nearest half-beat, never before computed position)
+    -- Insert new keyframe events at their already-computed alignment grid position (beat,
+    -- half-beat, quarter-beat, etc. per S.venue_kf_inst_subdiv for instrument-aware modes) -
+    -- no further snapping, or a coarser half-beat re-snap would collapse finer positions.
     for _, ev in ipairs(ctrl_events) do
-        local snapped = math.max(ev.ppq, math.floor(ev.ppq / half_beat + 0.5) * half_beat)
-        r.MIDI_InsertTextSysexEvt(take, false, false, snapped, 1, ev.text)
+        r.MIDI_InsertTextSysexEvt(take, false, false, ev.ppq, 1, ev.text)
     end
 
     r.Undo_EndBlock2(0, 'RB Generate Manual Keyframes (' .. #ctrl_events .. ' events)', -1)

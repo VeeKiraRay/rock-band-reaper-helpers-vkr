@@ -170,6 +170,10 @@ function DrawVenueSectionGenTab()
             if r.ImGui_RadioButton(ctx, 'Every half beat##kfis', S.venue_kf_inst_subdiv == 1) then
                 S.venue_kf_inst_subdiv = 1
             end
+            r.ImGui_SameLine(ctx)
+            if r.ImGui_RadioButton(ctx, 'Every quarter beat##kfis', S.venue_kf_inst_subdiv == 2) then
+                S.venue_kf_inst_subdiv = 2
+            end
             Tooltip(TIPS.venue_kf_inst_subdiv)
         end
         if _kf_dis then r.ImGui_EndDisabled(ctx) end

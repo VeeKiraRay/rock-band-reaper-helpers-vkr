@@ -239,10 +239,13 @@ function GenerateSectionEvent()
         }
     end
 
-    -- half-beat snap helper
+    -- half-beat snap helper. no_snap: skip snapping - keyframe ctrl_events are already
+    -- placed on their own alignment grid (possibly finer than half-beat, e.g. quarter-beat
+    -- instrument-aware modes) by GenerateThemedSectionEvents; re-snapping to half-beat would
+    -- collapse those finer positions onto the nearest half-beat/beat.
     local half_beat = math.floor(ppq / 2 + 0.5)
-    local function insert_snapped(abs_ppq, text)
-        local snapped = math.floor(abs_ppq / half_beat + 0.5) * half_beat
+    local function insert_snapped(abs_ppq, text, no_snap)
+        local snapped = no_snap and abs_ppq or (math.floor(abs_ppq / half_beat + 0.5) * half_beat)
         r.MIDI_InsertTextSysexEvt(take, false, false, snapped, 1, text)
     end
 
@@ -378,7 +381,7 @@ function GenerateSectionEvent()
             lt_count = lt_count + 1
         end
         for _, ev in ipairs(ctrl_events) do
-            insert_snapped(clear_start_ppq + ev.tick, ev.text)
+            insert_snapped(clear_start_ppq + ev.tick, ev.text, true)
             total_inserted = total_inserted + 1
             ctrl_count = ctrl_count + 1
         end
