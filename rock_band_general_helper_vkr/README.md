@@ -109,6 +109,10 @@ A per-project authoring checklist: a list of steps, grouped into sections, that 
 
 **Show completion timestamp** — checkbox, off by default. When on, a checked item shows "Completed on dd.MM.yyyy at hh:mm" underneath it. The timestamp is recorded the moment you check an item either way — this checkbox only controls whether it's displayed.
 
+**Show only unfinished** — checkbox, off by default. When on, checked items are hidden so you can focus on what's left; a section whose every item is checked disappears entirely. Nothing is lost — turn the checkbox back off to see everything again.
+
+A **progress line** ("10 / 40 completed - 25%") sits below the checkboxes once a template is selected, counting the whole template regardless of whether "Show only unfinished" is hiding some of it.
+
 #### Checking off items
 
 Click the checkbox or the item's label text to toggle it — both work. Checking an item saves immediately to the project (its own save slot, independent of this tab's own Save/Load buttons below), so you don't need to remember to hit Save before closing REAPER. Unchecking an item clears its recorded time.
@@ -135,7 +139,7 @@ A couple of edge cases are handled predictably rather than guessed at:
 - If a step somehow ends up with more than one tooltip attached (e.g. it already has a same-line `{...}` *and* a `{...}` line follows it, or it has two `{...}` groups on the same line), the tooltip is dropped rather than picking one arbitrarily.
 - The tab warns you (above the checklist) if a template file has the same step repeated twice under the same section — almost always a copy-paste slip — or if its `[` / `]` or `{` / `}` brackets don't balance, which usually means a bracket got deleted or mistyped somewhere in the file. Both are just warnings; the rest of the file still loads.
 
-Checked-item history is capped at roughly 100 entries across everything you've ever checked in a project; if you're well past that, the next time you check something the script quietly drops any entries that no longer match a step in *any* template currently in `resources/workflow/`, so leftover checkmarks from templates you've since edited or removed don't pile up forever.
+Switching templates (via the combo) immediately drops checked history for any step that doesn't match the newly-selected template — only whichever template is currently selected keeps its checked state around. If a step's section+label happens to match between the old and new template it survives the switch (see [Checking off items](#checking-off-items) above); anything else is gone, including if you switch back later. Keep this in mind if you're bouncing between two templates for the same song — history isn't retained per-template, only for whichever one is currently selected.
 
 ---
 

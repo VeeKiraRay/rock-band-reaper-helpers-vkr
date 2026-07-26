@@ -25,12 +25,14 @@ Four WIP tabs appear only when **Show WIPs? = Yes** in the General tab (persiste
 - Save / Load buttons for project-scoped settings (placed last, since they persist the settings above them).
 
 *Workflow sub-tab* — per-project authoring checklist, sourced from a user-editable `.txt` template.
-- **Template combo** — select a `.txt` file from `resources/workflow/` (ships with one starter template, `Default.txt`, based on a typical full-band song's steps). Empty folder shows a disabled hint instead of a combo. When no persisted selection matches (first use, or the previously selected file was removed), a template named `Default` is auto-selected if present, else the first template alphabetically.
+- **Template combo** — select a `.txt` file from `resources/workflow/` (ships with one starter template, `Default.txt`, based on a typical full-band song's steps). Empty folder shows a disabled hint instead of a combo. Any selection change (manual pick, or the startup fallback when no persisted selection matches) goes through `SelectWorkflowFile` — see below.
 - Template markup: `[Section Name]` lines are non-checkable headers (rendered via `SectionHeader`); plain lines are checkable items; a trailing `{tooltip text}` on an item line (or a `{...}` line of its own, which attaches to the previous item) becomes that item's hover tooltip. An item that picks up more than one tooltip source (same-line + a following own-line block, or two same-line groups) drops the tooltip entirely rather than guessing which wins.
 - Checking an item stamps `os.time()` and immediately autosaves (its own `workflow_v1` project ExtState key, independent of this tab's own Save/Load buttons); unchecking clears the timestamp. A **Show completion timestamp** checkbox (off by default, persisted) controls whether "Completed on dd.MM.yyyy at hh:mm" is displayed under a checked item — the timestamp is always recorded regardless of the checkbox; only its display is optional.
-- Checked state is keyed by **(section, item label)**, not label alone — the same item text can appear under multiple different `[section]` headers (e.g. "Guitar" under both "Instruments Expert" and "Difficulty reductions" in the starter template) without sharing state. Switching to a different template file only requires both the section and label text to match exactly for a checked item to carry over; anything else starts unchecked.
+- A **Show only unfinished** checkbox (off by default, persisted) hides checked items during render via a lazy-header-flush loop in `DrawGeneralWorkflowTab`: a header is buffered in `pending_header` and only actually drawn right before the next item that passes the "not (hide_done and checked)" test, so a section whose every item is hidden never gets flushed — no separate per-section pass needed. Reduces to the unfiltered render when the checkbox is off, since every item then passes the test.
+- A progress line (`ComputeWorkflowStats(entries, state)`, pure — no `r`/`ctx`/`S` dependency, takes the current file's `entries` and `S.workflow_state` directly) renders `"done / total completed - pct%"` below the checkboxes, always over the *whole* template regardless of the unfinished-only filter.
+- **Template switching prunes, not caps.** `SelectWorkflowFile(idx)` (the one place `S.workflow_file_idx`/`S.workflow_file_name` actually change) calls `PruneToWorkflowEntries(S.workflow_files[idx].entries)` — drops any `S.workflow_state` entry not matching that *one* file's items — then `SaveWorkflowState()` immediately. Replaced an earlier design that only pruned once total checked items exceeded a 100-item cap, compared against every loaded template rather than just the selected one; this is simpler and matches the actual use case (bouncing between a couple of templates doesn't need long-lived cross-template history).
+- Checked state is keyed by **(section, item label)**, not label alone — the same item text can appear under multiple different `[section]` headers (e.g. "Guitar" under both "Instruments Expert" and "Difficulty reductions" in the starter template) without sharing state.
 - Parse-time validation (shown as warnings above the checklist, non-blocking): duplicate `(section, label)` pairs within one file, and unbalanced `[`/`]` or `{`/`}` bracket counts in the file.
-- If saved checklist state across all templates would exceed `WORKFLOW_MAX_ITEMS` (100), the next save auto-purges entries whose `(section, label)` no longer appears in any currently-loaded `.txt` file before writing — no confirmation prompt, since this only prunes state that's already unreachable from any template.
 
 **Tempo Map tab** — generate a REAPER tempo map from drum audio analysis.
 1. Set the four source track dropdowns (KICK, SNARE, KIT, Fallback). Any can be left as "(none)".
@@ -185,8 +187,8 @@ Every Validate action (all four sub-tabs, H/M/E only — never Expert) also runs
 | `rock_band_general_helper_vkr/venue_sprites.lua` | `LoadVenueSprite`, `DrawVenueTooltipSprite`, `BeginVenueTooltip`, `EndVenueTooltip`, `VenueSpriteFoldersFound` (global); `DIRECTED_SPRITE_NAMES`, `VENUE_SPRITE_ROOT` (module-level globals). JPEG-only. Checks `resources/img/spritesheets/{category}/` (large) then `resources/img/spritesheets/{category} small/` (small) — no third-party fallback. Frame count is read from the filename (`{key}_f{N}_spritesheet.jpg`). Display size scales by `S.venue_preview_scale` (1 or 2). Cache stores `{image, frame_count, cols, rows}` per sprite. |
 | `rock_band_general_helper_vkr/venue_lighting.lua` | `MANUAL_LIGHTING_SET`, `LIGHTING_OFFSET_16THS`, `INST_KF_MODES`, `FindNextMeasureStartPpq`, `CollectInstNotePositions`, `GenerateKeyframesForSpan`, `GenerateLightingEvents`, `GenerateThemedSectionEvents` (global); `MANUAL_LIGHTING_POOL`, `AUTO_LIGHTING_POOL`, lighting constants, `SnapPpqToNearestBeat`, `ProcessThemeSection` (local) |
 | `rock_band_general_helper_vkr/venue_generator.lua` | `GenerateVenueEvents`, `DeleteTextEventsInRange` (predicate-driven deleter backing all clear functions), `ClearVenueTextEventsInRange`, `ClearVenueNonCameraEventsInRange`, `ClearVenueExceptLPInRange`, `ClearVenueKeyframesInRange` (global) |
-| `rock_band_general_helper_vkr/workflow.lua` | `WORKFLOW_MAX_ITEMS`, `ParseWorkflowContent`, `ParseWorkflowFile`, `LoadWorkflowFiles`, `EscapeWF`, `UnescapeWF` (global); `FindBraceGroups`, `StripBraceGroups` (local) — Workflow sub-tab's `.txt` template parser (pure over string content) + `resources/workflow/` folder scanner |
-| `rock_band_general_helper_vkr/actions_workflow.lua` | `CompositeKey`, `PurgeStaleWorkflowEntries`, `SaveWorkflowState`, `LoadWorkflowState`, `ToggleWorkflowItem` (global); `CountTable` (local) — Workflow checklist state, persistence (`workflow_v1` ExtState key), and the item-count-cap purge |
+| `rock_band_general_helper_vkr/workflow.lua` | `ParseWorkflowContent`, `ParseWorkflowFile`, `LoadWorkflowFiles`, `EscapeWF`, `UnescapeWF` (global); `FindBraceGroups`, `StripBraceGroups` (local) — Workflow sub-tab's `.txt` template parser (pure over string content) + `resources/workflow/` folder scanner |
+| `rock_band_general_helper_vkr/actions_workflow.lua` | `CompositeKey`, `PruneToWorkflowEntries`, `SaveWorkflowState`, `LoadWorkflowState`, `SelectWorkflowFile`, `ToggleWorkflowItem`, `ComputeWorkflowStats` (global) — Workflow checklist state, persistence (`workflow_v1` ExtState key), template-switch pruning, and the pure progress-count helper |
 | `rock_band_general_helper_vkr/tempomap.lua` | `ComputeTempoRMSContour`, `DetectOnsets`, `EstimateBPM`, `GuessTimeSig`, `GetSourcesForRange`, `FitBeatGrid`, `RmsToOnsetFlux`, `FindLocalPeak` |
 | `rock_band_general_helper_vkr/actions.lua` | `AlignAudioTracks`, `AlignAllAudio`, `AlignCountIn`, `CreateSongFadeOut`; `CountInBeatSlots` (local) |
 | `rock_band_general_helper_vkr/actions_tempomap.lua` | `ShowTempoContext`, `EstimateInitialBPM`, `AutoTuneThreshold`, `ClearGeneratedTempoMarkers`, `GenerateTempoMap`; `BPM_MIN`, `BPM_MAX` (locals) |
@@ -233,7 +235,6 @@ Every Validate action (all four sub-tabs, H/M/E only — never Expert) also runs
 - `actions_venue_sing_along.lua`: `RB3_VOCAL_MIN`, `RB3_VOCAL_MAX`, `RB3_PHRASE_PITCH` (module-level locals), `AvailableHarmTake`, `ReadPhrasesAndVocalNotes`, `MeasureDurationAtTime`, `BuildSpans`
 - `actions_venue_events.lua`: `_round_ppq`, `_is_crowd`, `_bare_form`, `_letter_form`, `_family_span`, `_spot_conflict`, `_require_take`, `_insert`, `_refuse`; `BOOKEND_EVENTS` (module-level local)
 - `workflow.lua`: `FindBraceGroups`, `StripBraceGroups`
-- `actions_workflow.lua`: `CountTable`
 - `ui_venue_events.lua`: `_draw_prc_row`, `_draw_plain_row`
 - `actions.lua`: `CountInBeatSlots`
 - `actions_tempomap.lua`: `BPM_MIN`, `BPM_MAX` (module-level locals)
@@ -296,10 +297,11 @@ venue_lighting.lua             → MANUAL_LIGHTING_SET, LIGHTING_OFFSET_16THS, I
 venue_generator.lua            → GenerateVenueEvents, DeleteTextEventsInRange, ClearVenueTextEventsInRange,
                                   ClearVenueNonCameraEventsInRange, ClearVenueExceptLPInRange,
                                   ClearVenueKeyframesInRange
-workflow.lua                   → WORKFLOW_MAX_ITEMS, ParseWorkflowContent, ParseWorkflowFile,
+workflow.lua                   → ParseWorkflowContent, ParseWorkflowFile,
                                   LoadWorkflowFiles, EscapeWF, UnescapeWF
-actions_workflow.lua           → CompositeKey, PurgeStaleWorkflowEntries, SaveWorkflowState,
-                                  LoadWorkflowState, ToggleWorkflowItem
+actions_workflow.lua           → CompositeKey, PruneToWorkflowEntries, SaveWorkflowState,
+                                  LoadWorkflowState, SelectWorkflowFile, ToggleWorkflowItem,
+                                  ComputeWorkflowStats
 tempomap.lua                   → ComputeTempoRMSContour, DetectOnsets, EstimateBPM,
                                   GuessTimeSig, GetSourcesForRange, FitBeatGrid,
                                   RmsToOnsetFlux, FindLocalPeak

@@ -11,8 +11,6 @@
 -- following own-line block, or two same-line groups) drops its tooltip
 -- entirely rather than guessing which source wins.
 
-WORKFLOW_MAX_ITEMS = 100
-
 -- ---------------------------------------------------------------------------
 -- Parsing
 -- ---------------------------------------------------------------------------

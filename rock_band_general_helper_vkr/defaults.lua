@@ -225,6 +225,7 @@ S = {
     workflow_file_name  = '',   -- persisted (scalar blob): selected template's stem filename
     workflow_state      = {},   -- persisted via workflow_v1; keyed by CompositeKey(section, label)
     workflow_show_ts    = false, -- persisted (scalar blob): show "Completed on ..." under checked items
+    workflow_hide_done  = false, -- persisted (scalar blob): hide checked items (and fully-checked sections)
 }
 
 ----------------------------------------------------------------------
@@ -893,8 +894,14 @@ TIPS = {
     workflow_file        = "Pick a workflow checklist template from resources/workflow/.\n\n" ..
                            "Add or edit .txt files there to tailor the checklist to your\n" ..
                            "own process - each file can use a different set of steps\n" ..
-                           "(e.g. a shorter list for instrumental songs).",
+                           "(e.g. a shorter list for instrumental songs).\n\n" ..
+                           "Switching templates drops checked history for any item not\n" ..
+                           "in the newly-selected template - it isn't kept around for\n" ..
+                           "when you switch back.",
     workflow_show_ts     = "Show the completion date/time under each checked item.\n\n" ..
                            "The timestamp is always recorded when you check an item -\n" ..
                            "this only controls whether it's displayed.",
+    workflow_hide_done   = "Hide checked items so you can focus on what's left.\n\n" ..
+                           "A section whose every item is checked is hidden entirely.\n" ..
+                           "Nothing is lost - unchecking this shows everything again.",
 }

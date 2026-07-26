@@ -3,10 +3,11 @@
 -- @about
 --   Tests for the Workflow checklist feature: template parsing (workflow.lua),
 --   including [section]/{tooltip} markup and duplicate/bracket-balance
---   validation, plus state persistence and the item-count-cap purge
---   (actions_workflow.lua). Run from the REAPER Actions list for a fully
---   isolated Lua context, or via the test_rock_band_helpers_vkr launcher.
---   Results appear in the REAPER console.
+--   validation, plus state persistence, template-switch pruning, and the
+--   progress-count helper (actions_workflow.lua). Run from the REAPER
+--   Actions list for a fully isolated Lua context, or via the
+--   test_rock_band_helpers_vkr launcher. Results appear in the REAPER
+--   console.
 --
 --   The persistence tests read/write this project's real "RBHelperVKR" /
 --   "workflow_v1" ExtState key - they snapshot the original value first and

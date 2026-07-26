@@ -9,6 +9,31 @@ over 5. See `CLAUDE.md` → "Changelog / `@about` trimming" for the rule.
 
 `rock_band_general_helper_vkr.lua`
 
+**v0.9.29**
+- Venue > Keyframe align: instrument-aware modes (Guitar/Bass/Keys
+  notes, Drum kicks/snare) gain a third Subdivision option, "Every
+  quarter beat" (16th-note grid, max 16 [next] per measure in 4/4),
+  alongside the existing "Every beat" and "Every half beat". Added
+  to all four places the Subdivision radio row appears (Section
+  gen, Manual gen, and the Keyframes sub-tab's own row, plus the
+  shared RenderKeyframeAlignCombo). New shared KeyframeSubdivQN in
+  venue_lighting.lua replaces the inlined half-beat ternary in
+  GenerateKeyframesForSpan/ProcessThemeSection and
+  GenerateManualKeyframes (actions_venue_manual.lua).
+- Fix: every keyframe insertion site (Keyframes sub-tab regenerate,
+  Manual gen, Section gen, and the full-song Generate) re-snapped
+  every [first]/[next] event to the nearest half-beat after
+  GenerateKeyframesForSpan/GenerateThemedSectionEvents had already
+  placed it - harmless while half-beat was the finest grid, but with
+  quarter-beat now available it silently collapsed 1/4 and 3/4-beat
+  positions onto the nearest half-beat or beat, producing duplicate/
+  merged events and gaps where a real note existed. Keyframe events
+  are now inserted at their already-computed position with no
+  further snapping; camera/lighting/postproc/bonusfx insertion is
+  unaffected. Also incidentally corrects "Section start" mode
+  (align 0), which was being pulled onto the half-beat grid instead
+  of landing exactly on the section marker as documented.
+
 **v0.9.28**
 - Difficulty > Keys: the "Reduce using Pro Keys (same tier)" reduction
   (v0.9.27) now also matches sustain length, not just which events

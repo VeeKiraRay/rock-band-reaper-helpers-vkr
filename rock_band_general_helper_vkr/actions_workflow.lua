@@ -1,6 +1,5 @@
--- Workflow checklist state: persistence, toggling, and stale-entry purging.
--- Requires: workflow.lua (WORKFLOW_MAX_ITEMS, LoadWorkflowFiles, EscapeWF,
---                         UnescapeWF), r, S (globals)
+-- Workflow checklist state: persistence, toggling, and template-switch pruning.
+-- Requires: workflow.lua (LoadWorkflowFiles, EscapeWF, UnescapeWF), r, S (globals)
 
 local PROJ_WORKFLOW_KEY = 'workflow_v1'
 
@@ -15,30 +14,20 @@ function CompositeKey(section, label)
     return (section or '') .. '\30' .. label
 end
 
-local function CountTable(t)
-    local n = 0
-    for _ in pairs(t) do n = n + 1 end
-    return n
-end
-
 -- ---------------------------------------------------------------------------
 -- Persistence
 -- ---------------------------------------------------------------------------
 
--- Drops any S.workflow_state entry whose (section,label) key doesn't appear
--- as a checkable item in any .txt file currently loaded in S.workflow_files.
--- Only runs when the files list has actually been loaded (i.e. the Workflow
--- tab has been opened this session) - otherwise there is no label universe
--- to compare against, so a save just past the cap this run leaves cleanup
--- for the next one.
-function PurgeStaleWorkflowEntries()
-    if not S.workflow_files then return end
+-- Drops any S.workflow_state entry whose (section,label) key isn't a
+-- checkable item in `entries` (one template file's parsed entries, not all
+-- loaded templates) - keeps persisted state scoped to whichever template is
+-- currently selected instead of accumulating history across every template
+-- ever picked.
+function PruneToWorkflowEntries(entries)
     local live = {}
-    for _, wf in ipairs(S.workflow_files) do
-        for _, e in ipairs(wf.entries) do
-            if e.kind == 'item' then
-                live[CompositeKey(e.section, e.label)] = true
-            end
+    for _, e in ipairs(entries) do
+        if e.kind == 'item' then
+            live[CompositeKey(e.section, e.label)] = true
         end
     end
     for key in pairs(S.workflow_state) do
@@ -47,9 +36,6 @@ function PurgeStaleWorkflowEntries()
 end
 
 function SaveWorkflowState()
-    if CountTable(S.workflow_state) > WORKFLOW_MAX_ITEMS then
-        PurgeStaleWorkflowEntries()
-    end
     local parts = {}
     for _, entry in pairs(S.workflow_state) do
         parts[#parts + 1] = EscapeWF(entry.section) .. '|' .. EscapeWF(entry.label) .. '|' ..
@@ -77,6 +63,23 @@ function LoadWorkflowState()
 end
 
 -- ---------------------------------------------------------------------------
+-- Template selection
+-- ---------------------------------------------------------------------------
+
+-- The one place a workflow template selection actually changes (combo pick,
+-- or the startup fallback to Default/first-alphabetical). Prunes checked
+-- state down to the newly-selected file's own items and saves immediately,
+-- so switching templates never leaves a stale mix of two templates' history
+-- sitting in the project.
+function SelectWorkflowFile(idx)
+    local wf = S.workflow_files[idx]
+    S.workflow_file_idx  = idx
+    S.workflow_file_name = wf.stem
+    PruneToWorkflowEntries(wf.entries)
+    SaveWorkflowState()
+end
+
+-- ---------------------------------------------------------------------------
 -- Toggling
 -- ---------------------------------------------------------------------------
 
@@ -91,4 +94,23 @@ function ToggleWorkflowItem(section, label, new_checked)
         ts      = new_checked and os.time() or nil,
     }
     SaveWorkflowState()
+end
+
+-- ---------------------------------------------------------------------------
+-- Progress
+-- ---------------------------------------------------------------------------
+
+-- Pure function over one template's entries + the checked-state table (no
+-- REAPER/UI dependency) so it can be unit tested directly. Returns
+-- (done, total) counting only checkable items - headers aren't counted.
+function ComputeWorkflowStats(entries, state)
+    local total, done = 0, 0
+    for _, e in ipairs(entries) do
+        if e.kind == 'item' then
+            total = total + 1
+            local st = state[CompositeKey(e.section, e.label)]
+            if st and st.checked then done = done + 1 end
+        end
+    end
+    return done, total
 end

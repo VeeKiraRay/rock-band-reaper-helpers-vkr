@@ -1,6 +1,6 @@
 -- Tests for workflow.lua (ParseWorkflowContent markup parsing, EscapeWF/UnescapeWF)
--- and actions_workflow.lua (SaveWorkflowState/LoadWorkflowState round-trip, the
--- WORKFLOW_MAX_ITEMS purge trigger).
+-- and actions_workflow.lua (SaveWorkflowState/LoadWorkflowState round-trip,
+-- SelectWorkflowFile's template-switch pruning, ComputeWorkflowStats).
 
 ----------------------------------------------------------------------
 Test.section('ParseWorkflowContent - headers, items, tooltips')
@@ -164,15 +164,11 @@ end)
 Test.section('SaveWorkflowState / LoadWorkflowState (project ExtState round-trip)')
 
 do
-    local _, _orig_ext   = r.GetProjExtState(0, 'RBHelperVKR', 'workflow_v1')
-    local _orig_S_state  = S.workflow_state
-    local _orig_S_files  = S.workflow_files
-
-    local function CountKeys(t)
-        local n = 0
-        for _ in pairs(t) do n = n + 1 end
-        return n
-    end
+    local _, _orig_ext        = r.GetProjExtState(0, 'RBHelperVKR', 'workflow_v1')
+    local _orig_S_state       = S.workflow_state
+    local _orig_S_files       = S.workflow_files
+    local _orig_S_file_idx    = S.workflow_file_idx
+    local _orig_S_file_name   = S.workflow_file_name
 
     Test.it('round-trips checked state and timestamp', function()
         S.workflow_state = {}
@@ -200,33 +196,64 @@ do
         Test.expect(loaded.ts == nil, 'timestamp cleared on uncheck')
     end)
 
-    Test.it('purges stale entries once past WORKFLOW_MAX_ITEMS', function()
+    Test.it("SelectWorkflowFile prunes state to the newly-selected file's entries", function()
         S.workflow_state = {}
         S.workflow_files = {
-            { stem = 'fixture', label = 'fixture', errors = {}, entries = {
-                { kind = 'item', section = 'Sec', label = 'Live Item' },
+            { stem = 'FileA', label = 'FileA', errors = {}, entries = {
+                { kind = 'item', section = 'Sec', label = 'A Item' },
+            } },
+            { stem = 'FileB', label = 'FileB', errors = {}, entries = {
+                { kind = 'item', section = 'Sec', label = 'B Item' },
             } },
         }
-        ToggleWorkflowItem('Sec', 'Live Item', true)
-        for i = 1, WORKFLOW_MAX_ITEMS do
-            local k = CompositeKey('Stale', 'Item ' .. i)
-            S.workflow_state[k] = { section = 'Stale', label = 'Item ' .. i, checked = true, ts = os.time() }
-        end
-        Test.expect(CountKeys(S.workflow_state) > WORKFLOW_MAX_ITEMS, 'seeded past the cap')
+        S.workflow_file_idx  = 0
+        S.workflow_file_name = ''
 
-        SaveWorkflowState()  -- should purge stale entries before writing
+        SelectWorkflowFile(1)
+        ToggleWorkflowItem('Sec', 'A Item', true)
+        Test.expect(S.workflow_state[CompositeKey('Sec', 'A Item')] ~= nil, 'A item recorded while FileA selected')
 
-        Test.expect(S.workflow_state[CompositeKey('Sec', 'Live Item')] ~= nil, 'live entry kept in memory')
-        Test.expect(S.workflow_state[CompositeKey('Stale', 'Item 1')] == nil, 'stale entry purged in memory')
+        SelectWorkflowFile(2)
+        Test.expect(S.workflow_file_idx == 2, 'selected index updated')
+        Test.expect(S.workflow_file_name == 'FileB', 'selected name updated')
+        Test.expect(S.workflow_state[CompositeKey('Sec', 'A Item')] == nil,
+            "FileA's entry pruned on switching to FileB")
 
         LoadWorkflowState()
-        Test.expect(S.workflow_state[CompositeKey('Sec', 'Live Item')] ~= nil, 'live entry survives reload')
-        Test.expect(S.workflow_state[CompositeKey('Stale', 'Item 1')] == nil, 'stale entry stays purged after reload')
+        Test.expect(S.workflow_state[CompositeKey('Sec', 'A Item')] == nil,
+            'pruned entry stays gone after reload - SelectWorkflowFile saved immediately')
     end)
 
     -- Always restore the real project's original workflow_v1 value and S
     -- state, regardless of pass/fail above.
     r.SetProjExtState(0, 'RBHelperVKR', 'workflow_v1', _orig_ext or '')
-    S.workflow_state = _orig_S_state
-    S.workflow_files = _orig_S_files
+    S.workflow_state      = _orig_S_state
+    S.workflow_files      = _orig_S_files
+    S.workflow_file_idx   = _orig_S_file_idx
+    S.workflow_file_name  = _orig_S_file_name
 end
+
+----------------------------------------------------------------------
+Test.section('ComputeWorkflowStats')
+----------------------------------------------------------------------
+
+Test.it('counts checked items against total, ignoring headers', function()
+    local entries = {
+        { kind = 'header', label = 'Sec' },
+        { kind = 'item', section = 'Sec', label = 'One' },
+        { kind = 'item', section = 'Sec', label = 'Two' },
+        { kind = 'item', section = 'Sec', label = 'Three' },
+    }
+    local state = {
+        [CompositeKey('Sec', 'One')] = { checked = true },
+        [CompositeKey('Sec', 'Two')] = { checked = false },
+    }
+    local done, total = ComputeWorkflowStats(entries, state)
+    Test.expect(done == 1, 'one checked item counted')
+    Test.expect(total == 3, 'three checkable items counted, header excluded')
+end)
+
+Test.it('returns 0/0 for a file with no checkable items', function()
+    local done, total = ComputeWorkflowStats({ { kind = 'header', label = 'Empty' } }, {})
+    Test.expect(done == 0 and total == 0, 'no items means 0/0')
+end)

@@ -63,6 +63,7 @@ local function SerializeSettings()
         -- Workflow checklist
         'wffn=' .. S.workflow_file_name,
         'wfsts=' .. (S.workflow_show_ts and '1' or '0'),
+        'wfhd=' .. (S.workflow_hide_done and '1' or '0'),
     }, ';')
 end
 
@@ -124,6 +125,7 @@ local function DeserializeSettings(str)
         -- Workflow checklist
         elseif k == 'wffn'   then S.workflow_file_name      = v
         elseif k == 'wfsts'  then S.workflow_show_ts        = (v == '1')
+        elseif k == 'wfhd'   then S.workflow_hide_done      = (v == '1')
         end
     end
 end
