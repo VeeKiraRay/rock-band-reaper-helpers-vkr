@@ -6,19 +6,16 @@
 
 Designed for authoring Rock Band-style vocal charts — it defaults to the RB3 vocal pitch range (C1–C5) and the standard phrase-marker convention (pitch 105) — but the timing detection and lyric assignment work for any rhythm/karaoke MIDI workflow.
 
-<!-- TODO: replace with a 10–15 s GIF showing dry run → generate → assign lyrics -->
-
-![Demo](../assets/demo.gif)
 
 ---
 
 ## Quick start
 
-1. Open a REAPER project containing a vocal stem on one track and a destination track with a MIDI item on it.
+1. Open a REAPER project with a vocal stem on one track and a destination track with a MIDI item on it.
 2. Run the script. The window opens and attempts to auto-select the right tracks (it looks for tracks named `VOCALS AUDIO` / `DRYVOX1` for audio and `PART VOCALS` for MIDI destination).
-3. Confirm the track selections in the dropdowns if needed.
-4. Click **Dry run** to see how many notes would be detected with the current settings.
-5. Click **Generate (append)** to write the notes into your MIDI item.
+3. Open the **Tuner** tab and press play — it reads back the detected pitch live as you play, no notes required.
+4. Once you have notes on the destination track (placed by hand, or via the experimental Note Placement tab), use **Pitch**, **Lyrics**, **Pitch slide**, **Harmonies**, and **Validation** to refine them.
+5. Automatic note detection/generation (Dry run / Generate) is currently experimental — enable it via General → Settings → **Show WIPs?** (see [README_WIP.md](README_WIP.md)).
 
 ---
 
@@ -29,17 +26,24 @@ Designed for authoring Rock Band-style vocal charts — it defaults to the RB3 v
 The script window has a persistent track-selector row at the top and a status/result panel at the bottom. Everything in between is organised into tabs:
 
 | Area                   | Description                                                                                         |
-| ---------------------- | --------------------------------------------------------------------------------------------------- |
+| ---------------------- | ----------------------------------------------------------------------------------------------------- |
 | Track selectors        | Above the tab bar — Audio source, MIDI destination; always visible                                  |
-| **General** tab        | Save / Load project settings; Refresh tracks                                                        |
+| **General** tab        | Save / Load project settings; Refresh tracks; Show WIPs toggle                                      |
 | **Tuner** tab          | Live pitch detector — reads audio at the playhead and shows the current note, Hz, and history       |
-| **Note Placement** tab | Detection sliders, Default pitch, velocity, Dry run / Generate buttons                              |
 | **Pitch** tab          | Pitch source for Apply pitch changes: Built-in detection (YIN) or Reference MIDI; Snap to Key Scale |
 | **Lyrics** tab         | Select a lyrics file, assign or clear lyric events                                                  |
 | **Pitch slide** tab    | Scan existing notes for pitch slides (glides, scoops, bends)                                        |
 | **Harmonies** tab      | Copy lead vocal notes to up to three harmony tracks with pitch interval options                     |
 | **Validation** tab     | Validate phrase markers; check phrase similarity to catch copy errors                               |
 | Status / Undo          | Below the tab bar — result of the last action, and the Undo button                                  |
+
+<a id="wip-tabs"></a>
+
+| WIP tab (hidden by default) | Purpose                                                                 |
+| ----------------------------- | ------------------------------------------------------------------------ |
+| **Note Placement**            | Detect syllable/phrase timing from the audio and generate/snap MIDI notes |
+
+Enable it via **Show WIPs? = Yes** on the General tab's Settings sub-tab; it appears after Validation in the tab bar. It works at a basic level but has known issues and isn't ready for general use — see **[README_WIP.md](README_WIP.md)** for its full documentation.
 
 ---
 
@@ -64,11 +68,25 @@ Without a time selection, the full audio item is analysed.
 
 ## General tab
 
+Contains two sub-tabs: **Actions** and **Settings**.
+
+### Actions sub-tab
+
+![Actions sub-tab](../assets/v_general_actions.jpg)
+
+**Refresh tracks** re-scans the project's track list to pick up any tracks added or renamed after the script opened.
+
+### Settings sub-tab
+
+![Settings sub-tab](../assets/v_general_settings.jpg)
+
+**Show WIPs?** — toggles whether the Note Placement tab appears (see [WIP tabs](#wip-tabs)). Default No.
+
 Settings are saved per-project using REAPER's project state. Click **Save** to store the current Detection and Pitch settings. Click **Load** to restore them.
 
 Settings are loaded automatically when the script opens (if a save exists for the current project) and when you switch REAPER project tabs.
 
-**What is saved:** all Detection sliders, Pitch source selection and all pitch settings (including YIN parameters), Velocity, Slide Scan settings, Harmonies destination enabled/mode/lyric-suffix options, Harmonies key selection, Copy phrase markers, Snap to Key Scale settings (key, scale, avoid-collision), and Phrase Similarity threshold and mode.
+**What is saved:** all Detection sliders, Pitch source selection and all pitch settings (including YIN parameters), Velocity, Slide Scan settings, Harmonies destination enabled/mode/lyric-suffix options, Harmonies key selection, Copy phrase markers, Snap to Key Scale settings (key, scale, avoid-collision), Phrase Similarity threshold and mode, and the Show WIPs toggle.
 
 **What is not saved:** track selections. If your project follows the naming convention (`VOCALS AUDIO`, `PART VOCALS`, `HARM1–3`) the script will re-select the right tracks automatically. The Harmonies key-detection results are session-only and reset on each open.
 
@@ -76,7 +94,7 @@ Settings are loaded automatically when the script opens (if a save exists for th
 
 ## Tuner tab
 
-![Tuner tab](../assets/tuner.jpg)
+![Tuner tab](../assets/v_tuner.jpg)
 
 The **Tuner** tab is a live pitch detector. While active it reads audio from the selected source track at the current playhead position every 100 ms and displays the detected note.
 
@@ -125,7 +143,7 @@ The five voice-range presets (Low male through High female) also enable the Min/
 These are the same settings used by the Pitch tab's Built-in detection mode. Adjusting them here changes the behaviour of both the tuner and Apply pitch changes.
 
 | Slider                 | Range       | Default | Notes                                                                                                                                                                                       |
-| ---------------------- | ----------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ---------------------- | ----------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **YIN threshold**      | 0.01 – 0.5  | 0.15    | Confidence gate. Lower = stricter (more `—` on ambiguous audio). Higher = more detections but more risk of wrong results on noise.                                                          |
 | **Min frequency (Hz)** | 40 – 400    | 80 Hz   | Set just below the lowest note in the vocal. Narrows the search range and reduces octave errors.                                                                                            |
 | **Max frequency (Hz)** | 200 – 2000  | 1000 Hz | Set just above the highest note.                                                                                                                                                            |
@@ -138,64 +156,9 @@ The same Min pitch / Max pitch checkbox+slider pairs from the Pitch tab. When en
 
 ---
 
-## Note Placement tab
-
-### Detection settings
-
-![Note Placement tab](../assets/note_placement.jpg)
-
-The Detection sliders control the audio energy analysis. Start with defaults and adjust based on what Dry run reports.
-
-| Slider                      | Range                 | Default | What to adjust                                                                                                         |
-| --------------------------- | --------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------- |
-| **RMS threshold**           | 0.001 – 0.5           | 0.05    | Lower if quiet phrases are missed; raise if noise/breath triggers too many notes.                                      |
-| **Low-pass cutoff**         | 0 – 8000 Hz (0 = off) | Off     | Set to ~1500–2500 Hz to make sibilants (S, F, SH) invisible to the detector, so note starts snap to the vowel.         |
-| **Peak-split ratio**        | 0 – 95% (0 = off)     | Off     | When phrases contain multiple syllables without dropping to silence, this splits them. Start around 40–60% and adjust. |
-| **Min offset to next note** | 0 – 500 ms            | 100 ms  | Enforces a minimum gap between notes by trimming end times. Prevents notes from running into each other.               |
-| **Min note length**         | 10 – 500 ms           | 60 ms   | Discards very short detections (breath noise, consonants). Raise to filter out more.                                   |
-| **RMS window**              | 5 – 100 ms            | 25 ms   | Time resolution of the analysis. Smaller = more precise timing but slower. Rarely needs changing.                      |
-
-> **Tip:** All sliders support Ctrl+click to type an exact value.
-
-### MIDI output
-
-- **Velocity** — MIDI velocity assigned to every generated note (1–127).
-- **Default pitch** — the fixed pitch used by Generate and Dry run for every note. Also serves as the fallback when Reference MIDI or Built-in detection cannot assign a pitch to a note. Displayed using Rock Band octave numbering (C1 = MIDI 36, C5 = MIDI 84).
-
-### Generating notes
-
-- **Dry run** — runs the full detection pipeline but does not write anything to REAPER. Reports how many notes were found and other stats.
-- **Generate (append)** — writes notes into the destination MIDI item. Before inserting, it clears existing notes at the pitches it will produce (plus the Default pitch) within the analysis range, so re-running is safe and does not stack duplicates.
-- **Generate (replace)** — clears _all_ notes in the vocal pitch range (C1–C5) within the analysis range first, then inserts the new notes. Notes at other pitches (phrase markers at pitch 105, etc.) are preserved. Use this when you want a completely fresh result with no leftover notes from previous runs.
-
-The result panel below the tab bar shows counts for the last action.
-
----
-
-## Auto-tune from reference
-
-Auto-tune automates the process of finding Detection slider values that reproduce a set of manually-placed timing reference notes.
-
-**How to use it:**
-
-1. Manually place a handful of MIDI notes on the destination track at the Default pitch. These represent the "correct" timing you want the detector to match.
-2. Make a time selection covering those reference notes.
-3. Click **Auto-tune from reference**.
-
-The script runs a coordinate descent search over five detection parameters (**RMS threshold**, **Low-pass cutoff**, **Peak-split ratio**, **Min offset**, **Min note length**) and leaves the rest alone. When it finishes, the sliders update to the best-found values and the result panel shows accuracy statistics.
-
-**What auto-tune changes:** the five detection sliders listed above.
-**What it leaves alone:** RMS window (a resolution choice, not a fit-to-reference parameter), all pitch settings, velocity, and your reference notes themselves.
-
-> **Note:** Auto-tune can take several seconds for longer sections. The UI will be unresponsive during the search — this is expected (see [Known limitations](#known-limitations)).
-
----
-
 ## Pitch tab
 
 The Pitch tab controls how **Apply pitch changes** re-pitches existing notes on the destination track. **Generate and Dry run always use the Default pitch** (set on the Note Placement tab) and are not affected by anything on this tab.
-
-![Pitch tab](../assets/pitch.jpg)
 
 ### Placement sub-tabs
 
@@ -203,12 +166,14 @@ Pitch source is chosen by which sub-tab is open when you click Apply pitch chang
 
 #### Placement - Built-in
 
+![Placement - Reference sub-tab](../assets/v_pitch_placement_build_in.jpg)
+
 The script analyses the audio directly using the [YIN algorithm](http://audition.ens.fr/adc/pdf/2002_JASA_YIN.pdf) to estimate the fundamental frequency of each note. No external MIDI reference needed. This is the default.
 
 A **Vocal style preset** combo (see [Tuner tab](#vocal-style-preset)) sits above the sliders here too, sharing the same settings.
 
 | Slider            | Range         | Default | Notes                                                                                                                   |
-| ----------------- | ------------- | ------- | ----------------------------------------------------------------------------------------------------------------------- |
+| ----------------- | ------------- | ------- | ------------------------------------------------------------------------------------------------------------------------- |
 | **YIN threshold** | 0.01 – 0.5    | 0.15    | Confidence cutoff. Lower = stricter (more fallbacks to Default pitch). Higher = more detections but more octave errors. |
 | **Min frequency** | 40 – 400 Hz   | 80 Hz   | Set to just below the lowest note in the vocal.                                                                         |
 | **Max frequency** | 200 – 2000 Hz | 1000 Hz | Set to just above the highest note.                                                                                     |
@@ -219,6 +184,8 @@ The algorithm samples audio starting at 30% into each note (to avoid the attack 
 > **Tip:** If YIN produces consistent pitch errors across a section, use **Auto-tune YIN from reference** to automatically search for better settings.
 
 #### Placement - Reference
+
+![Placement - Reference sub-tab](../assets/v_pitch_placement_reference.jpg)
 
 Pitch is taken from an existing MIDI track. For each note, the script finds the nearest MIDI note on the reference track (within the **Search tolerance** window) and uses that pitch. Falls back to Default pitch when nothing is within range.
 
@@ -268,6 +235,9 @@ The button is always active. Both pitch sources are meaningful for re-pitching e
 
 ### Snap sub-tab: Snap to Key Scale
 
+<!-- TODO: screenshot of the Snap to Key Scale sub-tab -->
+![Snap to Key Scale sub-tab](../assets/v_pitch_placement_snap.jpg)
+
 **Snap to Key Scale** shifts every vocal note in scope to the nearest pitch in a chosen key, moving each note by the fewest semitones needed to land on a scale degree. On a tie (a note equidistant between two scale degrees), the lower pitch wins.
 
 Set the **Key** (root note) and **Scale** (Major or Minor) to match the song — look these up on Tunebat or a chord chart and verify by ear.
@@ -282,7 +252,7 @@ Phrase markers (pitch 105) are never moved or deleted. Per-note velocity and lyr
 
 ## Lyrics tab
 
-![Lyrics section](../assets/lyrics.jpg)
+![Lyrics section](../assets/v_lyrics.jpg)
 
 The Lyrics tab assigns words from a plain-text file to the MIDI notes on the destination track as lyric text events (the same format REAPER's native lyric tools use).
 
@@ -310,11 +280,11 @@ The selected filename is shown above the buttons. The path is remembered for the
 All four buttons sit on one row:
 
 | Button            | What it does                                                                     |
-| ----------------- | -------------------------------------------------------------------------------- |
+| ----------------- | ---------------------------------------------------------------------------------- |
 | **Auto-detect**   | Find `lyrics.txt` in the project folder                                          |
 | **Browse...**     | Pick any `.txt` file                                                             |
 | **Clear lyrics**  | Remove all lyric events from the whole MIDI take (preserves special game events) |
-| **Assign lyrics** | Clear first, then assign one word per note in start-time order                   |
+| **Assign lyrics** | Clear first, then assign one word per note in start-time order                  |
 
 **Assign lyrics** always operates on the whole take regardless of any time selection. Words are read from the start of the file and assigned in order to every note in the RB3 vocal range (C1–C5). Time selection is intentionally ignored — scoping to a selection would assign the first words in the file to whichever notes are in the selection, shifting every subsequent word onto the wrong note.
 
@@ -342,7 +312,7 @@ After **Assign lyrics** the result panel shows:
 
 ## Pitch slide tab
 
-![Lyrics section](../assets/pitch_slides.jpg)
+![Pitch slide section](../assets/v_pitch_slide.jpg)
 
 The **Pitch slide** tab scans existing MIDI notes on the destination track and reports any where the detected pitch moves significantly during the note — slides, scoops, bends, and other pitch curves that a Rock Band vocal chart may need to represent explicitly.
 
@@ -361,7 +331,7 @@ The result panel lists every note where a slide was detected, with its position,
 ### Slide Scan settings
 
 | Slider              | Range       | Default | What it does                                                                                       |
-| ------------------- | ----------- | ------- | -------------------------------------------------------------------------------------------------- |
+| ------------------- | ----------- | ------- | ----------------------------------------------------------------------------------------------------- |
 | **Min note length** | 20 – 300 ms | 80 ms   | Notes shorter than this are skipped entirely.                                                      |
 | **Min segment**     | 5 – 100 ms  | 20 ms   | A detected pitch run shorter than this is discarded. Increase to suppress false positives.         |
 | **Edge skip**       | 0 – 50 ms   | 20 ms   | Skip the start and end of each note before sampling. Hides consonant artifacts at note boundaries. |
@@ -374,7 +344,7 @@ The scan also uses the **YIN threshold**, **Min frequency**, and **Max frequency
 
 ## Harmonies tab
 
-![Harmonies section](../assets/harmonies.jpg)
+![Harmonies section](../assets/v_harmonies.jpg)
 
 The **Harmonies** tab copies lead vocal notes from a source MIDI track to up to three destination tracks, transposing each by a chosen pitch interval. Lyrics from the source are copied at the same time. Use this to build Rock Band-style harmony parts (HARM1, HARM2, HARM3) from a completed lead vocal (PART VOCALS) without manual copy-and-paste.
 
@@ -383,11 +353,11 @@ The **Harmonies** tab copies lead vocal notes from a source MIDI track to up to 
 The script auto-selects tracks by name on startup and on project switch:
 
 | Role          | Auto-selected track name                                     |
-| ------------- | ------------------------------------------------------------ |
+| ------------- | -------------------------------------------------------------- |
 | Source        | `PART VOCALS` (first MIDI item found); falls back to `HARM1` |
-| Destination 1 | `HARM1`                                                      |
-| Destination 2 | `HARM2`                                                      |
-| Destination 3 | `HARM3`                                                      |
+| Destination 1 | `HARM1`                                                        |
+| Destination 2 | `HARM2`                                                        |
+| Destination 3 | `HARM3`                                                        |
 
 All four dropdowns can be changed manually. Destination tracks do not need to contain a MIDI item — the script will report an error if one is missing when you click Apply.
 
@@ -411,7 +381,7 @@ If a source lyric already ends with `#` or `$`, the suffix is not duplicated. Wh
 ### Interval modes
 
 | Mode                  | Semitone offset | Notes                                                                                  |
-| --------------------- | --------------- | -------------------------------------------------------------------------------------- |
+| ---------------------- | --------------- | ------------------------------------------------------------------------------------ |
 | Copy as-is            | 0               | Exact copy at the same pitch.                                                          |
 | Fixed minor 3rd above | +3              | Same offset applied to every note.                                                     |
 | Fixed major 3rd above | +4              | Same offset applied to every note.                                                     |
@@ -483,7 +453,7 @@ Operates on the whole take regardless of time selection. Read-only — does not 
 Compares all phrases by their melodic content and groups those that are similar enough to be the same melody. Use this to catch copy errors in repeated sections — for example, a verse used twice where one note was accidentally changed in the second occurrence, or an intentional variation you want to compare against the other occurrences.
 
 | Setting                  | Description                                                                                                                                                                                                                                                     |
-| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Similarity threshold** | Minimum similarity (50–100%) for two phrases to be grouped. 80% is a reasonable starting point. Lower it to catch more distant matches; raise it to focus on near-identical copies.                                                                             |
 | **Same key only**        | When on (default), compares actual note pitches — phrases must be note-for-note the same to score high. When off, compares melodic contour (the shape of rises and falls) regardless of transposition, so the same melody in a different key still scores high. |
 
@@ -516,39 +486,17 @@ The **Undo** button sits in the status bar at the bottom of the window, always v
 
 ## Tips
 
-- **Use Generate (append) for iteration, Generate (replace) for a clean slate.** Append mode re-runs safely without stacking duplicates (clears only the pitches it's about to write). Replace mode wipes all vocal-range notes in the range — useful when detection settings have changed significantly and you want a completely fresh result.
-- **Use a time selection to work section by section.** Chorus and verse may need different threshold settings. Generate into the same MIDI item repeatedly; each run only touches its own range.
-- **Low-pass cutoff makes a big difference** for sibilant-heavy vocals. If note starts consistently land on the consonant instead of the vowel, enable the low-pass filter around 1500–2000 Hz.
-- **Reference MIDI mode + Basic Pitch** is a good combination: Basic Pitch provides reasonable pitch estimates that you can refine with the pitch range constraints, while the script provides tighter timing than Basic Pitch alone.
-- **Auto-tune works best with 10–30 representative reference notes** covering the range of dynamics in the section.
+- **Use a time selection to work section by section.** Chorus and verse may need different pitch or scan settings — most actions on Pitch, Pitch slide, and Harmonies scope to the active selection.
 - **Finish timing and pitch before assigning lyrics.** Assign lyrics runs on notes as they are at the moment you click — if you later split, merge, or reorder notes, re-run Assign lyrics to realign the words. The whole-take clear-and-reassign approach keeps this safe and idempotent.
 - **Name your lyrics file `lyrics.txt` and save it in the project folder.** Auto-detect will find it every time you open the script or switch project tabs, saving you the Browse step entirely.
+
+More tips specific to note detection/generation (Note Placement) are in [README_WIP.md](README_WIP.md#tips).
 
 ---
 
 ## Troubleshooting
 
 If something is going wrong, find the symptom below and try the suggested fixes.
-
-### Detection
-
-**Note starts land on consonants instead of vowels.**
-Enable the **Low-pass cutoff** at around 1500–2000 Hz. Sibilants (S, F, SH) carry significant energy at high frequencies, which can trigger detection slightly before the vowel begins. Filtering them out makes the detector "see" the vowel onset.
-
-**Quiet phrases are being missed entirely.**
-Lower the **RMS threshold** (try 0.02 or 0.01). If only specific phrases are quiet relative to the rest of the section, work that section separately with a time selection.
-
-**Too many false notes — breath noise, consonants, room tone trigger detections.**
-Raise the **RMS threshold**, raise **Min note length** to 80–120 ms, or both. Breath noise is usually short and low-energy; either of these filters should remove most of it.
-
-**Fast syllables are being merged into one long note.**
-Enable **Peak-split ratio**. Start at 40–50% and adjust. The split happens wherever the contour drops below `peak × ratio` within a phrase.
-
-**Notes are running into each other with no gap between them.**
-Raise **Min offset to next note**. The default of 100 ms is conservative; values up to 200–250 ms work well for slower vocals.
-
-**Auto-tune produces strange results, or results aren't noticeably better than defaults.**
-Auto-tune is a heuristic search — it finds the best combination from a set of candidate values, but there is no guarantee that combination will be perfect for every vocal. Even with accurate reference notes, the underlying audio (stem separation quality, room noise, breathy or sibilant vocals) constrains how well any parameter set can perform. Treat the result as a starting point: accept the values, then nudge the sliders manually from there. If the result is consistently poor, check that the reference notes cover the dynamic range of the section and that 10–30 reference notes are used rather than just a few.
 
 ### Pitch
 
@@ -573,10 +521,12 @@ The auto-detect looks for a file literally named `lyrics.txt` in the project fol
 The lyrics file has fewer syllables than there are notes in scope. Common causes: a multi-syllable word that should be split with hyphens (`won-` `der-` `ful` instead of `wonderful`), or an extra note that shouldn't be there.
 
 **Count mismatch warning: more lyrics than notes.**
-The opposite — usually a missed detection (try a lower RMS threshold) or two syllables incorrectly merged into one note (try peak-split).
+The opposite — usually a missed detection (try a lower RMS threshold on the Note Placement tab) or two syllables incorrectly merged into one note (try peak-split).
 
 **Phrase capitalization check reports violations.**
 A phrase marker note (pitch 105) is followed by a lyric that starts with a lowercase letter. Either capitalize the lyric in your file or move the phrase marker — the result panel gives you the measure number and timestamp so you can navigate directly.
+
+Detection-specific troubleshooting (consonants vs. vowels, missed/false notes, auto-tune) is in [README_WIP.md](README_WIP.md#troubleshooting).
 
 ---
 
@@ -597,18 +547,16 @@ A phrase marker note (pitch 105) is followed by a lyric that starts with a lower
 
 These are intentional trade-offs or REAPER API constraints, not bugs. Documented here so you know what to expect.
 
-1. **Auto-tune freezes the UI during the parameter search.** Single-threaded Lua, and REAPER's audio accessor APIs (`GetAudioAccessorSamples`, `new_array`) do not work reliably from a Lua coroutine — they return nil. A coroutine-based progress bar was attempted and reverted for this reason. Typical 20–40 second sections finish in a few seconds; full songs can take noticeably longer.
+1. **Apply pitch changes matches by note-start time only.** If you have manually shifted notes around significantly, a moved note will pull the pitch of whatever reference note is closest in time, which may not be the one you intended. Re-run timing detection if matching breaks down.
 
-2. **Apply pitch changes matches by note-start time only.** If you have manually shifted notes around significantly, a moved note will pull the pitch of whatever reference note is closest in time, which may not be the one you intended. Re-run timing detection if matching breaks down.
+2. **Single audio item per audio track.** Without a time selection, only the first item on the audio track is analyzed. With a time selection, the script picks the item that overlaps. If your stem is split across multiple items, glue them first. Applies to Note Placement's detection, the Tuner, and Harmonies' Detect from audio.
 
-3. **Peak-split uses the global per-phrase peak.** A phrase with one loud syllable (RMS 0.8) and one quiet one (RMS 0.3) at split ratio 50% will lose the quiet syllable, because the cut threshold (0.4) is above it. In practice vocals usually stay within ~2× dynamic range within a phrase, but uneven sections may need a lower split ratio or a manual fix.
+3. **Reference MIDI alignment is the user's responsibility.** There is no automatic cross-correlation between detected onsets and reference onsets. If Basic Pitch's output is consistently early or late, nudge the MIDI item in REAPER or widen the Search tolerance.
 
-4. **Single audio item per audio track.** Without a time selection, only the first item on the audio track is analyzed. With a time selection, the script picks the item that overlaps. If your stem is split across multiple items, glue them first.
+4. **Track selections are not persisted across sessions.** Track indices are positional and would be brittle to save. Smart defaults (matching `VOCALS AUDIO` / `PART VOCALS` track names) cover the common case; otherwise re-pick on each open.
 
-5. **Reference MIDI alignment is the user's responsibility.** There is no automatic cross-correlation between detected onsets and reference onsets. If Basic Pitch's output is consistently early or late, nudge the MIDI item in REAPER or widen the Search tolerance.
+5. **Harmony mode indices are positional.** The interval mode for each destination is saved as an index into the mode list. If the list order changes between script versions, saved modes may map to different intervals. Check destination mode settings after a script update.
 
-6. **Track selections are not persisted across sessions.** Track indices are positional and would be brittle to save. Smart defaults (matching `VOCALS AUDIO` / `PART VOCALS` track names) cover the common case; otherwise re-pick on each open.
+6. **YIN samples a fixed window at 30% into the note.** Works well for sustained vowels but may land on a consonant for very fast syllables. The 30% offset is a heuristic that avoids the attack transient while staying inside the note.
 
-7. **Harmony mode indices are positional.** The interval mode for each destination is saved as an index into the mode list. If the list order changes between script versions, saved modes may map to different intervals. Check destination mode settings after a script update.
-
-8. **YIN samples a fixed window at 30% into the note.** Works well for sustained vowels but may land on a consonant for very fast syllables. The 30% offset is a heuristic that avoids the attack transient while staying inside the note.
+For limitations specific to note detection/generation (Note Placement), see [README_WIP.md](README_WIP.md#known-limitations).
