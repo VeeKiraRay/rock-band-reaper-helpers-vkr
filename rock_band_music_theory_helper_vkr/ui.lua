@@ -170,6 +170,117 @@ local function DrawDrumsTab()
     end
 end
 
+local GUITAR_SEARCH_INPUT_W = 320  -- wider than WIDTH_STD (200): fret lines like
+                                    -- "x 10 12 12 10 x" run long; one-off, context-specific.
+
+local function DrawGuitarTab()
+    SectionHeader('Shape Search')
+    r.ImGui_Spacing(ctx)
+    r.ImGui_TextWrapped(ctx, 'Paste a fret shape (space-separated) to classify it and see its suggested RB mapping.')
+    r.ImGui_SetNextItemWidth(ctx, GUITAR_SEARCH_INPUT_W)
+    local changed, val = r.ImGui_InputText(ctx, '##guitar_search', S.guitar_search_input)
+    if changed then S.guitar_search_input = val end
+    Tooltip(TIPS.guitar_search)
+
+    r.ImGui_Spacing(ctx)
+    if S.guitar_search_input and S.guitar_search_input:match('%S') then
+        local results, err = GuitarAnalyzeShapeAllTunings(S.guitar_search_input)
+        if not results then
+            r.ImGui_TextWrapped(ctx, 'No notes recognized (' .. err .. ').')
+        else
+            local show_tuning_labels = #results > 1
+            for _, entry in ipairs(results) do
+                local result = entry.analysis
+                local combo_text
+                if result.combo then
+                    combo_text = result.combo
+                elseif result.ambiguous_options then
+                    combo_text = 'any of ' .. table.concat(result.ambiguous_options, '/')
+                else
+                    combo_text = '?'
+                end
+                local line = result.type_name
+                if result.detail then line = line .. '  (' .. result.detail .. ')' end
+                line = line .. '  ->  ' .. (result.width or 'no RB mapping suggestion') .. '  (' .. combo_text .. ')'
+                if show_tuning_labels then line = entry.tuning_name .. ': ' .. line end
+                r.ImGui_TextWrapped(ctx, line)
+            end
+        end
+    else
+        r.ImGui_TextDisabled(ctx, '(no input)')
+    end
+
+    r.ImGui_Spacing(ctx)
+    r.ImGui_Spacing(ctx)
+
+    SectionHeader('Chord Type Explorer')
+    r.ImGui_Spacing(ctx)
+    r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
+    local selected_type = GUITAR_CHORD_TYPES[S.guitar_chord_type_idx]
+    if r.ImGui_BeginCombo(ctx, '##guitar_chord_type', selected_type.name) then
+        for i, t in ipairs(GUITAR_CHORD_TYPES) do
+            local is_sel = (i == S.guitar_chord_type_idx)
+            if r.ImGui_Selectable(ctx, t.name, is_sel) then
+                S.guitar_chord_type_idx = i
+            end
+            if is_sel then r.ImGui_SetItemDefaultFocus(ctx) end
+        end
+        r.ImGui_EndCombo(ctx)
+    end
+    selected_type = GUITAR_CHORD_TYPES[S.guitar_chord_type_idx]
+
+    r.ImGui_Spacing(ctx)
+    r.ImGui_TextWrapped(ctx, selected_type.description)
+    r.ImGui_Spacing(ctx)
+
+    if r.ImGui_BeginTable(ctx, '##guitar_chords', 4, TABLE_FLAGS) then
+        r.ImGui_TableSetupColumn(ctx, 'Shape')
+        r.ImGui_TableSetupColumn(ctx, 'Name')
+        r.ImGui_TableSetupColumn(ctx, 'Sound')
+        r.ImGui_TableSetupColumn(ctx, 'RB Mapping')
+        r.ImGui_TableHeadersRow(ctx)
+        for _, row in ipairs(GUITAR_CHORDS) do
+            if row.type == selected_type.name then
+                r.ImGui_TableNextRow(ctx)
+                r.ImGui_TableSetColumnIndex(ctx, 0)
+                -- row.name is not unique across rows (a few shapes share a Name,
+                -- e.g. two "Power chord" rows both named G5), so the Selectable
+                -- label uses shape+name together to keep widget IDs distinct.
+                r.ImGui_Selectable(ctx, row.shape .. '##' .. row.name, false, r.ImGui_SelectableFlags_SpanAllColumns())
+                r.ImGui_TableSetColumnIndex(ctx, 1)
+                r.ImGui_Text(ctx, row.name)
+                r.ImGui_TableSetColumnIndex(ctx, 2)
+                r.ImGui_Text(ctx, row.sound)
+                r.ImGui_TableSetColumnIndex(ctx, 3)
+                r.ImGui_Text(ctx, row.rb_mapping)
+            end
+        end
+        r.ImGui_EndTable(ctx)
+    end
+
+    r.ImGui_Spacing(ctx)
+    r.ImGui_Spacing(ctx)
+
+    SectionHeader('RB Lane-Combo Terminology')
+    r.ImGui_Spacing(ctx)
+    r.ImGui_TextWrapped(ctx,
+        'G=Green R=Red Y=Yellow B=Blue O=Orange. A combo name lists the lanes used, low to high.')
+    r.ImGui_Spacing(ctx)
+    if r.ImGui_BeginTable(ctx, '##guitar_terms', 2, TABLE_FLAGS) then
+        r.ImGui_TableSetupColumn(ctx, 'Width')
+        r.ImGui_TableSetupColumn(ctx, 'Lane combos')
+        r.ImGui_TableHeadersRow(ctx)
+        for _, row in ipairs(GUITAR_LANE_TERMS) do
+            r.ImGui_TableNextRow(ctx)
+            r.ImGui_TableSetColumnIndex(ctx, 0)
+            r.ImGui_Text(ctx, row.width)
+            r.ImGui_TableSetColumnIndex(ctx, 1)
+            r.ImGui_TextWrapped(ctx, row.combos)
+        end
+        r.ImGui_EndTable(ctx)
+    end
+end
+
 local function Loop()
     -- Burst timer: fires remaining samples from a multi-sample row click.
     if S.burst_files then
@@ -195,6 +306,13 @@ local function Loop()
                 r.ImGui_Spacing(ctx)
                 r.ImGui_BeginChild(ctx, '##drums_scroll', 0, 0, r.ImGui_ChildFlags_None(), r.ImGui_WindowFlags_None())
                 DrawDrumsTab()
+                r.ImGui_EndChild(ctx)
+                r.ImGui_EndTabItem(ctx)
+            end
+            if r.ImGui_BeginTabItem(ctx, 'Guitar') then
+                r.ImGui_Spacing(ctx)
+                r.ImGui_BeginChild(ctx, '##guitar_scroll', 0, 0, r.ImGui_ChildFlags_None(), r.ImGui_WindowFlags_None())
+                DrawGuitarTab()
                 r.ImGui_EndChild(ctx)
                 r.ImGui_EndTabItem(ctx)
             end

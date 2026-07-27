@@ -9,12 +9,14 @@ Module folder: `rock_band_music_theory_helper_vkr/`
 
 | File | Role |
 |---|---|
-| `defaults.lua` | Global data tables: `DRUM_NOTATION`, `RB_LANE_COLORS`, `PRO_VS_4LANE`, `DRUM_PATTERNS`. Also defines the minimal `S` and `TIPS` globals required by shared conventions. |
+| `defaults.lua` | Global data tables: `DRUM_NOTATION`, `RB_LANE_COLORS`, `PRO_VS_4LANE`, `DRUM_PATTERNS`, `GUITAR_CHORDS`, `GUITAR_LANE_TERMS`. Also defines the minimal `S` and `TIPS` globals required by shared conventions. |
 | `ui.lua` | `Loop` function, tab bar, per-instrument render functions. Calls `r.defer(Loop)` to start the script. |
+| `lib/reaper_guitar_theory.lua` (shared, not in this module folder) | Pure fret-shape classification: `GuitarParseFretInput`, `GuitarClassifyChordType`, `GuitarSuggestRBMapping`, `GuitarAnalyzeShape`. No `r`/`ctx`/`S` dependency — see "Adding a new instrument tab" below for when logic like this belongs in `lib/` instead of the module folder. |
 
 Load order in entry point:
 ```
 lib/reaper_imgui_helpers.lua   (SectionHeader, Tooltip)
+lib/reaper_guitar_theory.lua   (pure guitar shape/chord classification)
 rock_band_music_theory_helper_vkr/defaults.lua
 rock_band_music_theory_helper_vkr/ui.lua
 ```
@@ -35,16 +37,25 @@ Each instrument section gets its own named table(s). Current tables:
 | `RB_LANE_COLORS` | Rows: `color`, `piece` — currently empty; see [`_future_ideas/music_theory_drum_colors.md`](_future_ideas/music_theory_drum_colors.md) |
 | `PRO_VS_4LANE` | Array of plain strings (bullet list) — currently empty; see [`_future_ideas/music_theory_pro_vs_4lane.md`](_future_ideas/music_theory_pro_vs_4lane.md) |
 | `DRUM_PATTERNS` | Rows: `name`, `desc` |
+| `GUITAR_CHORDS` | Rows: `shape`, `type`, `sound`, `rb_mapping` — see `lib/reaper_guitar_theory.lua`'s header comment for how these were converted/verified from `_future_ideas/GUITAR_THEORY.md` |
+| `GUITAR_LANE_TERMS` | Rows: `width`, `combos` — RB lane-combo letter names (GR/RY/... ) per spread width |
 
 ---
 
 ## Adding a new instrument tab
 
-1. Add content tables to `defaults.lua` following the existing naming pattern (e.g., `GUITAR_CHORDS`, `GUITAR_TIPS`).
+1. Add content tables to `defaults.lua` following the existing naming pattern (e.g., `GUITAR_CHORDS`, `GUITAR_LANE_TERMS`).
 2. Add a `local function DrawGuitarTab()` in `ui.lua` that loops over those tables.
 3. Add a `BeginTabItem('Guitar')` block inside the `BeginTabBar` in `Loop`, calling `DrawGuitarTab()`.
 
-No other files need changing.
+No other files need changing — **unless** the tab needs reusable classification
+logic rather than plain lookup data (Drums is pure lookup; Guitar's shape
+search needed real computation: fret parsing, interval math, chord-template
+matching). That kind of logic belongs in its own `lib/` file (see
+`lib/reaper_guitar_theory.lua`), not the module folder — it keeps the
+function pure (no `r`/`ctx`/`S`), testable standalone, and reusable by other
+scripts later (the Guitar tab's classifier is intentionally reusable by
+`rock_band_general_helper_vkr`'s Guitar-tab converters in a future task).
 
 ---
 

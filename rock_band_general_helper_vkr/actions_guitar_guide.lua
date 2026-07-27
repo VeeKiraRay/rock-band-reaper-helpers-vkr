@@ -3,6 +3,13 @@
 -- Tab Input guide
 ----------------------------------------------------------------------
 
+-- Duplicated (deliberately, not shared) as GUITAR_TAB_OPEN in
+-- lib/reaper_guitar_theory.lua, which also has a pure fret-shape ->
+-- chord-quality classifier the Music Theory Helper's Guitar tab uses.
+-- TODO(guitar-integration): AssignGems below and AssignGemsForGuide
+-- currently pick gems purely by pitch rank / pool-cycling, with no
+-- awareness of chord quality. A future task should have them consult
+-- GuitarClassifyChordType/GuitarSuggestRBMapping instead.
 local TAB_OPEN    = { 64, 59, 55, 50, 45, 40 }  -- e B G D A E (standard tuning)
 local TAB_GAP_BIG = 10  -- seconds; >> wrap_gap_s â†’ triggers phrase break in AssignGems
 

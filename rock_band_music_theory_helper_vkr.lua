@@ -1,10 +1,13 @@
 -- @description Rock Band Music Theory Helper
 -- @author VeeKiraRay
--- @version 0.1
+-- @version 0.2
 -- @about
 --   In-DAW reference guide for Rock Band custom charters.
---   Covers drum notation, RB lane mappings, and common patterns.
---   More instruments planned in future tabs.
+--   Covers drum notation, RB lane mappings, common patterns, and a Guitar
+--   tab with a real-shape-to-RB-mapping reference, lane-combo terminology,
+--   and a live fret-shape classifier.
+--   v0.2: Added Guitar tab (chord-shape reference table, RB lane-combo
+--         terminology, live fret-shape search/classifier).
 
 r = reaper
 
@@ -36,6 +39,11 @@ local _mdir   = _dir .. _script:match('[/\\]([^/\\]+)%.lua$') .. '/'
 local _img_path = _dir .. 'resources/img/drum.png'
 local _img_ok, _img_result = pcall(r.ImGui_CreateImage, _img_path)
 IMG_DRUM_NOTATION = _img_ok and _img_result or nil
+-- Un-attached ReaImGui images are only guaranteed valid while drawn every
+-- frame. Attach so the image survives frames where the Drums tab (and its
+-- ImGui_Image call) isn't the active tab. Matches the pattern used by every
+-- other image in this codebase (see venue_sprites.lua, venue_sprite_tester_vkr.lua).
+if IMG_DRUM_NOTATION then r.ImGui_Attach(ctx, IMG_DRUM_NOTATION) end
 
 -- Read PNG image dimensions from file header (bytes 17-24 of a valid PNG).
 -- Used by ui.lua to maintain aspect ratio when displaying the image.
@@ -51,6 +59,7 @@ end
 IMG_DRUM_W, IMG_DRUM_H = _png_dims(_img_path)
 
 dofile(_dir  .. 'lib/reaper_imgui_helpers.lua')
+dofile(_dir  .. 'lib/reaper_guitar_theory.lua')
 dofile(_mdir .. 'defaults.lua')
 
 -- Detect optional audio sample pack (separate download, MIT-licensed MuseScore Basic).
