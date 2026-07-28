@@ -204,7 +204,7 @@ Three sub-tabs — **Guitar / Bass**, **Keys / Pro Keys**, **Vocal** — share t
 
 ![Guitar / Bass sub-tab](../assets/g_tab_input_gb.jpg)
 
-An extra **"Notes are in play order"** checkbox: checked assigns gems using ordered chord-shape ranking (aware of the previous shot); unchecked ("palette mode") just sorts the distinct pitches used and spreads them across gems 0–4 with no ordering context. **Run guide** reports the per-event gem assignment and reasoning, using the same Wrap gap / Max chord settings as the Guitar tab's converter.
+**Run guide** reports the per-event gem assignment and reasoning, using the same Wrap gap / Max chord settings as the Guitar tab's converter — chord-shape ranking assigns lane position by pitch (higher pitch trends toward Orange, lower toward Green, mirroring real fretboard hand movement). Chord shapes are chord-quality-aware — e.g. a power chord always gets a matching 1-3 lane spread (even voiced with a doubled root across 3 strings), and the report calls out the recognized chord name. When a passage has more distinct shapes than available lane combos, the shapes that appear first each claim their own combo; any later shape reuses whichever combo it conflicts with the least, based on which chords are actually back-to-back in the passage — two genuinely adjacent chords only ever end up looking identical when it's truly unavoidable, flagged with `(*Wrap)` in the report.
 
 ### Keys / Pro Keys
 

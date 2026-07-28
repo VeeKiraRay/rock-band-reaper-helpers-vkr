@@ -3,13 +3,10 @@
 -- No dependency on r/ctx/S -- pure global functions/tables only, safe to
 -- dofile from a Lua-only context (see dev/tests/run_guitar_theory.lua).
 --
--- TODO(guitar-integration): rock_band_general_helper_vkr's AssignGems
--- (actions_guitar.lua) and AssignGemsForGuide (actions_guitar_guide.lua)
--- currently pick gems purely by pitch rank / pool-cycling, with no
--- awareness of chord quality. A future task should have them consult
--- GuitarClassifyChordType/GuitarSuggestRBMapping instead. Not done here --
--- rock_band_general_helper_vkr/ is intentionally untouched by this change.
--- Currently only rock_band_music_theory_helper_vkr consumes this file.
+-- Consumed by both rock_band_music_theory_helper_vkr (Guitar tab reference)
+-- and rock_band_general_helper_vkr (BuildShapeGemMap in actions_guitar.lua
+-- consults GuitarClassifyChordType/GuitarSuggestRBMapping for chord-quality-
+-- aware dyad gem assignment in AssignGems/AssignGemsForGuide).
 
 -- Standard tuning, HIGH string to LOW string: e B G D A E.
 -- Matches the pre-existing convention in

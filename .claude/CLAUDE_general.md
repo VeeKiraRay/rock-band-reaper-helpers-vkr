@@ -62,6 +62,27 @@ Four WIP tabs appear only when **Show WIPs? = Yes** in the General tab (persiste
 - Wrap gap slider: rest gap in ms that starts a new phrase from Green (position 0).
 - Context window slider: how many measures to look ahead when planning gem scale.
 - Max chord: 2 or 3 simultaneous gems per chord event.
+- Every chord shape consults `lib/reaper_guitar_theory.lua`'s chord-quality classifier
+  (via `BuildShapeGemMap` in `actions_guitar.lua`), by PITCH CLASS rather than physical
+  note count — a real-guitar interval like a power chord's perfect fifth always gets a
+  matching lane spread (e.g. 1-3: GY/RB/YO) instead of whatever pitch-rank pool-cycling
+  happens to land on, even when voiced with a doubled root across 3 strings (e.g.
+  `x x x 7 7 5`, root+5th+octave) — that collapses to the same 2-gem combo a literal
+  2-note power chord gets, not a 3-note chord. The preview report annotates recognized
+  shapes with their chord name (e.g. `[Power chord]`, `[Major triad]`). When more
+  distinct shapes share a width/size group than that group has combo alternatives, the
+  first (lowest-pitched) shapes to reach the group each claim a unique combo; any
+  further (higher-pitched) shape reuses whichever already-claimed combo minimizes
+  conflicts against shapes it's actually adjacent to ANYWHERE in the passage — two
+  chords that are genuinely back-to-back only end up looking identical when it's truly
+  unavoidable (more distinct shapes than combos), never just because they're
+  pitch-neighbors. Reused shapes get `(*Wrap)` appended to their reason string; the
+  shape that legitimately claimed the combo first is never flagged. Past
+  `MAX_CONFLICT_SHAPES` (200) distinct shapes in one group, skips the conflict search
+  and falls back to plain clamp-to-last — real songs stay far below this; it only
+  guards against a mis-selected source track (e.g. a drum track) producing a huge,
+  near-random shape vocabulary that would otherwise make the search's worst-case
+  O(N²) cost visibly freeze REAPER's single-threaded UI.
 - Workflow: Preview (reasoning report only) or Auto-insert (writes gems, fully undoable).
 - Validate Guitar: check existing gems on the target track against authoring rules.
 
@@ -195,8 +216,8 @@ Every Validate action (all four sub-tabs, H/M/E only — never Expert) also runs
 | `rock_band_general_helper_vkr/actions_drums.lua` | `ConvertDrums` (global); `BuildMap`, `ReadMIDINotes`, `ClearDrumNotes`, `BuildDrumOutput`, `BuildReport` (local) |
 | `rock_band_general_helper_vkr/actions_keys.lua` | `SplitHands`, `ConvertProKeys`, `ConvertPianoToProKeys`, `ConvertKeys5` (global); `PK_MIN`, `PK_MAX`, `PK_RANGES`, `PK_PREF_LABEL` (module-level globals); `ReadMIDINotesWithChannel`, `IsRightHand`, `ClearAllNotesInTimeRange`, `WriteNotesToTrack`, `CompressChord` (local) |
 | `rock_band_general_helper_vkr/actions_keys_guides.lua` | `ProKeysTabGuide`, `VocalTabGuide` (global); `PkEventLabel`, `ParseTabToRaws` (local) |
-| `rock_band_general_helper_vkr/actions_guitar.lua` | `ConvertGuitar`, `ValidateGuitar`, `GetBPMAt`, `CompressChord`, `GemLabel`, `PitchLabel`, `ChordTypeName` (global); `GEM_MIN`, `GEM_MAX`, `GEM_LETTERS`, `CHORD_WINDOW_S`, `POOLS`, `POOLS2_NO14` (module-level globals) — Expert gem generation and authoring rule validation |
-| `rock_band_general_helper_vkr/actions_guitar_guide.lua` | `ParseTabHorizontal`, `ParseTabVertical`, `ReformatVerticalTab`, `GuitarTabGuide` (global); `AssignGemsForGuide` (local) — guitar Tab Input guide |
+| `rock_band_general_helper_vkr/actions_guitar.lua` | `ConvertGuitar`, `ValidateGuitar`, `GetBPMAt`, `CompressChord`, `GemLabel`, `PitchLabel`, `ChordTypeName`, `BuildShapeGemMap`, `ChordQualityLabel` (global); `GEM_MIN`, `GEM_MAX`, `GEM_LETTERS`, `CHORD_WINDOW_S`, `POOLS`, `POOLS2_NO14` (module-level globals) — Expert gem generation and authoring rule validation. `BuildShapeGemMap` (shared with `actions_guitar_guide.lua`) is the global shape→gem-combo map builder; every 2+-note shape consults `GuitarSuggestRBMapping` (`lib/reaper_guitar_theory.lua`) BY PITCH CLASS (not physical note count) so e.g. a power chord — even voiced with a doubled root across 3 strings — always gets a 1-3-spread 2-gem combo. When a group has more distinct shapes than available combos, `AssignByConflict` gives the first (lowest-pitched) shapes a unique combo each, then assigns each overflow shape whichever already-claimed combo minimizes conflicts against shapes it's actually adjacent to anywhere in the passage (an adjacency table built from the real event sequence, restricted to same-group consecutive pairs), tie-broken toward the top of the pool and refined over a few bounded sweeps — returned as a third `shared` map so callers can flag reused combos; `ChordQualityLabel` names the recognized shape (e.g. `[Power chord]`) for the reason string |
+| `rock_band_general_helper_vkr/actions_guitar_guide.lua` | `ParseTabHorizontal`, `ParseTabVertical`, `ReformatVerticalTab`, `GuitarTabGuide` (global); `AssignGemsForGuide` (local) — guitar Tab Input guide; `AssignGemsForGuide` delegates its shape→gem map to `BuildShapeGemMap` (`actions_guitar.lua`) |
 | `rock_band_general_helper_vkr/actions_guitar_validate.lua` | `SustainThresholds`, `ReadRBGuitarNotes`, `RunValidation` (global) — validation helpers called by `ValidateGuitar` |
 | `rock_band_general_helper_vkr/actions_midi_align.lua` | `AlignMIDI`, `ResizeAllMIDI` (global) |
 | `rock_band_general_helper_vkr/actions_midi_replace.lua` | `SetSearchPattern`, `SetReplacePattern`, `FillRange`, `DoMIDIPatternReplace` (global); `MeasureLabel`, `NoteLabel`, `PatternsMatch`, `ClearPatternWindow`, `GetTrackAndTake` (local) |
@@ -241,7 +262,7 @@ Every Validate action (all four sub-tabs, H/M/E only — never Expert) also runs
 - `actions_drums.lua`: `BuildMap`, `ReadMIDINotes`, `ClearDrumNotes`, `BuildDrumOutput`, `BuildReport`
 - `actions_keys.lua`: `ReadMIDINotesWithChannel`, `IsRightHand`, `ClearAllNotesInTimeRange`, `WriteNotesToTrack`, `CompressChord`
 - `actions_keys_guides.lua`: `PkEventLabel`, `ParseTabToRaws`
-- `actions_guitar.lua`: `ReadGuitarMIDI`, `GroupIntoEvents`, `IsIllegalGO`, `AssignGems`, `BuildPreviewReport`, `BuildOutNotes`, `ClearGuitarGems`
+- `actions_guitar.lua`: `ReadGuitarMIDI`, `GroupIntoEvents`, `IsIllegalGO`, `AssignGems`, `BuildPreviewReport`, `BuildOutNotes`, `ClearGuitarGems`, `PoolByWidth`, `WIDTH_TO_SPREAD`, `MAX_CONFLICT_SHAPES` (module-level locals), `shape_key`, `sort_by_pitch`, `AssignByConflict`
 - `actions_guitar_guide.lua`: `AssignGemsForGuide`
 - `actions_difficulty_shared.lua`: `ChartsAreIdentical`
 - `actions_difficulty.lua`: `ADJACENT_HIGHER` (module-level local); `EventLabel`, `ReadPKNotes`, `GroupIntoEvents`, `GetBeatDurAt`, `QNAt`, `CountNotes`, `CheckChordCount`, `CheckChordSpan`, `CheckIntervalJumps`, `CheckSpacing`, `CheckLaneShifts`, `CheckNotesAboveExpert`, `BuildReport`, `RunPKValidation`
@@ -268,6 +289,10 @@ lib/reaper_imgui_helpers.lua   → Tooltip, SliderTooltip, SectionHeader, GetTra
                                   but shadowed locally in ui.lua for -1 support)
 lib/reaper_dsp.lua             → (loaded; not currently used by general helper)
 lib/reaper_midi_helpers.lua    → FindFirstMIDIItem, InsertNotes, ClearNotesAtPitchesInRange, …
+lib/reaper_guitar_theory.lua   → GuitarClassifyChordType, GuitarSuggestRBMapping (consulted by
+                                  actions_guitar.lua's BuildShapeGemMap, by pitch class, for
+                                  chord-quality mapping); GUITAR_TAB_OPEN (tuning table, also used by
+                                  actions_guitar_guide.lua's tab parsers)
 defaults.lua                   → S, VENUE_VALID, TIPS, constants
 settings.lua                   → SaveSettings, LoadSettings
 helpers.lua                    → FindTrackByName, FindNamedTrackMIDI, GetTakePPQPerQN,

@@ -29,11 +29,7 @@ local function _DrawTabInputBody(mode, radio_w_ti)
     r.ImGui_Spacing(ctx)
 
     -- Mode-specific option (one checkbox per mode, same vertical slot)
-    if mode == 0 then
-        _, S.mc_gtr_tab_ordered = r.ImGui_Checkbox(ctx, 'Notes are in play order', S.mc_gtr_tab_ordered)
-        Tooltip(TIPS.mc_gtr_tab_ordered)
-        r.ImGui_Spacing(ctx)
-    elseif mode == 1 then
+    if mode == 1 then
         _, S.pk_tab_animation = r.ImGui_Checkbox(
             ctx, 'For animation (full C2\xe2\x80\x93C4, no lane windows)', S.pk_tab_animation)
         Tooltip(TIPS.pk_tab_animation)

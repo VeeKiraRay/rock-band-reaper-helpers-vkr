@@ -3,14 +3,10 @@
 -- Tab Input guide
 ----------------------------------------------------------------------
 
--- Duplicated (deliberately, not shared) as GUITAR_TAB_OPEN in
--- lib/reaper_guitar_theory.lua, which also has a pure fret-shape ->
--- chord-quality classifier the Music Theory Helper's Guitar tab uses.
--- TODO(guitar-integration): AssignGems below and AssignGemsForGuide
--- currently pick gems purely by pitch rank / pool-cycling, with no
--- awareness of chord quality. A future task should have them consult
--- GuitarClassifyChordType/GuitarSuggestRBMapping instead.
-local TAB_OPEN    = { 64, 59, 55, 50, 45, 40 }  -- e B G D A E (standard tuning)
+-- Tuning table: GUITAR_TAB_OPEN, from lib/reaper_guitar_theory.lua (e B G D
+-- A E, standard tuning) -- also the pure fret-shape -> chord-quality
+-- classifier AssignGemsForGuide's dyad handling consults (see
+-- BuildShapeGemMap in actions_guitar.lua).
 local TAB_GAP_BIG = 10  -- seconds; >> wrap_gap_s â†’ triggers phrase break in AssignGems
 
 -- Horizontal: one event per line, 6 space-separated tokens (digit=fret, else=unplayed).
@@ -30,7 +26,7 @@ function ParseTabHorizontal(text)
                 si = si + 1
                 if si > 6 then break end
                 local f = tonumber(tok)
-                if f then pitches[#pitches + 1] = TAB_OPEN[si] + f end
+                if f then pitches[#pitches + 1] = GUITAR_TAB_OPEN[si] + f end
             end
             if #pitches > 0 then
                 events[#events + 1] = { pitches = pitches, phrase_idx = phrase_idx, tab_str = trimmed }
@@ -61,7 +57,7 @@ function ParseTabVertical(text)
         local pitches = {}
         for si = 1, #rows do
             local f = tonumber((rows[si] or {})[col])
-            if f then pitches[#pitches + 1] = TAB_OPEN[si] + f end
+            if f then pitches[#pitches + 1] = GUITAR_TAB_OPEN[si] + f end
         end
         if #pitches > 0 then
             events[#events + 1] = { pitches = pitches, phrase_idx = phrase_idx }
@@ -112,51 +108,9 @@ local function AssignGemsForGuide(events, wrap_gap_s, max_chord)
         return table.concat(t, ',')
     end
 
-    -- Build global shapeâ†’gem map across all events
-    local all_shapes  = {}
-    local size_orders = {}
-
-    for _, ev in ipairs(events) do
-        local pitches = CompressChord(ev.pitches, max_chord)
-        table.sort(pitches)
-        local sz  = #pitches
-        local key = shape_key(pitches)
-        if not all_shapes[key] then
-            local sum = 0
-            for _, p in ipairs(pitches) do sum = sum + p end
-            all_shapes[key] = { avg = sum / sz, max = pitches[sz], sz = sz, pitches = pitches }
-            if not size_orders[sz] then size_orders[sz] = {} end
-            size_orders[sz][#size_orders[sz] + 1] = key
-        end
-    end
-
-    local pool2      = S.mc_gtr_allow_14 and POOLS[2] or POOLS2_NO14
-    local shape_gems = {}
-
-    local sizes = {}
-    for sz in pairs(size_orders) do sizes[#sizes + 1] = sz end
-    table.sort(sizes)
-
-    for _, sz in ipairs(sizes) do
-        local order = size_orders[sz]
-        table.sort(order, function(a, b)
-            local sa, sb = all_shapes[a], all_shapes[b]
-            if sa.max ~= sb.max then return sa.max < sb.max end
-            return sa.avg < sb.avg
-        end)
-        local N = #order
-        for rank, key in ipairs(order) do
-            local combo
-            if sz == 1 then
-                local gem = N == 1 and 0 or math.min(4, math.floor((rank - 1) * 4 / (N - 1) + 0.5))
-                combo = { gem }
-            else
-                local pool = (sz == 2) and pool2 or (POOLS[math.min(sz, 3)] or POOLS[1])
-                combo = pool[((rank - 1) % #pool) + 1]
-            end
-            shape_gems[key] = combo
-        end
-    end
+    -- Global shapeâ†’gem map across all events - see BuildShapeGemMap's own
+    -- doc comment (actions_guitar.lua) for the dyad chord-quality logic.
+    local all_shapes, shape_gems, shared = BuildShapeGemMap(events, max_chord)
 
     -- Split into phrases for report annotations only
     local phrases = {}
@@ -230,9 +184,11 @@ local function AssignGemsForGuide(events, wrap_gap_s, max_chord)
             if n_orig > #pitches then
                 reason = reason .. string.format('  (compressed %d\xe2\x86\x92%d)', n_orig, #pitches)
             end
+            reason = reason .. ChordQualityLabel(pitches)
             if narrowed_14 then
                 reason = reason .. '  (1-4 \xe2\x86\x92 1-3: narrowed per setting)'
             end
+            if shared[key] then reason = reason .. '  (*Wrap)' end
             assignments[#assignments + 1] = {
                 s = ev.s, e = ev.e, gems = gems, reason = reason, is_meta = false,
                 tab_str = ev.tab_str,
@@ -269,43 +225,7 @@ function GuitarTabGuide()
         S.status = 'No valid notes found in tab input'
         return
     end
-    local assignments
-    if not S.mc_gtr_tab_ordered then
-        -- Palette mode: bucket all distinct pitches across gems 0-4.
-        -- With N > 5 pitches, multiple pitches intentionally share the same gem.
-        local seen, sorted_pitches = {}, {}
-        for _, ev in ipairs(events) do
-            for _, p in ipairs(ev.pitches) do
-                if not seen[p] then seen[p] = true; sorted_pitches[#sorted_pitches + 1] = p end
-            end
-        end
-        table.sort(sorted_pitches)
-        local N = #sorted_pitches
-        local header_parts = {}
-        for i, p in ipairs(sorted_pitches) do
-            local gem = N == 1 and 0 or math.min(4, math.floor((i - 1) * 4 / (N - 1) + 0.5))
-            header_parts[#header_parts + 1] = PitchName(p) .. '\xe2\x86\x92' .. GEM_LETTERS[gem]
-        end
-        assignments = { {
-            s = 0,
-            reason = 'Palette (' .. N .. ' pitch' .. (N == 1 and '' or 'es') .. ')  '
-                     .. table.concat(header_parts, '  '),
-            is_meta = true,
-        } }
-        for i, p in ipairs(sorted_pitches) do
-            local gem  = N == 1 and 0 or math.min(4, math.floor((i - 1) * 4 / (N - 1) + 0.5))
-            local gems = {gem}
-            assignments[#assignments + 1] = {
-                s = (i - 1) * 0.01, e = (i - 1) * 0.01 + 0.005,
-                gems = gems,
-                reason = string.format('single  %s \xe2\x86\x92 %s', PitchName(p), GemLabel(gems)),
-                is_meta = false,
-                tab_str = PitchName(p),
-            }
-        end
-    else
-        assignments = AssignGemsForGuide(events, S.mc_gtr_wrap_gap_ms / 1000, S.mc_gtr_max_chord)
-    end
+    local assignments = AssignGemsForGuide(events, S.mc_gtr_wrap_gap_ms / 1000, S.mc_gtr_max_chord)
     local lines = {}
     for _, a in ipairs(assignments) do
         if a.is_meta then

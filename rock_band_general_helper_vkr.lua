@@ -1,6 +1,6 @@
 -- @description Rock Band General Helper
 -- @author VeeKiraRay
--- @version 0.9.35
+-- @version 0.9.38
 -- @about
 --   Utility actions for Rock Band authoring in REAPER.
 --
@@ -21,6 +21,66 @@
 --   This @about block keeps only the 5 most recent versions.
 --   Full history: CHANGELOG.md in the repo.
 --
+--   v0.9.38
+--     - Fixed a combo-wrap collision: when a passage has more distinct
+--       chord shapes in one lane-spread group than that group has combo
+--       alternatives (e.g. 4 different power chords but only 3: G+Y/R+B/
+--       Y+O), a same-combo collision was possible between two shapes that
+--       are actually back-to-back in the passage (modulo-wrapping could
+--       collide the lowest- and highest-pitched shapes; a simpler
+--       pitch-rank-only fix could still collide genuinely adjacent
+--       chords). BuildShapeGemMap now assigns the first (lowest-pitched)
+--       shapes in a group a unique combo each, then gives every
+--       additional (higher-pitched) shape whichever already-claimed combo
+--       minimizes conflicts against shapes it's actually adjacent to
+--       ANYWHERE in the passage - built from a real adjacency table over
+--       the event sequence, with a bounded refinement pass - so two
+--       genuinely back-to-back chords only ever end up looking identical
+--       when it's truly unavoidable (more distinct shapes than combos),
+--       never just because they happen to be pitch-neighbors. Reused
+--       shapes get "(*Wrap)" appended to their reason string in both the
+--       Guitar tab converter's preview and Tab Input's guide report; the
+--       shape that legitimately claimed the combo first is never flagged.
+--       New AssignByConflict helper (actions_guitar.lua); BuildShapeGemMap
+--       gained a third return value (shared: key->true). Safety cap: past
+--       200 distinct shapes in one group (MAX_CONFLICT_SHAPES), skips the
+--       search and falls back to plain clamp-to-last - real songs stay far
+--       below this; it only guards against a mis-selected source track
+--       (e.g. a drum track) producing a huge, near-random shape vocabulary
+--       that would otherwise make the search's worst case visibly freeze
+--       REAPER's single-threaded UI.
+--   v0.9.37
+--     - Tab Input's Guitar/Bass guide: removed the "Notes are in play
+--       order" checkbox and palette mode. Palette mode flattened every
+--       chord into independent single-note gem events (no chord grouping
+--       at all), which doesn't reflect real RB charting - the guide now
+--       always uses the chord-shape-aware assignment the checked state
+--       already provided, matching how the real Guitar tab converter
+--       (ConvertGuitar) has always behaved (it never had a palette-mode
+--       equivalent). S.mc_gtr_tab_ordered and its ExtState key (mcgtor)
+--       are gone.
+--   v0.9.36
+--     - Guitar tab converter and Tab Input's Guitar/Bass guide are now
+--       chord-quality-aware: a real-guitar interval like a power chord's
+--       perfect fifth always gets a matching lane spread (1-3: GY/RB/YO)
+--       instead of whatever pitch-rank pool-cycling happened to land on,
+--       and the preview/guide report annotates recognized shapes with
+--       their chord name (e.g. "[Power chord]"). This applies by PITCH
+--       CLASS, not physical note count: a shape played on 3 strings but
+--       harmonically just root+5th+octave (e.g. "x x x 7 7 5") is
+--       recognized as a power chord and correctly collapses to a 2-gem
+--       1-3 combo, matching real RB charts, instead of being treated as
+--       an unrelated 3-note chord. Genuine 3-distinct-pitch-class shapes
+--       (real triads etc.) are unaffected - the library has no narrower
+--       mapping for those, though the report now names them too when
+--       recognized (e.g. "[Major triad]"). Consults
+--       lib/reaper_guitar_theory.lua (already used by the Music Theory
+--       Helper) via new shared BuildShapeGemMap (actions_guitar.lua),
+--       which replaces the near-identical shape->gem map building
+--       previously duplicated in AssignGems and AssignGemsForGuide
+--       (actions_guitar_guide.lua). actions_guitar_guide.lua's local
+--       TAB_OPEN tuning table is gone, now reads GUITAR_TAB_OPEN from the
+--       shared lib.
 --   v0.9.35
 --     - Venue > Camera pacing: new "Vocal phrase start" mode - camera cuts land
 --       exactly on PART VOCALS phrase-marker (pitch 105) note starts instead
@@ -54,63 +114,6 @@
 --       long-lived cross-template history. WORKFLOW_MAX_ITEMS is gone;
 --       PurgeStaleWorkflowEntries is replaced by PruneToWorkflowEntries
 --       (scoped to one file's entries instead of every loaded one).
---   v0.9.33
---     - Venue subtab intro descriptions (Keyframes, Themes gen, Events,
---       Manual gen, Section gen) now wrap to a new line instead of
---       clipping when the window is narrower than the text - same
---       treatment the result panel already got in v0.9.24, applied to
---       these five r.ImGui_Text calls (now r.ImGui_TextWrapped).
---   v0.9.32
---     - General tab: new "Workflow" sub-tab - a per-project authoring
---       checklist sourced from a user-editable .txt template
---       (resources/workflow/, one starter template "Default" included -
---       selected automatically on first use if present, else the first
---       template alphabetically). [Section] lines group items under a
---       header; plain lines are checkable steps; a trailing {tooltip}
---       (same line, or its own line right after) attaches a hover tooltip -
---       an item with more than one tooltip source drops the tooltip rather
---       than guessing which wins. Checking an item stamps the time and
---       autosaves immediately under its own workflow_v1 project key
---       (independent of this tab's own Save/Load); unchecking clears the
---       timestamp. A "Show completion timestamp" checkbox (off by default,
---       persisted) controls whether "Completed on dd.MM.yyyy at hh:mm" is
---       displayed under checked items - the timestamp is always recorded
---       regardless of the checkbox, only its display is optional. Checked
---       state is keyed by (section, item label), not label alone, so
---       identical item text under two different section headers (e.g.
---       "Guitar" under both "Instruments Expert" and "Difficulty
---       reductions") tracks separately. Switching templates carries over
---       any item whose section+label matches exactly; anything else starts
---       unchecked. Parse-time warnings (shown above the checklist) flag
---       duplicate (section,label) pairs and unbalanced [ ] / { } bracket
---       counts in a template file. Saved state auto-purges entries no
---       longer present in any loaded template once the total exceeds 100
---       items. New workflow.lua (parser) and actions_workflow.lua
---       (persistence) modules.
---   v0.9.31
---     - Venue > Actions: new "Sub VENUE tracks" group splits VENUE's events
---       across 6 category tracks - "VENUE normal camera", "VENUE directed
---       camera", "VENUE lighting", "VENUE keyevents", "VENUE post proc",
---       "VENUE special" - for easier authoring once a song has accumulated
---       a lot of keyframes, then merges them back. "Copy all to subtracks"
---       creates (if missing, muted by default - an editing-only split that
---       shouldn't reach the final export) and re-syncs all 6; new tracks
---       inherit VENUE's custom MIDI note names and get their take named
---       after the track so open MIDI editor tabs are identifiable instead
---       of all showing as "MIDI take". VENUE's own MIDI notes (e.g. the
---       sing-cue notes at pitches 85-87) travel with "VENUE special"
---       alongside its text events. "Copy all to main track" early-exits
---       with a status message if no subtracks exist yet; otherwise clears
---       VENUE and replaces it with their combined contents, notes included
---       (confirmation popup first, mirrors the Difficulty tab's overwrite
---       modal). A Subtrack dropdown plus Copy to/Copy from work on one
---       category at a time
---       (Copy to auto-creates the subtrack, Copy from does not; for
---       Special both directions also carry VENUE's notes). New
---       CategorizeVenueEvent in new actions_venue_subtracks.lua is the
---       first unified 6-way VENUE event classifier - also now backs
---       RemoveVenueEventsByType (actions_venue_manual.lua), replacing its
---       three duplicated pattern checks with one shared classification.
 r = reaper  -- global so all dofile'd modules can use it
 
 if not r.ImGui_CreateContext then
@@ -147,6 +150,7 @@ for _, _f in ipairs({
     _dir  .. 'lib/reaper_imgui_helpers.lua',
     _dir  .. 'lib/reaper_dsp.lua',
     _dir  .. 'lib/reaper_midi_helpers.lua',
+    _dir  .. 'lib/reaper_guitar_theory.lua',
     _mdir .. 'defaults.lua',
     _mdir .. 'settings.lua',
     _mdir .. 'helpers.lua',
@@ -206,6 +210,7 @@ end
 dofile(_dir  .. 'lib/reaper_imgui_helpers.lua')
 dofile(_dir  .. 'lib/reaper_dsp.lua')
 dofile(_dir  .. 'lib/reaper_midi_helpers.lua')
+dofile(_dir  .. 'lib/reaper_guitar_theory.lua')
 dofile(_mdir .. 'defaults.lua')
 dofile(_mdir .. 'settings.lua')
 dofile(_mdir .. 'helpers.lua')

@@ -2,7 +2,7 @@
 -- @author VeeKiraRay
 -- @about
 --   Algorithm unit tests for EstimateBPM, GuessTimeSig, FitBeatGrid,
---   ComputePlayerStatesAt, and KeyframeSubdivQN.
+--   ComputePlayerStatesAt, KeyframeSubdivQN, and BuildShapeGemMap.
 --   These functions operate on plain Lua tables with no REAPER API calls.
 --   Run from the REAPER Actions list or triggered via the test launcher.
 --   Results appear in the REAPER console (View > Show REAPER console).
@@ -30,11 +30,14 @@ r.ShowConsoleMsg('======  General Helper — algorithm unit tests  ======\n')
 
 dofile(_tdir .. 'framework.lua')
 dofile(_root .. 'lib/reaper_dsp.lua')
+dofile(_root .. 'lib/reaper_guitar_theory.lua')  -- GuitarSuggestRBMapping, GuitarClassifyChordType
 dofile(_mdir .. 'defaults.lua')        -- S and constants
 dofile(_mdir .. 'tempomap.lua')        -- EstimateBPM, GuessTimeSig, FitBeatGrid
 dofile(_mdir .. 'venue_awareness.lua') -- ComputePlayerStatesAt (pure; REAPER-facing
                                        -- functions in this file are not exercised)
 dofile(_mdir .. 'venue_lighting.lua')  -- KeyframeSubdivQN (pure; other functions in
+                                       -- this file are not exercised)
+dofile(_mdir .. 'actions_guitar.lua')  -- BuildShapeGemMap (pure; other functions in
                                        -- this file are not exercised)
 
 dofile(_tdir .. 'general_algorithms.lua')

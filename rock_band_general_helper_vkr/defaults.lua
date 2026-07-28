@@ -131,9 +131,8 @@ S = {
     mc_gtr_max_chord      = 3,    -- max simultaneous gems per chord (2 or 3)
     mc_gtr_allow_14       = true, -- allow 1-4 chord stretches (spread >= 3)
     mc_gtr_workflow       = 0,    -- 0 = Preview, 1 = Auto-insert
-    -- Tab Input guide (format/ordered/mode persisted; input buffers are ephemeral)
+    -- Tab Input guide (format/mode persisted; input buffers are ephemeral)
     mc_gtr_tab_format     = 0,    -- 0 = horizontal, 1 = vertical
-    mc_gtr_tab_ordered    = true, -- true = sequence mode, false = palette mode
     mc_gtr_tab_input_h    = '',   -- horizontal textarea content
     mc_gtr_tab_input_v    = '',   -- vertical textarea content
     tab_input_mode        = 0,    -- 0 = Guitar/Bass, 1 = Keys/Pro Keys, 2 = Vocal
@@ -623,12 +622,6 @@ TIPS = {
                          'Supports multi-digit frets (10, 12, etc.). Blank line = phrase break.\n\n' ..
                          'Vertical: standard guitar tab layout - 6 rows (e/B/G/D/A/E),\n' ..
                          'each row is space-separated tokens, columns = events. All-dash column = phrase break.',
-    mc_gtr_tab_ordered = 'When checked, notes are in the order they are played. Repeat a pitch each\n' ..
-                         'time it appears in the riff. Blank lines (horizontal) or all-dash columns\n' ..
-                         '(vertical) start a new phrase and reset the anchor set.\n\n' ..
-                         'When unchecked (palette mode), write each distinct pitch once in any order.\n' ..
-                         'The tool sorts by pitch and assigns gems based on pitch spread alone -\n' ..
-                         'no ordering context is used.',
     mc_gtr_add_note    = 'Append a new empty note slot to the input.\n\n' ..
                          'Horizontal: appends a new all-dash line (- - - - - -).\n' ..
                          'Vertical: pads all rows to equal length and appends a new all-dash column.',

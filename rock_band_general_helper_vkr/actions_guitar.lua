@@ -128,36 +128,191 @@ POOLS = {
 POOLS2_NO14 = {{0,1},{0,2},{1,2},{1,3},{2,3},{2,4},{3,4}}
 
 ----------------------------------------------------------------------
--- Gem assignment: main algorithm
+-- Shared shape -> gem-combo map (used by AssignGems and AssignGemsForGuide)
 ----------------------------------------------------------------------
 
--- Shape-based algorithm:
---
--- Phase 1 (global map building):
---   All distinct compressed chord shapes across the entire event list are
---   collected, sorted by pitch (max then avg), and assigned gem combos from
---   the pool in order. Pool cycling (wrapping) only occurs when the number
---   of distinct shapes in a size group exceeds the pool size - unused gem
---   combos are never skipped. Gaps between notes do NOT reset assignments.
---
--- Phase 2 (output):
---   Walk events in order, emitting gem assignments using the global shape map.
---   Gaps > wrap_gap_s are annotated as phrase boundaries in the report only.
---
--- Returns assignments[]: each entry is either:
---   { s, e, gems[], reason, is_meta=false }  - a real gem event
---   { s, reason, is_meta=true }              - phrase/wrap annotation
-local function AssignGems(events, wrap_gap_s, max_chord)
-    if #events == 0 then return {} end
+-- combo[2]-combo[1] (lane-index spread) -> the sub-list of pool2 entries
+-- with that spread, in their original relative order.
+local function PoolByWidth(pool2)
+    local by_width = {}
+    for _, combo in ipairs(pool2) do
+        local spread = combo[2] - combo[1]
+        by_width[spread] = by_width[spread] or {}
+        table.insert(by_width[spread], combo)
+    end
+    return by_width
+end
 
-    local function shape_key(sorted_pitches)
-        local t = {}
-        for _, p in ipairs(sorted_pitches) do t[#t + 1] = p end
-        return table.concat(t, ',')
+-- GuitarSuggestRBMapping's width strings (lib/reaper_guitar_theory.lua) ->
+-- lane-index spread.
+local WIDTH_TO_SPREAD = { ['1-2'] = 1, ['1-3'] = 2, ['1-4'] = 3, ['1-5'] = 4 }
+
+local function shape_key(sorted_pitches)
+    local t = {}
+    for _, p in ipairs(sorted_pitches) do t[#t + 1] = p end
+    return table.concat(t, ',')
+end
+
+-- '  [Perfect fifth (power chord)]' for a recognized shape, else '' -
+-- appended to a Phase-2 reason string so the report shows *why* a
+-- particular combo was chosen, not just the combo itself. Works on any
+-- pitch count: GuitarClassifyChordType is pitch-class based, so it
+-- correctly names e.g. a 3-physical-note power chord (root+5th+octave) the
+-- same as a literal 2-note one, and also names real 3+-pitch-class chords
+-- (Major triad, Sus4, ...) when GUITAR_CHORD_TEMPLATES matches.
+function ChordQualityLabel(pitches)
+    local type_name = GuitarClassifyChordType(pitches)
+    if type_name and type_name ~= 'Single note' and type_name ~= 'No notes'
+       and not type_name:match('^Unrecognized') then
+        return '  [' .. type_name .. ']'
+    end
+    return ''
+end
+
+local function sort_by_pitch(order, all_shapes)
+    table.sort(order, function(a, b)
+        local sa, sb = all_shapes[a], all_shapes[b]
+        if sa.max ~= sb.max then return sa.max < sb.max end
+        return sa.avg < sb.avg
+    end)
+end
+
+-- Safety cap for the conflict-minimizing search in AssignByConflict below.
+-- That search is roughly O(pool_size x distinct shapes) for typical songs
+-- (a given shape usually only neighbors a handful of others), but can
+-- approach O(pool_size x N^2) in the worst case (N = distinct shapes in
+-- one group) if the adjacency pattern is densely interconnected. A real
+-- guitar song's distinct-shape count per group stays in the
+-- tens-to-low-hundreds even for long, harmonically dense material - this
+-- cap sits comfortably above that. The realistic way to exceed it is
+-- pointing the Guitar tab converter at the wrong source track (e.g. a
+-- drum track, or anything not shaped like a guitar part), producing a
+-- large near-random shape vocabulary - REAPER scripts run single-threaded
+-- and blocking, so an uncapped O(N^2) search there would visibly freeze
+-- the UI. Past this cap, AssignByConflict falls back to plain
+-- clamp-to-last (O(N), no adjacency scoring) so worst-case runtime stays
+-- bounded no matter how large or tangled the input gets. Hardcoded for
+-- now; if real songs ever legitimately need more, this can become a
+-- user-facing setting later.
+local MAX_CONFLICT_SHAPES = 200
+
+-- Assigns combos to `order` (already pitch-sorted, low to high) from
+-- `list`. If there's a combo for every distinct shape (#order <= #list),
+-- each gets a unique one - zero conflicts, no search needed. Otherwise
+-- (overflow), the first #list shapes (lowest pitch) each claim a unique
+-- combo, exactly as above; every remaining (higher-pitched) shape reuses
+-- whichever already-claimed combo minimizes conflicts against shapes it's
+-- actually adjacent to ANYWHERE in the passage (`adjacency`, built from
+-- the real event sequence - see BuildShapeGemMap), so two chords that are
+-- genuinely back-to-back never end up looking identical unless truly
+-- unavoidable. Ties broken toward the top of the pool (a shape reaching
+-- this branch is, by construction, higher-pitched than every claimer, so
+-- prefers staying near the "Orange end"); further ties broken by the
+-- earliest slot index, for determinism. A bounded refinement pass (up to
+-- 3 sweeps, stopping early once a sweep changes nothing) then lets the
+-- overflow shapes re-settle using full information, now that every shape
+-- has an initial combo - the forward pass alone only sees earlier
+-- shapes' choices. Claimed (non-overflow) shapes are never reassigned.
+-- Marks every shape that didn't claim one of the first #list unique slots
+-- in `shared` (key -> true) - the original claimant is never flagged.
+-- Above MAX_CONFLICT_SHAPES distinct shapes, skips the search entirely
+-- (see its own comment above).
+local function AssignByConflict(order, list, adjacency, shape_gems, shared)
+    local N, M = #order, #list
+    local cur_idx = {}   -- key -> currently assigned index into `list`
+
+    for rank = 1, math.min(N, M) do
+        cur_idx[order[rank]] = rank
     end
 
-    -- Phase 1: build a single global shapeâ†’gem map -----------------------
+    if N > M and N > MAX_CONFLICT_SHAPES then
+        for rank = M + 1, N do
+            local key = order[rank]
+            cur_idx[key] = M
+            shared[key] = true
+        end
+    elseif N > M then
+        local function score(key, c)
+            local total, neighbors = 0, adjacency[key]
+            if neighbors then
+                for other, w in pairs(neighbors) do
+                    if cur_idx[other] == c then total = total + w end
+                end
+            end
+            return total
+        end
 
+        local function best_index(key)
+            local best_c, best_score, best_dist
+            for c = 1, M do
+                local s, dist = score(key, c), M - c
+                if not best_score or s < best_score
+                   or (s == best_score and dist < best_dist) then
+                    best_c, best_score, best_dist = c, s, dist
+                end
+            end
+            return best_c
+        end
+
+        for rank = M + 1, N do
+            local key = order[rank]
+            cur_idx[key] = best_index(key)
+            shared[key] = true
+        end
+
+        for _ = 1, 3 do
+            local changed = false
+            for rank = M + 1, N do
+                local key    = order[rank]
+                local better = best_index(key)
+                if better ~= cur_idx[key] and score(key, better) < score(key, cur_idx[key]) then
+                    cur_idx[key] = better
+                    changed = true
+                end
+            end
+            if not changed then break end
+        end
+    end
+
+    for _, key in ipairs(order) do
+        shape_gems[key] = list[cur_idx[key]]
+    end
+end
+
+-- Build a single global shape -> gem-combo map across the whole event list.
+-- All distinct compressed chord shapes are collected and assigned gem
+-- combos:
+--
+-- - 1-note shapes: unchanged, evenly spread across gems 0-4.
+-- - 2+-note shapes: each is classified by GuitarSuggestRBMapping
+--   (lib/reaper_guitar_theory.lua), which is PITCH-CLASS based, not
+--   physical-note-count based - a shape with 3 physical notes but only 2
+--   distinct pitch classes (e.g. a power chord voiced as root+5th+octave,
+--   like "x x x 7 7 5") is recognized as a dyad and assigned the SAME
+--   2-gem combo a literal 2-note power chord would get, dropping the
+--   redundant note from the gem output entirely - this is what real RB
+--   charts do, and is the exact case the reference table in
+--   rock_band_music_theory_helper_vkr's GUITAR_CHORDS documents (that
+--   shape's rb_mapping is '1-3', not a 3-note chord). A genuine compound
+--   interval (>1 octave) gets GuitarSuggestRBMapping's deterministic 'GO'
+--   combo directly. Shapes that resolve to a recognized width are
+--   rank-cycled within that width's matching combos (for differentiation
+--   across multiple same-quality shapes); shapes GuitarSuggestRBMapping
+--   can't narrow (unrecognized 2-pitch-class intervals, the ambiguous
+--   perfect-fourth case, or genuine 3+-pitch-class chords like a real
+--   triad) fall back to the original per-physical-size pool cycling,
+--   unchanged from before this classification existed.
+--
+-- When the number of distinct shapes in a group exceeds the group's combo
+-- list size, combos are assigned by conflict-minimizing search (see
+-- AssignByConflict above), using the shapes' real adjacency in the played
+-- sequence - two shapes that are genuinely back-to-back anywhere in the
+-- passage only end up with the same combo when it's truly unavoidable
+-- (more distinct shapes in the group than that group has combos for).
+-- Returns all_shapes (key -> {avg,max,sz,pitches}), shape_gems (key -> gem
+-- combo, global, never reset by gaps between notes), shared (key -> true
+-- for any shape that had to reuse another shape's combo in its group).
+function BuildShapeGemMap(events, max_chord)
     local all_shapes  = {}   -- key â†’ {avg, max, sz, pitches}
     local size_orders = {}   -- sz â†’ [keys in first-seen order, sorted later]
 
@@ -176,32 +331,126 @@ local function AssignGems(events, wrap_gap_s, max_chord)
     end
 
     local pool2      = S.mc_gtr_allow_14 and POOLS[2] or POOLS2_NO14
+    local pool2_by_w = PoolByWidth(pool2)
     local shape_gems = {}   -- key â†’ gem combo (global, never reset)
+    local shared     = {}   -- key â†’ true when its combo is shared with another shape
 
     local sizes = {}
     for sz in pairs(size_orders) do sizes[#sizes + 1] = sz end
     table.sort(sizes)
 
-    for _, sz in ipairs(sizes) do
-        local order = size_orders[sz]
-        table.sort(order, function(a, b)
-            local sa, sb = all_shapes[a], all_shapes[b]
-            if sa.max ~= sb.max then return sa.max < sb.max end
-            return sa.avg < sb.avg
-        end)
+    -- 1-note shapes: unchanged.
+    if size_orders[1] then
+        local order = size_orders[1]
+        sort_by_pitch(order, all_shapes)
         local N = #order
         for rank, key in ipairs(order) do
-            local combo
-            if sz == 1 then
-                local gem = N == 1 and 0 or math.min(4, math.floor((rank - 1) * 4 / (N - 1) + 0.5))
-                combo = { gem }
-            else
-                local pool = (sz == 2) and pool2 or (POOLS[math.min(sz, 3)] or POOLS[1])
-                combo = pool[((rank - 1) % #pool) + 1]
-            end
-            shape_gems[key] = combo
+            local gem = N == 1 and 0 or math.min(4, math.floor((rank - 1) * 4 / (N - 1) + 0.5))
+            shape_gems[key] = { gem }
         end
     end
+
+    -- 2+-note shapes: classify by real (pitch-class) width first, across
+    -- ALL physical sizes, so a 3-physical-note power chord and a literal
+    -- 2-note one share the same width-bucketed combo pool. Anything that
+    -- doesn't resolve to a recognized width falls through to a per-size
+    -- fallback bucket (sz==2 -> unconstrained pool2 cycling; sz>=3 -> that
+    -- size's own POOLS entry), exactly as before this classification.
+    local by_width      = {}   -- spread -> [keys], shared across all sizes
+    local fallback_2    = {}   -- sz==2, no principled width
+    local fallback_3    = {}   -- sz -> [keys], sz>=3, no principled width
+    local key_to_group  = {}   -- key -> group id string, for adjacency below
+
+    for _, sz in ipairs(sizes) do
+        if sz >= 2 then
+            local order = size_orders[sz]
+            sort_by_pitch(order, all_shapes)
+            for _, key in ipairs(order) do
+                local pitches = all_shapes[key].pitches
+                local width, combo = GuitarSuggestRBMapping(pitches)
+                if combo == 'GO' then
+                    shape_gems[key] = { 0, 4 }
+                else
+                    local spread = width and WIDTH_TO_SPREAD[width]
+                    if spread and pool2_by_w[spread] and #pool2_by_w[spread] > 0 then
+                        by_width[spread] = by_width[spread] or {}
+                        by_width[spread][#by_width[spread] + 1] = key
+                        key_to_group[key] = 'w' .. spread
+                    elseif sz == 2 then
+                        fallback_2[#fallback_2 + 1] = key
+                        key_to_group[key] = 'f2'
+                    else
+                        fallback_3[sz] = fallback_3[sz] or {}
+                        fallback_3[sz][#fallback_3[sz] + 1] = key
+                        key_to_group[key] = 'f3:' .. sz
+                    end
+                end
+            end
+        end
+    end
+
+    -- Adjacency: for each pair of consecutive events with DIFFERENT
+    -- shapes in the SAME group, count how many times that pair is
+    -- actually back-to-back in the passage - feeds AssignByConflict's
+    -- conflict-minimizing search below. Cross-group adjacency (e.g. a
+    -- dyad immediately followed by a real triad) isn't tracked - those
+    -- shapes never compete for the same combo list anyway.
+    local adjacency = {}   -- key -> { other_key -> count }
+    local prev_key
+    for _, ev in ipairs(events) do
+        local pitches = CompressChord(ev.pitches, max_chord)
+        table.sort(pitches)
+        local key = shape_key(pitches)
+        if prev_key and prev_key ~= key then
+            local g1, g2 = key_to_group[prev_key], key_to_group[key]
+            if g1 and g1 == g2 then
+                adjacency[prev_key] = adjacency[prev_key] or {}
+                adjacency[prev_key][key] = (adjacency[prev_key][key] or 0) + 1
+                adjacency[key] = adjacency[key] or {}
+                adjacency[key][prev_key] = (adjacency[key][prev_key] or 0) + 1
+            end
+        end
+        prev_key = key
+    end
+
+    for spread = 1, 4 do
+        local keys = by_width[spread]
+        if keys then
+            sort_by_pitch(keys, all_shapes)
+            AssignByConflict(keys, pool2_by_w[spread], adjacency, shape_gems, shared)
+        end
+    end
+    AssignByConflict(fallback_2, pool2, adjacency, shape_gems, shared)
+    for sz, keys in pairs(fallback_3) do
+        local pool = POOLS[math.min(sz, 3)] or POOLS[1]
+        AssignByConflict(keys, pool, adjacency, shape_gems, shared)
+    end
+
+    return all_shapes, shape_gems, shared
+end
+
+----------------------------------------------------------------------
+-- Gem assignment: main algorithm
+----------------------------------------------------------------------
+
+-- Shape-based algorithm:
+--
+-- Phase 1 (global map building):
+--   BuildShapeGemMap collects all distinct compressed chord shapes across
+--   the entire event list and assigns each a gem combo (see its own doc
+--   comment above). Gaps between notes do NOT reset assignments.
+--
+-- Phase 2 (output):
+--   Walk events in order, emitting gem assignments using the global shape map.
+--   Gaps > wrap_gap_s are annotated as phrase boundaries in the report only.
+--
+-- Returns assignments[]: each entry is either:
+--   { s, e, gems[], reason, is_meta=false }  - a real gem event
+--   { s, reason, is_meta=true }              - phrase/wrap annotation
+local function AssignGems(events, wrap_gap_s, max_chord)
+    if #events == 0 then return {} end
+
+    local all_shapes, shape_gems, shared = BuildShapeGemMap(events, max_chord)
 
     -- Phrase ranges: for report annotations only - do NOT reset gem assignments
     local phrase_ranges = {}
@@ -310,9 +559,11 @@ local function AssignGems(events, wrap_gap_s, max_chord)
         if n_orig > #pitches then
             reason = reason .. string.format('  (compressed %d\xe2\x86\x92%d)', n_orig, #pitches)
         end
+        reason = reason .. ChordQualityLabel(pitches)
         if go_fixed  then reason = reason .. '  (G+O 3-note illegal \xe2\x86\x92 kept as 1-5)' end
         if go_subst  then reason = reason .. '  (G\xe2\x86\x92R: G+O \xe2\x86\x92 R+O for playability)' end
         if narrowed_14 then reason = reason .. '  (1-4 \xe2\x86\x92 1-3: narrowed per setting)' end
+        if shared[key] then reason = reason .. '  (*Wrap)' end
 
         assignments[#assignments + 1] = {
             s = ev.s, e = ev.e, gems = gems, reason = reason, is_meta = false,
