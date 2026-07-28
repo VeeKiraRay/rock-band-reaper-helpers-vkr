@@ -47,7 +47,7 @@ local function BuildPatternLabel(sel_s, sel_e, note_count)
     local s_m   = tonumber(r.format_timestr_pos(sel_s, '', 1):match('^(%d+)')) or 0
     local e_m   = tonumber(r.format_timestr_pos(sel_e, '', 1):match('^(%d+)')) or 0
     local m_cnt = e_m - s_m
-    return string.format('M%d\xe2\x80\x93M%d (%d measure%s with %d note%s)',
+    return string.format('M%d-M%d (%d measure%s with %d note%s)',
         s_m, e_m - 1,
         m_cnt, m_cnt ~= 1 and 's' or '',
         note_count, note_count ~= 1 and 's' or '')
@@ -79,10 +79,42 @@ end
 
 local function GetTrackAndTake(idx)
     local track = r.GetTrack(0, idx)
-    if not track then return nil, nil, nil, 'Selected track no longer exists \xe2\x80\x94 refresh tracks.' end
+    if not track then return nil, nil, nil, 'Selected track no longer exists - refresh tracks.' end
     local item, take = FindFirstMIDIItem(track)
     if not take then return nil, nil, nil, 'No MIDI item on source track.' end
     return track, item, take, nil
+end
+
+-- Resolve the scan scope for the source track's MIDI item to take-relative
+-- PPQ bounds: the time selection if active, else the whole item.
+local function ResolvePatternScope(take, item, sel_s, sel_e)
+    if sel_s then
+        return r.MIDI_GetPPQPosFromProjTime(take, sel_s), r.MIDI_GetPPQPosFromProjTime(take, sel_e)
+    end
+    local item_pos = r.GetMediaItemInfo_Value(item, 'D_POSITION')
+    local item_len = r.GetMediaItemInfo_Value(item, 'D_LENGTH')
+    return r.MIDI_GetPPQPosFromProjTime(take, item_pos), r.MIDI_GetPPQPosFromProjTime(take, item_pos + item_len)
+end
+
+-- Walk [spq, epq) in Search-pattern-sized/strided windows and return an array
+-- of take-relative PPQ match start positions. On a match, jumps past the
+-- whole matched window (like DoMIDIPatternReplace does when replacing) so a
+-- replaced region is never rescanned; on a miss, advances by one measure.
+local function ScanPatternMatches(take, spq, epq, lo, hi)
+    local dur  = S.mr_search_dur_ppq
+    local step = S.mr_search_step_ppq > 0 and S.mr_search_step_ppq or dur
+    local matches = {}
+    local w = spq
+    while w + dur <= epq do
+        local cand = ReadMIDIPatternFromTake(take, w, w + dur, lo, hi)
+        if PatternsMatch(S.mr_search_notes, cand) then
+            matches[#matches + 1] = w
+            w = w + dur
+        else
+            w = w + step
+        end
+    end
+    return matches
 end
 
 ----------------------------------------------------------------------
@@ -206,7 +238,7 @@ function DoMIDIPatternReplace()
         S.status = 'Set a Replace pattern first.'; return
     end
     if #S.mr_search_notes == 0 then
-        S.status = 'Search pattern has 0 notes \xe2\x80\x94 nothing to match.'; return
+        S.status = 'Search pattern has 0 notes - nothing to match.'; return
     end
     if math.abs(S.mr_search_dur_ppq - S.mr_replace_dur_ppq) > 0.5 then
         S.status = 'Search and Replace patterns must cover the same duration.'; return
@@ -220,37 +252,20 @@ function DoMIDIPatternReplace()
     -- Scan scope: time selection or full MIDI item
     local sel_s, sel_e = GetTimeSelection()
     local dur = S.mr_search_dur_ppq
-    local spq, epq
-    if sel_s then
-        spq = r.MIDI_GetPPQPosFromProjTime(take, sel_s)
-        epq = r.MIDI_GetPPQPosFromProjTime(take, sel_e)
-    else
-        local item_pos = r.GetMediaItemInfo_Value(item, 'D_POSITION')
-        local item_len = r.GetMediaItemInfo_Value(item, 'D_LENGTH')
-        spq = r.MIDI_GetPPQPosFromProjTime(take, item_pos)
-        epq = r.MIDI_GetPPQPosFromProjTime(take, item_pos + item_len)
-    end
+    local spq, epq = ResolvePatternScope(take, item, sel_s, sel_e)
+    local match_positions = ScanPatternMatches(take, spq, epq, lo, hi)
 
-    local step    = S.mr_search_step_ppq > 0 and S.mr_search_step_ppq or dur
-    local matches = 0
     r.PreventUIRefresh(1)
     r.Undo_BeginBlock2(0)
     r.MarkTrackItemsDirty(track, item)
 
-    local w = spq
-    while w + dur <= epq do
-        local cand = ReadMIDIPatternFromTake(take, w, w + dur, lo, hi)
-        if PatternsMatch(S.mr_search_notes, cand) then
-            ClearPatternWindow(take, w, w + dur, lo, hi)
-            for _, note in ipairs(S.mr_replace_notes) do
-                r.MIDI_InsertNote(take, false, false, w + note.rel_s, w + note.rel_e, 0, note.pitch, 100, false)
-            end
-            matches = matches + 1
-            w = w + dur   -- skip past the replaced region
-        else
-            w = w + step  -- try next measure boundary
+    for _, w in ipairs(match_positions) do
+        ClearPatternWindow(take, w, w + dur, lo, hi)
+        for _, note in ipairs(S.mr_replace_notes) do
+            r.MIDI_InsertNote(take, false, false, w + note.rel_s, w + note.rel_e, 0, note.pitch, 100, false)
         end
     end
+    local matches = #match_positions
 
     r.Undo_EndBlock2(0, 'Pattern Replace: ' .. matches .. ' replacement' .. (matches ~= 1 and 's' or ''), -1)
     r.PreventUIRefresh(-1)
@@ -261,4 +276,82 @@ function DoMIDIPatternReplace()
     else
         S.status = 'No matches found.'
     end
+end
+
+----------------------------------------------------------------------
+
+-- Move the edit cursor to the nearest Search-pattern match before/after the
+-- current edit cursor position. direction: -1 = previous, 1 = next.
+local function GoToPatternMatch(direction)
+    if S.mr_midi_src_idx < 0 then
+        S.status = 'Set a source MIDI track first.'; return
+    end
+    if not S.mr_search_notes or #S.mr_search_notes == 0 then
+        S.status = 'Set a Search pattern first.'; return
+    end
+    local track, item, take, err = GetTrackAndTake(S.mr_midi_src_idx)
+    if err then S.status = err; return end
+
+    local _, track_name = r.GetTrackName(track)
+    local lo, hi = GetPatternPitchRange(track_name, S.mr_diff_idx)
+
+    local sel_s, sel_e = GetTimeSelection()
+    local spq, epq = ResolvePatternScope(take, item, sel_s, sel_e)
+    local match_positions = ScanPatternMatches(take, spq, epq, lo, hi)
+
+    local cur_ppq = r.MIDI_GetPPQPosFromProjTime(take, r.GetCursorPosition())
+    local EPS = 0.5
+    local best = nil
+    for _, w in ipairs(match_positions) do
+        if direction < 0 then
+            if w < cur_ppq - EPS and (not best or w > best) then best = w end
+        else
+            if w > cur_ppq + EPS and (not best or w < best) then best = w end
+        end
+    end
+
+    if not best then
+        S.status = direction < 0 and 'No previous instance found.' or 'No next instance found.'
+        return
+    end
+
+    r.SetEditCurPos(r.MIDI_GetProjTimeFromPPQPos(take, best), true, false)
+    S.status = direction < 0 and 'Moved to previous match.' or 'Moved to next match.'
+end
+
+function GoPrevPatternMatch() GoToPatternMatch(-1) end
+function GoNextPatternMatch() GoToPatternMatch(1) end
+
+----------------------------------------------------------------------
+
+function ListPatternMatches()
+    if S.mr_midi_src_idx < 0 then
+        S.status = 'Set a source MIDI track first.'; return
+    end
+    if not S.mr_search_notes or #S.mr_search_notes == 0 then
+        S.status = 'Set a Search pattern first.'; return
+    end
+    local track, item, take, err = GetTrackAndTake(S.mr_midi_src_idx)
+    if err then S.status = err; return end
+
+    local _, track_name = r.GetTrackName(track)
+    local lo, hi = GetPatternPitchRange(track_name, S.mr_diff_idx)
+
+    local sel_s, sel_e = GetTimeSelection()
+    local spq, epq = ResolvePatternScope(take, item, sel_s, sel_e)
+    local match_positions = ScanPatternMatches(take, spq, epq, lo, hi)
+
+    if #match_positions == 0 then
+        S.status = 'No matches found.'
+        S.last_result = nil
+        return
+    end
+
+    local lines = { ('%d match%s found:'):format(#match_positions, #match_positions ~= 1 and 'es' or ''), '' }
+    for i, w in ipairs(match_positions) do
+        local t = r.MIDI_GetProjTimeFromPPQPos(take, w)
+        lines[#lines + 1] = ('%d. %s'):format(i, FormatTime(t))
+    end
+    S.status = ('Listed %d match%s.'):format(#match_positions, #match_positions ~= 1 and 'es' or '')
+    S.last_result = table.concat(lines, '\n')
 end

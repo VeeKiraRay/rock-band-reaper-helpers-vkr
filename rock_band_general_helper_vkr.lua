@@ -1,6 +1,6 @@
 -- @description Rock Band General Helper
 -- @author VeeKiraRay
--- @version 0.9.38
+-- @version 0.9.39
 -- @about
 --   Utility actions for Rock Band authoring in REAPER.
 --
@@ -21,6 +21,30 @@
 --   This @about block keeps only the 5 most recent versions.
 --   Full history: CHANGELOG.md in the repo.
 --
+--   v0.9.39
+--     - MIDI tab > Pattern: new "Go Prev" / "Go Next" buttons move the edit
+--       cursor between Search-pattern matches; "List Search" reports every
+--       match with its measure/time location (read-only). All three share
+--       the Replace All match-scanning walk (new local ScanPatternMatches,
+--       actions_midi_replace.lua). Fixed a real bug along the way: the
+--       Pattern tab's measure-range label and a few MIDI-tab status
+--       messages used UTF-8 en-dash/em-dash byte escapes that ReaImGui's
+--       font can't rasterize, rendering as "?" - replaced with plain
+--       ASCII dashes in actions_midi_replace.lua, actions_midi_align.lua,
+--       and ui_midi.lua.
+--     - MIDI tab > Length: new "Midi note" section (above the existing
+--       reference-track resize section, now labeled "Midi track") bulk-
+--       adjusts note lengths on one track's difficulty tier. "Non-sustains"
+--       unifies every note SHORTER than 1/4 note to a selected standard
+--       size (1/8 to 1/128, default 1/32) - existing sustains are left
+--       untouched; "Only sustains" widens or narrows each sustain's
+--       (>= 1/4 note) gap to the next note to an exact 32nd-note amount,
+--       searching up to 16x32nd notes ahead - a sustain with nothing that
+--       close is left unchanged, and one that would shrink below a
+--       1/32-note floor is clamped there instead. All math works in raw
+--       take-PPQ ticks (never seconds or QN floats) so results land
+--       exactly on REAPER's own note-length grid. New
+--       actions_midi_length.lua (AdjustMidiNoteLengths).
 --   v0.9.38
 --     - Fixed a combo-wrap collision: when a passage has more distinct
 --       chord shapes in one lane-spread group than that group has combo
@@ -99,21 +123,6 @@
 --       GenerateCameraEvents gained an optional phrase_positions_16ths param.
 --       RB3_PHRASE_PITCH is now a shared global (venue_camera.lua) instead of
 --       a local duplicated in actions_venue_sing_along.lua.
---   v0.9.34
---     - Workflow sub-tab: new "Show only unfinished" checkbox hides checked
---       items (and any section whose items are all checked) so a long
---       checklist doesn't force scrolling past finished work; a "done /
---       total completed - pct%" progress line now sits below the
---       checkboxes, always counted over the whole template regardless of
---       the filter. Simplified how checked history is pruned: switching
---       templates now immediately drops history for items not in the
---       newly-selected file (SelectWorkflowFile), instead of only pruning
---       once the total exceeded a 100-item cap compared against every
---       loaded template - simpler, and matches the actual use case of
---       bouncing between a couple of templates rather than keeping
---       long-lived cross-template history. WORKFLOW_MAX_ITEMS is gone;
---       PurgeStaleWorkflowEntries is replaced by PruneToWorkflowEntries
---       (scoped to one file's entries instead of every loaded one).
 r = reaper  -- global so all dofile'd modules can use it
 
 if not r.ImGui_CreateContext then
@@ -180,6 +189,7 @@ for _, _f in ipairs({
     _mdir .. 'actions_guitar_validate.lua',
     _mdir .. 'actions_midi_align.lua',
     _mdir .. 'actions_midi_replace.lua',
+    _mdir .. 'actions_midi_length.lua',
     _mdir .. 'actions_difficulty_shared.lua',
     _mdir .. 'actions_difficulty.lua',
     _mdir .. 'actions_difficulty_5k.lua',
@@ -241,6 +251,7 @@ dofile(_mdir .. 'actions_guitar_guide.lua')
 dofile(_mdir .. 'actions_guitar_validate.lua')
 dofile(_mdir .. 'actions_midi_align.lua')
 dofile(_mdir .. 'actions_midi_replace.lua')
+dofile(_mdir .. 'actions_midi_length.lua')
 dofile(_mdir .. 'actions_difficulty_shared.lua')
 dofile(_mdir .. 'actions_difficulty.lua')
 dofile(_mdir .. 'actions_difficulty_5k.lua')

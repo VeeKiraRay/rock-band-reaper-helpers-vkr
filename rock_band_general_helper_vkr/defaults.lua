@@ -142,6 +142,12 @@ S = {
     ma_mode               = 0,  -- 0 = move only, 1 = move + stretch
     -- MIDI length sync (not persisted - track index only)
     ms_ref_idx            = -1,
+    -- MIDI note length/sustain adjustment (persisted except track index)
+    mn_midi_idx           = -1,
+    mn_diff_idx           = 1,     -- 1=Expert, 2=Hard, 3=Medium, 4=Easy (no "All")
+    mn_note_type          = 0,     -- 0 = All notes, 1 = Only sustains
+    mn_note_denom         = 32,    -- All notes: note size denominator (8/16/32/64/128)
+    mn_sustain_32nds      = 3,     -- Only sustains: gap size in 32nd notes (0-32)
     -- Pattern Replace (session-only - not persisted)
     mr_midi_src_idx       = -1,
     mr_diff_idx           = 0,     -- 0=All, 1=Expert, 2=Hard, 3=Medium, 4=Easy
@@ -709,6 +715,30 @@ TIPS = {
                 "reference clips managed by the MIDI Alignment section above.\n\n" ..
                 "If shrinking: check that no notes exist beyond the new item end.",
 
+    -- MIDI tab - Midi note (length/sustain adjustment)
+    mn_midi_track  = "MIDI track to adjust note lengths on.",
+    mn_diff        = "Restricts the adjustment to one difficulty tier's pitch range.\n\n" ..
+                     "PART DRUMS/GUITAR/BASS/KEYS: Expert 96-100, Hard 84-88,\n" ..
+                     "Medium 72-76, Easy 60-64.\n\n" ..
+                     "PART VOCALS/HARM1-3 and PART REAL_KEYS*/PART KEYS_ANIM* always use\n" ..
+                     "their own fixed range regardless of this selector.\n\n" ..
+                     "No notes outside the selected range are touched.",
+    mn_note_type   = "Non-sustains: unify every note SHORTER than 1/4 note to the selected\n" ..
+                     "Note size. Existing sustains (>= 1/4 note) are left untouched.\n\n" ..
+                     "Only sustains: leave note starts and short notes untouched; instead\n" ..
+                     "adjust the gap between each sustain (>= 1/4 note) and the next note.",
+    mn_note_denom  = "Standard note length every non-sustain note in range is set to (start\n" ..
+                     "position unchanged, only the end position moves). Default: 1/32.",
+    mn_sustain_32nds = "Target gap, in 32nd notes, between a sustain's end and the next note.\n\n" ..
+                     "Widens or shortens the sustain as needed to hit this gap exactly.\n" ..
+                     "Only looks up to a half note (16x32nd notes) ahead for a next note -\n" ..
+                     "sustains with nothing that close are left unchanged.",
+    mn_adjust      = "Apply the note-length/sustain-gap adjustment to the selected track\n" ..
+                     "and difficulty range.\n\n" ..
+                     "With a time selection: only adjusts notes starting inside it.\n" ..
+                     "Without: adjusts the whole MIDI item.\n\n" ..
+                     "Fully undoable.",
+
     -- MIDI tab - Pattern Replace
     mr_midi_src    = "MIDI track to search and replace patterns within.\n\n" ..
                      "All four actions (Set Search, Set Replace, Replace All, Fill Range)\n" ..
@@ -734,6 +764,18 @@ TIPS = {
                      "Clears each destination window first, then inserts the Replace notes.\n" ..
                      "Requires an active time selection.\n\n" ..
                      "Fully undoable.",
+    mr_go_prev     = "Move the edit cursor to the nearest Search-pattern match before the\n" ..
+                     "current cursor position.\n\n" ..
+                     "With a time selection: only searches within that range.\n" ..
+                     "Without: searches the full MIDI item.",
+    mr_go_next     = "Move the edit cursor to the nearest Search-pattern match after the\n" ..
+                     "current cursor position.\n\n" ..
+                     "With a time selection: only searches within that range.\n" ..
+                     "Without: searches the full MIDI item.",
+    mr_list_search = "List every Search-pattern match with its measure and time location.\n\n" ..
+                     "With a time selection: only searches within that range.\n" ..
+                     "Without: searches the full MIDI item.\n\n" ..
+                     "Read-only.",
 
     -- General tab - Song fade out
     song_fade_out = "Create a volume fade out on the SONG AUDIO track within the time selection.\n\n" ..

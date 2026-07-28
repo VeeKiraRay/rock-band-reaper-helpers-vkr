@@ -9,7 +9,7 @@ function AlignMIDI()
     end
     local src_tr = r.GetTrack(0, S.ma_midi_src_idx)
     if not src_tr then
-        S.status = 'Error: selected track no longer exists \xe2\x80\x94 refresh tracks.'
+        S.status = 'Error: selected track no longer exists - refresh tracks.'
         S.last_result = nil
         return
     end
@@ -108,7 +108,7 @@ function ResizeAllMIDI()
     end
     local ref_tr = r.GetTrack(0, S.ms_ref_idx)
     if not ref_tr then
-        S.status = 'Error: reference track no longer exists \xe2\x80\x94 refresh tracks.'
+        S.status = 'Error: reference track no longer exists - refresh tracks.'
         S.last_result = nil
         return
     end
@@ -189,14 +189,14 @@ function ResizeAllMIDI()
 
     if #skipped > 0 then
         lines[#lines + 1] = ''
-        lines[#lines + 1] = ('Skipped \xe2\x80\x94 not at position 0 (%d):'):format(#skipped)
+        lines[#lines + 1] = ('Skipped - not at position 0 (%d):'):format(#skipped)
         for _, n in ipairs(skipped) do
             lines[#lines + 1] = '  ' .. n
         end
     end
     if shrunk > 0 then
         lines[#lines + 1] = ''
-        lines[#lines + 1] = ('Warning: %d item%s shrunk \xe2\x80\x94 verify no notes are cut off.'):format(
+        lines[#lines + 1] = ('Warning: %d item%s shrunk - verify no notes are cut off.'):format(
             shrunk, shrunk == 1 and ' was' or 's were')
     end
 

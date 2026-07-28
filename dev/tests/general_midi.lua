@@ -479,6 +479,319 @@ Test.it('SetSearchPattern with Difficulty=All spans every tier on PART DRUMS', f
 end)
 
 ----------------------------------------------------------------------
+-- Pattern navigation — Go Prev / Go Next / List Search
+-- Synthetic track (not a fixture) so match positions are exactly known.
+----------------------------------------------------------------------
+Test.section('Pattern navigation — Go Prev / Go Next / List Search')
+
+-- Create an empty MIDI-item-bearing track named `name`, `len_s` seconds long
+-- from project time 0. Returns (take, item, track_idx).
+local function MakeMidiTrack(name, len_s)
+    local idx  = CreateEmptyFixtureTrack(name)
+    local tr   = r.GetTrack(0, idx)
+    local item = r.CreateNewMIDIItemInProj(tr, 0, len_s or 20, false)
+    local take = r.GetActiveTake(item)
+    return take, item, idx
+end
+
+Test.it('ListPatternMatches finds every recurrence; Go Next/Go Prev step between them', function()
+    reset()
+    local take, item, idx = MakeMidiTrack('PART DRUMS', 12)
+    local ppq_per_qn      = GetTakePPQPerQN(take)
+    local ppq_per_measure = ppq_per_qn * 4  -- default 4/4
+
+    -- A single Expert-range kick (pitch 96) at the start of measures 1, 3, 5
+    -- (0-indexed: 0, 2, 4) — an unambiguous, exactly-known recurrence.
+    for _, m in ipairs({ 0, 2, 4 }) do
+        local sp = m * ppq_per_measure
+        r.MIDI_InsertNote(take, false, false, sp, sp + 1, 0, 96, 100, false)
+    end
+
+    S.mr_midi_src_idx = idx
+    S.mr_diff_idx     = 1  -- Expert
+
+    -- Capture measure 1's note as the search pattern.
+    local m1_time = r.MIDI_GetProjTimeFromPPQPos(take, 0)
+    local m2_time = r.MIDI_GetProjTimeFromPPQPos(take, ppq_per_measure)
+    r.GetSet_LoopTimeRange(true, false, m1_time, m2_time, false)
+    SetSearchPattern()
+    r.GetSet_LoopTimeRange(true, false, 0, 0, false)
+    Test.expect(S.mr_search_notes ~= nil and #S.mr_search_notes == 1,
+        'expected a 1-note search pattern captured')
+    Test.expect(not S.mr_search_label:find('\xe2'),
+        'search label contains a non-ASCII byte (dash-escape regression): ' .. S.mr_search_label)
+
+    ListPatternMatches()
+    Test.expect(S.last_result ~= nil and S.last_result:find('^3 match'),
+        'expected 3 matches listed, got status=' .. S.status .. ' result=' .. tostring(S.last_result))
+    Test.expect(not S.last_result:find('\xe2'),
+        'List Search result contains a non-ASCII byte (dash-escape regression)')
+
+    local m3_time = r.MIDI_GetProjTimeFromPPQPos(take, 2 * ppq_per_measure)
+    local m5_time = r.MIDI_GetProjTimeFromPPQPos(take, 4 * ppq_per_measure)
+
+    -- Go Next: measure 1 -> 3 -> 5 -> none left
+    r.SetEditCurPos(m1_time + 0.05, false, false)
+    GoNextPatternMatch()
+    Test.expect(math.abs(r.GetCursorPosition() - m3_time) < 0.01,
+        'Go Next: expected cursor at measure 3, got ' .. r.GetCursorPosition())
+    GoNextPatternMatch()
+    Test.expect(math.abs(r.GetCursorPosition() - m5_time) < 0.01,
+        'Go Next: expected cursor at measure 5, got ' .. r.GetCursorPosition())
+    GoNextPatternMatch()
+    Test.expect(S.status == 'No next instance found.', 'expected no-next status, got: ' .. S.status)
+
+    -- Go Prev: measure 5 -> 3 -> 1 -> none left
+    r.SetEditCurPos(m5_time + 0.05, false, false)
+    GoPrevPatternMatch()
+    Test.expect(math.abs(r.GetCursorPosition() - m3_time) < 0.01,
+        'Go Prev: expected cursor at measure 3, got ' .. r.GetCursorPosition())
+    GoPrevPatternMatch()
+    Test.expect(math.abs(r.GetCursorPosition() - m1_time) < 0.01,
+        'Go Prev: expected cursor at measure 1, got ' .. r.GetCursorPosition())
+    GoPrevPatternMatch()
+    Test.expect(S.status == 'No previous instance found.', 'expected no-previous status, got: ' .. S.status)
+
+    CleanupFixture(idx)
+end)
+
+----------------------------------------------------------------------
+-- Midi note length adjustment — AdjustMidiNoteLengths
+-- Synthetic tracks so exact PPQ-tick results can be asserted.
+----------------------------------------------------------------------
+Test.section('Midi note length adjustment — AdjustMidiNoteLengths')
+
+Test.it('Non-sustains: unifies every note shorter than 1/4 note to the selected note size', function()
+    reset()
+    local take, item, idx = MakeMidiTrack('PART GUITAR', 20)
+    local ppq_per_qn = GetTakePPQPerQN(take)
+    local len32      = math.floor(ppq_per_qn * 4 / 32 + 0.5)
+
+    -- Two short (non-sustain) Expert-range (96-100) notes of varying wrong
+    -- lengths, plus a third that is already a 1/4-note sustain.
+    local sustain_sppq, sustain_eppq = 2 * ppq_per_qn, 3 * ppq_per_qn
+    r.MIDI_InsertNote(take, false, false, 0,               100,             0, 96, 100, false)
+    r.MIDI_InsertNote(take, false, false, ppq_per_qn,       ppq_per_qn + 5,  0, 98, 100, false)
+    r.MIDI_InsertNote(take, false, false, sustain_sppq,     sustain_eppq,    0, 100, 100, false)
+
+    S.mn_midi_idx   = idx
+    S.mn_diff_idx   = 1  -- Expert
+    S.mn_note_type  = 0  -- Non-sustains
+    S.mn_note_denom = 32
+    AdjustMidiNoteLengths()
+
+    Test.expect(not S.status:find('^Error'), 'AdjustMidiNoteLengths errored: ' .. S.status)
+    local _, n = r.MIDI_CountEvts(take)
+    Test.expect(n == 3, 'expected 3 notes still present, got ' .. n)
+    for i = 0, 1 do
+        local ok, _, _, sppq, eppq = r.MIDI_GetNote(take, i)
+        Test.expect(ok and (eppq - sppq) == len32,
+            ('note %d: expected length %d, got %d'):format(i, len32, eppq - sppq))
+    end
+    local ok, _, _, sppq3, eppq3 = r.MIDI_GetNote(take, 2)
+    Test.expect(ok and sppq3 == sustain_sppq and eppq3 == sustain_eppq,
+        'expected the existing 1/4-note sustain to be left completely untouched')
+    CleanupFixture(idx)
+end)
+
+Test.it('Only sustains: widens a too-small gap to the requested 32nd-note amount', function()
+    reset()
+    local take, item, idx = MakeMidiTrack('PART GUITAR', 20)
+    local ppq_per_qn = GetTakePPQPerQN(take)
+    local len32      = math.floor(ppq_per_qn * 4 / 32 + 0.5)
+
+    -- A 1-quarter-note sustain, then the next note only 2x32nds later.
+    local sustain_sppq = 0
+    local sustain_eppq = ppq_per_qn
+    local next_sppq    = sustain_eppq + 2 * len32
+    r.MIDI_InsertNote(take, false, false, sustain_sppq, sustain_eppq, 0, 96, 100, false)
+    r.MIDI_InsertNote(take, false, false, next_sppq, next_sppq + len32, 0, 96, 100, false)
+
+    S.mn_midi_idx        = idx
+    S.mn_diff_idx        = 1  -- Expert
+    S.mn_note_type       = 1  -- Only sustains
+    S.mn_sustain_32nds   = 4
+    AdjustMidiNoteLengths()
+
+    Test.expect(not S.status:find('^Error'), 'AdjustMidiNoteLengths errored: ' .. S.status)
+    local ok, _, _, new_sppq, new_eppq = r.MIDI_GetNote(take, 0)
+    Test.expect(ok and new_sppq == sustain_sppq, 'sustain start must not move')
+    Test.expect(new_eppq == next_sppq - 4 * len32,
+        ('expected sustain end at %d, got %d'):format(next_sppq - 4 * len32, new_eppq))
+    CleanupFixture(idx)
+end)
+
+Test.it('Only sustains: narrows a too-large gap (lengthens the sustain) toward the requested amount', function()
+    reset()
+    local take, item, idx = MakeMidiTrack('PART GUITAR', 20)
+    local ppq_per_qn = GetTakePPQPerQN(take)
+    local len32      = math.floor(ppq_per_qn * 4 / 32 + 0.5)
+
+    -- A 1-quarter-note sustain, next note 8x32nds later (well within the
+    -- 16x32nd search window); request a smaller 2x32nd gap.
+    local sustain_sppq = 0
+    local sustain_eppq = ppq_per_qn
+    local next_sppq    = sustain_eppq + 8 * len32
+    r.MIDI_InsertNote(take, false, false, sustain_sppq, sustain_eppq, 0, 96, 100, false)
+    r.MIDI_InsertNote(take, false, false, next_sppq, next_sppq + len32, 0, 96, 100, false)
+
+    S.mn_midi_idx      = idx
+    S.mn_diff_idx      = 1
+    S.mn_note_type     = 1
+    S.mn_sustain_32nds = 2
+    AdjustMidiNoteLengths()
+
+    local ok, _, _, new_sppq, new_eppq = r.MIDI_GetNote(take, 0)
+    Test.expect(ok and new_eppq > sustain_eppq, 'expected the sustain to be lengthened')
+    Test.expect(new_eppq == next_sppq - 2 * len32,
+        ('expected sustain end at %d, got %d'):format(next_sppq - 2 * len32, new_eppq))
+    CleanupFixture(idx)
+end)
+
+Test.it('Only sustains: clamps to the 1/32-note floor when the requested gap would shrink it below that', function()
+    reset()
+    local take, item, idx = MakeMidiTrack('PART GUITAR', 20)
+    local ppq_per_qn = GetTakePPQPerQN(take)
+    local len32      = math.floor(ppq_per_qn * 4 / 32 + 0.5)
+
+    -- A 1-quarter-note sustain, next note only 1x32nd later; requesting a
+    -- large gap (16x32nds) would push the sustain length negative.
+    local sustain_sppq = 0
+    local sustain_eppq = ppq_per_qn
+    local next_sppq    = sustain_eppq + len32
+    r.MIDI_InsertNote(take, false, false, sustain_sppq, sustain_eppq, 0, 96, 100, false)
+    r.MIDI_InsertNote(take, false, false, next_sppq, next_sppq + len32, 0, 96, 100, false)
+
+    S.mn_midi_idx      = idx
+    S.mn_diff_idx      = 1
+    S.mn_note_type     = 1
+    S.mn_sustain_32nds = 16
+    AdjustMidiNoteLengths()
+
+    local ok, _, _, new_sppq, new_eppq = r.MIDI_GetNote(take, 0)
+    Test.expect(ok and new_eppq == sustain_sppq + len32,
+        ('expected sustain clamped to the 1/32-note floor (%d), got %d'):format(sustain_sppq + len32, new_eppq))
+    Test.expect(S.last_result ~= nil and S.last_result:find('clamped'),
+        'expected the report to mention a clamped sustain: ' .. tostring(S.last_result))
+    CleanupFixture(idx)
+end)
+
+Test.it('Only sustains: skips a sustain with no next note within the 16x32nd search window', function()
+    reset()
+    local take, item, idx = MakeMidiTrack('PART GUITAR', 20)
+    local ppq_per_qn = GetTakePPQPerQN(take)
+    local len32      = math.floor(ppq_per_qn * 4 / 32 + 0.5)
+
+    -- A 1-quarter-note sustain with nothing else on the track at all.
+    local sustain_sppq = 0
+    local sustain_eppq = ppq_per_qn
+    r.MIDI_InsertNote(take, false, false, sustain_sppq, sustain_eppq, 0, 96, 100, false)
+
+    S.mn_midi_idx      = idx
+    S.mn_diff_idx      = 1
+    S.mn_note_type     = 1
+    S.mn_sustain_32nds = 4
+    AdjustMidiNoteLengths()
+
+    local ok, _, _, new_sppq, new_eppq = r.MIDI_GetNote(take, 0)
+    Test.expect(ok and new_sppq == sustain_sppq and new_eppq == sustain_eppq,
+        'expected the sustain to be left unchanged (no next note in range)')
+    Test.expect(S.last_result ~= nil and S.last_result:find('1 skipped'),
+        'expected the report to count 1 skipped sustain: ' .. tostring(S.last_result))
+    CleanupFixture(idx)
+end)
+
+Test.it('Only sustains: a note shorter than 1/4 note is left untouched', function()
+    reset()
+    local take, item, idx = MakeMidiTrack('PART GUITAR', 20)
+    local ppq_per_qn = GetTakePPQPerQN(take)
+    local len32      = math.floor(ppq_per_qn * 4 / 32 + 0.5)
+
+    -- An 8th-note-length note (not a sustain: shorter than 1/4 note), and a
+    -- following note close enough that a real sustain would be adjusted.
+    local short_sppq = 0
+    local short_eppq = math.floor(ppq_per_qn / 2 + 0.5)  -- 1/8 note
+    local next_sppq  = short_eppq + len32
+    r.MIDI_InsertNote(take, false, false, short_sppq, short_eppq, 0, 96, 100, false)
+    r.MIDI_InsertNote(take, false, false, next_sppq, next_sppq + len32, 0, 96, 100, false)
+
+    S.mn_midi_idx      = idx
+    S.mn_diff_idx      = 1
+    S.mn_note_type     = 1
+    S.mn_sustain_32nds = 8
+    AdjustMidiNoteLengths()
+
+    local ok, _, _, new_sppq, new_eppq = r.MIDI_GetNote(take, 0)
+    Test.expect(ok and new_sppq == short_sppq and new_eppq == short_eppq,
+        'expected the non-sustain note to be left completely unchanged')
+    CleanupFixture(idx)
+end)
+
+Test.it('Only sustains: a chord sustain (same start tick) is counted once, not per pitch', function()
+    reset()
+    local take, item, idx = MakeMidiTrack('PART GUITAR', 20)
+    local ppq_per_qn = GetTakePPQPerQN(take)
+    local len32      = math.floor(ppq_per_qn * 4 / 32 + 0.5)
+
+    -- A Green+Red+Blue chord sustain (3 pitches, same start/end), then the
+    -- next chord 2x32nds later.
+    local sustain_sppq = 0
+    local sustain_eppq = ppq_per_qn
+    local next_sppq    = sustain_eppq + 2 * len32
+    for _, pitch in ipairs({ 96, 97, 99 }) do
+        r.MIDI_InsertNote(take, false, false, sustain_sppq, sustain_eppq, 0, pitch, 100, false)
+        r.MIDI_InsertNote(take, false, false, next_sppq, next_sppq + len32, 0, pitch, 100, false)
+    end
+
+    S.mn_midi_idx        = idx
+    S.mn_diff_idx        = 1  -- Expert
+    S.mn_note_type       = 1  -- Only sustains
+    S.mn_sustain_32nds   = 4
+    AdjustMidiNoteLengths()
+
+    Test.expect(S.last_result ~= nil and S.last_result:find('^1 sustain'),
+        'expected the 3-pitch chord to be reported as 1 sustain, got: ' .. tostring(S.last_result))
+    local _, n = r.MIDI_CountEvts(take)
+    for i = 0, n - 1 do
+        local ok, _, _, sppq, eppq = r.MIDI_GetNote(take, i)
+        if ok and sppq == sustain_sppq then
+            Test.expect(eppq == next_sppq - 4 * len32,
+                ('chord note at index %d: expected end %d, got %d'):format(i, next_sppq - 4 * len32, eppq))
+        end
+    end
+    CleanupFixture(idx)
+end)
+
+Test.it('Non-sustains: a chord (same start tick) is counted once, not per pitch', function()
+    reset()
+    local take, item, idx = MakeMidiTrack('PART GUITAR', 20)
+    local ppq_per_qn = GetTakePPQPerQN(take)
+    local len32      = math.floor(ppq_per_qn * 4 / 32 + 0.5)
+
+    -- A Green+Red+Blue chord of short (wrong-length) notes sharing one start tick.
+    for _, pitch in ipairs({ 96, 97, 99 }) do
+        r.MIDI_InsertNote(take, false, false, 0, 50, 0, pitch, 100, false)
+    end
+
+    S.mn_midi_idx   = idx
+    S.mn_diff_idx   = 1  -- Expert
+    S.mn_note_type  = 0  -- Non-sustains
+    S.mn_note_denom = 32
+    AdjustMidiNoteLengths()
+
+    Test.expect(S.status:find('^Adjusted 1 non%-sustain note%.'),
+        'expected the 3-pitch chord to be reported as 1 note, got status: ' .. S.status)
+    local _, n = r.MIDI_CountEvts(take)
+    Test.expect(n == 3, 'expected 3 notes still present, got ' .. n)
+    for i = 0, n - 1 do
+        local ok, _, _, sppq, eppq = r.MIDI_GetNote(take, i)
+        Test.expect(ok and (eppq - sppq) == len32,
+            ('chord note %d: expected length %d, got %d'):format(i, len32, eppq - sppq))
+    end
+    CleanupFixture(idx)
+end)
+
+----------------------------------------------------------------------
 -- Venue — rb_venue_events.mid (EVENTS + VENUE tracks, no instrument awareness data)
 -- Venue actions locate tracks by name via FindTrackByName, not S index.
 ----------------------------------------------------------------------

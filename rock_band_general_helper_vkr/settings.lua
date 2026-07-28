@@ -45,6 +45,11 @@ local function SerializeSettings()
         'd5kpkr=' .. (S.diff_5k_pk_reduce and '1' or '0'),
         -- MIDI alignment
         'mama='  .. S.ma_mode,
+        -- MIDI note length/sustain adjustment
+        'mndi='  .. S.mn_diff_idx,
+        'mnnt='  .. S.mn_note_type,
+        'mnnd='  .. S.mn_note_denom,
+        'mns32=' .. S.mn_sustain_32nds,
         -- Venue theme
         'vthn='  .. S.venue_theme_name,
         'vkfa='  .. S.venue_keyframe_align,
@@ -106,6 +111,11 @@ local function DeserializeSettings(str)
         elseif k == 'd5kpkr' then S.diff_5k_pk_reduce  = (v == '1')
         -- MIDI alignment
         elseif k == 'mama'  then S.ma_mode             = tonumber(v) or 0
+        -- MIDI note length/sustain adjustment
+        elseif k == 'mndi'  then S.mn_diff_idx         = tonumber(v) or S.mn_diff_idx
+        elseif k == 'mnnt'  then S.mn_note_type        = tonumber(v) or S.mn_note_type
+        elseif k == 'mnnd'  then S.mn_note_denom       = tonumber(v) or S.mn_note_denom
+        elseif k == 'mns32' then S.mn_sustain_32nds    = tonumber(v) or S.mn_sustain_32nds
         -- Venue theme
         elseif k == 'vthn'  then S.venue_theme_name      = v
         elseif k == 'vkfa'  then S.venue_keyframe_align  = tonumber(v) or 0

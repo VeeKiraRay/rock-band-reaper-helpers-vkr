@@ -123,7 +123,7 @@ Every Validate action (all four sub-tabs, H/M/E only — never Expert) also runs
 - Every Validate report ends with an informational (non-pass/fail) scan of `[mix N drums<config>]` disco-flip text events, listing which difficulty tiers have one authored — correctness of the flip depends on the surrounding beat pattern, which can't be judged from note data alone (the Hard-only un-flip check above is the one exception that *is* checkable).
 - Track field (`diff_drums_idx`) auto-detected by name (PART DRUMS) — independent of the Drums tab's own conversion target-track field.
 
-**MIDI tab** — MIDI alignment, length sync, and pattern replace. Contains three sub-tabs:
+**MIDI tab** — MIDI alignment, length sync, note-length adjustment, and pattern replace. Contains three sub-tabs:
 
 *Alignment sub-tab* — align an imported MIDI item to the project grid.
 - Source track selector.
@@ -131,12 +131,18 @@ Every Validate action (all four sub-tabs, H/M/E only — never Expert) also runs
 - Move + Stretch: also adjusts the take playback rate so the last note lands at the time selection end.
 - Set a time selection first, then click **Align MIDI**. Fully undoable.
 
-*Length sub-tab* — resize every MIDI item on every track to match a reference track's length.
-- Reference track selector, **Resize all MIDI** button.
+*Length sub-tab* — two sections, **Midi note** (above) and **Midi track** (below, the sub-tab's original content).
+- **Midi note** — bulk note-length/sustain-gap adjustment on one track's difficulty tier. Midi track selector + Difficulty selector (Expert/Hard/Medium/Easy — no "All": sustain rules differ per tier so there's no real use case for adjusting all four at once) + Note type radio:
+  - **Non-sustains** — a Note size combo (1/8, 1/16, 1/32 default, 1/64, 1/128); **Adjust notes** sets every note SHORTER than 1/4 note in the selected track/difficulty range to that standard length (start position never moves). Existing sustains (>= 1/4 note) are left completely untouched.
+  - **Only sustains** — a "32nd note amount" slider (0-32); **Adjust notes** finds every sustain (length >= 1/4 note) and widens or narrows it so the gap to the next note in range is exactly that many 32nd notes, searching up to 16x32nd notes ahead. No next note that close: the sustain is left unchanged. Honoring the requested gap would shrink the sustain below a 1/32-note floor: it's clamped to that floor instead (becomes a non-sustain) rather than skipped.
+  - All math works in raw take-PPQ ticks (via `GetTakePPQPerQN`, never seconds or QN floats) so results land exactly on REAPER's own note-length grid. Reuses `GetPatternPitchRange` (below) for the difficulty pitch range, so notes outside the tier (e.g. overdrive) are never touched. Respects time selection (falls back to the whole MIDI item). Fully undoable.
+  - A chord (multiple notes sharing one start tick, e.g. a Green+Red+Blue chord) still gets every pitch individually adjusted, but is counted once toward the report/status (`counted_starts` in both `AdjustNonSustainLengths` and `AdjustSustainGaps`, `actions_midi_length.lua`), so the numbers read as "N notes"/"N sustains", not "N pitches".
+- **Midi track** — resize every MIDI item on every track to match a reference track's length. Reference track selector, **Resize all MIDI** button.
 
-*Pattern sub-tab* — find and replace a note pattern across a MIDI track.
+*Pattern sub-tab* — find, replace, and navigate a note pattern across a MIDI track.
 - Source track selector; **Set Search** / **Set Replace** capture the currently-selected notes in the active MIDI editor as the search/replace patterns.
 - **Replace All** applies the replace pattern wherever the search pattern is found; **Fill Range** repeats the replace pattern across the time selection.
+- **Go Prev** / **Go Next** move the edit cursor to the nearest Search-pattern match before/after the current cursor position; **List Search** reports every match with its measure/time location (read-only, populates the shared result panel). All three share the same match-scanning walk as Replace All (`ScanPatternMatches`) and respect time selection the same way (falls back to the whole MIDI item).
 
 **Venue tab** — VENUE and EVENTS MIDI track events. Contains six sub-tabs (plus Preview):
 
@@ -220,7 +226,8 @@ Every Validate action (all four sub-tabs, H/M/E only — never Expert) also runs
 | `rock_band_general_helper_vkr/actions_guitar_guide.lua` | `ParseTabHorizontal`, `ParseTabVertical`, `ReformatVerticalTab`, `GuitarTabGuide` (global); `AssignGemsForGuide` (local) — guitar Tab Input guide; `AssignGemsForGuide` delegates its shape→gem map to `BuildShapeGemMap` (`actions_guitar.lua`) |
 | `rock_band_general_helper_vkr/actions_guitar_validate.lua` | `SustainThresholds`, `ReadRBGuitarNotes`, `RunValidation` (global) — validation helpers called by `ValidateGuitar` |
 | `rock_band_general_helper_vkr/actions_midi_align.lua` | `AlignMIDI`, `ResizeAllMIDI` (global) |
-| `rock_band_general_helper_vkr/actions_midi_replace.lua` | `SetSearchPattern`, `SetReplacePattern`, `FillRange`, `DoMIDIPatternReplace` (global); `MeasureLabel`, `NoteLabel`, `PatternsMatch`, `ClearPatternWindow`, `GetTrackAndTake` (local) |
+| `rock_band_general_helper_vkr/actions_midi_replace.lua` | `GetPatternPitchRange`, `SetSearchPattern`, `SetReplacePattern`, `FillRange`, `DoMIDIPatternReplace`, `GoPrevPatternMatch`, `GoNextPatternMatch`, `ListPatternMatches` (global); `BuildPatternLabel`, `PatternsMatch`, `ClearPatternWindow`, `GetTrackAndTake`, `ResolvePatternScope`, `ScanPatternMatches`, `GoToPatternMatch` (local) |
+| `rock_band_general_helper_vkr/actions_midi_length.lua` | `AdjustMidiNoteLengths` (global) — Midi note length/sustain-gap adjustment; `NoteLenPPQ`, `AdjustAllNoteLengths`, `AdjustSustainGaps` (local) |
 | `rock_band_general_helper_vkr/actions_difficulty_shared.lua` | `CheckDifficultyProgression`, `CompressChordOffsets` (global) — cross-difficulty identical-chart + note-count reduction checks, and the color-compression helper used by Keys/Guitar-Bass's Copy functions, shared by all four difficulty modules below |
 | `rock_band_general_helper_vkr/actions_difficulty.lua` | `CopyProKeysDiff`, `ValidateProKeysDiff`, `ValidateAllProKeys` (global) — Pro Keys difficulty rules |
 | `rock_band_general_helper_vkr/actions_difficulty_5k.lua` | `ValidateKeys5Diff`, `ValidateAllKeys5`, `CopyKeys5Diff` (global) — Keys (formerly "5-Lane Keys") difficulty rules |
@@ -279,7 +286,8 @@ thresholds (is-sustained, sustain gray zone) use a small `EPS_QN` epsilon instea
 `actions_difficulty_gtrbass.lua` reuses `SustainThresholds` (global, defined in
 `actions_guitar_validate.lua`, loaded earlier) for its Expert/Hard note-length
 and sustain-gap thresholds instead of re-deriving them.
-- `actions_midi_replace.lua`: `MeasureLabel`, `NoteLabel`, `PatternsMatch`, `ClearPatternWindow`, `GetTrackAndTake`
+- `actions_midi_replace.lua`: `BuildPatternLabel`, `PatternsMatch`, `ClearPatternWindow`, `GetTrackAndTake`, `ResolvePatternScope`, `ScanPatternMatches`, `GoToPatternMatch`
+- `actions_midi_length.lua`: `NoteLenPPQ`, `AdjustAllNoteLengths`, `AdjustSustainGaps`; `SUSTAIN_MIN_DENOM`, `FLOOR_DENOM`, `SEARCH_WINDOW_32NDS` (module-level locals)
 - `ui.lua`: `Loop`
 
 **Load order:**
@@ -340,7 +348,10 @@ actions_guitar.lua             → ConvertGuitar, ValidateGuitar, GetBPMAt
 actions_guitar_guide.lua       → ParseTabHorizontal, ParseTabVertical, ReformatVerticalTab, GuitarTabGuide
 actions_guitar_validate.lua    → SustainThresholds, ReadRBGuitarNotes, RunValidation
 actions_midi_align.lua         → AlignMIDI, ResizeAllMIDI
-actions_midi_replace.lua       → SetSearchPattern, SetReplacePattern, FillRange, DoMIDIPatternReplace
+actions_midi_replace.lua       → GetPatternPitchRange, SetSearchPattern, SetReplacePattern,
+                                  FillRange, DoMIDIPatternReplace, GoPrevPatternMatch,
+                                  GoNextPatternMatch, ListPatternMatches
+actions_midi_length.lua        → AdjustMidiNoteLengths
 actions_difficulty_shared.lua  → CheckDifficultyProgression
 actions_difficulty.lua         → CopyProKeysDiff, ValidateProKeysDiff, ValidateAllProKeys
 actions_difficulty_5k.lua      → ValidateKeys5Diff, ValidateAllKeys5, CopyKeys5Diff

@@ -9,6 +9,100 @@ over 5. See `CLAUDE.md` → "Changelog / `@about` trimming" for the rule.
 
 `rock_band_general_helper_vkr.lua`
 
+**v0.9.34**
+- Workflow sub-tab: new "Show only unfinished" checkbox hides checked
+  items (and any section whose items are all checked) so a long
+  checklist doesn't force scrolling past finished work; a "done /
+  total completed - pct%" progress line now sits below the
+  checkboxes, always counted over the whole template regardless of
+  the filter. Simplified how checked history is pruned: switching
+  templates now immediately drops history for items not in the
+  newly-selected file (SelectWorkflowFile), instead of only pruning
+  once the total exceeded a 100-item cap compared against every
+  loaded template - simpler, and matches the actual use case of
+  bouncing between a couple of templates rather than keeping
+  long-lived cross-template history. WORKFLOW_MAX_ITEMS is gone;
+  PurgeStaleWorkflowEntries is replaced by PruneToWorkflowEntries
+  (scoped to one file's entries instead of every loaded one).
+
+**v0.9.33**
+- Venue subtab intro descriptions (Keyframes, Themes gen, Events,
+  Manual gen, Section gen) now wrap to a new line instead of
+  clipping when the window is narrower than the text - same
+  treatment the result panel already got in v0.9.24, applied to
+  these five r.ImGui_Text calls (now r.ImGui_TextWrapped).
+
+**v0.9.32**
+- General tab: new "Workflow" sub-tab - a per-project authoring
+  checklist sourced from a user-editable .txt template
+  (resources/workflow/, one starter template "Default" included -
+  selected automatically on first use if present, else the first
+  template alphabetically). [Section] lines group items under a
+  header; plain lines are checkable steps; a trailing {tooltip}
+  (same line, or its own line right after) attaches a hover tooltip -
+  an item with more than one tooltip source drops the tooltip rather
+  than guessing which wins. Checking an item stamps the time and
+  autosaves immediately under its own workflow_v1 project key
+  (independent of this tab's own Save/Load); unchecking clears the
+  timestamp. A "Show completion timestamp" checkbox (off by default,
+  persisted) controls whether "Completed on dd.MM.yyyy at hh:mm" is
+  displayed under checked items - the timestamp is always recorded
+  regardless of the checkbox, only its display is optional. Checked
+  state is keyed by (section, item label), not label alone, so
+  identical item text under two different section headers (e.g.
+  "Guitar" under both "Instruments Expert" and "Difficulty
+  reductions") tracks separately. Switching templates carries over
+  any item whose section+label matches exactly; anything else starts
+  unchecked. Parse-time warnings (shown above the checklist) flag
+  duplicate (section,label) pairs and unbalanced [ ] / { } bracket
+  counts in a template file. Saved state auto-purges entries no
+  longer present in any loaded template once the total exceeds 100
+  items. New workflow.lua (parser) and actions_workflow.lua
+  (persistence) modules.
+
+**v0.9.31**
+- Venue > Actions: new "Sub VENUE tracks" group splits VENUE's events
+  across 6 category tracks - "VENUE normal camera", "VENUE directed
+  camera", "VENUE lighting", "VENUE keyevents", "VENUE post proc",
+  "VENUE special" - for easier authoring once a song has accumulated
+  a lot of keyframes, then merges them back. "Copy all to subtracks"
+  creates (if missing, muted by default - an editing-only split that
+  shouldn't reach the final export) and re-syncs all 6; new tracks
+  inherit VENUE's custom MIDI note names and get their take named
+  after the track so open MIDI editor tabs are identifiable instead
+  of all showing as "MIDI take". VENUE's own MIDI notes (e.g. the
+  sing-cue notes at pitches 85-87) travel with "VENUE special"
+  alongside its text events. "Copy all to main track" early-exits
+  with a status message if no subtracks exist yet; otherwise clears
+  VENUE and replaces it with their combined contents, notes included
+  (confirmation popup first, mirrors the Difficulty tab's overwrite
+  modal). A Subtrack dropdown plus Copy to/Copy from work on one
+  category at a time
+  (Copy to auto-creates the subtrack, Copy from does not; for
+  Special both directions also carry VENUE's notes). New
+  CategorizeVenueEvent in new actions_venue_subtracks.lua is the
+  first unified 6-way VENUE event classifier - also now backs
+  RemoveVenueEventsByType (actions_venue_manual.lua), replacing its
+  three duplicated pattern checks with one shared classification.
+
+**v0.9.30**
+- Venue > Themes gen: song end is now resolved from the EVENTS
+  track's [end] marker, not the VENUE MIDI item's own length -
+  nothing is generated at or after it even if the item runs
+  longer (harmless in-game; the result panel suggests trimming
+  the item to [end] when it runs meaningfully past it, purely
+  cosmetic, never required). Falls back to the item's length,
+  with a "Didn't find [end] event, used MIDI length as end."
+  note, when no [end] marker is present. When [music_end] sits
+  within 10 measures of [end], the outro [lighting
+  (blackout_spot)] bookend and the last scripted coop camera
+  cut both target it instead of the literal end - [end]
+  triggers the game's own forced camera cut, so landing our
+  own cut right beside it doubled up as a jump cut. New shared
+  FindEventTime in venue_awareness.lua generalizes the
+  existing [music_start] lookup; FindMusicStartTime is now a
+  thin wrapper over it.
+
 **v0.9.29**
 - Venue > Keyframe align: instrument-aware modes (Guitar/Bass/Keys
   notes, Drum kicks/snare) gain a third Subdivision option, "Every

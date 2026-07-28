@@ -9,6 +9,24 @@ local MR_DIFF_OPTIONS = {
     { idx = 4, label = 'Easy' },
 }
 
+-- MIDI > Length > Midi note: Difficulty dropdown options (S.mn_diff_idx).
+-- No "All" entry - sustain/gap rules differ per tier.
+local MN_DIFF_OPTIONS = {
+    { idx = 1, label = 'Expert' },
+    { idx = 2, label = 'Hard' },
+    { idx = 3, label = 'Medium' },
+    { idx = 4, label = 'Easy' },
+}
+
+-- MIDI > Length > Midi note: Note size dropdown options (S.mn_note_denom).
+local MN_NOTE_SIZE_OPTIONS = {
+    { idx = 8,   label = '1/8' },
+    { idx = 16,  label = '1/16' },
+    { idx = 32,  label = '1/32' },
+    { idx = 64,  label = '1/64' },
+    { idx = 128, label = '1/128' },
+}
+
 -- Shared body for each Tab Input mode sub-tab: format selector, mode-specific
 -- option, textarea, and Add note / Run guide. mode: 0=Guitar/Bass, 1=Keys/Pro
 -- Keys, 2=Vocal (mirrors S.tab_input_mode, kept in sync for persistence).
@@ -145,6 +163,59 @@ function DrawMIDITab(ctx)
         -- MIDI > Length sub-tab
         ------------------------------------------------
         if r.ImGui_BeginTabItem(ctx, 'Length') then
+            SectionHeader('Midi note')
+
+            local lbl_col_mn = LabelColWidth({ 'Midi track', 'Difficulty', 'Note type', 'Note size' })
+
+            r.ImGui_Text(ctx, 'Midi track')
+            r.ImGui_SameLine(ctx, lbl_col_mn)
+            r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
+            S.mn_midi_idx = TrackCombo('##mn_track', S.mn_midi_idx, midi_tracks)
+            Tooltip(TIPS.mn_midi_track)
+
+            r.ImGui_Text(ctx, 'Difficulty')
+            r.ImGui_SameLine(ctx, lbl_col_mn)
+            r.ImGui_SetNextItemWidth(ctx, WIDTH_SHORT)
+            S.mn_diff_idx = TrackCombo('##mn_diff', S.mn_diff_idx, MN_DIFF_OPTIONS)
+            Tooltip(TIPS.mn_diff)
+
+            r.ImGui_Spacing(ctx)
+            local radio_w_mn = RadioGroupWidth({ 'Non-sustains', 'Only sustains' })
+            r.ImGui_Text(ctx, 'Note type')
+            r.ImGui_SameLine(ctx, lbl_col_mn)
+            if r.ImGui_RadioButton(ctx, 'Non-sustains##mn_type', S.mn_note_type == 0) then
+                S.mn_note_type = 0
+            end
+            Tooltip(TIPS.mn_note_type)
+            r.ImGui_SameLine(ctx, lbl_col_mn + radio_w_mn)
+            if r.ImGui_RadioButton(ctx, 'Only sustains##mn_type', S.mn_note_type == 1) then
+                S.mn_note_type = 1
+            end
+            Tooltip(TIPS.mn_note_type)
+
+            if S.mn_note_type == 0 then
+                r.ImGui_Text(ctx, 'Note size')
+                r.ImGui_SameLine(ctx, lbl_col_mn)
+                r.ImGui_SetNextItemWidth(ctx, WIDTH_SHORT)
+                S.mn_note_denom = TrackCombo('##mn_denom', S.mn_note_denom, MN_NOTE_SIZE_OPTIONS)
+                Tooltip(TIPS.mn_note_denom)
+            else
+                r.ImGui_Text(ctx, '32nd note amount')
+                r.ImGui_SameLine(ctx)
+                r.ImGui_SetNextItemWidth(ctx, WIDTH_SHORT)
+                _, S.mn_sustain_32nds = r.ImGui_SliderInt(ctx, '##mn_gap32', S.mn_sustain_32nds, 0, 32)
+                Tooltip(TIPS.mn_sustain_32nds)
+            end
+
+            r.ImGui_Spacing(ctx)
+            if Btn('Adjust notes', BTN_H) then
+                RunAction(AdjustMidiNoteLengths)
+            end
+            Tooltip(TIPS.mn_adjust)
+
+            r.ImGui_Separator(ctx)
+            SectionHeader('Midi track')
+
             r.ImGui_Text(ctx, 'Reference track')
             r.ImGui_SameLine(ctx)
             r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
@@ -190,12 +261,15 @@ function DrawMIDITab(ctx)
                 if _tr then
                     local _, _trname = r.GetTrackName(_tr)
                     local _lo, _hi = GetPatternPitchRange(_trname, S.mr_diff_idx)
-                    r.ImGui_TextDisabled(ctx, ('Pitch range: %d\xe2\x80\x93%d'):format(_lo, _hi))
+                    r.ImGui_TextDisabled(ctx, ('Pitch range: %d-%d'):format(_lo, _hi))
                 end
             end
 
             r.ImGui_Spacing(ctx)
-            local bw_pat = BtnGroupWidth({ 'Set Search', 'Set Replace', 'Replace All', 'Fill Range' })
+            local bw_pat = BtnGroupWidth({
+                'Set Search', 'Set Replace', 'Replace All', 'Fill Range',
+                'Go Prev', 'Go Next', 'List Search',
+            })
             if is_busy_mr then r.ImGui_BeginDisabled(ctx) end
             if Btn('Set Search', BTN_H, bw_pat) then
                 RunAction(SetSearchPattern)
@@ -223,6 +297,24 @@ function DrawMIDITab(ctx)
             end
             Tooltip(TIPS.mr_fill_range)
             if is_busy_mr or no_replace then r.ImGui_EndDisabled(ctx) end
+
+            local no_search = not S.mr_search_notes
+            if is_busy_mr or no_search then r.ImGui_BeginDisabled(ctx) end
+            if Btn('Go Prev', BTN_H, bw_pat) then
+                RunAction(GoPrevPatternMatch)
+            end
+            Tooltip(TIPS.mr_go_prev)
+            r.ImGui_SameLine(ctx)
+            if Btn('Go Next', BTN_H, bw_pat) then
+                RunAction(GoNextPatternMatch)
+            end
+            Tooltip(TIPS.mr_go_next)
+            r.ImGui_SameLine(ctx)
+            if Btn('List Search', BTN_H, bw_pat) then
+                RunAction(ListPatternMatches)
+            end
+            Tooltip(TIPS.mr_list_search)
+            if is_busy_mr or no_search then r.ImGui_EndDisabled(ctx) end
 
             r.ImGui_Spacing(ctx)
             r.ImGui_Text(ctx, 'Search: ')
