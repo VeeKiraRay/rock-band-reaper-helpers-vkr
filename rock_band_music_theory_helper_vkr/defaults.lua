@@ -12,6 +12,12 @@ S = {
 
 TIPS = {}
 
+TIPS.guitar_play =
+    'Plays a short synthesized pluck of this chord (Karplus-Strong string synthesis) ' ..
+    'via the same SWS extension the Drums tab uses for its samples -- not a real ' ..
+    'guitar recording, just a preview tone. Requires the SWS extension; no MIDI ' ..
+    'setup or output device configuration needed.'
+
 TIPS.guitar_search =
     'Paste a fret shape and see its interval classification and suggested RB mapping.\n\n' ..
     'Muted strings at the START or END of the list are optional and can be left out ' ..

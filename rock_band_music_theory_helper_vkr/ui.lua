@@ -26,11 +26,12 @@ local function StopCurrentPreview()
     end
 end
 
--- Play a single file from the resources/audio/drums/ folder via SWS CF_CreatePreview.
+-- Preview an audio file at an absolute path via SWS CF_CreatePreview.
+-- Shared by drum sample playback and guitar synthesized-chord playback.
 -- Returns false if SWS is unavailable, the file is missing, or creation fails.
-local function PlayAudioFile(filename)
+local function PlayPreviewPath(path)
     StopCurrentPreview()
-    local pcm = r.PCM_Source_CreateFromFile(AUDIO_DRUMS_DIR .. filename)
+    local pcm = r.PCM_Source_CreateFromFile(path)
     if not pcm then return false end
     local preview = r.CF_CreatePreview(pcm)
     if not preview then r.PCM_Source_Destroy(pcm); return false end
@@ -40,6 +41,11 @@ local function PlayAudioFile(filename)
     S.preview_src = preview
     S.preview_pcm = pcm
     return true
+end
+
+-- Play a single file from the resources/audio/drums/ folder.
+local function PlayAudioFile(filename)
+    return PlayPreviewPath(AUDIO_DRUMS_DIR .. filename)
 end
 
 -- Play the audio for a DRUM_NOTATION row (passed directly or by 0-based img_idx).
@@ -65,6 +71,33 @@ local function PlayDrumWAV(img_idx_or_row)
     else
         return PlayAudioFile(row.audio_file)
     end
+end
+
+-- Guitar chord playback: synthesize a short Karplus-Strong plucked-string
+-- WAV for the given pitches and preview it via the same PlayPreviewPath
+-- used for drums, instead of routing MIDI to an external synth (see
+-- .claude/CLAUDE_music_theory.md for why -- StuffMIDIMessage has no path to
+-- a software synth without a track in the project). Needs SWS (same as
+-- drum playback), gated the same way via AUDIO_CF_AVAILABLE. The pitches
+-- come straight from lib/reaper_guitar_theory.lua's classifier, so this one
+-- code path covers both the static reference table and arbitrary live
+-- Shape Search results (any tuning).
+local GUITAR_SYNTH_SAMPLE_RATE = 44100
+local GUITAR_SYNTH_DURATION_S  = 1.0
+
+-- Synthesize and preview a chord shape (pitches[], as produced by
+-- GuitarAnalyzeShape/GuitarShapeToPitches). Returns false if SWS is
+-- unavailable, the pitch list is empty, or the write/preview fails.
+local function PlayGuitarChord(pitches)
+    if not AUDIO_CF_AVAILABLE then return false end
+    if not pitches or #pitches == 0 then return false end
+    -- Stop any current preview BEFORE overwriting GUITAR_PREVIEW_WAV_PATH --
+    -- releases whatever hold the previous preview had on that same file,
+    -- avoiding a write/read race against REAPER's own file handle.
+    StopCurrentPreview()
+    local samples = SynthesizeChordSamples(pitches, GUITAR_SYNTH_SAMPLE_RATE, GUITAR_SYNTH_DURATION_S, {})
+    if not WriteMonoWAV16(samples, GUITAR_SYNTH_SAMPLE_RATE, GUITAR_PREVIEW_WAV_PATH) then return false end
+    return PlayPreviewPath(GUITAR_PREVIEW_WAV_PATH)
 end
 
 local function DrawDrumsTab()
@@ -203,6 +236,11 @@ local function DrawGuitarTab()
                 if result.detail then line = line .. '  (' .. result.detail .. ')' end
                 line = line .. '  ->  ' .. (result.width or 'no RB mapping suggestion') .. '  (' .. combo_text .. ')'
                 if show_tuning_labels then line = entry.tuning_name .. ': ' .. line end
+                if r.ImGui_SmallButton(ctx, 'Play##guitar_search_play_' .. entry.tuning_name) then
+                    PlayGuitarChord(result.pitches)
+                end
+                Tooltip(TIPS.guitar_play)
+                r.ImGui_SameLine(ctx)
                 r.ImGui_TextWrapped(ctx, line)
             end
         end
@@ -232,6 +270,12 @@ local function DrawGuitarTab()
     r.ImGui_Spacing(ctx)
     r.ImGui_TextWrapped(ctx, selected_type.description)
     r.ImGui_Spacing(ctx)
+    if AUDIO_CF_AVAILABLE then
+        r.ImGui_TextWrapped(ctx, 'Click a row to hear it.')
+    else
+        r.ImGui_TextWrapped(ctx, 'Install the SWS extension to hear rows played back (click enabled once installed).')
+    end
+    r.ImGui_Spacing(ctx)
 
     if r.ImGui_BeginTable(ctx, '##guitar_chords', 4, TABLE_FLAGS) then
         r.ImGui_TableSetupColumn(ctx, 'Shape')
@@ -247,6 +291,10 @@ local function DrawGuitarTab()
                 -- e.g. two "Power chord" rows both named G5), so the Selectable
                 -- label uses shape+name together to keep widget IDs distinct.
                 r.ImGui_Selectable(ctx, row.shape .. '##' .. row.name, false, r.ImGui_SelectableFlags_SpanAllColumns())
+                if r.ImGui_IsItemClicked(ctx) then
+                    PlayGuitarChord(GuitarParseFretInput(row.shape))
+                end
+                Tooltip(TIPS.guitar_play)
                 r.ImGui_TableSetColumnIndex(ctx, 1)
                 r.ImGui_Text(ctx, row.name)
                 r.ImGui_TableSetColumnIndex(ctx, 2)

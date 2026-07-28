@@ -31,7 +31,7 @@ local results = { vocal = nil, general = nil, vocal_midi = nil, general_midi = n
                   dsp_algo = nil, vocal_algo = nil, general_algo = nil,
                   quick_actions = nil, spritesheet = nil, venue_events = nil,
                   venue_subtracks = nil, venue_phrase_pacing = nil, workflow = nil,
-                  guitar_theory = nil }
+                  guitar_theory = nil, karplus_strong = nil, wav_writer = nil }
 
 local COL_OK  = 0x55DD55FF
 local COL_ERR = 0xFF5555FF
@@ -66,8 +66,8 @@ local function draw_status(res)
 end
 
 function Loop()
-    r.ImGui_SetNextWindowSizeConstraints(ctx, 340, 480, 9999, 9999)
-    r.ImGui_SetNextWindowSize(ctx, 340, 480, r.ImGui_Cond_FirstUseEver())
+    r.ImGui_SetNextWindowSizeConstraints(ctx, 340, 545, 9999, 9999)
+    r.ImGui_SetNextWindowSize(ctx, 340, 545, r.ImGui_Cond_FirstUseEver())
     local visible, open = r.ImGui_Begin(ctx, 'RB Helper Test Runner', true)
     if visible then
         r.ImGui_Spacing(ctx)
@@ -137,6 +137,22 @@ function Loop()
         end
         r.ImGui_SameLine(ctx)
         draw_status(results.guitar_theory)
+
+        r.ImGui_Spacing(ctx)
+
+        if r.ImGui_Button(ctx, 'Karplus-Strong Tests', 155, 24) then
+            run('run_karplus_strong.lua', 'karplus_strong')
+        end
+        r.ImGui_SameLine(ctx)
+        draw_status(results.karplus_strong)
+
+        r.ImGui_Spacing(ctx)
+
+        if r.ImGui_Button(ctx, 'WAV Writer Tests', 155, 24) then
+            run('run_wav_writer.lua', 'wav_writer')
+        end
+        r.ImGui_SameLine(ctx)
+        draw_status(results.wav_writer)
 
         r.ImGui_Spacing(ctx)
         r.ImGui_Separator(ctx)

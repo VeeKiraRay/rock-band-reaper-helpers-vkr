@@ -1,11 +1,16 @@
 -- @description Rock Band Music Theory Helper
 -- @author VeeKiraRay
--- @version 0.2
+-- @version 0.3
 -- @about
 --   In-DAW reference guide for Rock Band custom charters.
 --   Covers drum notation, RB lane mappings, common patterns, and a Guitar
---   tab with a real-shape-to-RB-mapping reference, lane-combo terminology,
---   and a live fret-shape classifier.
+--   tab with a chord-type explorer, RB lane-combo terminology, a live
+--   fret-shape classifier (Standard + Drop D tuning), and audio playback
+--   via a synthesized preview tone (Karplus-Strong plucked-string
+--   synthesis, requires SWS -- same as Drums tab audio).
+--   v0.3: Guitar tab can now play chords back (synthesized preview tone,
+--         no extra assets required) from both the reference table and
+--         Shape Search.
 --   v0.2: Added Guitar tab (chord-shape reference table, RB lane-combo
 --         terminology, live fret-shape search/classifier).
 
@@ -60,7 +65,15 @@ IMG_DRUM_W, IMG_DRUM_H = _png_dims(_img_path)
 
 dofile(_dir  .. 'lib/reaper_imgui_helpers.lua')
 dofile(_dir  .. 'lib/reaper_guitar_theory.lua')
+dofile(_dir  .. 'lib/reaper_karplus_strong.lua')
+dofile(_dir  .. 'lib/reaper_wav_writer.lua')
 dofile(_mdir .. 'defaults.lua')
+
+-- Seed the RNG once with real entropy so KarplusStrongVoice's noise burst
+-- (when called without an explicit opts.seed) varies from play to play,
+-- like a real strum, instead of deterministically replaying Lua's default
+-- unseeded state every session.
+math.randomseed(os.time())
 
 -- Detect optional audio sample pack (separate download, MIT-licensed MuseScore Basic).
 -- Probe uses the first row's audio_file so the path is driven by defaults.lua content.
@@ -72,6 +85,16 @@ local _adir = _dir .. 'resources/audio/drums/'
 if AUDIO_CF_AVAILABLE and DRUM_NOTATION[1] and DRUM_NOTATION[1].audio_file then
     local _probe = io.open(_adir .. DRUM_NOTATION[1].audio_file, 'rb')
     if _probe then _probe:close(); AUDIO_DRUMS_DIR = _adir end
+end
+
+-- Scratch file the Guitar tab's synthesized chord preview writes to and
+-- immediately plays back (single fixed name, overwritten on every play --
+-- see PlayGuitarChord in ui.lua). resources/audio/ is tracked via
+-- resources/audio/.gitkeep so it exists in any checkout; RecursiveCreateDirectory
+-- is cheap insurance for non-standard deployments where it might not.
+GUITAR_PREVIEW_WAV_PATH = _dir .. 'resources/audio/guitar_preview_scratch.wav'
+if AUDIO_CF_AVAILABLE then
+    r.RecursiveCreateDirectory(_dir .. 'resources/audio/', 0)
 end
 
 dofile(_mdir .. 'ui.lua')
