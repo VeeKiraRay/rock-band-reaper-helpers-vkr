@@ -345,7 +345,18 @@ TIPS = {
                        "At or above 150 BPM all intervals scale by \xc3\x971.5 to avoid\n" ..
                        "camera cuts becoming too rapid at fast tempos.\n\n" ..
                        "4/4 reference: 16 \xc3\x9716ths = 1 measure (Medium), 24 = 1.5 measures\n" ..
-                       "(Slow), 32 = 2 measures (Minimal).",
+                       "(Slow), 32 = 2 measures (Minimal).\n\n" ..
+                       "Vocal phrase start: not interval-based - reads PART VOCALS phrase-\n" ..
+                       "marker (pitch 105) note starts and places a camera event exactly on\n" ..
+                       "each one; \"Include jitter\" has no effect in this mode.\n\n" ..
+                       "Themes gen uses every phrase in the song. Section gen only phrases\n" ..
+                       "that start inside the current section (one tailing in from the\n" ..
+                       "previous section doesn't count, one that runs into the next section\n" ..
+                       "does). Manual gen's \"Advance camera pacing\" jumps straight to the\n" ..
+                       "next phrase start instead of stepping by an interval, and does\n" ..
+                       "nothing when there is no further phrase.\n\n" ..
+                       "If no phrase markers exist at all, the recurring camera loop is\n" ..
+                       "skipped (forced/bookend camera events, if any, still happen).",
 
     venue_cam_pacing_jitter = "When checked, camera cut intervals are randomised within \xc2\xb120% of\n" ..
                               "the selected pacing value, giving a more natural feel.\n\n" ..

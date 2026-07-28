@@ -1,9 +1,11 @@
 -- Lighting and keyframe event generation: section processing, themed and random modes.
 -- Requires: BuildLightingPool, BuildPostprocPool, GetSectionPreset, FindTrackByName,
---           PickRandom, JitteredInterval, r, S (globals from venue_camera.lua and venue_themes.lua)
+--           PickRandom, JitteredInterval, RB3_PHRASE_PITCH, r, S
+--           (globals from venue_camera.lua and venue_themes.lua)
 -- Globals exported: MANUAL_LIGHTING_SET, LIGHTING_OFFSET_16THS, INST_KF_MODES,
---   FindNextMeasureStartPpq, CollectInstNotePositions, GenerateKeyframesForSpan,
---   GenerateLightingEvents, GenerateThemedSectionEvents, KeyframeSubdivQN
+--   FindNextMeasureStartPpq, CollectInstNotePositions, CollectVocalPhraseStarts,
+--   GenerateKeyframesForSpan, GenerateLightingEvents, GenerateThemedSectionEvents,
+--   KeyframeSubdivQN
 
 local MANUAL_LIGHTING_POOL = {
     '[lighting (verse)]', '[lighting (chorus)]',
@@ -104,6 +106,15 @@ function CollectInstNotePositions(track_name, pitch_min, pitch_max, venue_take,
     end
     table.sort(positions)
     return positions
+end
+
+-- Returns a sorted array of VENUE-take PPQ positions for PART VOCALS phrase-marker
+-- (pitch 105, RB3_PHRASE_PITCH) note starts in [range_start_ppq, range_end_ppq). Thin
+-- wrapper over CollectInstNotePositions with the phrase pitch pinned at both ends -
+-- backs the "Vocal phrase start" camera pacing mode (venue_camera.lua).
+function CollectVocalPhraseStarts(venue_take, range_start_ppq, range_end_ppq)
+    return CollectInstNotePositions('PART VOCALS', RB3_PHRASE_PITCH, RB3_PHRASE_PITCH,
+                                    venue_take, range_start_ppq, range_end_ppq)
 end
 
 -- Returns an array of {ppq, text} keyframe events ('[first]'/'[next]') for one manual-lighting

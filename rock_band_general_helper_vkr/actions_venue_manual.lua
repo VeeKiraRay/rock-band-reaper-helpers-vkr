@@ -4,7 +4,7 @@
 --           FindNextMeasureStartPpq, CollectInstNotePositions, ResolveUserCamInterval,
 --           JitteredInterval, CAM_INTERVAL_16THS, CAM_JITTER, KeyframeSubdivQN,
 --           DeleteTextEventsInRange, ClearVenueKeyframesInRange, CategorizeVenueEvent,
---           r, S (globals)
+--           FindTrackByName, FindFirstMIDIItem, RB3_PHRASE_PITCH, r, S (globals)
 
 local function _find_venue_track_and_take()
     local track, item, take = FindNamedTrackMIDI('VENUE')
@@ -40,7 +40,44 @@ end
 
 -- ---------------------------------------------------------------------------
 
+-- Returns the PPQ of the next PART VOCALS phrase-marker (pitch 105, RB3_PHRASE_PITCH)
+-- note start strictly after cur_ppq on the given take, or nil when none exists. Pure
+-- function of (take, cur_ppq) so it can be driven by a test without a MIDI editor.
+function FindNextVocalPhraseStartPpq(take, cur_ppq)
+    local next_ppq = nil
+    local _, note_cnt = r.MIDI_CountEvts(take)
+    for i = 0, note_cnt - 1 do
+        local ok, _, muted, sppq, _, _, pitch = r.MIDI_GetNote(take, i)
+        if ok and not muted and pitch == RB3_PHRASE_PITCH and sppq > cur_ppq then
+            if not next_ppq or sppq < next_ppq then next_ppq = sppq end
+        end
+    end
+    return next_ppq
+end
+
 function AdvanceCameraPacing()
+    if S.venue_cam_pacing == 7 then
+        local vt_track = FindTrackByName('PART VOCALS')
+        local vt_take
+        if vt_track then
+            local _vt_item
+            _vt_item, vt_take = FindFirstMIDIItem(vt_track)
+        end
+        if not vt_take then
+            S.status = 'No PART VOCALS track/MIDI item found - cannot advance to next vocal phrase.'
+            return
+        end
+        local cur_ppq  = r.MIDI_GetPPQPosFromProjTime(vt_take, r.GetCursorPosition())
+        local next_ppq = FindNextVocalPhraseStartPpq(vt_take, cur_ppq)
+        if not next_ppq then
+            S.status = 'No further vocal phrase found - already at or past the last phrase.'
+            return
+        end
+        r.SetEditCurPos(r.MIDI_GetProjTimeFromPPQPos(vt_take, next_ppq), true, false)
+        S.status = 'Advanced playhead to next vocal phrase start.'
+        return
+    end
+
     local bpm = r.Master_GetTempo()
     local cam_interval = ResolveUserCamInterval(bpm) or CAM_INTERVAL_16THS
 

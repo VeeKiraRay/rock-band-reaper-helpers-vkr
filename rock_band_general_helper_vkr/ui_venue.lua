@@ -13,7 +13,7 @@ function RenderCamPacingRow(col_offset, hide_theme_default)
                      or (CAM_INTERVAL_16THS .. ' 16ths')
         _cp_td_suffix = ' (' .. _cpn .. ')'
     end
-    local _cp_short  = {'Theme default', 'Minimal', 'Slow', 'Medium', 'Fast', 'Crazy', 'Custom'}
+    local _cp_short  = {'Theme default', 'Minimal', 'Slow', 'Medium', 'Fast', 'Crazy', 'Custom', 'Vocal phrase'}
     local _cp_labels = {
         'Theme default' .. _cp_td_suffix,
         'Minimal (32 16ths, ~2 bars @ 120)',
@@ -22,6 +22,7 @@ function RenderCamPacingRow(col_offset, hide_theme_default)
         'Fast (8 16ths)',
         'Crazy (4 16ths, ~1 beat @ 120)',
         'Custom (' .. S.venue_cam_pacing_custom .. ' 16ths)',
+        'Vocal phrase start (PART VOCALS phrase notes)',
     }
     local _cp_preview
     if hide_theme_default and S.venue_cam_pacing == 0 then
@@ -52,7 +53,12 @@ function RenderCamPacingRow(col_offset, hide_theme_default)
     end
     Tooltip(TIPS.venue_cam_pacing)
     r.ImGui_SameLine(ctx)
+    -- Snapshot once: jitter has no effect in "Vocal phrase start" mode (events land exactly
+    -- on phrase notes), so gray the checkbox out instead of leaving it inertly checkable.
+    local _is_phrase_pacing = (S.venue_cam_pacing == 7)
+    if _is_phrase_pacing then r.ImGui_BeginDisabled(ctx) end
     _, S.venue_cam_pacing_jitter = r.ImGui_Checkbox(ctx, 'Include jitter##vcpacj', S.venue_cam_pacing_jitter)
+    if _is_phrase_pacing then r.ImGui_EndDisabled(ctx) end
     Tooltip(TIPS.venue_cam_pacing_jitter)
     if S.venue_cam_pacing == 6 then
         r.ImGui_Spacing(ctx)

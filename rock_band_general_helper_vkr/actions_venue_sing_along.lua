@@ -2,11 +2,11 @@
 -- bassist - same SING_PITCH_MAP convention as ReadSingNoteTimelines in venue_awareness.lua)
 -- from HARM2/HARM3 vocal harmony content.
 -- Requires: FindTrackByName, FindFirstMIDIItem, ClearNotesAtPitchesInRange, InsertNotes,
---           r, S (globals)
+--           RB3_PHRASE_PITCH (venue_camera.lua), r, S (globals)
 
 local RB3_VOCAL_MIN    = 36   -- C1, same vocal pitch range as PART VOCALS/HARM tracks
 local RB3_VOCAL_MAX    = 84   -- C5
-local RB3_PHRASE_PITCH = 105  -- phrase marker note; its own start/end is the phrase's start/end
+-- RB3_PHRASE_PITCH (105) is a global from venue_camera.lua (loaded first)
 
 -- Returns the take of an available source track (exists, unmuted, has a MIDI item), or nil.
 local function AvailableHarmTake(track_name)

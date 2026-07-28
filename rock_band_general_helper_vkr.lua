@@ -1,6 +1,6 @@
 -- @description Rock Band General Helper
 -- @author VeeKiraRay
--- @version 0.9.34
+-- @version 0.9.35
 -- @about
 --   Utility actions for Rock Band authoring in REAPER.
 --
@@ -21,6 +21,24 @@
 --   This @about block keeps only the 5 most recent versions.
 --   Full history: CHANGELOG.md in the repo.
 --
+--   v0.9.35
+--     - Venue > Camera pacing: new "Vocal phrase start" mode - camera cuts land
+--       exactly on PART VOCALS phrase-marker (pitch 105) note starts instead
+--       of a fixed interval; "Include jitter" has no effect (and is grayed
+--       out) in this mode. Themes gen uses every phrase in the song; Section
+--       gen only phrases starting inside the current section (a phrase
+--       tailing in from the previous section doesn't count, one that runs
+--       into the next section does); Manual gen's "Advance camera pacing"
+--       jumps the playhead straight to the next phrase start (new
+--       FindNextVocalPhraseStartPpq) and does nothing at or past the last
+--       phrase. If no phrase markers are found, the recurring camera loop is
+--       skipped for that generation but forced/bookend camera events still
+--       happen, and every other event category (lighting, postproc,
+--       keyframes) generates normally. New CollectVocalPhraseStarts
+--       (venue_lighting.lua) wraps CollectInstNotePositions for PART VOCALS;
+--       GenerateCameraEvents gained an optional phrase_positions_16ths param.
+--       RB3_PHRASE_PITCH is now a shared global (venue_camera.lua) instead of
+--       a local duplicated in actions_venue_sing_along.lua.
 --   v0.9.34
 --     - Workflow sub-tab: new "Show only unfinished" checkbox hides checked
 --       items (and any section whose items are all checked) so a long
@@ -93,23 +111,6 @@
 --       first unified 6-way VENUE event classifier - also now backs
 --       RemoveVenueEventsByType (actions_venue_manual.lua), replacing its
 --       three duplicated pattern checks with one shared classification.
---   v0.9.30
---     - Venue > Themes gen: song end is now resolved from the EVENTS
---       track's [end] marker, not the VENUE MIDI item's own length -
---       nothing is generated at or after it even if the item runs
---       longer (harmless in-game; the result panel suggests trimming
---       the item to [end] when it runs meaningfully past it, purely
---       cosmetic, never required). Falls back to the item's length,
---       with a "Didn't find [end] event, used MIDI length as end."
---       note, when no [end] marker is present. When [music_end] sits
---       within 10 measures of [end], the outro [lighting
---       (blackout_spot)] bookend and the last scripted coop camera
---       cut both target it instead of the literal end - [end]
---       triggers the game's own forced camera cut, so landing our
---       own cut right beside it doubled up as a jump cut. New shared
---       FindEventTime in venue_awareness.lua generalizes the
---       existing [music_start] lookup; FindMusicStartTime is now a
---       thin wrapper over it.
 r = reaper  -- global so all dofile'd modules can use it
 
 if not r.ImGui_CreateContext then

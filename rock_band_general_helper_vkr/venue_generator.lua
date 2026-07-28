@@ -205,12 +205,32 @@ function GenerateVenueEvents()
         sections[1].t_start = r.MIDI_GetProjTimeFromPPQPos(take, music_start_ppq)
     end
 
-    -- Camera: theme-level interval and per-section overrides
-    local cam_interval     = theme and GetThemeCameraInterval(theme.camera_pacing, bpm) or nil
+    -- Vocal phrase start pacing mode (S.venue_cam_pacing == 7): camera cadence follows
+    -- PART VOCALS phrase-marker (pitch 105) note starts instead of a fixed interval - see
+    -- GenerateCameraEvents' phrase_positions_16ths param and CollectVocalPhraseStarts.
+    local phrase_mode = (S.venue_cam_pacing == 7)
 
-    -- User camera pacing override (0=theme default, 1-5=named presets, 6=custom 16ths)
+    -- Camera: theme-level interval and per-section overrides (suppressed in phrase mode -
+    -- it has no interval concept)
+    local cam_interval = (not phrase_mode) and theme
+        and GetThemeCameraInterval(theme.camera_pacing, bpm) or nil
+
+    -- User camera pacing override (0=theme default, 1-5=named presets, 6=custom 16ths,
+    -- 7=vocal phrase start)
     local user_ci, user_cam_pacing = ResolveUserCamInterval(bpm)
     if user_ci then cam_interval = user_ci end
+
+    -- Phrase positions, range-relative in 16ths - possibly empty (phrase mode active but
+    -- no phrase markers found), never nil once phrase_mode is true.
+    local phrase_positions_16ths = nil
+    if phrase_mode then
+        local raw_positions = CollectVocalPhraseStarts(take, range_start_ppq, range_end_ppq)
+        phrase_positions_16ths = {}
+        for _, p in ipairs(raw_positions) do
+            phrase_positions_16ths[#phrase_positions_16ths + 1] =
+                (p - range_start_ppq) / sixteenth_ticks
+        end
+    end
 
     local forced_cuts      = nil
     local interval_changes = nil
@@ -233,7 +253,7 @@ function GenerateVenueEvents()
                         }
                     end
                 end
-                if preset.camera_pacing and not user_cam_pacing then
+                if preset.camera_pacing and not user_cam_pacing and not phrase_mode then
                     local sec_ppq   = r.MIDI_GetPPQPosFromProjTime(take, sec.t_start)
                     local pos_16ths = math.floor((sec_ppq - range_start_ppq) / sixteenth_ticks)
                     if pos_16ths >= 0 then
@@ -386,7 +406,8 @@ function GenerateVenueEvents()
     local cam_total_16ths = final_anchor_16ths or total_16ths
     local cam_events      = GenerateCameraEvents(active_coop, cam_dir, cam_total_16ths, ppq,
                                                 cam_interval, forced_cuts, interval_changes,
-                                                cam_start_min, cam_start_max, coop_opts, last_spot)
+                                                cam_start_min, cam_start_max, coop_opts, last_spot,
+                                                phrase_positions_16ths)
     local directed_count  = 0
     local companion_count = 0
     for _, ev in ipairs(cam_events) do
@@ -460,6 +481,10 @@ function GenerateVenueEvents()
     lines[#lines + 1] = ('Camera (directed):  %d'):format(directed_count)
     if companion_count + bookend_companion_count > 0 then
         lines[#lines + 1] = ('Camera (companion): %d'):format(companion_count + bookend_companion_count)
+    end
+    if phrase_mode and #phrase_positions_16ths == 0 then
+        lines[#lines + 1] = 'No PART VOCALS phrase markers found - the recurring camera loop ' ..
+                            'was skipped (bookend/forced-cut events, if any, were still placed).'
     end
     lines[#lines + 1] = ('Lighting (auto):    %d'):format(#lt_events - manual_count)
     lines[#lines + 1] = ('Lighting (manual):  %d'):format(manual_count)

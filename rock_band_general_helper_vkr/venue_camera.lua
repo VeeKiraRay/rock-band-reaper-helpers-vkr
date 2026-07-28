@@ -112,6 +112,10 @@ DIRECTED_TIPS = {
     directed_brej          = 'Big Rock Ending camera cut (jump variant). Author manually at the BRE section only.',
 }
 
+-- Phrase marker note; its own start/end is the vocal phrase's start/end. Shared with
+-- actions_venue_sing_along.lua (loaded later) and the "Vocal phrase start" camera pacing mode.
+RB3_PHRASE_PITCH = 105
+
 -- Future S-field candidates for UI configuration sliders:
 CAM_INTERVAL_16THS        = 24    -- ~1.5 measures between coop cuts (4/4)
 CAM_JITTER                = 0.20  -- ±20% randomisation
@@ -512,12 +516,19 @@ end
 --   When present, uses WeightedPickCoopEvent instead of PickRandom.
 -- initial_avoid_set: optional set of event strings banned for the very first pick (e.g. the
 --   text(s) placed at a caller's bookend spot immediately before this call) - see PickRandom.
+-- phrase_positions_16ths: "Vocal phrase start" pacing mode. nil = not active (normal
+--   interval-based pacing). Otherwise a sorted array (may be empty) of phrase-start
+--   positions in 16ths - the recurring loop visits exactly these positions (plus any
+--   forced_cuts targets) instead of stepping by cam_interval/JitteredInterval; jitter
+--   and the tail bonus shot are not used in this mode.
 function GenerateCameraEvents(active_coop, active_directed, total_16ths, ppq,
                               cam_interval, forced_cuts, interval_changes,
-                              start_min, start_max, coop_opts, initial_avoid_set)
+                              start_min, start_max, coop_opts, initial_avoid_set,
+                              phrase_positions_16ths)
     local base_interval   = cam_interval or CAM_INTERVAL_16THS
     local sixteenth_ticks = ppq / 4
     local events          = {}
+    local use_phrase      = phrase_positions_16ths ~= nil
 
     local fc_sorted = {}
     if forced_cuts then
@@ -529,9 +540,34 @@ function GenerateCameraEvents(active_coop, active_directed, total_16ths, ppq,
         return events
     end
 
-    local start_16ths = math.random(
-        start_min or CAM_START_MIN_16THS,
-        start_max or CAM_START_MAX_16THS)
+    local fc_idx     = 1
+    local phrase_idx = 1
+
+    -- Returns the smaller of "next remaining phrase position" / "next pending forced
+    -- cut's pos_16ths", or nil when neither remains. Phrase-mode only - this is what
+    -- lets a forced cut keep firing at its own position even when no phrases are left
+    -- (or none exist at all).
+    local function next_phrase_or_fc()
+        local ph = phrase_positions_16ths and phrase_positions_16ths[phrase_idx]
+        local fc = fc_sorted[fc_idx] and fc_sorted[fc_idx].pos_16ths
+        if ph and fc then return math.min(ph, fc) end
+        return ph or fc
+    end
+
+    local start_16ths
+    if use_phrase then
+        local lo = start_min or 0
+        while phrase_idx <= #phrase_positions_16ths
+              and phrase_positions_16ths[phrase_idx] < lo do
+            phrase_idx = phrase_idx + 1
+        end
+        start_16ths = next_phrase_or_fc()
+        if not start_16ths then return events end
+    else
+        start_16ths = math.random(
+            start_min or CAM_START_MIN_16THS,
+            start_max or CAM_START_MAX_16THS)
+    end
 
     local num_directed = 0
     if #active_directed > 0 then
@@ -558,7 +594,6 @@ function GenerateCameraEvents(active_coop, active_directed, total_16ths, ppq,
     local last_spot        = initial_avoid_set or {}
     local last_event_16ths = start_16ths
     local directed_idx     = 1
-    local fc_idx           = 1
     local cur_interval     = base_interval
     local ic_idx           = 1
 
@@ -655,16 +690,28 @@ function GenerateCameraEvents(active_coop, active_directed, total_16ths, ppq,
             end
         end
 
-        local interval = JitteredInterval(cur_interval, S.venue_cam_pacing_jitter and CAM_JITTER or 0)
-        if is_directed then
-            local min_cd = math.floor(cur_interval * CAM_DIRECTED_COOLDOWN)
-            if interval < min_cd then interval = min_cd end
+        if use_phrase then
+            -- Advance past whatever position was just processed (whether it produced a
+            -- coop pick, a forced cut, or nothing) so it's never revisited.
+            while phrase_idx <= #phrase_positions_16ths
+                  and phrase_positions_16ths[phrase_idx] <= pos_16ths do
+                phrase_idx = phrase_idx + 1
+            end
+            pos_16ths = next_phrase_or_fc() or blackout_16ths
+        else
+            local interval = JitteredInterval(cur_interval, S.venue_cam_pacing_jitter and CAM_JITTER or 0)
+            if is_directed then
+                local min_cd = math.floor(cur_interval * CAM_DIRECTED_COOLDOWN)
+                if interval < min_cd then interval = min_cd end
+            end
+            pos_16ths = pos_16ths + interval
         end
-        pos_16ths = pos_16ths + interval
     end
 
+    -- Tail bonus shot: not used in phrase mode - camera events are wanted exactly on
+    -- phrase notes, not on a synthetic extra position near the end of the range.
     local min_tail_gap = math.floor(base_interval * (1 - (S.venue_cam_pacing_jitter and CAM_JITTER or 0)))
-    if #active_coop > 0 and blackout_16ths > start_16ths
+    if not use_phrase and #active_coop > 0 and blackout_16ths > start_16ths
         and blackout_16ths - last_event_16ths >= min_tail_gap then
         local text
         if coop_opts then

@@ -1,7 +1,8 @@
 -- Section-by-section venue event generator.
 -- Requires: venue_generator.lua (ClearVenueTextEventsInRange, ClearVenueNonCameraEventsInRange,
 --                                 ClearVenueExceptLPInRange), venue_camera.lua (FindCompanion, …),
---           venue_lighting.lua (GenerateThemedSectionEvents, FindNextMeasureStartPpq),
+--           venue_lighting.lua (GenerateThemedSectionEvents, FindNextMeasureStartPpq,
+--                               CollectVocalPhraseStarts),
 --           venue_awareness.lua (ReadEventSections, ReadInstrumentPlayStates),
 --           venue_themes.lua (GetSectionPreset, BuildLightingPool, BuildPostprocPool,
 --                             GetThemeCameraInterval),
@@ -207,13 +208,31 @@ function GenerateSectionEvent()
     end
     coop_opts.sing_states = sing_states_16ths
 
-    -- Camera interval: user override, else (template mode) the template theme's pacing
+    -- Vocal phrase start pacing mode (S.venue_cam_pacing == 7): camera cadence follows
+    -- PART VOCALS phrase-marker (pitch 105) note starts inside this section instead of a
+    -- fixed interval - see GenerateCameraEvents' phrase_positions_16ths param.
+    local phrase_mode = (S.venue_cam_pacing == 7)
+
+    -- Camera interval: user override, else (template mode) the template theme's pacing.
+    -- Suppressed in phrase mode - it has no interval concept.
     local bpm = r.Master_GetTempo()
     local cam_interval = ResolveUserCamInterval(bpm)
-    if not cam_interval and S.venue_sec_mode == 1 then
+    if not cam_interval and S.venue_sec_mode == 1 and not phrase_mode then
         local _tmpl_th = S.venue_themes and S.venue_themes[S.venue_sec_tmpl_idx]
         if _tmpl_th and _tmpl_th.camera_pacing then
             cam_interval = GetThemeCameraInterval(_tmpl_th.camera_pacing, bpm)
+        end
+    end
+
+    -- Phrase positions, section-relative in 16ths - possibly empty (phrase mode active
+    -- but no phrase markers found in this section), never nil once phrase_mode is true.
+    local phrase_positions_16ths = nil
+    if phrase_mode then
+        local raw_positions = CollectVocalPhraseStarts(take, sec_start_ppq, sec_end_ppq)
+        phrase_positions_16ths = {}
+        for _, p in ipairs(raw_positions) do
+            phrase_positions_16ths[#phrase_positions_16ths + 1] =
+                (p - sec_start_ppq) / sixteenth_ticks
         end
     end
 
@@ -315,8 +334,9 @@ function GenerateSectionEvent()
         end
     end
 
-    -- Inherit pacing from last camera event of the previous section when no song-start bookend
-    if last_bookend_16ths == nil then
+    -- Inherit pacing from last camera event of the previous section when no song-start bookend.
+    -- Not applicable in phrase mode - it has no interval to inherit.
+    if not phrase_mode and last_bookend_16ths == nil then
         local ref_interval = cam_interval or CAM_INTERVAL_16THS
         local lookback_ppq = math.floor(3 * ref_interval * sixteenth_ticks)
         local search_start = math.max(item_start_ppq, sec_start_ppq - lookback_ppq)
@@ -337,25 +357,31 @@ function GenerateSectionEvent()
         end
     end
 
-    -- Camera events scoped to the section
-    local range_offset_16ths = math.floor((sec_start_ppq - item_start_ppq) / sixteenth_ticks)
-    local cam_start_min = range_offset_16ths >= CAM_START_MIN_16THS and CAM_SHORT_START_MIN_16THS or nil
-    local cam_start_max = range_offset_16ths >= CAM_START_MIN_16THS and CAM_SHORT_START_MAX_16THS or nil
-    if last_bookend_16ths then
-        local ref = cam_interval or CAM_INTERVAL_16THS
-        local _cj = S.venue_cam_pacing_jitter and CAM_JITTER or 0
-        local lo  = math.floor(last_bookend_16ths + ref * (1 - _cj))
-        local hi  = math.floor(last_bookend_16ths + ref * (1 + _cj))
-        lo = math.max(lo, 0)
-        hi = math.max(hi, math.max(lo, 1))
-        cam_start_min = cam_start_min and math.max(cam_start_min, lo) or lo
-        cam_start_max = cam_start_max and math.max(cam_start_max, hi) or hi
+    -- Camera events scoped to the section. In phrase mode, start_min/max are left nil -
+    -- phrase mode simply uses every phrase start inside [sec_start_ppq, sec_end_ppq),
+    -- no bookend-avoidance window needed.
+    local cam_start_min, cam_start_max
+    if not phrase_mode then
+        local range_offset_16ths = math.floor((sec_start_ppq - item_start_ppq) / sixteenth_ticks)
+        cam_start_min = range_offset_16ths >= CAM_START_MIN_16THS and CAM_SHORT_START_MIN_16THS or nil
+        cam_start_max = range_offset_16ths >= CAM_START_MIN_16THS and CAM_SHORT_START_MAX_16THS or nil
+        if last_bookend_16ths then
+            local ref = cam_interval or CAM_INTERVAL_16THS
+            local _cj = S.venue_cam_pacing_jitter and CAM_JITTER or 0
+            local lo  = math.floor(last_bookend_16ths + ref * (1 - _cj))
+            local hi  = math.floor(last_bookend_16ths + ref * (1 + _cj))
+            lo = math.max(lo, 0)
+            hi = math.max(hi, math.max(lo, 1))
+            cam_start_min = cam_start_min and math.max(cam_start_min, lo) or lo
+            cam_start_max = cam_start_max and math.max(cam_start_max, hi) or hi
+        end
     end
 
     local total_16ths = math.floor((sec_end_ppq - sec_start_ppq) / sixteenth_ticks)
     local cam_events  = GenerateCameraEvents(active_coop, {}, total_16ths, ppq,
                                              cam_interval, forced_cuts, nil,
-                                             cam_start_min, cam_start_max, coop_opts, last_spot)
+                                             cam_start_min, cam_start_max, coop_opts, last_spot,
+                                             phrase_positions_16ths)
     local cam_coop_count     = 0
     local cam_directed_count = 0
     local cam_companion_count = 0
@@ -417,6 +443,11 @@ function GenerateSectionEvent()
     end
     if cam_companion_count > 0 then
         lines[#lines + 1] = ('Camera (companion): %d'):format(cam_companion_count)
+    end
+    if phrase_mode and #phrase_positions_16ths == 0 then
+        lines[#lines + 1] = 'No PART VOCALS phrase markers found in this section - the ' ..
+                            'recurring camera loop was skipped (bookend/forced-cut events, ' ..
+                            'if any, were still placed).'
     end
     if lt_count > 0 then
         lines[#lines + 1] = ('Lighting:           %d'):format(lt_count)
