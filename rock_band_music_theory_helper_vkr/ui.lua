@@ -1,9 +1,28 @@
 local TABLE_FLAGS = r.ImGui_TableFlags_Borders()
                  | r.ImGui_TableFlags_RowBg()
-                 | r.ImGui_TableFlags_SizingStretchProp()
+                 | r.ImGui_TableFlags_SizingFixedFit()
 
 local COL_HIGHLIGHT_FILL   = 0xFFFF0050  -- yellow, ~31% opacity (RRGGBBAA)
 local COL_HIGHLIGHT_BORDER = 0xFFFF00FF  -- yellow, solid
+
+-- Fixed pixel widths for "prose" table columns (long sentences that would
+-- blow out a content-measured width) -- tune visually, same convention as
+-- NOTE_IMG_OFFSET_X etc. below. Content-sized columns (short values like
+-- names/shapes) are measured from their own data instead -- see ColWidth().
+local NOTES_COL_W = 340   -- DRUM_NOTATION 'Notes'
+local DESC_COL_W  = 380   -- DRUM_PATTERNS 'Description'
+
+-- Widest CalcTextSize (+ padding) among a column header and all its row
+-- values -- reuses LabelColWidth's CalcTextSize+padding idiom
+-- (lib/reaper_imgui_helpers.lua) so short-value table columns size to their
+-- own content instead of stretching with the window.
+local function ColWidth(header, rows, field)
+    local labels = { header }
+    for _, row in ipairs(rows) do labels[#labels + 1] = row[field] end
+    return LabelColWidth(labels)
+end
+
+local WIDTH_FIXED = r.ImGui_TableColumnFlags_WidthFixed()
 
 local NOTE_IMG_OFFSET_X  = 12    -- px from image left edge to first note column; tune visually
 local NOTE_W_WIDE_FACTOR = 1.83  -- width multiplier for wide note columns; tune visually
@@ -100,6 +119,9 @@ local function PlayGuitarChord(pitches)
     return PlayPreviewPath(GUITAR_PREVIEW_WAV_PATH)
 end
 
+local drum_notation_col_w  -- lazily computed once, first DrawDrumsTab() call
+local drum_patterns_col_w  -- lazily computed once, first DrawDrumsTab() call
+
 local function DrawDrumsTab()
     S.hovered_drum_idx = nil
 
@@ -113,10 +135,15 @@ local function DrawDrumsTab()
     end
     r.ImGui_Spacing(ctx)
 
+    drum_notation_col_w = drum_notation_col_w or {
+        voice = ColWidth('Drum Voice', DRUM_NOTATION, 'name'),
+        lane  = ColWidth('Pro Drums Lane', DRUM_NOTATION, 'rb_pro'),
+    }
+
     if r.ImGui_BeginTable(ctx, '##notation', 3, TABLE_FLAGS) then
-        r.ImGui_TableSetupColumn(ctx, 'Drum Voice')
-        r.ImGui_TableSetupColumn(ctx, 'Pro Drums Lane')
-        r.ImGui_TableSetupColumn(ctx, 'Notes')
+        r.ImGui_TableSetupColumn(ctx, 'Drum Voice', WIDTH_FIXED, drum_notation_col_w.voice)
+        r.ImGui_TableSetupColumn(ctx, 'Pro Drums Lane', WIDTH_FIXED, drum_notation_col_w.lane)
+        r.ImGui_TableSetupColumn(ctx, 'Notes', WIDTH_FIXED, NOTES_COL_W)
         r.ImGui_TableHeadersRow(ctx)
 
         for _, row in ipairs(DRUM_NOTATION) do
@@ -188,9 +215,10 @@ local function DrawDrumsTab()
     -- Common patterns
     SectionHeader('Common Drum Patterns')
     r.ImGui_Spacing(ctx)
+    drum_patterns_col_w = drum_patterns_col_w or ColWidth('Pattern', DRUM_PATTERNS, 'name')
     if r.ImGui_BeginTable(ctx, '##patterns', 2, TABLE_FLAGS) then
-        r.ImGui_TableSetupColumn(ctx, 'Pattern')
-        r.ImGui_TableSetupColumn(ctx, 'Description')
+        r.ImGui_TableSetupColumn(ctx, 'Pattern', WIDTH_FIXED, drum_patterns_col_w)
+        r.ImGui_TableSetupColumn(ctx, 'Description', WIDTH_FIXED, DESC_COL_W)
         r.ImGui_TableHeadersRow(ctx)
         for _, row in ipairs(DRUM_PATTERNS) do
             r.ImGui_TableNextRow(ctx)
@@ -205,6 +233,12 @@ end
 
 local GUITAR_SEARCH_INPUT_W = 320  -- wider than WIDTH_STD (200): fret lines like
                                     -- "x 10 12 12 10 x" run long; one-off, context-specific.
+
+-- Widths are measured against the FULL GUITAR_CHORDS table, not the subset
+-- filtered by the currently-selected Chord Type Explorer type, so columns
+-- don't jump width when the selection changes.
+local guitar_chords_col_w  -- lazily computed once, first DrawGuitarTab() call
+local guitar_terms_col_w   -- lazily computed once, first DrawGuitarTab() call
 
 local function DrawGuitarTab()
     SectionHeader('Shape Search')
@@ -277,11 +311,18 @@ local function DrawGuitarTab()
     end
     r.ImGui_Spacing(ctx)
 
+    guitar_chords_col_w = guitar_chords_col_w or {
+        shape      = ColWidth('Shape', GUITAR_CHORDS, 'shape'),
+        name       = ColWidth('Name', GUITAR_CHORDS, 'name'),
+        sound      = ColWidth('Sound', GUITAR_CHORDS, 'sound'),
+        rb_mapping = ColWidth('RB Mapping', GUITAR_CHORDS, 'rb_mapping'),
+    }
+
     if r.ImGui_BeginTable(ctx, '##guitar_chords', 4, TABLE_FLAGS) then
-        r.ImGui_TableSetupColumn(ctx, 'Shape')
-        r.ImGui_TableSetupColumn(ctx, 'Name')
-        r.ImGui_TableSetupColumn(ctx, 'Sound')
-        r.ImGui_TableSetupColumn(ctx, 'RB Mapping')
+        r.ImGui_TableSetupColumn(ctx, 'Shape', WIDTH_FIXED, guitar_chords_col_w.shape)
+        r.ImGui_TableSetupColumn(ctx, 'Name', WIDTH_FIXED, guitar_chords_col_w.name)
+        r.ImGui_TableSetupColumn(ctx, 'Sound', WIDTH_FIXED, guitar_chords_col_w.sound)
+        r.ImGui_TableSetupColumn(ctx, 'RB Mapping', WIDTH_FIXED, guitar_chords_col_w.rb_mapping)
         r.ImGui_TableHeadersRow(ctx)
         for _, row in ipairs(GUITAR_CHORDS) do
             if row.type == selected_type.name then
@@ -314,9 +355,14 @@ local function DrawGuitarTab()
     r.ImGui_TextWrapped(ctx,
         'G=Green R=Red Y=Yellow B=Blue O=Orange. A combo name lists the lanes used, low to high.')
     r.ImGui_Spacing(ctx)
+    guitar_terms_col_w = guitar_terms_col_w or {
+        width  = ColWidth('Width', GUITAR_LANE_TERMS, 'width'),
+        combos = ColWidth('Lane combos', GUITAR_LANE_TERMS, 'combos'),
+    }
+
     if r.ImGui_BeginTable(ctx, '##guitar_terms', 2, TABLE_FLAGS) then
-        r.ImGui_TableSetupColumn(ctx, 'Width')
-        r.ImGui_TableSetupColumn(ctx, 'Lane combos')
+        r.ImGui_TableSetupColumn(ctx, 'Width', WIDTH_FIXED, guitar_terms_col_w.width)
+        r.ImGui_TableSetupColumn(ctx, 'Lane combos', WIDTH_FIXED, guitar_terms_col_w.combos)
         r.ImGui_TableHeadersRow(ctx)
         for _, row in ipairs(GUITAR_LANE_TERMS) do
             r.ImGui_TableNextRow(ctx)

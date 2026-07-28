@@ -13,22 +13,23 @@ S = {
 TIPS = {}
 
 TIPS.guitar_play =
-    'Plays a short synthesized pluck of this chord (Karplus-Strong string synthesis) ' ..
-    'via the same SWS extension the Drums tab uses for its samples -- not a real ' ..
-    'guitar recording, just a preview tone. Requires the SWS extension; no MIDI ' ..
+    'Plays a short synthesized pluck of this chord (Karplus-Strong string ' ..
+    'synthesis)\n' ..
+    'via the same SWS extension the Drums tab uses for its samples -- not a real\n' ..
+    'guitar recording, just a preview tone. Requires the SWS extension; no MIDI\n' ..
     'setup or output device configuration needed.'
 
 TIPS.guitar_search =
     'Paste a fret shape and see its interval classification and suggested RB mapping.\n\n' ..
-    'Muted strings at the START or END of the list are optional and can be left out ' ..
-    'entirely -- "7 7 5", "x x x 7 7 5", and "- 7 7 5 -" all mean the same shape. ' ..
+    'Muted strings at the START or END of the list are optional and can be left out\n' ..
+    'entirely -- "7 7 5", "x x x 7 7 5", and "- 7 7 5 -" all mean the same shape.\n' ..
     'A short list always anchors to the LOWEST strings.\n\n' ..
-    'Muted strings BETWEEN played notes are NOT optional -- they mean "skip this ' ..
+    'Muted strings BETWEEN played notes are NOT optional -- they mean "skip this\n' ..
     'string" and change the shape (e.g. "7 x 5" is an octave; "7 5" is not).\n\n' ..
-    'Full form: exactly 6 numbers or "x" (muted), high-to-low, e.g. "x 7 9 9 7 x" -- ' ..
-    'the only way to reach strings above the lowest few (e.g. shapes using the B ' ..
+    'Full form: exactly 6 numbers or "x" (muted), high-to-low, e.g. "x 7 9 9 7 x" --\n' ..
+    'the only way to reach strings above the lowest few (e.g. shapes using the B\n' ..
     'string). Same convention as the Guitar tab guide\'s tab input in the General Helper.\n\n' ..
-    'The shape is also checked against Drop D tuning. If Drop D gives a different ' ..
+    'The shape is also checked against Drop D tuning. If Drop D gives a different\n' ..
     'result than Standard, both are shown -- e.g. try "0 0 0" or "2 2 2".'
 
 -- ---------------------------------------------------------------------------
