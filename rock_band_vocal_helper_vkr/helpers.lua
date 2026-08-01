@@ -9,6 +9,16 @@ function IsOnGrid(t)
     return math.abs(frac64 - math.floor(frac64 + 0.5)) < 0.05
 end
 
+-- MIDI ticks per quarter note for a take (defensive 960 fallback).
+-- Fresh copy - the general helper's tree isn't dofile'd here; only lib/ is
+-- shared between the two script trees.
+function GetTakePPQPerQN(take)
+    local qn_start = r.MIDI_GetPPQPosFromProjQN(take, 0)
+    local qn_one   = r.MIDI_GetPPQPosFromProjQN(take, 1)
+    local ppq      = qn_one - qn_start
+    return ppq > 0 and ppq or 960
+end
+
 local function TrackHasAudio(track)
     for i = 0, r.CountTrackMediaItems(track) - 1 do
         local item = r.GetTrackMediaItem(track, i)

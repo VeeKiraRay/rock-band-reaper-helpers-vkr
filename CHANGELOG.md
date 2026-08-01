@@ -544,6 +544,12 @@ over 5. See `CLAUDE.md` → "Changelog / `@about` trimming" for the rule.
 
 `rock_band_vocal_helper_vkr.lua`
 
+**v1.9**
+- Related buttons now share a uniform width per group (BtnGroupWidth(),
+  from lib/reaper_imgui_helpers.lua) instead of each sizing to its own
+  label: Save/Load (General tab) and Auto-detect/Browse.../Clear
+  lyrics/Assign lyrics (Lyrics tab).
+
 **v1.8**
 - Internal housekeeping, no behavior changes. Every button in every tab
   now goes through a shared Btn(label, height) helper (new, in

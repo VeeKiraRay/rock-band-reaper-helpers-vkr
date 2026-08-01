@@ -1,0 +1,6 @@
+[Verse]
+Hello world
+Second line here
+
+[Chorus]
+One more

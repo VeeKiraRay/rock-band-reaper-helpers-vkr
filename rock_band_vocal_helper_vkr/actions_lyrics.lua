@@ -1,20 +1,60 @@
--- Lyrics tab actions (ParseLyricsFile, ClearLyricEvents, ClearLyricsInRange, ClearLyricsAction, AssignLyricsAction)
+-- Lyrics tab actions (ParseLyricsFile, ParseLyricsLines, ClearLyricEvents, ClearLyricsInRange, ClearLyricsAction, AssignLyricsAction)
 
 ----------------------------------------------------------------------
--- Lyrics helpers (local - only called within this file)
+-- Lyrics helpers (ReadLyricsFileContent is local - only called within this
+-- file; ParseLyricsFile and ParseLyricsLines below are promoted to global)
 ----------------------------------------------------------------------
-local function ParseLyricsFile(path)
+-- Shared: open file, strip [comment] blocks. Both parsers below must see
+-- identical stripped content so their word order/count always match exactly
+-- (ParseLyricsLines' flat word list is depended on to line up 1:1 with
+-- ParseLyricsFile's, since actions_phrases.lua reuses Assign Lyrics' word
+-- index <-> note index scheme).
+local function ReadLyricsFileContent(path)
     local f = io.open(path, 'r')
     if not f then return nil, 'Could not open file:\n' .. path end
     local content = f:read('*all')
     f:close()
-    content = content:gsub('%b[]', '')  -- strip [comment] blocks
+    return content:gsub('%b[]', '')  -- strip [comment] blocks
+end
+
+-- Global (promoted for testability, same as EditDistance in
+-- actions_validation.lua): also directly compared against ParseLyricsLines'
+-- flat word list in dev/tests/vocal_algorithms.lua.
+function ParseLyricsFile(path)
+    local content, err = ReadLyricsFileContent(path)
+    if not content then return nil, err end
     local words = {}
     for w in content:gmatch('%S+') do words[#words + 1] = w end
     if #words == 0 then
         return nil, 'No lyrics found in file (after stripping comments).'
     end
     return words
+end
+
+-- Global: also called from actions_phrases.lua (CreatePhrasesAction).
+-- Line-preserving parse: same global bracket-strip as ParseLyricsFile, so
+-- `flat` here is identical to ParseLyricsFile's `words` - flat[i] and
+-- ParseLyricsFile's words[i] both correspond to the same scoped-note index i.
+-- A line that strips to zero words (blank line, or a [Section]-only line) is
+-- dropped, not recorded as an empty line entry.
+function ParseLyricsLines(path)
+    local content, err = ReadLyricsFileContent(path)
+    if not content then return nil, err end
+    local lines, flat = {}, {}
+    for raw_line in (content .. '\n'):gmatch('(.-)\n') do
+        local words = {}
+        for w in raw_line:gmatch('%S+') do
+            words[#words + 1] = w
+            flat[#flat + 1] = w
+        end
+        if #words > 0 then
+            lines[#lines + 1] = { words = words, start_idx = #flat - #words + 1, end_idx = #flat }
+        end
+    end
+    if #flat == 0 then
+        return nil, 'No lyrics found in file (after stripping comments).'
+    end
+    return lines, flat
 end
 
 -- Remove all type-5 (lyric) text events from a take, preserving LYRIC_IGNORE entries.

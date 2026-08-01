@@ -447,7 +447,7 @@ function Loop()
 
                 r.ImGui_Separator(ctx)
                 SectionHeader('Actions')
-                local bw_lyrics_actions = BtnGroupWidth({ 'Clear lyrics', 'Assign lyrics' })
+                local bw_lyrics_actions = BtnGroupWidth({ 'Clear lyrics', 'Assign lyrics', 'Create phrases' })
                 if Btn('Clear lyrics', BTN_H, bw_lyrics_actions) then
                     RunAction(ClearLyricsAction)
                 end
@@ -461,6 +461,14 @@ function Loop()
                 end
                 if assign_disabled then r.ImGui_EndDisabled(ctx) end
                 Tooltip(TIPS.lyrics_assign)
+
+                r.ImGui_SameLine(ctx)
+                if assign_disabled then r.ImGui_BeginDisabled(ctx) end
+                if Btn('Create phrases', BTN_H, bw_lyrics_actions) then
+                    RunAction(CreatePhrasesAction)
+                end
+                if assign_disabled then r.ImGui_EndDisabled(ctx) end
+                Tooltip(TIPS.create_phrases)
 
                 r.ImGui_EndTabItem(ctx)
             end

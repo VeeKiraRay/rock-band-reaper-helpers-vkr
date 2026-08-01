@@ -298,6 +298,25 @@ TIPS = {
         "phrase capitalization check (first word after each phrase marker should " ..
         "start with an uppercase letter).",
 
+    create_phrases =
+        "Create phrase-marker (pitch 105) notes, one per line in the lyrics file.\n\n" ..
+        "A 'line' is a newline-delimited group of words in lyrics.txt; blank lines " ..
+        "and lines that strip to nothing (e.g. a lone [Chorus] marker) are skipped.\n\n" ..
+        "Reuses Assign Lyrics' word<->note indexing (whole take, ignoring time " ..
+        "selection). Before writing anything, checks that lyrics.txt still matches " ..
+        "the lyric text already on the take - if it doesn't, nothing is written; " ..
+        "run Assign lyrics first.\n\n" ..
+        "Each phrase marker starts on the nearest 1/32-note grid position at or " ..
+        "before its line's first note, and ends at or after its last note, then " ..
+        "grows lead-in/tail spacing in priority order: each side gets a " ..
+        "guaranteed sliver (1/32 note) first, then the gap between phrases " ..
+        "grows toward its own 1/8-note ideal, and only room left over after " ..
+        "that goes toward further lead-in/tail growth (preferring a measure " ..
+        "boundary, then a beat, then a half-beat, then a quarter-beat) - so a " ..
+        "tight spot keeps some breathing room on every note and a visible " ..
+        "gap between phrases, never closing below 1/32 note.\n\n" ..
+        "Existing phrase markers on the whole take are cleared first.",
+
     validate_phrases =
         "Check all phrases (pitch-105 marker regions) for common authoring issues.\n\n" ..
         "Checks per phrase:\n" ..

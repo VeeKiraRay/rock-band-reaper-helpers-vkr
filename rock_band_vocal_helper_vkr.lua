@@ -1,6 +1,6 @@
 -- @description Rock Band Vocal Helper
 -- @author VeeKiraRay
--- @version 1.13
+-- @version 1.14
 -- @about
 --   Analyses a vocal audio track and appends MIDI notes to an existing MIDI
 --   item on a destination track, one note per detected syllable or phrase.
@@ -13,6 +13,14 @@
 --   This @about block keeps only the 5 most recent versions.
 --   Full history: CHANGELOG.md in the repo.
 --
+--   v1.14
+--     - Lyrics tab: new "Create phrases" action writes phrase-marker
+--       (pitch 105) notes, one per line in the lyrics file, bracketing that
+--       line's sung notes with lead-in/tail spacing snapped to the grid and
+--       to nearby beat/measure boundaries. Reuses Assign Lyrics' word<->note
+--       positional indexing (whole take), and validates lyrics.txt against
+--       the take's existing lyric text before writing anything - aborts
+--       with no changes if they've drifted out of sync.
 --   v1.13
 --     - Result panel (bottom of every tab): long lines now wrap to the
 --       window's current width (ImGui_PushTextWrapPos(ctx, 0)) instead of
@@ -55,12 +63,6 @@
 --       content moved to a new ui_pitch.lua module (DrawPitchTab).
 --     - Lyrics tab buttons grouped under File (Auto-detect, Browse...) and
 --       Actions (Clear lyrics, Assign lyrics) section headers.
---
---   v1.9
---     - Related buttons now share a uniform width per group
---       (BtnGroupWidth(), from lib/reaper_imgui_helpers.lua) instead of each
---       sizing to its own label: Save/Load (General tab) and
---       Auto-detect/Browse.../Clear lyrics/Assign lyrics (Lyrics tab).
 --
 --   Workflow:
 --     1. Pick the audio source track and the MIDI destination track.
@@ -115,6 +117,7 @@ for _, _f in ipairs({
     _mdir .. 'tuner.lua',
     _mdir .. 'actions.lua',
     _mdir .. 'actions_lyrics.lua',
+    _mdir .. 'actions_phrases.lua',
     _mdir .. 'actions_validation.lua',
     _mdir .. 'actions_harmonies.lua',
     _mdir .. 'actions_slides.lua',
@@ -144,6 +147,7 @@ dofile(_mdir .. 'autotune.lua')
 dofile(_mdir .. 'tuner.lua')
 dofile(_mdir .. 'actions.lua')
 dofile(_mdir .. 'actions_lyrics.lua')
+dofile(_mdir .. 'actions_phrases.lua')
 dofile(_mdir .. 'actions_validation.lua')
 dofile(_mdir .. 'actions_harmonies.lua')
 dofile(_mdir .. 'actions_slides.lua')

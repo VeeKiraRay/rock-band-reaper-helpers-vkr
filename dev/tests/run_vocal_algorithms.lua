@@ -20,6 +20,7 @@ local _root = _in_dev_tests and _strip(_strip(_ctx_dir))
            or _ctx_dir
 local _tdir = _root .. 'dev/tests/'
 local _mdir       = _root .. 'rock_band_vocal_helper_vkr/'
+_FIXTURE_DIR      = _tdir .. 'midi/'   -- global: read by vocal_algorithms.lua's ParseLyricsLines tests
 
 ctx = nil
 
@@ -33,6 +34,7 @@ dofile(_mdir .. 'autotune.lua')           -- ScoreNotes
 dofile(_mdir .. 'actions_snap_key.lua')   -- NearestScalePitch
 dofile(_mdir .. 'actions_harmonies.lua')  -- DiatonicThirdOffset
 dofile(_mdir .. 'actions_validation.lua') -- EditDistance
+dofile(_mdir .. 'actions_lyrics.lua')     -- ParseLyricsLines, ParseLyricsFile
 
 dofile(_tdir .. 'vocal_algorithms.lua')
 Test.report()

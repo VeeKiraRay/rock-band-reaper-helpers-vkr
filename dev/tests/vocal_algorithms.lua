@@ -107,6 +107,48 @@ Test.it('empty reference (all extras) → penalty >= 1000 per extra', function()
     Test.expect(ScoreNotes(det, {}).score >= 1000, '1 extra → score >= 1000')
 end)
 
+----------------------------------------------------------------------
+-- lyrics_phrases.txt:
+--   [Verse]
+--   Hello world
+--   Second line here
+--
+--   [Chorus]
+--   One more
+-- -> flat words: Hello(1) world(2) Second(3) line(4) here(5) One(6) more(7)
+Test.section('ParseLyricsLines')
+
+Test.it('bracket-only and blank lines are dropped; 3 non-blank lines remain', function()
+    local lines, flat = ParseLyricsLines(_FIXTURE_DIR .. 'lyrics_phrases.txt')
+    Test.expect(lines ~= nil, 'parses without error')
+    Test.expect(#lines == 3, ('expected 3 lines, got %d'):format(#lines))
+    Test.expect(#flat == 7, ('expected 7 words, got %d'):format(#flat))
+end)
+
+Test.it('start_idx/end_idx match hand-counted word positions', function()
+    local lines = ParseLyricsLines(_FIXTURE_DIR .. 'lyrics_phrases.txt')
+    Test.expect(lines[1].start_idx == 1 and lines[1].end_idx == 2, 'line 1 = words 1-2')
+    Test.expect(lines[2].start_idx == 3 and lines[2].end_idx == 5, 'line 2 = words 3-5')
+    Test.expect(lines[3].start_idx == 6 and lines[3].end_idx == 7, 'line 3 = words 6-7')
+end)
+
+Test.it('flat word list matches ParseLyricsFile exactly (load-bearing invariant)', function()
+    local _, flat = ParseLyricsLines(_FIXTURE_DIR .. 'lyrics_phrases.txt')
+    local words = ParseLyricsFile(_FIXTURE_DIR .. 'lyrics_phrases.txt')
+    Test.expect(#flat == #words, 'same word count')
+    local same = true
+    for i = 1, #flat do
+        if flat[i] ~= words[i] then same = false end
+    end
+    Test.expect(same, 'same word order/content, index for index')
+end)
+
+Test.it('file with only bracket markers → nil, error', function()
+    local lines, err = ParseLyricsLines(_FIXTURE_DIR .. 'lyrics_phrases_empty.txt')
+    Test.expect(lines == nil, 'no lines returned')
+    Test.expect(type(err) == 'string' and #err > 0, 'error message returned')
+end)
+
 Test.it('detection outside 0.25s tolerance: treated as miss + extra', function()
     -- ref onset at 0.0; det onset at 0.3s offset > MATCH_TOLERANCE_S=0.25 → no match
     local ref = { {s=0.0, e=0.5} }

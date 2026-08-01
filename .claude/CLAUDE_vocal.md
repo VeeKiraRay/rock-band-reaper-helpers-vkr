@@ -83,7 +83,7 @@ settings.lua:
                                   SaveSettings, LoadSettings (global)
 
 helpers.lua:
-  7.  Helpers                     IsOnGrid, SetDefaultTracks, AutoDetectLyricsFile
+  7.  Helpers                     IsOnGrid, GetTakePPQPerQN, SetDefaultTracks, AutoDetectLyricsFile
                                   TrackHasAudio, TrackHasMIDI (local)
 
 pipeline.lua:
@@ -105,34 +105,41 @@ actions.lua:
                                   ApplyPitchChangesAction, SnapDraft
 
 actions_lyrics.lua:
-  16. Lyrics helpers (local)      ParseLyricsFile, ClearLyricEvents
+  16. Lyrics helpers              ReadLyricsFileContent (local); ParseLyricsFile,
+                                  ParseLyricsLines (global, promoted for testability)
   17. Lyrics actions              ClearLyricsInRange (global), ClearLyricsAction,
                                   AssignLyricsAction
 
+actions_phrases.lua:
+  18. Phrases action              CreatePhrasesAction, NoteLenPPQ (global); SnapDown, SnapUp,
+                                  NearestBeatPpq, NearestHalfBeatPpq, NearestQuarterBeatPpq,
+                                  NearestMeasurePpq, CollectScopedAndLyrics, FindMismatches,
+                                  RunPhase1, GrowEdge, RunPhase2 (local)
+
 actions_validation.lua:
-  18. Validation actions          ValidatePhrases, PhraseSimilarityAction
+  19. Validation actions          ValidatePhrases, PhraseSimilarityAction
 
 actions_harmonies.lua:
-  19. Harmonies actions           HarmoniesAction
+  20. Harmonies actions           HarmoniesAction
 
 actions_slides.lua:
-  20. Slide scan action           ScanPitchSlidesAction; ClassifySlide (local)
+  21. Slide scan action           ScanPitchSlidesAction; ClassifySlide (local)
 
 actions_snap_key.lua:
-  21. Snap to key action          SnapToKeyAction, NearestScalePitch; NextScalePitch (local)
+  22. Snap to key action          SnapToKeyAction, NearestScalePitch; NextScalePitch (local)
 
 ui_slides.lua:
-  22. Pitch slide tab             DrawPitchSlideTab(ctx)
+  23. Pitch slide tab             DrawPitchSlideTab(ctx)
 
 ui_harmonies.lua:
-  23. Harmonies tab               DrawHarmoniesTab(ctx)
+  24. Harmonies tab               DrawHarmoniesTab(ctx)
 
 ui_pitch.lua:
-  24. Pitch tab                   DrawPitchTab(ctx) — Placement / Snap sub-tabs
+  25. Pitch tab                   DrawPitchTab(ctx) — Placement / Snap sub-tabs
 
 ui.lua:
-  25. UI                          Loop, FilteredTrackCombo (global)
-  26. r.defer(Loop)               start
+  26. UI                          Loop, FilteredTrackCombo (global)
+  27. r.defer(Loop)               start
 ```
 
 ---
@@ -145,12 +152,13 @@ ui.lua:
 | `rock_band_vocal_helper_vkr/defaults.lua`           | `DEFAULTS`, `S`, `ResetXxx()`, constants (`MODE_*`, `RB3_*`, `LYRIC_IGNORE`)                                                                |
 | `rock_band_vocal_helper_vkr/tips.lua`               | `TIPS` (global) — all tooltip strings                                                                                                        |
 | `rock_band_vocal_helper_vkr/settings.lua`           | `SaveSettings`, `LoadSettings`                                                                                                               |
-| `rock_band_vocal_helper_vkr/helpers.lua`            | `IsOnGrid`, `SetDefaultTracks`, `AutoDetectLyricsFile`; `TrackHasAudio`, `TrackHasMIDI` (local)                                              |
+| `rock_band_vocal_helper_vkr/helpers.lua`            | `IsOnGrid`, `GetTakePPQPerQN`, `SetDefaultTracks`, `AutoDetectLyricsFile`; `TrackHasAudio`, `TrackHasMIDI` (local)                            |
 | `rock_band_vocal_helper_vkr/pipeline.lua`           | `ResolveAnalysisRange`, `ResolveApplyPitchTarget`, `RunDetection`, `AssignPitches`, `ApplyPitchRange`, `FindNearestRefPitch`, `FormatResult` |
 | `rock_band_vocal_helper_vkr/autotune.lua`           | `AutoTune`, `AutoTuneYIN`, `ApplyAutoTuneResult`, format helpers                                                                             |
 | `rock_band_vocal_helper_vkr/tuner.lua`              | `StartTuner`, `StopTuner`, `RunTuner`; `FindItemAtPos`, `OpenContextForItem` (local)                                                         |
 | `rock_band_vocal_helper_vkr/actions.lua`            | `Preview`, `Generate`, `RunAutoTune`, `RunAutoTuneYIN`, `ApplyPitchChangesAction`, `SnapDraft`; `ResolveTracks`, `ResolveApplyPitchTracks` (local) |
-| `rock_band_vocal_helper_vkr/actions_lyrics.lua`     | `ClearLyricsInRange` (global), `ClearLyricsAction`, `AssignLyricsAction`; `ParseLyricsFile`, `ClearLyricEvents` (local)                      |
+| `rock_band_vocal_helper_vkr/actions_lyrics.lua`     | `ParseLyricsFile`, `ParseLyricsLines`, `ClearLyricsInRange`, `ClearLyricsAction`, `AssignLyricsAction`; `ReadLyricsFileContent`, `ClearLyricEvents` (local) |
+| `rock_band_vocal_helper_vkr/actions_phrases.lua`    | `CreatePhrasesAction`, `NoteLenPPQ`; `SnapDown`, `SnapUp`, `NearestBeatPpq`, `NearestHalfBeatPpq`, `NearestQuarterBeatPpq`, `NearestMeasurePpq`, `CollectScopedAndLyrics`, `FindMismatches`, `RunPhase1`, `GrowEdge`, `RunPhase2` (local) |
 | `rock_band_vocal_helper_vkr/actions_validation.lua` | `ValidatePhrases`, `PhraseSimilarityAction`, `EditDistance`; `(no local helpers)`                                                            |
 | `rock_band_vocal_helper_vkr/actions_harmonies.lua`  | `HarmoniesAction`, `DiatonicThirdOffset`; `ApplyLyricSuffix`, `ResolveHarmTracks` (local)                                                   |
 | `rock_band_vocal_helper_vkr/actions_slides.lua`     | `ScanPitchSlidesAction`; `ClassifySlide` (local)                                                                                             |
@@ -163,7 +171,8 @@ ui.lua:
 **Local-only functions:**
 
 - `actions.lua`: `ResolveTracks`, `ResolveApplyPitchTracks`
-- `actions_lyrics.lua`: `ParseLyricsFile`, `ClearLyricEvents`
+- `actions_lyrics.lua`: `ReadLyricsFileContent`, `ClearLyricEvents`
+- `actions_phrases.lua`: `SnapDown`, `SnapUp`, `NearestBeatPpq`, `NearestHalfBeatPpq`, `NearestQuarterBeatPpq`, `NearestMeasurePpq`, `CollectScopedAndLyrics`, `FindMismatches`, `RunPhase1`, `GrowEdge`, `RunPhase2`
 - `actions_validation.lua`: (none — `EditDistance` promoted to global for testability)
 - `actions_harmonies.lua`: `ApplyLyricSuffix`, `ResolveHarmTracks`
 - `actions_slides.lua`: `ClassifySlide`
@@ -183,13 +192,15 @@ lib/reaper_midi_helpers.lua    → MIDI read/write helpers
 defaults.lua                   → S, DEFAULTS, constants
 tips.lua                       → TIPS
 settings.lua                   → SaveSettings, LoadSettings
-helpers.lua                    → IsOnGrid, SetDefaultTracks, AutoDetectLyricsFile
+helpers.lua                    → IsOnGrid, GetTakePPQPerQN, SetDefaultTracks, AutoDetectLyricsFile
 pipeline.lua                   → RunDetection, AssignPitches, FormatResult
 autotune.lua                   → AutoTune, AutoTuneYIN
 tuner.lua                      → StartTuner, StopTuner, RunTuner
 actions.lua                    → Preview, Generate, RunAutoTune, RunAutoTuneYIN,
                                   ApplyPitchChangesAction, SnapDraft
-actions_lyrics.lua             → ClearLyricsInRange, ClearLyricsAction, AssignLyricsAction
+actions_lyrics.lua             → ParseLyricsFile, ParseLyricsLines, ClearLyricsInRange,
+                                  ClearLyricsAction, AssignLyricsAction
+actions_phrases.lua            → CreatePhrasesAction, NoteLenPPQ
 actions_validation.lua         → ValidatePhrases, PhraseSimilarityAction
 actions_harmonies.lua          → HarmoniesAction
 actions_slides.lua             → ScanPitchSlidesAction
@@ -335,6 +346,16 @@ Scope: active time selection, or full MIDI item after confirmation.
 
 **Phrase capitalization check.** For each pitch-105 note (phrase marker), finds the first vocal note at or after it, checks that its lyric starts with uppercase. Reports each violation as `mNN  Xm SS.MMMsec  "word"`.
 
+**Create phrases.** `CreatePhrasesAction()` in `actions_phrases.lua`. Writes pitch-105 phrase-marker notes, one per lyrics.txt "line" — a newline-delimited group of words, distinct from `ParseLyricsFile`'s flat whitespace-only parse. `ParseLyricsLines` (in `actions_lyrics.lua`, sharing `ReadLyricsFileContent`'s bracket-strip with `ParseLyricsFile` so the two word lists always agree) returns each line's `start_idx`/`end_idx` into that same flat word array. Because Assign Lyrics only ever guarantees word *i* ↔ the *i*-th vocal-range note (whole take, by start time), a line's first-word index doubles as the index of its first note — no independent search is needed to find "where a line starts."
+
+That reuse only holds if lyrics.txt still matches what's actually on the take, so before writing anything, Create Phrases cross-checks every word against the take's existing type-5 lyric text (same range Assign Lyrics would have written). Any mismatch aborts with zero notes written, listing every offending line/word/position and suggesting Assign lyrics be re-run first. Lines beyond the last note available (`lyrics.txt` longer than the take has notes for) are reported as an "unprocessed" notice, not an abort.
+
+Placement is two passes. Pass 1 snaps each phrase's start down to the nearest 1/32-note at or before its first pitch note, and its end up to the nearest 1/32-note at or after its last pitch note, inserting phrases in line order; if a phrase's pass-1 start would leave less than a 1/32-note gap from the previous phrase's pass-1 end, Create Phrases stops there — phrases already inserted for earlier lines are kept, later lines are not attempted, and the colliding pair is reported. Pass 2 (only over phrases actually inserted) grows each phrase's lead-in/tail and the gap between neighbors in strict priority order, highest first: (1) the 1/32-note absolute gap floor, guaranteed by pass 1; (2) a guaranteed minimum of 1/32 note of individual lead-in/tail growth for *each* side; (3) growing the gap the rest of the way toward its own 1/8-note ideal; (4) any further leftover split 60/40 between lead-in/tail (lead-in prioritized), each capped at its own 1/8-note ideal, preferring to land on a measure boundary, then a beat, then a half-beat, then a quarter-beat (each tier tried in that priority order; measure only loses to beat when beat is clearly closer to the ideal target). In a tight spot this means every note gets at least a sliver of breathing room and the gap between phrases grows before either side maxes out its own spacing — not the other way around. First and last phrases have no neighbor on their outer side and grow freely toward the ideal.
+
+All of pass 2's growth arithmetic (the ideal cap, the 60/40 split, the growth amount itself) is expressed as an integer count of 1/32-note grid units rather than fractional ppq — since a pass-1 edge is already an exact grid multiple, `pass1_edge_ppq + direction * units * thirty2_ppq` is always grid-aligned by construction, for both the start and end of every phrase. This is deliberate: an earlier fractional-ppq version could produce an off-grid edge whenever a side's allotted budget fell short of the full ideal (common — the tail side's 40% share reaches the cap less often than lead-in's 60%), which isn't just a tight-spot problem since it happened even with generous room available.
+
+Existing pitch-105 notes on the whole take are cleared first. Scope: whole take, same as Assign Lyrics.
+
 **Lyric file format.** Plain text. `[anything in brackets]` stripped before splitting. Words split on any whitespace.
 
 **`LYRIC_IGNORE`** — special game events that both Clear and Assign preserve:
@@ -462,6 +483,10 @@ Separate button, separate flow. `ResolveApplyPitchTarget` allows partially-overl
 
 Assign lyrics ignores time selection and operates on the full MIDI take. If Assign respected a time selection, it would read from the beginning of the lyrics file but write only to notes in the selection — every word after the selection start would land on the wrong note. The RB3 vocal range filter and `LYRIC_IGNORE` table protect all non-lyric content.
 
+### 10. Create Phrases reuses Assign Lyrics' positional indexing
+
+Assign Lyrics only ever guarantees word *i* ↔ the *i*-th vocal-range note — never word-per-syllable alignment beyond that. A line-preserving parse over the exact same bracket-strip-then-split content (`ParseLyricsLines`, sharing `ReadLyricsFileContent` with `ParseLyricsFile`) gets "which notes belong to which line" for free, without a live search through notes for a line's first word. This is exactly why the pre-flight mismatch check exists: the whole scheme is only valid for as long as lyrics.txt and the take's actual lyric text events agree, so Create Phrases verifies that before writing anything and aborts (zero mutation) otherwise.
+
 ---
 
 ## Known limitations
@@ -539,6 +564,14 @@ Assign lyrics ignores time selection and operates on the full MIDI take. If Assi
 - [ ] Lyrics — Count mismatch warning appears when notes ≠ lyrics.
 - [ ] Lyrics — Phrase capitalization check reports violations with timestamps.
 - [ ] Lyrics — Assign is greyed out when no file selected; active after auto-detect or browse.
+- [ ] Lyrics — Create phrases: whole-take scope; existing phrase markers cleared first.
+- [ ] Lyrics — Create phrases: aborts with zero notes written and reports every mismatch when lyrics.txt drifts from the take's lyric text.
+- [ ] Lyrics — Create phrases: lines beyond the last available note are reported as an "unprocessed" notice, not an abort.
+- [ ] Lyrics — Create phrases: pass-1 phrase markers bracket each line's notes, snapped to the 1/32-note grid.
+- [ ] Lyrics — Create phrases: pass-2 grows lead-in/tail spacing toward the 1/8-note ideal, preferring measure > beat > half-beat > quarter-beat boundaries; every resulting phrase-marker start and end lands exactly on the 1/32-note grid; a too-tight neighbor pair stops the run and keeps phrases already inserted.
+- [ ] Lyrics — Create phrases: in a tight spot, both phrases keep at least a 1/32-note sliver of individual lead-in/tail before the gap between them grows toward its own 1/8-note ideal (not maximized individual spacing at the gap's expense).
+- [ ] Lyrics — Create phrases: first/last phrase grows freely on its outer (no-neighbor) side.
+- [ ] Lyrics — Create phrases is greyed out when no lyrics file selected, same as Assign lyrics.
 - [ ] Tab bar: 8 tabs (General, Tuner, Note Placement, Pitch, Lyrics, Pitch slide, Harmonies, Validation); switching doesn't clear `S.status` / `S.last_result`. General has Actions/Settings sub-tabs; Pitch has Placement - Built-in/Placement - Reference/Snap sub-tabs; Note Placement (WIP) has Auto Detection/Draft Snap sub-tabs.
 - [ ] Generate (replace): clears all existing vocal-range notes in the range, then inserts fresh detections; result panel says "Replaced".
 - [ ] Draft Snap: rough hand-drawn notes snap to audio onsets; pitches assigned from configured pitch source.
