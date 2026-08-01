@@ -34,7 +34,7 @@ Download the packages you need, then **Extract Here** inside the `resources/` fo
 |---|---|---|
 | `img_large.zip` | `img/spritesheets/camera/`, `lighting/`, `postproc/` — 426×240 px tiles | General helper — venue sprite previews at 2× scale |
 | `img_small.zip` | `img/spritesheets/camera small/`, `lighting small/`, `postproc small/` — 213×120 px tiles | General helper — venue sprite previews at 1× scale |
-| `audio.zip` | `audio/drums/*.ogg` | Music Theory helper — drum audio preview |
+| `audio.zip` | `audio/drums/*.ogg` | Music Theory helper — drum audio preview (**also needs the SWS extension**, see below) |
 
 You can install both `img_large.zip` and `img_small.zip` side by side — they populate different subfolders and do not conflict. Install only the size(s) you intend to use.
 
@@ -64,4 +64,13 @@ Venue theme files (`.rbtheme`) are not distributed with this project. If you hav
 | Venue theme generation | `themes/` | Themes gen sub-tab disabled; Analysis, Manual gen, and Section gen (Custom mode) still work |
 | Venue sprite previews | `img/spritesheets/` | No animation previews; some events fall back to descriptive text tooltips, others show nothing |
 | Music theory drum notation | bundled (`img/drum.png`) | Notation image missing; all other music theory features work normally |
-| Music theory drum audio preview | `audio/drums/` | Audio playback disabled; all other music theory features work normally |
+| Music theory drum audio preview | `audio/drums/` **and** the SWS extension | Audio playback disabled; all other music theory features work normally |
+| Music theory guitar chord preview | the SWS extension (no pack needed) | Playback disabled; the chord explorer and shape search still work normally |
+
+---
+
+## Audio playback also needs the SWS extension
+
+The sample pack is only half of what drum playback needs. **All** audio in the Music Theory helper — drum samples and the Guitar tab's synthesized chord preview alike — plays through the [SWS/S&M extension](https://www.sws-extension.org/). With SWS missing, the helper cannot see the sample pack at all (the pack probe runs only when SWS is present), so a correctly extracted `audio/drums/` folder will still show no playback.
+
+SWS is **not** a ReaPack package — it has its own installer, separate from how ReaImGui is installed. See the [SWS section of the main README](../README.md#sws-extension-audio-playback-only) for install and troubleshooting steps.

@@ -1,13 +1,21 @@
 -- @description Rock Band Music Theory Helper
 -- @author VeeKiraRay
--- @version 0.3
+-- @version 0.3.1
 -- @about
 --   In-DAW reference guide for Rock Band custom charters.
 --   Covers drum notation, RB lane mappings, common patterns, and a Guitar
 --   tab with a chord-type explorer, RB lane-combo terminology, a live
---   fret-shape classifier (Standard + Drop D tuning), and audio playback
---   via a synthesized preview tone (Karplus-Strong plucked-string
---   synthesis, requires SWS -- same as Drums tab audio).
+--   fret-shape classifier (Standard + Drop D tuning), and audio playback.
+--   ALL audio playback -- drum samples and the Guitar tab's synthesized
+--   preview tone (Karplus-Strong plucked-string synthesis) alike -- goes
+--   through the SWS extension's CF_Preview API, so SWS is required to hear
+--   anything on either tab. SWS is NOT a ReaPack package: install it from
+--   sws-extension.org, then restart REAPER. The drum sample pack is a
+--   separate optional download (see resources/INSTALLATION_GUIDE.md) and
+--   is only used by the Drums tab; the Guitar tab needs no extra assets.
+--   v0.3.1: Drums tab now says why playback is unavailable, distinguishing
+--         a missing SWS extension from a missing drum sample pack (it
+--         previously showed the same silent fallback text for both).
 --   v0.3: Guitar tab can now play chords back (synthesized preview tone,
 --         no extra assets required) from both the reference table and
 --         Shape Search.

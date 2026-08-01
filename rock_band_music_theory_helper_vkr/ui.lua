@@ -128,10 +128,19 @@ local function DrawDrumsTab()
     -- Notation legend
     SectionHeader('Drum Notation Legend')
     r.ImGui_Spacing(ctx)
+    -- Three cases, not two: AUDIO_DRUMS_DIR is nil both when SWS is missing and
+    -- when the sample pack isn't installed (the pack probe in the entry point is
+    -- itself gated on AUDIO_CF_AVAILABLE), so collapsing them leaves a user with
+    -- a correctly-installed pack no clue why clicking does nothing.
     if AUDIO_DRUMS_DIR then
         r.ImGui_TextWrapped(ctx, 'Hover a row to highlight it in the image below. Click to play the sample.')
+    elseif not AUDIO_CF_AVAILABLE then
+        r.ImGui_TextWrapped(ctx, 'Hover a row to highlight the corresponding note in the reference image below. ' ..
+                                 'Install the SWS extension to hear rows played back (click enabled once installed).')
     else
-        r.ImGui_TextWrapped(ctx, 'Hover a row to highlight the corresponding note in the reference image below.')
+        r.ImGui_TextWrapped(ctx, 'Hover a row to highlight the corresponding note in the reference image below. ' ..
+                                 'Install the drum sample pack into resources/audio/drums/ to hear rows played back ' ..
+                                 '(see resources/INSTALLATION_GUIDE.md).')
     end
     r.ImGui_Spacing(ctx)
 
