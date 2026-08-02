@@ -1,5 +1,5 @@
 -- Shared core for the vocal note create-at-playhead quick action.
--- Not a bindable action itself — loaded via dofile by the *_vkr.lua wrapper.
+-- Not a bindable action itself - loaded via dofile by the *_vkr.lua wrapper.
 -- Requires global: r (reaper), set by the wrapper before dofile.
 
 local RB3_MIN_PITCH = 36  -- C1 (matches rock_band_vocal_helper_vkr/defaults.lua)

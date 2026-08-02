@@ -1,4 +1,4 @@
--- @description Rock Band Music Theory Helper — WAV Writer Unit Tests
+-- @description Rock Band Music Theory Helper - WAV Writer Unit Tests
 -- @author VeeKiraRay
 -- @about
 --   Algorithm unit tests for lib/reaper_wav_writer.lua: WAV header/data
@@ -24,7 +24,7 @@ local _tdir = _root .. 'dev/tests/'
 ctx = nil
 
 r.ClearConsole()
-r.ShowConsoleMsg('======  WAV Writer — algorithm unit tests  ======\n')
+r.ShowConsoleMsg('======  WAV Writer - algorithm unit tests  ======\n')
 
 dofile(_tdir .. 'framework.lua')
 dofile(_root .. 'lib/reaper_wav_writer.lua')

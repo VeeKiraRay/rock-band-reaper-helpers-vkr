@@ -1,7 +1,7 @@
 -- Algorithm unit tests for general helper pure-Lua functions:
 -- EstimateBPM, GuessTimeSig, FitBeatGrid.
 -- Tempomap constants (BPM_MIN, BPM_MAX, ONSET_GRACE_S) are module-locals in
--- tempomap.lua, closed over by the functions — no setup required here.
+-- tempomap.lua, closed over by the functions - no setup required here.
 
 ----------------------------------------------------------------------
 Test.section('EstimateBPM')

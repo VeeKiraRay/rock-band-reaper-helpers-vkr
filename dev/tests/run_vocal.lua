@@ -1,4 +1,4 @@
--- @description Rock Band Vocal Helper — Smoke Tests
+-- @description Rock Band Vocal Helper - Smoke Tests
 -- @author VeeKiraRay
 -- @about
 --   Smoke-tests every public Vocal Helper action without starting the ImGui loop.
@@ -26,7 +26,7 @@ local _mdir       = _root .. 'rock_band_vocal_helper_vkr/'
 ctx = nil  -- actions do not call ImGui directly
 
 r.ClearConsole()
-r.ShowConsoleMsg('======  Vocal Helper — smoke tests  ======\n')
+r.ShowConsoleMsg('======  Vocal Helper - smoke tests  ======\n')
 
 dofile(_tdir .. 'framework.lua')
 dofile(_root .. 'lib/reaper_imgui_helpers.lua')

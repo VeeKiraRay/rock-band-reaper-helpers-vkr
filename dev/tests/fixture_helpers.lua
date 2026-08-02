@@ -82,6 +82,34 @@ function CleanupFixture(from_idx)
     end
 end
 
+-- Install a Test.after hook that returns the project to `baseline` tracks and
+-- drops any pending tempo snapshot, so one aborted test cannot poison the rest
+-- of the suite.
+--
+-- Why this is needed: a test that errors never reaches its own CleanupFixture,
+-- so its tracks stay in the project. LoadFixture's InsertMedia(path, 0) means
+-- "add to current track", and it only creates new tracks when there is no
+-- track to add to -- so once leftovers exist, every later LoadFixture silently
+-- appends to an existing track and reports 0 tracks created. The result is a
+-- single real failure followed by a cascade of misleading
+-- "<fixture> created no tracks" errors that hide it.
+--
+-- After a passing test this is a no-op: the test's own CleanupFixture already
+-- brought the count back to baseline.
+function EnableFixtureAutoCleanup()
+    local baseline = r.CountTracks(0)
+    Test.after = function()
+        for i = r.CountTracks(0) - 1, baseline, -1 do
+            local tr = r.GetTrack(0, i)
+            if tr then r.DeleteTrack(tr) end
+        end
+        if _tempo_snapshot then
+            RestoreTempoMap(_tempo_snapshot)
+            _tempo_snapshot = nil
+        end
+    end
+end
+
 -- Find a track whose name contains pattern (case-insensitive plain search).
 -- Searches from from_idx (default 0). Returns absolute track index or nil.
 function FindFixtureTrack(pattern, from_idx)

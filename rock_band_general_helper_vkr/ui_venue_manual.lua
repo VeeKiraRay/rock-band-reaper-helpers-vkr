@@ -213,11 +213,11 @@ function DrawVenueManualTab()
             'Downbeat:      [first] at cursor; [next] from the next measure start.\n\n' ..
             'Instrument modes emit [next] only at beat/half-beat/quarter-beat grid points where\n' ..
             'qualifying notes actually exist on the named track:\n' ..
-            '  Guitar notes \xe2\x80\x93 PART GUITAR (pitches 96\xe2\x80\x93100)\n' ..
-            '  Bass notes   \xe2\x80\x93 PART BASS   (pitches 96\xe2\x80\x93100)\n' ..
-            '  Keys notes   \xe2\x80\x93 PART KEYS   (pitches 96\xe2\x80\x93100)\n' ..
-            '  Drum kicks   \xe2\x80\x93 PART DRUMS  (pitch 96)\n' ..
-            '  Drum snare   \xe2\x80\x93 PART DRUMS  (pitch 97)')
+            '  Guitar notes - PART GUITAR (pitches 96-100)\n' ..
+            '  Bass notes   - PART BASS   (pitches 96-100)\n' ..
+            '  Keys notes   - PART KEYS   (pitches 96-100)\n' ..
+            '  Drum kicks   - PART DRUMS  (pitch 96)\n' ..
+            '  Drum snare   - PART DRUMS  (pitch 97)')
     r.ImGui_SameLine(ctx)
     if Btn('Add##mg_kf_btn', 0) then
         RunAction(GenerateManualKeyframes)

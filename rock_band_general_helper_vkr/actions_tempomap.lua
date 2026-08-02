@@ -303,7 +303,7 @@ function EstimateInitialBPM()
 
     if (ci_whole and ci_whole.truncated) or (ci_local and ci_local.truncated) then
         lines[#lines + 1] = ''
-        lines[#lines + 1] = 'WARNING: audio read error mid-range — results may be incomplete.'
+        lines[#lines + 1] = 'WARNING: audio read error mid-range - results may be incomplete.'
     end
 
     local status_bpm = bpm_whole and ('%d'):format(bpm_whole) or '?'
@@ -768,7 +768,7 @@ function GenerateTempoMap()
 
     if ci_gm_truncated then
         lines[#lines + 1] = ''
-        lines[#lines + 1] = 'WARNING: audio read error mid-range — some measures may be missing.'
+        lines[#lines + 1] = 'WARNING: audio read error mid-range - some measures may be missing.'
     end
 
     S.status = ('Generated %d marker%s from %s'):format(

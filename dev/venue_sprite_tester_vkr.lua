@@ -229,7 +229,7 @@ local function DrawSheetRow(dir, stem, fmt, border, dw, dh)
 end
 
 ------------------------------------------------------------------------
--- DrawPanel: draws one table column — title, PNG row, and optional JPEG row.
+-- DrawPanel: draws one table column - title, PNG row, and optional JPEG row.
 ------------------------------------------------------------------------
 local function DrawPanel(p, ev, dw, dh)
     local stem = S.alt <= 1

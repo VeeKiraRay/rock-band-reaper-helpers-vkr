@@ -1,4 +1,4 @@
--- @description Rock Band Venue Phrase Pacing — Tests
+-- @description Rock Band Venue Phrase Pacing - Tests
 -- @author VeeKiraRay
 -- @about
 --   Tests for the "Vocal phrase start" camera pacing mode: GenerateCameraEvents' phrase
@@ -26,7 +26,7 @@ local _gdir = _root .. 'rock_band_general_helper_vkr/'
 ctx = nil
 
 r.ClearConsole()
-r.ShowConsoleMsg('======  Venue Phrase Pacing — tests  ======\n')
+r.ShowConsoleMsg('======  Venue Phrase Pacing - tests  ======\n')
 
 dofile(_tdir .. 'framework.lua')
 dofile(_tdir .. 'fixture_helpers.lua')
@@ -35,6 +35,8 @@ dofile(_gdir .. 'helpers.lua')                    -- FindTrackByName
 dofile(_gdir .. 'venue_camera.lua')               -- GenerateCameraEvents, RB3_PHRASE_PITCH
 dofile(_gdir .. 'venue_lighting.lua')             -- CollectInstNotePositions, CollectVocalPhraseStarts
 dofile(_gdir .. 'actions_venue_manual.lua')       -- FindNextVocalPhraseStartPpq
+
+EnableFixtureAutoCleanup()  -- one aborted test must not poison the rest
 
 dofile(_tdir .. 'venue_phrase_pacing.lua')
 Test.report()

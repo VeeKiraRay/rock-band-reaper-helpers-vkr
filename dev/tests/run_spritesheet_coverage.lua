@@ -1,4 +1,4 @@
--- @description Rock Band General Helper — Spritesheet Coverage
+-- @description Rock Band General Helper - Spritesheet Coverage
 -- @author VeeKiraRay
 -- @about
 --   Checks that every venue event has at least one spritesheet JPEG (large or small folder).
@@ -117,7 +117,7 @@ local function check_category(title, cat_folder, expected_keys)
         table.sort(extras)
         for _, fname in ipairs(extras) do
             Test.it('no extra file: ' .. fname, function()
-                error('unexpected in ' .. label .. ' — leftover alt or unrecognised sprite')
+                error('unexpected in ' .. label .. ' - leftover alt or unrecognised sprite')
             end)
         end
     end

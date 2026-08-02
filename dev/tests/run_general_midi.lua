@@ -1,4 +1,4 @@
--- @description Rock Band General Helper — MIDI Fixture Tests
+-- @description Rock Band General Helper - MIDI Fixture Tests
 -- @author VeeKiraRay
 -- @about
 --   Extensive MIDI fixture tests for the General Helper.
@@ -28,13 +28,14 @@ _FIXTURE_DIR      = _tdir .. 'midi/'
 ctx = nil
 
 r.ClearConsole()
-r.ShowConsoleMsg('======  General Helper — MIDI fixture tests  ======\n')
+r.ShowConsoleMsg('======  General Helper - MIDI fixture tests  ======\n')
 
 dofile(_tdir .. 'framework.lua')
 dofile(_tdir .. 'fixture_helpers.lua')
 dofile(_root .. 'lib/reaper_imgui_helpers.lua')
 dofile(_root .. 'lib/reaper_dsp.lua')
 dofile(_root .. 'lib/reaper_midi_helpers.lua')
+dofile(_root .. 'lib/reaper_guitar_theory.lua')  -- GuitarSuggestRBMapping, used by actions_guitar.lua
 dofile(_mdir .. 'defaults.lua')
 dofile(_mdir .. 'settings.lua')
 dofile(_mdir .. 'helpers.lua')
@@ -64,6 +65,8 @@ dofile(_mdir .. 'actions_difficulty_5k.lua')
 dofile(_mdir .. 'actions_difficulty_gtrbass.lua')
 dofile(_mdir .. 'actions_difficulty_drums.lua')
 -- ui*.lua intentionally omitted: it calls r.defer(Loop) which starts the ImGui loop
+
+EnableFixtureAutoCleanup()  -- one aborted test must not poison the rest
 
 dofile(_tdir .. 'general_midi.lua')
 Test.report()

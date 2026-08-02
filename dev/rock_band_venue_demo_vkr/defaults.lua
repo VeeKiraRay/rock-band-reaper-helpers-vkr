@@ -18,7 +18,7 @@ DEMO_CAM_COMBO_GK = 2   -- Guitar + Keys  (no Bass)
 
 ----------------------------------------------------------------------
 -- Event pools (mirrors rock_band_general_helper_vkr / venue_camera.lua
---              and venue_themes.lua — keep in sync if those change)
+--              and venue_themes.lua - keep in sync if those change)
 ----------------------------------------------------------------------
 
 COOP_POOL = {
@@ -156,7 +156,7 @@ POSTPROC_LABELS = {
 }
 
 -- Maps postproc bare names (without .pp) to the FCP spritesheet key (exceptions only).
--- Mirrors the local table in venue_sprites.lua — keep in sync if that changes.
+-- Mirrors the local table in venue_sprites.lua - keep in sync if that changes.
 POSTPROC_SPRITE_NAMES = {
     contrast_a='contrastbw',                  desat_posterize_trails='desatposterize',
     film_16mm='16mmfilm',                     ['film_b+w']='filmbw',
@@ -189,14 +189,14 @@ S = {
 TIPS = {
     demo_mode =
         "Which layer of events to cycle through in this pass.\n\n" ..
-        "Camera  — cycles all 38 directed cuts (4 measures each).\n" ..
+        "Camera  - cycles all 38 directed cuts (4 measures each).\n" ..
         "          Neutral lighting and postproc are held constant throughout.\n\n" ..
-        "Coop    — cycles all coop (non-directed) camera shots (2 measures each).\n" ..
+        "Coop    - cycles all coop (non-directed) camera shots (2 measures each).\n" ..
         "          Neutral lighting and postproc are held constant throughout.\n\n" ..
-        "Lighting — cycles all 22 lighting presets.\n" ..
+        "Lighting - cycles all 22 lighting presets.\n" ..
         "          Each preset gets two windows: Far (whole venue) and Near (band members).\n" ..
         "          Manual presets also generate two keyframe densities (1-beat and 2-beat).\n\n" ..
-        "PostProc — cycles all 30 .pp effects x 2 camera angles (far + near).\n" ..
+        "PostProc - cycles all 30 .pp effects x 2 camera angles (far + near).\n" ..
         "          Each effect gets one far window then one near window.\n" ..
         "          Neutral lighting is held constant throughout.\n" ..
         "          Change the neutral lighting selector and re-run to capture combinations.",
@@ -214,12 +214,12 @@ TIPS = {
     demo_window_s_camera =
         "Camera (directed cut) windows are fixed at 4 measures each.\n\n" ..
         "Directed cuts have variable pre-roll and some shots take time to complete\n" ..
-        "before yielding — 4 measures gives enough headroom at any BPM.\n\n" ..
+        "before yielding - 4 measures gives enough headroom at any BPM.\n\n" ..
         "Change BPM above to adjust the absolute duration.",
 
     demo_window_s_coop =
         "Coop camera windows are fixed at 2 measures each.\n\n" ..
-        "Coop shots are instant cuts with no pre-roll — 2 measures gives enough\n" ..
+        "Coop shots are instant cuts with no pre-roll - 2 measures gives enough\n" ..
         "time to see the full composition settle.\n\n" ..
         "Change BPM above to adjust the absolute duration.",
 
@@ -245,7 +245,7 @@ TIPS = {
     demo_cam_combo =
         "Which two non-drummer instruments are in the band.\n\n" ..
         "Directed cuts that require the absent instrument are excluded from the\n" ..
-        "generated sequence — for example, selecting Bass + Guitar removes all\n" ..
+        "generated sequence - for example, selecting Bass + Guitar removes all\n" ..
         "keyboard-specific cuts ([directed_keys], [directed_duo_kb], etc.).\n\n" ..
         "Drums and vocals are always present and are never filtered.",
 
@@ -255,5 +255,5 @@ TIPS = {
         "sequence based on the current mode and neutral-layer settings.\n\n" ..
         "Also writes a manifest CSV to the project folder mapping each\n" ..
         "event key to its window start/end time and expected spritesheet filename.\n\n" ..
-        "Use an empty/dedicated demo project — this REPLACES the VENUE track.",
+        "Use an empty/dedicated demo project - this REPLACES the VENUE track.",
 }

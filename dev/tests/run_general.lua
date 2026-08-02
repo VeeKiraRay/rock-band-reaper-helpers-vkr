@@ -1,4 +1,4 @@
--- @description Rock Band General Helper — Smoke Tests
+-- @description Rock Band General Helper - Smoke Tests
 -- @author VeeKiraRay
 -- @about
 --   Smoke-tests every public General Helper action without starting the ImGui loop.
@@ -27,12 +27,13 @@ SCRIPT_MDIR       = _mdir  -- venue_themes.lua uses this to locate .rbtheme file
 ctx = nil  -- actions do not call ImGui directly
 
 r.ClearConsole()
-r.ShowConsoleMsg('======  General Helper — smoke tests  ======\n')
+r.ShowConsoleMsg('======  General Helper - smoke tests  ======\n')
 
 dofile(_tdir .. 'framework.lua')
 dofile(_root .. 'lib/reaper_imgui_helpers.lua')
 dofile(_root .. 'lib/reaper_dsp.lua')
 dofile(_root .. 'lib/reaper_midi_helpers.lua')
+dofile(_root .. 'lib/reaper_guitar_theory.lua')  -- GuitarSuggestRBMapping, used by actions_guitar.lua
 dofile(_mdir .. 'defaults.lua')
 dofile(_mdir .. 'settings.lua')
 dofile(_mdir .. 'helpers.lua')

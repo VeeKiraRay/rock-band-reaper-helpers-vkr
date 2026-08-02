@@ -1,14 +1,14 @@
 -- Shared core for the vocal note snap-to-playhead quick actions.
--- Not a bindable action itself — loaded via dofile by the *_vkr.lua wrappers.
+-- Not a bindable action itself - loaded via dofile by the *_vkr.lua wrappers.
 -- Requires global: r (reaper), set by the wrapper before dofile.
 
 local RB3_MIN_PITCH = 36  -- C1 (matches rock_band_vocal_helper_vkr/defaults.lua)
 local RB3_MAX_PITCH = 84  -- C5
 local MAX_DIST      = 1.0 -- s; ignore notes farther than this from the cursor
 
--- mode: 'auto'  — closer edge decides: start closer → move note, end closer → stretch
---       'start' — always move the note so it starts at the cursor (length preserved)
---       'end'   — always stretch the note so it ends at the cursor
+-- mode: 'auto'  - closer edge decides: start closer → move note, end closer → stretch
+--       'start' - always move the note so it starts at the cursor (length preserved)
+--       'end'   - always stretch the note so it ends at the cursor
 -- Testable core: operates on an explicit take and cursor time (project s).
 -- When a note is moved, lyric events (type 5) at its start move with it.
 -- Returns 'moved' | 'stretched' | 'selected' (already in place), or nil if

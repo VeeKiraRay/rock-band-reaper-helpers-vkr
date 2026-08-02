@@ -7,7 +7,7 @@
 -- A E, standard tuning) -- also the pure fret-shape -> chord-quality
 -- classifier AssignGemsForGuide's dyad handling consults (see
 -- BuildShapeGemMap in actions_guitar.lua).
-local TAB_GAP_BIG = 10  -- seconds; >> wrap_gap_s â†’ triggers phrase break in AssignGems
+local TAB_GAP_BIG = 10  -- seconds; >> wrap_gap_s -> triggers phrase break in AssignGems
 
 -- Horizontal: one event per line, 6 space-separated tokens (digit=fret, else=unplayed).
 -- Blank line = phrase break. Supports multi-digit frets (10, 12, etc.).
@@ -108,7 +108,7 @@ local function AssignGemsForGuide(events, wrap_gap_s, max_chord)
         return table.concat(t, ',')
     end
 
-    -- Global shapeâ†’gem map across all events - see BuildShapeGemMap's own
+    -- Global shape->gem map across all events - see BuildShapeGemMap's own
     -- doc comment (actions_guitar.lua) for the dyad chord-quality logic.
     local all_shapes, shape_gems, shared = BuildShapeGemMap(events, max_chord)
 

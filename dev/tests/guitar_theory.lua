@@ -97,7 +97,7 @@ end)
 
 ----------------------------------------------------------------------
 
-Test.section('GuitarClassifyChordType — dyads')
+Test.section('GuitarClassifyChordType - dyads')
 
 Test.it('interval 3 -> Minor third', function()
     local t = GuitarClassifyChordType({ 45, 48 })
@@ -146,7 +146,7 @@ end)
 
 ----------------------------------------------------------------------
 
-Test.section('GuitarClassifyChordType — chords (round-trip via GUITAR_CHORDS)')
+Test.section('GuitarClassifyChordType - chords (round-trip via GUITAR_CHORDS)')
 
 -- Each row: {shape string in GuitarParseFretInput's 6-token form, expected type}.
 -- These are the same verified shapes shipped in
@@ -250,7 +250,7 @@ end)
 
 ----------------------------------------------------------------------
 
-Test.section('GuitarAnalyzeShape — combined pipeline')
+Test.section('GuitarAnalyzeShape - combined pipeline')
 
 Test.it('bundles classification and mapping into one result table', function()
     local pitches = GuitarParseFretInput('x x x 7 7 5')  -- Power chord
@@ -262,7 +262,7 @@ end)
 
 ----------------------------------------------------------------------
 
-Test.section('GuitarShapeToPitches — tuning parameter')
+Test.section('GuitarShapeToPitches - tuning parameter')
 
 Test.it('defaults to standard tuning', function()
     local pitches = GuitarShapeToPitches({ { str = 6, fret = 0 } })

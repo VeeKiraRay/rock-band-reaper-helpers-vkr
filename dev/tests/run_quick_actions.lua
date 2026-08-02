@@ -1,4 +1,4 @@
--- @description Rock Band Quick Actions — Tests
+-- @description Rock Band Quick Actions - Tests
 -- @author VeeKiraRay
 -- @about
 --   Tests for the quick_actions/ hotkey scripts. Each test builds a MIDI item
@@ -25,12 +25,14 @@ local _tdir = _root .. 'dev/tests/'
 ctx = nil
 
 r.ClearConsole()
-r.ShowConsoleMsg('======  Quick actions — tests  ======\n')
+r.ShowConsoleMsg('======  Quick actions - tests  ======\n')
 
 dofile(_tdir .. 'framework.lua')
 dofile(_tdir .. 'fixture_helpers.lua')
 dofile(_root .. 'quick_actions/lib/vocal_note_snap_core.lua')
 dofile(_root .. 'quick_actions/lib/vocal_note_create_core.lua')
+
+EnableFixtureAutoCleanup()  -- one aborted test must not poison the rest
 
 dofile(_tdir .. 'quick_actions.lua')
 Test.report()

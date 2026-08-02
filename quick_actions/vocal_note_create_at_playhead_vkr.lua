@@ -2,7 +2,7 @@
 -- @author VeeKiraRay
 -- @version 1.0
 -- @about
---   MIDI-editor quick action — bind to a hotkey. Creates a new vocal note at
+--   MIDI-editor quick action - bind to a hotkey. Creates a new vocal note at
 --   the edit cursor, one MIDI-editor grid unit long, velocity 96. Pitch is
 --   copied from the nearest vocal-range note (C1-C5, pitch 36-84), or C3 if
 --   the take has none. The note is clamped so it never overlaps the next

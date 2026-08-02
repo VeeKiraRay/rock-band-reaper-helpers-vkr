@@ -400,7 +400,7 @@ function ValidateGtrBassDiff(instrument, diff_label)
     end
     local track = r.GetTrack(0, idx)
     if not track then
-        S.status      = ('Error: %s track no longer exists \xe2\x80\x94 refresh tracks.'):format(inst.track_name)
+        S.status      = ('Error: %s track no longer exists - refresh tracks.'):format(inst.track_name)
         S.last_result = nil
         return
     end
@@ -411,18 +411,18 @@ function ValidateGtrBassDiff(instrument, diff_label)
     local events        = GroupGBChords(notes)
 
     if #notes == 0 then
-        S.status = ('Validate %s %s: no notes in %s\xe2\x80\x93%s (%d\xe2\x80\x93%d).'):format(
+        S.status = ('Validate %s %s: no notes in %s-%s (%d-%d).'):format(
             inst.label, diff_label, PitchName(rng.lo), PitchName(rng.hi), rng.lo, rng.hi)
         S.last_result = sel_s
-            and ('No %s notes (%s\xe2\x80\x93%s) in the current time selection.'):format(
+            and ('No %s notes (%s-%s) in the current time selection.'):format(
                 DIFF_NAMES[diff_label], PitchName(rng.lo), PitchName(rng.hi))
-            or  ('No %s notes (%s\xe2\x80\x93%s) on %s track.'):format(
+            or  ('No %s notes (%s-%s) on %s track.'):format(
                 DIFF_NAMES[diff_label], PitchName(rng.lo), PitchName(rng.hi), inst.track_name)
         return
     end
 
     local scope  = sel_s and ' [time selection]' or ''
-    local header = ('%s %s Validation  [%s\xe2\x80\x93%s, %d\xe2\x80\x93%d]%s'):format(
+    local header = ('%s %s Validation  [%s-%s, %d-%d]%s'):format(
         inst.label, DIFF_NAMES[diff_label], PitchName(rng.lo), PitchName(rng.hi), rng.lo, rng.hi, scope)
     local report, total = RunGBChecks(diff_label, events, header, rng, track, sel_s, sel_e)
 
@@ -460,7 +460,7 @@ function ValidateAllGtrBass(instrument)
     end
     local track = r.GetTrack(0, idx)
     if not track then
-        S.status      = ('Error: %s track no longer exists \xe2\x80\x94 refresh tracks.'):format(inst.track_name)
+        S.status      = ('Error: %s track no longer exists - refresh tracks.'):format(inst.track_name)
         S.last_result = nil
         return
     end
@@ -482,12 +482,12 @@ function ValidateAllGtrBass(instrument)
 
         if #notes == 0 then
             summary[#summary + 1] = dl .. ':empty'
-            all_lines[#all_lines + 1] = ('=== %s ===  (no notes in range %d\xe2\x80\x93%d)'):format(
+            all_lines[#all_lines + 1] = ('=== %s ===  (no notes in range %d-%d)'):format(
                 DIFF_NAMES[dl], rng.lo, rng.hi)
             all_lines[#all_lines + 1] = ''
             prev_dl, prev_events, prev_count = dl, {}, 0
         else
-            local header         = ('=== %s %s  [%d\xe2\x80\x93%d] ==='):format(inst.label, DIFF_NAMES[dl], rng.lo, rng.hi)
+            local header         = ('=== %s %s  [%d-%d] ==='):format(inst.label, DIFF_NAMES[dl], rng.lo, rng.hi)
             local report, total  = RunGBChecks(dl, events, header, rng, track, sel_s, sel_e)
 
             if dl ~= 'X' and prev_dl == ADJACENT_HIGHER[dl] then
@@ -527,7 +527,7 @@ function CopyGtrBassDiff(instrument, diff_label, force)
     end
     local track = r.GetTrack(0, idx)
     if not track then
-        S.status      = ('Error: %s track no longer exists \xe2\x80\x94 refresh tracks.'):format(inst.track_name)
+        S.status      = ('Error: %s track no longer exists - refresh tracks.'):format(inst.track_name)
         S.last_result = nil
         return
     end
@@ -545,7 +545,7 @@ function CopyGtrBassDiff(instrument, diff_label, force)
 
     if #src_notes == 0 then
         S.status      = ('Copy %s to %s: no notes on %s to copy.'):format(inst.label, DIFF_NAMES[diff_label], DIFF_NAMES[src_dl])
-        S.last_result = ('%s %s range (%d\xe2\x80\x93%d) has no notes%s.'):format(
+        S.last_result = ('%s %s range (%d-%d) has no notes%s.'):format(
             inst.label, DIFF_NAMES[src_dl], src_rng.lo, src_rng.hi, sel_s and ' in the current time selection' or '')
         return
     end

@@ -1,4 +1,4 @@
--- @description Rock Band Music Theory Helper — Guitar Theory Unit Tests
+-- @description Rock Band Music Theory Helper - Guitar Theory Unit Tests
 -- @author VeeKiraRay
 -- @about
 --   Algorithm unit tests for lib/reaper_guitar_theory.lua: fret parsing,
@@ -24,7 +24,7 @@ local _tdir = _root .. 'dev/tests/'
 ctx = nil
 
 r.ClearConsole()
-r.ShowConsoleMsg('======  Guitar Theory — algorithm unit tests  ======\n')
+r.ShowConsoleMsg('======  Guitar Theory - algorithm unit tests  ======\n')
 
 dofile(_tdir .. 'framework.lua')
 dofile(_root .. 'lib/reaper_guitar_theory.lua')

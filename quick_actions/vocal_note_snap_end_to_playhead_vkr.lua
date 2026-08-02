@@ -2,7 +2,7 @@
 -- @author VeeKiraRay
 -- @version 1.0
 -- @about
---   MIDI-editor quick action — bind to a hotkey. Finds the vocal-range note
+--   MIDI-editor quick action - bind to a hotkey. Finds the vocal-range note
 --   (C1-C5, pitch 36-84) on the edit cursor, or the nearest one starting
 --   before the cursor within 1 s, selects it, and stretches it so it ends at
 --   the cursor. Notes starting at or after the cursor are ignored (the end

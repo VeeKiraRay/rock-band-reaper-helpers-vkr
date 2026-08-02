@@ -11,7 +11,7 @@ local _last_state_count    = -1    -- r.GetProjectStateChangeCount() at last ref
 local _last_refresh_time   = 0     -- r.time_precise() at last refresh
 local _auto_refresh_paused = false -- true if a read exceeded _SLOW_READ_THRESHOLD
 local _AUTO_REFRESH_SECS   = 5.0   -- safety-net re-read interval when state count unchanged
-local _SLOW_READ_THRESHOLD = 0.15  -- 150 ms — pause auto-refresh if exceeded
+local _SLOW_READ_THRESHOLD = 0.15  -- 150 ms - pause auto-refresh if exceeded
 
 -- Matches SPRITE_DISPLAY_W / SPRITE_DISPLAY_H in venue_sprites.lua
 local _SPRITE_W = 213
@@ -21,7 +21,7 @@ local _SPRITE_H = 120
 local _COMBO_BG      = 0
 local _COMBO_BK      = 1
 local _COMBO_GK      = 2
-local _COMBO_NAMES   = { [0]='Bass \xe2\x80\x93 Guitar', [1]='Bass \xe2\x80\x93 Keys', [2]='Guitar \xe2\x80\x93 Keys' }
+local _COMBO_NAMES   = { [0]='Bass - Guitar', [1]='Bass - Keys', [2]='Guitar - Keys' }
 local _COMBO_ABSENT  = { [0]='k', [1]='g', [2]='b' }          -- instrument NOT in this combo
 local _COMBO_LETTERS = { [0]={'b','g'}, [1]={'b','k'}, [2]={'g','k'} }  -- instruments IN this combo
 local _INST_NAMES    = { b='PART BASS', g='PART GUITAR', k='PART KEYS' }
@@ -135,7 +135,7 @@ end
 
 -- Draw one labeled column (header + event card or placeholder).
 -- NOTE: r.ImGui_Separator inside a BeginGroup expands to full window width,
--- breaking the side-by-side layout — use Spacing instead, and draw the
+-- breaking the side-by-side layout - use Spacing instead, and draw the
 -- separator once outside all groups (in _draw_category_row).
 -- Dummy reserves the sprite footprint so all columns stay the same width
 -- even when there is no event or no spritesheet installed.
@@ -279,7 +279,7 @@ function DrawVenuePreviewTab()
     Tooltip(_t_vpshw)
 
     if not VenueSpriteFoldersFound() then
-        r.ImGui_TextDisabled(ctx, '\xe2\x80\x94 no spritesheets installed')
+        r.ImGui_TextDisabled(ctx, '- no spritesheets installed')
     end
 
     if _auto_refresh_paused then
@@ -297,7 +297,7 @@ function DrawVenuePreviewTab()
         return
     end
     if not _preview_cache then
-        r.ImGui_TextDisabled(ctx, 'No data \xe2\x80\x94 reading\xe2\x80\xa6')
+        r.ImGui_TextDisabled(ctx, 'No data - reading\xe2\x80\xa6')
         return
     end
 

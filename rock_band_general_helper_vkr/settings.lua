@@ -140,7 +140,7 @@ end
 
 -- Save/LoadSectionConfigs (actions_venue_section.lua) and Save/LoadWorkflowState
 -- (actions_workflow.lua) aren't loaded by the slim standalone preview entry
--- point (rock_band_preview_vkr.lua) — guard the calls so this file works in
+-- point (rock_band_preview_vkr.lua) - guard the calls so this file works in
 -- both entry points.
 function SaveSettings()
     r.SetProjExtState(0, PROJ_KEY_SECTION, PROJ_KEY_NAME, SerializeSettings())

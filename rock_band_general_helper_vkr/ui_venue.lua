@@ -245,7 +245,7 @@ function DrawVenueTab(ctx)
 
             local _no_themes = #S.venue_themes == 0
             if _no_themes then
-                r.ImGui_TextDisabled(ctx, 'No themes found \xe2\x80\x94 add .rbtheme files to the resources/themes/ folder')
+                r.ImGui_TextDisabled(ctx, 'No themes found - add .rbtheme files to the resources/themes/ folder')
                 r.ImGui_BeginDisabled(ctx)
             end
             local _no_sections = not S.venue_sections or #S.venue_sections == 0

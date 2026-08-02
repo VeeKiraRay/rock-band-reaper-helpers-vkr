@@ -13,11 +13,11 @@ local function reset()
 end
 
 ----------------------------------------------------------------------
--- Validation and lyrics — rb_vocal.mid
+-- Validation and lyrics - rb_vocal.mid
 -- Track has vocal notes (pitch 36-84), phrase markers (pitch 105),
 -- and type-5 lyric text events already authored.
 ----------------------------------------------------------------------
-Test.section('Vocal validation — rb_vocal.mid')
+Test.section('Vocal validation - rb_vocal.mid')
 
 Test.it('ValidatePhrases: checks phrase markers contain notes and reports', function()
     reset()
@@ -54,7 +54,7 @@ Test.it('AssignLyricsAction: reads lyrics.txt and attaches words to notes', func
 end)
 
 ----------------------------------------------------------------------
--- Phrases — rb_vocal.mid
+-- Phrases - rb_vocal.mid
 ----------------------------------------------------------------------
 Test.section('Phrases - rb_vocal.mid')
 
@@ -195,11 +195,11 @@ Test.it('CreatePhrasesAction: reports unprocessed lines when fewer notes than ly
 end)
 
 ----------------------------------------------------------------------
--- Harmonies — rb_vocal_and_harm.mid
+-- Harmonies - rb_vocal_and_harm.mid
 -- Contains PART VOCALS source and HARM1/HARM2/HARM3 destination tracks,
 -- each with a MIDI item ready to receive generated harmony notes.
 ----------------------------------------------------------------------
-Test.section('Harmonies — rb_vocal_and_harm.mid')
+Test.section('Harmonies - rb_vocal_and_harm.mid')
 
 Test.it('HarmoniesAction: copies PART VOCALS to HARM1 in unison (mode 0)', function()
     reset()

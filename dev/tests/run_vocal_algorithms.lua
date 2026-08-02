@@ -1,4 +1,4 @@
--- @description Rock Band Vocal Helper — Algorithm Unit Tests
+-- @description Rock Band Vocal Helper - Algorithm Unit Tests
 -- @author VeeKiraRay
 -- @about
 --   Algorithm unit tests for ScoreNotes, NearestScalePitch, DiatonicThirdOffset,
@@ -25,7 +25,7 @@ _FIXTURE_DIR      = _tdir .. 'midi/'   -- global: read by vocal_algorithms.lua's
 ctx = nil
 
 r.ClearConsole()
-r.ShowConsoleMsg('======  Vocal Helper — algorithm unit tests  ======\n')
+r.ShowConsoleMsg('======  Vocal Helper - algorithm unit tests  ======\n')
 
 dofile(_tdir .. 'framework.lua')
 dofile(_root .. 'lib/reaper_dsp.lua')

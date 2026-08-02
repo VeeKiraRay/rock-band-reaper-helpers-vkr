@@ -196,7 +196,7 @@ local function DrawUI()
         n_windows = #POSTPROC_NAMES * 2   -- far + near window per effect
         est_min   = (t_offset_s + n_windows * S.demo_window_s) / 60.0
     end
-    r.ImGui_TextDisabled(ctx, string.format('%d windows  \xe2\x80\x93  estimated %.1f min', n_windows, est_min))
+    r.ImGui_TextDisabled(ctx, string.format('%d windows  -  estimated %.1f min', n_windows, est_min))
 
     r.ImGui_Spacing(ctx)
 

@@ -1,4 +1,4 @@
--- @description Rock Band General Helper — Algorithm Unit Tests
+-- @description Rock Band General Helper - Algorithm Unit Tests
 -- @author VeeKiraRay
 -- @about
 --   Algorithm unit tests for EstimateBPM, GuessTimeSig, FitBeatGrid,
@@ -26,7 +26,7 @@ SCRIPT_MDIR       = _mdir  -- tempomap.lua does not use this, but set for consis
 ctx = nil
 
 r.ClearConsole()
-r.ShowConsoleMsg('======  General Helper — algorithm unit tests  ======\n')
+r.ShowConsoleMsg('======  General Helper - algorithm unit tests  ======\n')
 
 dofile(_tdir .. 'framework.lua')
 dofile(_root .. 'lib/reaper_dsp.lua')

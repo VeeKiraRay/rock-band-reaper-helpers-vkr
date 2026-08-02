@@ -68,7 +68,7 @@ local function Snap(notes, cursor, mode)
 end
 
 ----------------------------------------------------------------------
-Test.section('Vocal note snap — auto mode')
+Test.section('Vocal note snap - auto mode')
 
 Test.it('cursor inside note, near start: moves note, length preserved', function()
     local res, n = Snap({ { s = 2, e = 3, pitch = 60 } }, 2.2, 'auto')
@@ -133,7 +133,7 @@ Test.it('note on cursor beats a nearer-edged neighbour', function()
 end)
 
 ----------------------------------------------------------------------
-Test.section('Vocal note snap — forced start / end modes')
+Test.section('Vocal note snap - forced start / end modes')
 
 Test.it('start mode: cursor past midpoint still moves (never stretches)', function()
     local res, n = Snap({ { s = 2, e = 3, pitch = 60 } }, 2.9, 'start')
@@ -172,7 +172,7 @@ Test.it('note already in target position: selects it, reports selected', functio
 end)
 
 ----------------------------------------------------------------------
-Test.section('Vocal note snap — lyric follows note')
+Test.section('Vocal note snap - lyric follows note')
 
 Test.it('move: lyric at note start moves with the note', function()
     local res, n, lyr = Snap({ { s = 2, e = 3, pitch = 60, lyric = 'word' } },

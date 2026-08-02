@@ -1,4 +1,4 @@
--- @description Rock Band Venue Subtracks — Tests
+-- @description Rock Band Venue Subtracks - Tests
 -- @author VeeKiraRay
 -- @about
 --   Tests for the VENUE sub-track split/merge feature (actions_venue_subtracks.lua):
@@ -26,7 +26,7 @@ local _gdir = _root .. 'rock_band_general_helper_vkr/'
 ctx = nil
 
 r.ClearConsole()
-r.ShowConsoleMsg('======  Venue Subtracks — tests  ======\n')
+r.ShowConsoleMsg('======  Venue Subtracks - tests  ======\n')
 
 dofile(_tdir .. 'framework.lua')
 dofile(_tdir .. 'fixture_helpers.lua')
@@ -35,6 +35,8 @@ dofile(_gdir .. 'helpers.lua')                    -- FindTrackByName, FindNamedT
 dofile(_gdir .. 'venue_generator.lua')            -- DeleteTextEventsInRange, ClearVenueTextEventsInRange
 dofile(_gdir .. 'actions_venue_subtracks.lua')    -- code under test
 dofile(_gdir .. 'actions_venue_manual.lua')       -- RemoveVenueEventsByType regression
+
+EnableFixtureAutoCleanup()  -- one aborted test must not poison the rest
 
 dofile(_tdir .. 'venue_subtracks.lua')
 Test.report()

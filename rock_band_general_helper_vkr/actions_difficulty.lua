@@ -19,9 +19,9 @@ local PK_ALLOW_SH  = { X=true, H=true, M=false, E=false }  -- allow mid-song lan
 -- Non-primary positions (D=2, E=4, G=7) are technically valid but harder to read.
 local PK_PREFERRED_SHIFTS = { [0]=true, [5]=true, [9]=true }
 local PK_RANGE_NAMES = {
-    [0]='C range (C2\xe2\x80\x93E3)',  [2]='D range (D2\xe2\x80\x93F#3)',
-    [4]='E range (E2\xe2\x80\x93G#3)', [5]='F range (F2\xe2\x80\x93A3)',
-    [7]='G range (G2\xe2\x80\x93B3)',  [9]='A range (A2\xe2\x80\x93C4)',
+    [0]='C range (C2-E3)',  [2]='D range (D2-F#3)',
+    [4]='E range (E2-G#3)', [5]='F range (F2-A3)',
+    [7]='G range (G2-B3)',  [9]='A range (A2-C4)',
 }
 
 local DIFF_NAMES = { X='Expert', H='Hard', M='Medium', E='Easy' }
@@ -350,7 +350,7 @@ local function CheckPreferredRanges(lane_shifts)
     for _, ls in ipairs(lane_shifts) do
         if not PK_PREFERRED_SHIFTS[ls.pitch] then
             local rname = PK_RANGE_NAMES[ls.pitch] or ('pitch ' .. ls.pitch)
-            issues[#issues + 1] = ('%s: %s \xe2\x80\x94 prefer C range (C2\xe2\x80\x93E3), F range (F2\xe2\x80\x93A3), or A range (A2\xe2\x80\x93C4)'):format(
+            issues[#issues + 1] = ('%s: %s - prefer C range (C2-E3), F range (F2-A3), or A range (A2-C4)'):format(
                 FormatTime(ls.s), rname)
         end
     end
@@ -526,7 +526,7 @@ local function CheckMissingMeasures(exp_events, lower_events)
         if s_m == e_m then
             issues[#issues + 1] = ('Measure %d has Expert notes but none here'):format(s_m)
         else
-            issues[#issues + 1] = ('Measures %d\xe2\x80\x93%d have Expert notes but none here'):format(s_m, e_m)
+            issues[#issues + 1] = ('Measures %d-%d have Expert notes but none here'):format(s_m, e_m)
         end
         i = i + 1
     end
@@ -671,7 +671,7 @@ function CopyProKeysDiff(diff_label, force)
     end
     local src_tr, tgt_tr = r.GetTrack(0, src_idx), r.GetTrack(0, tgt_idx)
     if not src_tr or not tgt_tr then
-        S.status      = 'Error: a selected track no longer exists \xe2\x80\x94 refresh tracks.'
+        S.status      = 'Error: a selected track no longer exists - refresh tracks.'
         S.last_result = nil
         return
     end
@@ -741,7 +741,7 @@ function ValidateProKeysDiff(diff_label)
     end
     local tgt_tr = r.GetTrack(0, tgt_idx)
     if not tgt_tr then
-        S.status      = ('Error: %s track no longer exists \xe2\x80\x94 refresh tracks.'):format(DIFF_NAMES[diff_label])
+        S.status      = ('Error: %s track no longer exists - refresh tracks.'):format(DIFF_NAMES[diff_label])
         S.last_result = nil
         return
     end

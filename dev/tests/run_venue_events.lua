@@ -1,4 +1,4 @@
--- @description Rock Band Venue Events — Tests
+-- @description Rock Band Venue Events - Tests
 -- @author VeeKiraRay
 -- @about
 --   Tests for the Venue > Events sub-tab: section_events.lua vocabulary vs
@@ -27,7 +27,7 @@ ctx = nil
 _EVENTS_LIST_PATH = _root .. '_external_docs/Text Events List - Events.txt'
 
 r.ClearConsole()
-r.ShowConsoleMsg('======  Venue Events — tests  ======\n')
+r.ShowConsoleMsg('======  Venue Events - tests  ======\n')
 
 dofile(_tdir .. 'framework.lua')
 dofile(_tdir .. 'fixture_helpers.lua')
@@ -39,6 +39,8 @@ dofile(_gdir .. 'venue_lighting.lua')             -- FindNextMeasureStartPpq (fi
 dofile(_gdir .. 'venue_generator.lua')            -- ResolveSongEndAndAnchor
 dofile(_gdir .. 'section_events.lua')
 dofile(_gdir .. 'actions_venue_events.lua')
+
+EnableFixtureAutoCleanup()  -- one aborted test must not poison the rest
 
 dofile(_tdir .. 'venue_events.lua')
 Test.report()

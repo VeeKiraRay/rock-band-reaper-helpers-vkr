@@ -1,4 +1,4 @@
--- @description Rock Band Workflow Checklist — Tests
+-- @description Rock Band Workflow Checklist - Tests
 -- @author VeeKiraRay
 -- @about
 --   Tests for the Workflow checklist feature: template parsing (workflow.lua),
@@ -32,7 +32,7 @@ local _gdir = _root .. 'rock_band_general_helper_vkr/'
 ctx = nil
 
 r.ClearConsole()
-r.ShowConsoleMsg('======  Workflow Checklist — tests  ======\n')
+r.ShowConsoleMsg('======  Workflow Checklist - tests  ======\n')
 
 dofile(_tdir .. 'framework.lua')
 dofile(_gdir .. 'defaults.lua')            -- S

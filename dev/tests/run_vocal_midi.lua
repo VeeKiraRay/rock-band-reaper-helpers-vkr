@@ -1,4 +1,4 @@
--- @description Rock Band Vocal Helper — MIDI Fixture Tests
+-- @description Rock Band Vocal Helper - MIDI Fixture Tests
 -- @author VeeKiraRay
 -- @about
 --   Extensive MIDI fixture tests for the Vocal Helper.
@@ -27,7 +27,7 @@ _FIXTURE_DIR      = _tdir .. 'midi/'
 ctx = nil
 
 r.ClearConsole()
-r.ShowConsoleMsg('======  Vocal Helper — MIDI fixture tests  ======\n')
+r.ShowConsoleMsg('======  Vocal Helper - MIDI fixture tests  ======\n')
 
 dofile(_tdir .. 'framework.lua')
 dofile(_tdir .. 'fixture_helpers.lua')
@@ -49,6 +49,8 @@ dofile(_mdir .. 'actions_harmonies.lua')
 dofile(_mdir .. 'actions_slides.lua')
 dofile(_mdir .. 'actions_snap_key.lua')
 -- ui*.lua intentionally omitted: it calls r.defer(Loop) which starts the ImGui loop
+
+EnableFixtureAutoCleanup()  -- one aborted test must not poison the rest
 
 dofile(_tdir .. 'vocal_midi.lua')
 Test.report()

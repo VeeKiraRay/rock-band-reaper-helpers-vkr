@@ -24,7 +24,7 @@ function DrawVenueSectionGenTab()
         local nm = s.num and (cn .. ' ' .. s.num) or cn
         local ms = r.format_timestr_pos(s.t_start, '', 1):match('^(%d+)') or '?'
         local me = r.format_timestr_pos(s.t_end,   '', 1):match('^(%d+)') or '?'
-        return nm .. ' (m' .. ms .. '\xe2\x80\x93m' .. me .. ')'
+        return nm .. ' (m' .. ms .. '-m' .. me .. ')'
     end
 
     -- Build directed name list once per frame (bare names, no brackets)
@@ -60,7 +60,7 @@ function DrawVenueSectionGenTab()
 
     local _sg_no_sections = not S.venue_sections or #S.venue_sections == 0
     if _sg_no_sections then
-        r.ImGui_TextDisabled(ctx, 'No [prc_*] sections found \xe2\x80\x94 add markers to the EVENTS track')
+        r.ImGui_TextDisabled(ctx, 'No [prc_*] sections found - add markers to the EVENTS track')
     end
 
     r.ImGui_Spacing(ctx)
@@ -307,7 +307,7 @@ function DrawVenueSectionGenTab()
         r.ImGui_Spacing(ctx)
         local _tmpl_no_themes = #S.venue_themes == 0
         if _tmpl_no_themes then
-            r.ImGui_TextDisabled(ctx, 'No themes found \xe2\x80\x94 add .rbtheme files to the resources/themes/ folder')
+            r.ImGui_TextDisabled(ctx, 'No themes found - add .rbtheme files to the resources/themes/ folder')
             r.ImGui_BeginDisabled(ctx)
         end
         r.ImGui_Text(ctx, 'Theme')
@@ -337,9 +337,9 @@ function DrawVenueSectionGenTab()
             r.ImGui_Spacing(ctx)
             if _preset then
                 local _lt_val = _preset.allowed_lightpresets and
-                    table.concat(_preset.allowed_lightpresets, ', ') or '\xe2\x80\x94'
+                    table.concat(_preset.allowed_lightpresets, ', ') or '-'
                 local _pp_val = _preset.allowed_postprocs and
-                    table.concat(_preset.allowed_postprocs, ', ') or '\xe2\x80\x94'
+                    table.concat(_preset.allowed_postprocs, ', ') or '-'
                 r.ImGui_Text(ctx, 'Lighting')
                 r.ImGui_SameLine(ctx, lbl_col)
                 r.ImGui_TextDisabled(ctx, _lt_val)
@@ -348,16 +348,16 @@ function DrawVenueSectionGenTab()
                 r.ImGui_TextDisabled(ctx, _pp_val)
                 r.ImGui_Text(ctx, 'Keyframe rate')
                 r.ImGui_SameLine(ctx, lbl_col)
-                r.ImGui_TextDisabled(ctx, _preset.keyframe_rate and tostring(_preset.keyframe_rate) or '\xe2\x80\x94')
+                r.ImGui_TextDisabled(ctx, _preset.keyframe_rate and tostring(_preset.keyframe_rate) or '-')
                 r.ImGui_Text(ctx, 'Light blendin')
                 r.ImGui_SameLine(ctx, lbl_col)
-                r.ImGui_TextDisabled(ctx, _preset.lightpreset_blendin and tostring(_preset.lightpreset_blendin) or '\xe2\x80\x94')
+                r.ImGui_TextDisabled(ctx, _preset.lightpreset_blendin and tostring(_preset.lightpreset_blendin) or '-')
                 r.ImGui_Text(ctx, 'PP blendin')
                 r.ImGui_SameLine(ctx, lbl_col)
-                r.ImGui_TextDisabled(ctx, _preset.postproc_blendin and tostring(_preset.postproc_blendin) or '\xe2\x80\x94')
+                r.ImGui_TextDisabled(ctx, _preset.postproc_blendin and tostring(_preset.postproc_blendin) or '-')
                 r.ImGui_Text(ctx, 'Directed cut')
                 r.ImGui_SameLine(ctx, lbl_col)
-                r.ImGui_TextDisabled(ctx, _preset.dircut_at_start or '\xe2\x80\x94')
+                r.ImGui_TextDisabled(ctx, _preset.dircut_at_start or '-')
                 r.ImGui_Text(ctx, 'Bonus FX')
                 r.ImGui_SameLine(ctx, lbl_col)
                 r.ImGui_TextDisabled(ctx, _preset.bonusfx_at_start and 'yes' or 'no')

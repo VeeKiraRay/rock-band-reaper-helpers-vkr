@@ -1,4 +1,4 @@
--- @description Rock Band DSP Library — Algorithm Unit Tests
+-- @description Rock Band DSP Library - Algorithm Unit Tests
 -- @author VeeKiraRay
 -- @about
 --   Algorithm unit tests for GateAndSplit, ApplyMinOffset, and SnapOnsets.
@@ -23,7 +23,7 @@ local _tdir = _root .. 'dev/tests/'
 ctx = nil
 
 r.ClearConsole()
-r.ShowConsoleMsg('======  DSP Library — algorithm unit tests  ======\n')
+r.ShowConsoleMsg('======  DSP Library - algorithm unit tests  ======\n')
 
 dofile(_tdir .. 'framework.lua')
 dofile(_root .. 'lib/reaper_dsp.lua')

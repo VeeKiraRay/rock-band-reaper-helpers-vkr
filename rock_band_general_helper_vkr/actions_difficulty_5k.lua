@@ -403,7 +403,7 @@ function ValidateKeys5Diff(diff_label)
     end
     local track = r.GetTrack(0, S.diff_5k_idx)
     if not track then
-        S.status      = 'Error: PART KEYS track no longer exists \xe2\x80\x94 refresh tracks.'
+        S.status      = 'Error: PART KEYS track no longer exists - refresh tracks.'
         S.last_result = nil
         return
     end
@@ -415,18 +415,18 @@ function ValidateKeys5Diff(diff_label)
     local events       = GroupK5Chords(notes)
 
     if #notes == 0 then
-        S.status = ('Validate 5-Key %s: no notes in %s\xe2\x80\x93%s (%d\xe2\x80\x93%d).'):format(
+        S.status = ('Validate 5-Key %s: no notes in %s-%s (%d-%d).'):format(
             diff_label, PitchName(rng.lo), PitchName(rng.hi), rng.lo, rng.hi)
         S.last_result = sel_s
-            and ('No %s notes (%s\xe2\x80\x93%s) in the current time selection.'):format(
+            and ('No %s notes (%s-%s) in the current time selection.'):format(
                 DIFF_NAMES[diff_label], PitchName(rng.lo), PitchName(rng.hi))
-            or  ('No %s notes (%s\xe2\x80\x93%s) on PART KEYS track.'):format(
+            or  ('No %s notes (%s-%s) on PART KEYS track.'):format(
                 DIFF_NAMES[diff_label], PitchName(rng.lo), PitchName(rng.hi))
         return
     end
 
     local scope  = sel_s and ' [time selection]' or ''
-    local header = ('5-Lane Keys %s Validation  [%s\xe2\x80\x93%s, %d\xe2\x80\x93%d]%s'):format(
+    local header = ('5-Lane Keys %s Validation  [%s-%s, %d-%d]%s'):format(
         DIFF_NAMES[diff_label], PitchName(rng.lo), PitchName(rng.hi), rng.lo, rng.hi, scope)
     local report, total = RunK5Checks(diff_label, events, header, rng.hi)
 
@@ -462,7 +462,7 @@ function ValidateAllKeys5()
     end
     local track = r.GetTrack(0, S.diff_5k_idx)
     if not track then
-        S.status      = 'Error: PART KEYS track no longer exists \xe2\x80\x94 refresh tracks.'
+        S.status      = 'Error: PART KEYS track no longer exists - refresh tracks.'
         S.last_result = nil
         return
     end
@@ -484,12 +484,12 @@ function ValidateAllKeys5()
 
         if #notes == 0 then
             summary[#summary + 1] = dl .. ':empty'
-            all_lines[#all_lines + 1] = ('=== %s ===  (no notes in range %d\xe2\x80\x93%d)'):format(
+            all_lines[#all_lines + 1] = ('=== %s ===  (no notes in range %d-%d)'):format(
                 DIFF_NAMES[dl], rng.lo, rng.hi)
             all_lines[#all_lines + 1] = ''
             prev_dl, prev_events, prev_count = dl, {}, 0
         else
-            local header        = ('=== 5-Lane Keys %s  [%d\xe2\x80\x93%d] ==='):format(DIFF_NAMES[dl], rng.lo, rng.hi)
+            local header        = ('=== 5-Lane Keys %s  [%d-%d] ==='):format(DIFF_NAMES[dl], rng.lo, rng.hi)
             local report, total = RunK5Checks(dl, events, header, rng.hi)
 
             if dl ~= 'X' and prev_dl == ADJACENT_HIGHER[dl] then
@@ -527,7 +527,7 @@ function CopyKeys5Diff(diff_label, force)
     end
     local track = r.GetTrack(0, S.diff_5k_idx)
     if not track then
-        S.status      = 'Error: PART KEYS track no longer exists \xe2\x80\x94 refresh tracks.'
+        S.status      = 'Error: PART KEYS track no longer exists - refresh tracks.'
         S.last_result = nil
         return
     end
@@ -545,7 +545,7 @@ function CopyKeys5Diff(diff_label, force)
 
     if #src_notes == 0 then
         S.status      = ('Copy to %s: no notes on %s to copy.'):format(DIFF_NAMES[diff_label], DIFF_NAMES[src_dl])
-        S.last_result = ('%s range (%d\xe2\x80\x93%d) has no notes%s.'):format(
+        S.last_result = ('%s range (%d-%d) has no notes%s.'):format(
             DIFF_NAMES[src_dl], src_rng.lo, src_rng.hi, sel_s and ' in the current time selection' or '')
         return
     end

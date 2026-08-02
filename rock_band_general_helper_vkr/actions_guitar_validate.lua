@@ -5,7 +5,7 @@
 
 -- Returns sustain tail threshold (seconds), minimum gap after sustain, minimum note length.
 -- Sustain threshold: note must be LONGER than this to show a tail.
--- >100 BPM: dotted 8th note; â‰¤100 BPM: 3/16th note (per updated authoring rules).
+-- >100 BPM: dotted 8th note; <=100 BPM: 3/16th note (per updated authoring rules).
 -- Min gap after sustain: 1/32nd note (standard: 1/16th).
 -- Min note length: 1/64th note.
 function SustainThresholds(time)
@@ -100,7 +100,7 @@ function RunValidation(notes)
         -- Minimum note length: 1/64th
         local _, _, note_min_s = SustainThresholds(ev.s)
         if dur < note_min_s - 0.001 then
-            add(ev.s, string.format('Note too short: %.1f ms (min 1/64th â‰ˆ %.1f ms)',
+            add(ev.s, string.format('Note too short: %.1f ms (min 1/64th ~ %.1f ms)',
                 dur * 1000, note_min_s * 1000))
         end
 
@@ -117,7 +117,7 @@ function RunValidation(notes)
                 local gap = ev.s - prev_ev.e
                 if gap < gap_min_s - 0.001 then
                     add(ev.s, string.format(
-                        'Gap after sustain too small: %.1f ms (min 1/32nd â‰ˆ %.1f ms)',
+                        'Gap after sustain too small: %.1f ms (min 1/32nd ~ %.1f ms)',
                         gap * 1000, gap_min_s * 1000))
                 end
             end

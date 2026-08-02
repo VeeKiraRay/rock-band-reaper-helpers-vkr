@@ -344,7 +344,7 @@ TIPS = {
 
     venue_cam_pacing = "Override the camera cut pacing for the entire song.\n\n" ..
                        "Theme default: use the pacing defined in the selected theme\n" ..
-                       "(falls back to Slow \xe2\x80\x94 24 16ths \xe2\x80\x94 when no theme is selected).\n\n" ..
+                       "(falls back to Slow - 24 16ths - when no theme is selected).\n\n" ..
                        "Any other value overrides both the theme's global camera_pacing\n" ..
                        "and any per-section camera_pacing overrides defined in the theme.\n\n" ..
                        "At or above 150 BPM all intervals scale by \xc3\x971.5 to avoid\n" ..
@@ -366,9 +366,9 @@ TIPS = {
     venue_cam_pacing_jitter = "When checked, camera cut intervals are randomised within \xc2\xb120% of\n" ..
                               "the selected pacing value, giving a more natural feel.\n\n" ..
                               "When unchecked, all camera cuts land at the exact interval with\n" ..
-                              "no randomisation — use this for metrically precise authoring.",
+                              "no randomisation - use this for metrically precise authoring.",
 
-    venue_cam_pacing_custom = "Custom camera cut interval in 16th notes (2\xe2\x80\x93128).\n\n" ..
+    venue_cam_pacing_custom = "Custom camera cut interval in 16th notes (2-128).\n\n" ..
                               "At or above 150 BPM this value is scaled by \xc3\x971.5,\n" ..
                               "same as the named presets.\n\n" ..
                               "Ctrl+click to type an exact value.",
@@ -637,55 +637,55 @@ TIPS = {
     tab_input_mode     = 'Switch the Tab Input mode.\n\n' ..
                          'Guitar/Bass: standard guitar tab format (horizontal or vertical).\n' ..
                          'Keys/Pro Keys: enter fret numbers relative to guitar string pitches,\n' ..
-                         'shifted into the C2\xe2\x80\x93C4 Pro Keys range.\n' ..
-                         'Vocal: same tab format, shifted into the wider C1\xe2\x80\x93C5 vocal range.',
-    pk_run_guide       = 'Convert frets to pitches, shift into the C2\xe2\x80\x93C4 Pro Keys range\n' ..
-                         '(MIDI 48\xe2\x80\x9372), and suggest the best lane range.\n\n' ..
-                         'Nothing is written to the project \xe2\x80\x94 reference guide only.\n\n' ..
+                         'shifted into the C2-C4 Pro Keys range.\n' ..
+                         'Vocal: same tab format, shifted into the wider C1-C5 vocal range.',
+    pk_run_guide       = 'Convert frets to pitches, shift into the C2-C4 Pro Keys range\n' ..
+                         '(MIDI 48-72), and suggest the best lane range.\n\n' ..
+                         'Nothing is written to the project - reference guide only.\n\n' ..
                          'When \xe2\x80\x9cFor animation\xe2\x80\x9d is checked: skips lane window scoring\n' ..
-                         'and reports against the full C2\xe2\x80\x93C4 range instead.',
-    pk_tab_animation   = 'Animation mode: score against the full C2\xe2\x80\x93C4 range instead of a\n' ..
+                         'and reports against the full C2-C4 range instead.',
+    pk_tab_animation   = 'Animation mode: score against the full C2-C4 range instead of a\n' ..
                          '10th (17-key lane window). Use when planning notes for\n' ..
                          'PART KEYS_ANIM_RH or PART KEYS_ANIM_LH.\n\n' ..
-                         'Lane range suggestions are hidden; only out-of-C2\xe2\x80\x93C4 notes are flagged.',
-    voc_run_guide      = 'Convert frets to pitches, find the best octave shift to fit C1\xe2\x80\x93C5\n' ..
-                         '(MIDI 36\xe2\x80\x9384), and report any out-of-range notes.\n\n' ..
-                         'Nothing is written to the project \xe2\x80\x94 reference guide only.\n' ..
+                         'Lane range suggestions are hidden; only out-of-C2-C4 notes are flagged.',
+    voc_run_guide      = 'Convert frets to pitches, find the best octave shift to fit C1-C5\n' ..
+                         '(MIDI 36-84), and report any out-of-range notes.\n\n' ..
+                         'Nothing is written to the project - reference guide only.\n' ..
                          'Blank lines separate phrases.',
 
     -- MIDI converter - Keys tab (Pro Keys animation)
     mc_keys_pk_src     = 'Expert Pro Keys source track (PART REAL_KEYS_X or similar).\n' ..
-                         'Notes in C2\xe2\x80\x93C4 (MIDI 48\xe2\x80\x9372) are copied to the animation track.\n' ..
-                         'Lane shift markers (MIDI 0\xe2\x80\x939) are automatically excluded.',
-    gen_animation      = 'Copy Expert Pro Keys notes (C2\xe2\x80\x93C4) to the animation target track(s).\n\n' ..
-                         'Lane shift markers and any notes outside C2\xe2\x80\x93C4 are stripped.\n' ..
+                         'Notes in C2-C4 (MIDI 48-72) are copied to the animation track.\n' ..
+                         'Lane shift markers (MIDI 0-9) are automatically excluded.',
+    gen_animation      = 'Copy Expert Pro Keys notes (C2-C4) to the animation target track(s).\n\n' ..
+                         'Lane shift markers and any notes outside C2-C4 are stripped.\n' ..
                          'RH/LH targets are shared with the Hand Split section above.\n\n' ..
                          'Respects time selection if active. Fully undoable.',
 
     -- MIDI converter - Keys tab (piano→Pro Keys range)
     mc_pk_conv_tgt      = 'Target Pro Keys track (typically PART REAL_KEYS_X).\n' ..
-                          'Notes will be octave-shifted into C2\xe2\x80\x93C4 (MIDI 48\xe2\x80\x9372).',
+                          'Notes will be octave-shifted into C2-C4 (MIDI 48-72).',
     mc_pk_insert_shifts = 'Auto-insert lane shift marker notes when the melody moves outside\n' ..
                           'the current 10th-window range.\n\n' ..
-                          'Markers are MIDI notes 0\xe2\x80\x939 (C\xe2\x80\x93A in the lowest octave), placed\n' ..
+                          'Markers are MIDI notes 0-9 (C-A in the lowest octave), placed\n' ..
                           'approximately one measure before the range transition.\n' ..
                           'They can be moved or deleted after insertion.',
     gen_pk_from_piano   = 'Convert piano MIDI to Pro Keys range by octave-shifting all notes\n' ..
-                          'into C2\xe2\x80\x93C4 (MIDI 48\xe2\x80\x9372).\n\n' ..
+                          'into C2-C4 (MIDI 48-72).\n\n' ..
                           'Each note is shifted up or down by whole octaves until it lands in range.\n' ..
                           'Uses the source track from Hand Split above.\n\n' ..
                           'Respects time selection if active. Fully undoable.',
 
     -- MIDI converter - Keys tab (piano→5-Lane Keys)
     mc_5k_tgt          = 'Target 5-Lane Keys track (PART KEYS).\n' ..
-                         'Output notes will be Expert gems (pitches 96\xe2\x80\x93100).',
+                         'Output notes will be Expert gems (pitches 96-100).',
     mc_5k_phrase_gap   = 'Rest gap in milliseconds that resets the gem window to Green (position 0).\n' ..
                          'After a silence of at least this length, the next note starts a new phrase\n' ..
                          'and anchors the window to its pitch.',
     mc_5k_max_chord    = 'Maximum simultaneous gems per chord.\n' ..
                          '3-note chords keep the lowest, one middle, and highest note.\n' ..
                          '2-note chords keep only the lowest and highest.',
-    gen_5k             = 'Map piano MIDI to 5-lane Expert Keys gems (96\xe2\x80\x93100).\n\n' ..
+    gen_5k             = 'Map piano MIDI to 5-lane Expert Keys gems (96-100).\n\n' ..
                          'A 5-semitone window tracks the melody: the window root maps to Green,\n' ..
                          'and the window shifts when the melody moves outside it.\n' ..
                          'After a rest of the configured phrase gap length, the window resets.\n\n' ..
@@ -699,7 +699,7 @@ TIPS = {
     ma_mode     = "Move only: shifts the item so the first note lands at the time selection start.\n" ..
                   "Move + Stretch: also adjusts the playback rate so the last note lands at the\n" ..
                   "time selection end.\n\n" ..
-                  "The result does not need to be exact \xe2\x80\x94 snap/quantize finishes alignment.",
+                  "The result does not need to be exact - snap/quantize finishes alignment.",
     ma_align    = "Move (and optionally stretch) the MIDI item to align with the time selection.\n\n" ..
                   "Set a time selection first. Move + Stretch adjusts the playback rate so the\n" ..
                   "last note lands at the time selection end.\n\n" ..
@@ -819,7 +819,7 @@ TIPS = {
     -- Difficulty tab - 5-Lane Keys
     diff_5k_track     = "5-Lane Keys track (PART KEYS).\n" ..
                         "All four difficulties live on this single track in separate pitch ranges:\n" ..
-                        "Expert 96\xe2\x80\x93100 | Hard 84\xe2\x80\x9388 | Medium 72\xe2\x80\x9375 | Easy 60\xe2\x80\x9362",
+                        "Expert 96-100 | Hard 84-88 | Medium 72-75 | Easy 60-62",
     diff_5k_autodetect = "Search for a track named PART KEYS and assign it.\n" ..
                          "Resets the current selection before scanning.",
     diff_5k_copy      = "Copy notes from the tier above (Expert\xe2\x86\x92Hard, Hard\xe2\x86\x92Medium,\n" ..
@@ -859,7 +859,7 @@ TIPS = {
     diff_gb_track      = "Guitar/Bass difficulty track (PART GUITAR or PART BASS, matching the\n" ..
                          "instrument selected above).\n" ..
                          "All four difficulties live on this single track in separate pitch ranges:\n" ..
-                         "Expert 96\xe2\x80\x93100 | Hard 84\xe2\x80\x9388 | Medium 72\xe2\x80\x9375 | Easy 60\xe2\x80\x9362",
+                         "Expert 96-100 | Hard 84-88 | Medium 72-75 | Easy 60-62",
     diff_gb_autodetect = "Search for tracks named PART GUITAR and PART BASS by exact name and\n" ..
                          "assign them. Resets both selections before scanning.",
     diff_gb_copy       = "Copy notes from the tier above (Expert\xe2\x86\x92Hard, Hard\xe2\x86\x92Medium,\n" ..
@@ -886,7 +886,7 @@ TIPS = {
     -- Difficulty tab - Drums
     diff_drums_track      = "Drums difficulty track (PART DRUMS).\n" ..
                             "All four difficulties live on this single track in separate pitch ranges:\n" ..
-                            "Expert 96\xe2\x80\x93100 | Hard 84\xe2\x80\x9388 | Medium 72\xe2\x80\x9376 | Easy 60\xe2\x80\x9364",
+                            "Expert 96-100 | Hard 84-88 | Medium 72-76 | Easy 60-64",
     diff_drums_autodetect = "Search for a track named PART DRUMS and assign it.\n" ..
                             "Resets the current selection before scanning.",
     diff_drums_copy       = "Copy notes from the tier above (Expert\xe2\x86\x92Hard, Hard\xe2\x86\x92Medium,\n" ..
@@ -910,26 +910,26 @@ TIPS = {
                               "Respects time selection if active.",
 
     venue_preview_scale  = "Scale for venue event sprite previews shown in tooltips.\n\n" ..
-                           "1\xc3\x97 \xe2\x80\x93 smaller display (213\xc3\x97120 px).\n" ..
-                           "2\xc3\x97 \xe2\x80\x93 larger display (426\xc3\x97240 px).\n\n" ..
+                           "1\xc3\x97 - smaller display (213\xc3\x97120 px).\n" ..
+                           "2\xc3\x97 - larger display (426\xc3\x97240 px).\n\n" ..
                            "The scale affects display size only. Which source folder is loaded\n" ..
                            "(large or small) depends on what is installed.\n\n" ..
                            "The Preview tab has its own independent size setting.",
     venue_preview_animate = "Controls animation for venue sprite previews shown in tooltips.\n\n" ..
-                           "Animated \xe2\x80\x93 sprite plays through all frames continuously.\n" ..
-                           "Still \xe2\x80\x93 shows a single frame from the middle of the sheet.\n\n" ..
+                           "Animated - sprite plays through all frames continuously.\n" ..
+                           "Still - shows a single frame from the middle of the sheet.\n\n" ..
                            "The Preview tab has its own independent Animated/Still toggle.",
     venue_preview_combo   = "Which two instruments are in the player's band lineup.\n\n" ..
-                           "Bass + Guitar  \xe2\x80\x93  no Keys player; Keys camera shots are filtered.\n" ..
-                           "Bass + Keys    \xe2\x80\x93  no Guitar player; Guitar camera shots are filtered.\n" ..
-                           "Guitar + Keys  \xe2\x80\x93  no Bass player; Bass camera shots are filtered.\n\n" ..
+                           "Bass + Guitar  -  no Keys player; Keys camera shots are filtered.\n" ..
+                           "Bass + Keys    -  no Guitar player; Guitar camera shots are filtered.\n" ..
+                           "Guitar + Keys  -  no Bass player; Bass camera shots are filtered.\n\n" ..
                            "Camera events that require the absent instrument are replaced by an\n" ..
                            "alternative event at the same position, if one exists. Only the Camera\n" ..
                            "row is affected; Lighting and Post-Process are unchanged.",
     venue_preview_show_mode = "How many events to display per category.\n\n" ..
-                           "Current only       \xe2\x80\x93  one column showing the active event (started at or\n" ..
+                           "Current only       -  one column showing the active event (started at or\n" ..
                            "                      before the playhead and not yet superseded).\n" ..
-                           "Surrounding events \xe2\x80\x93  three columns: the previous, current, and next event.",
+                           "Surrounding events -  three columns: the previous, current, and next event.",
     venue_preview_refresh_resume = "Auto-refresh was paused because the last VENUE MIDI read\n" ..
                            "took 150 ms or longer.\n\n" ..
                            "Click to re-enable automatic updates. If it pauses again,\n" ..

@@ -204,7 +204,7 @@ function GenerateDemoVenue()
 
     elseif mode == DEMO_MODE_COOP then
         -- Neutral lighting + pp at measure 1; coop shots start at measure 3.
-        -- Coop shots are instant cuts with no variable pre-roll — 2 measures each.
+        -- Coop shots are instant cuts with no variable pre-roll - 2 measures each.
         local coop_win_s = 2.0 * measure_s
         E(0, lt_event)
         E(0, pp_event)

@@ -49,7 +49,7 @@ local function _DrawTabInputBody(mode, radio_w_ti)
     -- Mode-specific option (one checkbox per mode, same vertical slot)
     if mode == 1 then
         _, S.pk_tab_animation = r.ImGui_Checkbox(
-            ctx, 'For animation (full C2\xe2\x80\x93C4, no lane windows)', S.pk_tab_animation)
+            ctx, 'For animation (full C2-C4, no lane windows)', S.pk_tab_animation)
         Tooltip(TIPS.pk_tab_animation)
         r.ImGui_Spacing(ctx)
     end

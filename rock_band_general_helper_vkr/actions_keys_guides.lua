@@ -132,12 +132,12 @@ function ProKeysTabGuide()
 
     if S.pk_tab_animation then
         -- Animation mode: report against full C2-C4 range, skip lane window scoring
-        lines[#lines + 1] = 'Animation mode \xe2\x80\x94 full C2\xe2\x80\x93C4 range (no lane window).'
+        lines[#lines + 1] = 'Animation mode - full C2-C4 range (no lane window).'
         lines[#lines + 1] = ''
         if best_out_count == 0 then
-            lines[#lines + 1] = 'All notes fit within C2\xe2\x80\x93C4.'
+            lines[#lines + 1] = 'All notes fit within C2-C4.'
         else
-            lines[#lines + 1] = (best_out_count .. ' note(s) fall outside C2\xe2\x80\x93C4 even after best shift.')
+            lines[#lines + 1] = (best_out_count .. ' note(s) fall outside C2-C4 even after best shift.')
             lines[#lines + 1] = 'Consider re-voicing those notes.'
             -- List out-of-range events
             lines[#lines + 1] = ''
@@ -151,7 +151,7 @@ function ProKeysTabGuide()
                     end
                 end
                 if #bad > 0 then
-                    lines[#lines + 1] = ('  Event %d (phrase %d): %s \xe2\x80\x94 %s'):format(
+                    lines[#lines + 1] = ('  Event %d (phrase %d): %s - %s'):format(
                         i, ev.phrase_idx, PkEventLabel(ev.pitches), table.concat(bad, '; '))
                 end
             end
@@ -163,9 +163,9 @@ function ProKeysTabGuide()
             for _, s in ipairs(span_warns) do lines[#lines + 1] = s end
         end
 
-        local status_fit = best_out_count == 0 and 'all fit C2\xe2\x80\x93C4' or
-                           (best_out_count .. ' out of C2\xe2\x80\x93C4')
-        S.status = ('Pro Keys guide (animation): %s \xe2\x80\x94 %s'):format(shift_label, status_fit)
+        local status_fit = best_out_count == 0 and 'all fit C2-C4' or
+                           (best_out_count .. ' out of C2-C4')
+        S.status = ('Pro Keys guide (animation): %s - %s'):format(shift_label, status_fit)
     else
         -- Standard mode: score lane windows and suggest best range
 
@@ -209,7 +209,7 @@ function ProKeysTabGuide()
                 end
             end
             if #bad > 0 then
-                oor[#oor + 1] = ('  Event %d (phrase %d): %s \xe2\x80\x94 %s'):format(
+                oor[#oor + 1] = ('  Event %d (phrase %d): %s - %s'):format(
                     i, ev.phrase_idx, PkEventLabel(ev.pitches), table.concat(bad, '; '))
             else
                 in_count = in_count + 1
@@ -234,7 +234,7 @@ function ProKeysTabGuide()
             for _, s in ipairs(oor) do lines[#lines + 1] = s end
             lines[#lines + 1] = ''
             if best_out_count > 0 then
-                lines[#lines + 1] = 'Note: no octave shift fits all notes in C2\xe2\x80\x93C4.'
+                lines[#lines + 1] = 'Note: no octave shift fits all notes in C2-C4.'
                 lines[#lines + 1] = 'Consider splitting the passage or re-voicing out-of-range notes.'
             else
                 lines[#lines + 1] = 'Consider shifting 1 oct or splitting at a phrase boundary.'
@@ -248,7 +248,7 @@ function ProKeysTabGuide()
         end
 
         local status_in = #oor == 0 and 'all fit' or (in_count .. '/' .. #events .. ' fit')
-        S.status = ('Pro Keys guide: %s \xe2\x80\x94 suggested %s (%s)'):format(
+        S.status = ('Pro Keys guide: %s - suggested %s (%s)'):format(
             shift_label, best_range.name, status_in)
     end
 
@@ -342,9 +342,9 @@ function VocalTabGuide()
     lines[#lines + 1] = ''
 
     if best_out_count == 0 then
-        lines[#lines + 1] = 'All notes fit within C1\xe2\x80\x93C5.'
+        lines[#lines + 1] = 'All notes fit within C1-C5.'
     else
-        lines[#lines + 1] = (best_out_count .. ' note(s) fall outside C1\xe2\x80\x93C5 even after best shift.')
+        lines[#lines + 1] = (best_out_count .. ' note(s) fall outside C1-C5 even after best shift.')
         lines[#lines + 1] = 'Consider re-voicing those notes or splitting the passage.'
         lines[#lines + 1] = ''
         for i, ev in ipairs(events) do
@@ -357,7 +357,7 @@ function VocalTabGuide()
                 end
             end
             if #bad > 0 then
-                lines[#lines + 1] = ('  Event %d (phrase %d): %s \xe2\x80\x94 %s'):format(
+                lines[#lines + 1] = ('  Event %d (phrase %d): %s - %s'):format(
                     i, ev.phrase_idx, PkEventLabel(ev.pitches), table.concat(bad, '; '))
             end
         end
@@ -369,8 +369,8 @@ function VocalTabGuide()
         for _, s in ipairs(span_warns) do lines[#lines + 1] = s end
     end
 
-    local status_fit = best_out_count == 0 and 'all fit C1\xe2\x80\x93C5' or
-                       (best_out_count .. ' out of C1\xe2\x80\x93C5')
-    S.status = ('Vocal guide: %s \xe2\x80\x94 %s'):format(shift_label, status_fit)
+    local status_fit = best_out_count == 0 and 'all fit C1-C5' or
+                       (best_out_count .. ' out of C1-C5')
+    S.status = ('Vocal guide: %s - %s'):format(shift_label, status_fit)
     S.last_result = table.concat(lines, '\n')
 end

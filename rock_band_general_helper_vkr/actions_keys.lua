@@ -1,4 +1,4 @@
--- MIDI converter: Piano MIDI â†’ Rock Band Keys (hand split, Pro Keys range, 5-Lane Keys)
+-- MIDI converter: Piano MIDI -> Rock Band Keys (hand split, Pro Keys range, 5-Lane Keys)
 -- Requires: S, r, GetTimeSelection, FindFirstMIDIItem, InsertNotes, PitchName (globals)
 
 -- Read all notes with channel info from every MIDI item on a track.
@@ -68,12 +68,12 @@ PK_MAX = 72   -- C4
 
 -- pref: 1 = preferred, 2 = common alternative, 3 = less common
 PK_RANGES = {
-    { name = 'C2\xe2\x80\x93E3', lo = 48, hi = 64, pref = 1 },
-    { name = 'D2\xe2\x80\x93F3', lo = 50, hi = 65, pref = 3 },
-    { name = 'E2\xe2\x80\x93G3', lo = 52, hi = 67, pref = 2 },
-    { name = 'F2\xe2\x80\x93A3', lo = 53, hi = 69, pref = 1 },
-    { name = 'G2\xe2\x80\x93B3', lo = 55, hi = 71, pref = 3 },
-    { name = 'A2\xe2\x80\x93C4', lo = 57, hi = 72, pref = 1 },
+    { name = 'C2-E3', lo = 48, hi = 64, pref = 1 },
+    { name = 'D2-F3', lo = 50, hi = 65, pref = 3 },
+    { name = 'E2-G3', lo = 52, hi = 67, pref = 2 },
+    { name = 'F2-A3', lo = 53, hi = 69, pref = 1 },
+    { name = 'G2-B3', lo = 55, hi = 71, pref = 3 },
+    { name = 'A2-C4', lo = 57, hi = 72, pref = 1 },
 }
 
 PK_PREF_LABEL = { [1] = '[preferred]', [2] = '[common alternative]', [3] = '[less common]' }
@@ -199,7 +199,7 @@ function ConvertProKeys()
 
     local src_tr = r.GetTrack(0, S.mc_keys_pk_src_idx)
     if not src_tr then
-        S.status = 'Error: source track no longer exists \xe2\x80\x94 refresh tracks.'
+        S.status = 'Error: source track no longer exists - refresh tracks.'
         S.last_result = nil
         return
     end
@@ -219,9 +219,9 @@ function ConvertProKeys()
     end
 
     if #anim_notes == 0 then
-        S.status = 'No notes in C2\xe2\x80\x93C4 found on source track.'
-        S.last_result = sel_s and 'No C2\xe2\x80\x93C4 notes in the time selection.'
-                                or 'Source track has no notes in C2\xe2\x80\x93C4.'
+        S.status = 'No notes in C2-C4 found on source track.'
+        S.last_result = sel_s and 'No C2-C4 notes in the time selection.'
+                                or 'Source track has no notes in C2-C4.'
         return
     end
 
@@ -231,13 +231,13 @@ function ConvertProKeys()
     if S.mc_keys_preview then
         local lines = {
             ('Source: %d notes total'):format(#raw),
-            ('Animation notes (C2\xe2\x80\x93C4): %s'):format(anim_note),
+            ('Animation notes (C2-C4): %s'):format(anim_note),
         }
         if stripped > 0 then
             lines[#lines + 1] = ('Excluded (lane markers / out of range): %s'):format(strip_note)
         end
         lines[#lines + 1] = ''
-        lines[#lines + 1] = 'Preview only \xe2\x80\x94 switch to Auto-insert and run again to write.'
+        lines[#lines + 1] = 'Preview only - switch to Auto-insert and run again to write.'
         S.status = ('Animation preview: %s ready (not written)'):format(anim_note)
         S.last_result = table.concat(lines, '\n')
         return
@@ -253,7 +253,7 @@ function ConvertProKeys()
 
     local lines = {
         ('Source: %d notes total'):format(#raw),
-        ('Animation notes (C2\xe2\x80\x93C4): %s'):format(anim_note),
+        ('Animation notes (C2-C4): %s'):format(anim_note),
     }
     if stripped > 0 then
         lines[#lines + 1] = ('Excluded (lane markers / out of range): %s'):format(strip_note)
@@ -286,7 +286,7 @@ function ConvertPianoToProKeys()
 
     local src_tr = r.GetTrack(0, S.mc_keys_src_idx)
     if not src_tr then
-        S.status = 'Error: source track no longer exists \xe2\x80\x94 refresh tracks.'
+        S.status = 'Error: source track no longer exists - refresh tracks.'
         S.last_result = nil
         return
     end
@@ -375,7 +375,7 @@ function ConvertPianoToProKeys()
                             if marker_t < (sel_s or 0) then marker_t = out_notes[j].s end
                         end
                     end
-                    -- Marker pitch = range.lo - PK_MIN (maps C2â†’0, D2â†’2, E2â†’4, F2â†’5, G2â†’7, A2â†’9)
+                    -- Marker pitch = range.lo - PK_MIN (maps C2->0, D2->2, E2->4, F2->5, G2->7, A2->9)
                     local marker_pitch = new_range.lo - PK_MIN
                     shift_markers[#shift_markers + 1] = {
                         s     = marker_t,
@@ -394,7 +394,7 @@ function ConvertPianoToProKeys()
         local lines = {
             ('Source: %s'):format(note_str),
             '',
-            ('Already in C2\xe2\x80\x93C4:  %d notes'):format(n_in_range),
+            ('Already in C2-C4:  %d notes'):format(n_in_range),
             ('Shifted up:      %d notes'):format(n_shift_up),
             ('Shifted down:    %d notes'):format(n_shift_dn),
         }
@@ -406,7 +406,7 @@ function ConvertPianoToProKeys()
             lines[#lines + 1] = ('Lane shift markers: %d'):format(#shift_markers)
         end
         lines[#lines + 1] = ''
-        lines[#lines + 1] = 'Preview only \xe2\x80\x94 switch to Auto-insert and run again to write.'
+        lines[#lines + 1] = 'Preview only - switch to Auto-insert and run again to write.'
         S.status = ('Pro Keys preview: %s \xe2\x80\x92 %d shifted (not written)'):format(
             note_str, n_shift_up + n_shift_dn)
         S.last_result = table.concat(lines, '\n')
@@ -429,7 +429,7 @@ function ConvertPianoToProKeys()
     local lines = {
         ('Source: %s'):format(note_str),
         '',
-        ('Already in C2\xe2\x80\x93C4:  %d notes'):format(n_in_range),
+        ('Already in C2-C4:  %d notes'):format(n_in_range),
         ('Shifted up:      %d notes'):format(n_shift_up),
         ('Shifted down:    %d notes'):format(n_shift_dn),
     }
@@ -462,7 +462,7 @@ function ConvertKeys5()
 
     local src_tr = r.GetTrack(0, S.mc_keys_src_idx)
     if not src_tr then
-        S.status = 'Error: source track no longer exists \xe2\x80\x94 refresh tracks.'
+        S.status = 'Error: source track no longer exists - refresh tracks.'
         S.last_result = nil
         return
     end
@@ -492,7 +492,7 @@ function ConvertKeys5()
         events[#events + 1] = ev
     end
 
-    -- Assign gem positions using a sliding 5-semitone window [root, root+4] â†’ gems 96-100.
+    -- Assign gem positions using a sliding 5-semitone window [root, root+4] -> gems 96-100.
     local WINDOW_SIZE = 5
     local GEM_BASE    = 96
     local window_root   = nil
@@ -550,10 +550,10 @@ function ConvertKeys5()
     if S.mc_keys_preview then
         local lines = {
             ('Source: %s in %d chord events'):format(note_str, #events),
-            ('Output: %d gem notes (96\xe2\x80\x93100)'):format(#out_notes),
+            ('Output: %d gem notes (96-100)'):format(#out_notes),
             ('Phrase resets: %d  |  Window shifts: %d'):format(phrase_resets, window_shifts),
             '',
-            'Preview only \xe2\x80\x94 switch to Auto-insert and run again to write.',
+            'Preview only - switch to Auto-insert and run again to write.',
         }
         S.status = ('5-Lane preview: %d events \xe2\x80\x92 %d gems (not written)'):format(
             #events, #out_notes)
@@ -570,7 +570,7 @@ function ConvertKeys5()
 
     local lines = {
         ('Source: %s in %d chord events'):format(note_str, #events),
-        ('Output: %d gem notes written (96\xe2\x80\x93100)'):format(written),
+        ('Output: %d gem notes written (96-100)'):format(written),
         ('Phrase resets: %d  |  Window shifts: %d'):format(phrase_resets, window_shifts),
     }
     S.status = ('5-Lane Keys: %d gem note%s written.'):format(

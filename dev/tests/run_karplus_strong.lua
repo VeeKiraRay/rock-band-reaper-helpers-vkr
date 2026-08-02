@@ -1,4 +1,4 @@
--- @description Rock Band Music Theory Helper — Karplus-Strong Unit Tests
+-- @description Rock Band Music Theory Helper - Karplus-Strong Unit Tests
 -- @author VeeKiraRay
 -- @about
 --   Algorithm unit tests for lib/reaper_karplus_strong.lua: single-voice
@@ -24,7 +24,7 @@ local _tdir = _root .. 'dev/tests/'
 ctx = nil
 
 r.ClearConsole()
-r.ShowConsoleMsg('======  Karplus-Strong — algorithm unit tests  ======\n')
+r.ShowConsoleMsg('======  Karplus-Strong - algorithm unit tests  ======\n')
 
 dofile(_tdir .. 'framework.lua')
 dofile(_root .. 'lib/reaper_karplus_strong.lua')

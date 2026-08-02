@@ -1,4 +1,4 @@
--- MIDI converter: raw guitar pitches â†’ Rock Band Expert Guitar gems
+-- MIDI converter: raw guitar pitches -> Rock Band Expert Guitar gems
 -- Requires: S, r, GetTimeSelection, FindFirstMIDIItem, InsertNotes, PitchName (globals)
 
 -- Expert Guitar gem pitches: 96=Green, 97=Red, 98=Yellow, 99=Blue, 100=Orange
@@ -313,8 +313,8 @@ end
 -- combo, global, never reset by gaps between notes), shared (key -> true
 -- for any shape that had to reuse another shape's combo in its group).
 function BuildShapeGemMap(events, max_chord)
-    local all_shapes  = {}   -- key â†’ {avg, max, sz, pitches}
-    local size_orders = {}   -- sz â†’ [keys in first-seen order, sorted later]
+    local all_shapes  = {}   -- key -> {avg, max, sz, pitches}
+    local size_orders = {}   -- sz -> [keys in first-seen order, sorted later]
 
     for _, ev in ipairs(events) do
         local pitches = CompressChord(ev.pitches, max_chord)
@@ -332,8 +332,8 @@ function BuildShapeGemMap(events, max_chord)
 
     local pool2      = S.mc_gtr_allow_14 and POOLS[2] or POOLS2_NO14
     local pool2_by_w = PoolByWidth(pool2)
-    local shape_gems = {}   -- key â†’ gem combo (global, never reset)
-    local shared     = {}   -- key â†’ true when its combo is shared with another shape
+    local shape_gems = {}   -- key -> gem combo (global, never reset)
+    local shared     = {}   -- key -> true when its combo is shared with another shape
 
     local sizes = {}
     for sz in pairs(size_orders) do sizes[#sizes + 1] = sz end
@@ -547,7 +547,7 @@ local function AssignGems(events, wrap_gap_s, max_chord)
         end
 
         -- Safety net: narrow any residual spread >= 3 when allow_14 is off
-        -- (can occur after G+O â†’ R+O substitution above).
+        -- (can occur after G+O -> R+O substitution above).
         local narrowed_14 = false
         if not S.mc_gtr_allow_14 and #gems == 2 and gems[2] - gems[1] >= 3 then
             gems        = { gems[1], gems[1] + 2 }
@@ -584,7 +584,7 @@ end
 
 local function BuildPreviewReport(assignments, n_src, n_gems)
     local lines = {}
-    lines[#lines + 1] = string.format('Source notes: %d  â†’  Gems to write: %d', n_src, n_gems)
+    lines[#lines + 1] = string.format('Source notes: %d  ->  Gems to write: %d', n_src, n_gems)
     lines[#lines + 1] = ''
     for _, a in ipairs(assignments) do
         if a.is_meta then
@@ -662,7 +662,7 @@ function ConvertGuitar()
     local report       = BuildPreviewReport(assignments, #src_notes, n_gems)
 
     if preview_mode then
-        S.status = string.format('Guitar preview: %d source notes â†’ %d gems (not written)',
+        S.status = string.format('Guitar preview: %d source notes -> %d gems (not written)',
             #src_notes, n_gems)
         S.last_result = report
         return

@@ -54,7 +54,7 @@ local function draw_status(res)
     if not res then
         r.ImGui_TextDisabled(ctx, '(not run)')
     elseif res.load_error then
-        r.ImGui_TextColored(ctx, COL_ERR, 'load error — see console')
+        r.ImGui_TextColored(ctx, COL_ERR, 'load error - see console')
     elseif res.fail == 0 then
         local n = tostring(res.pass)
         r.ImGui_TextColored(ctx, COL_OK, n .. '/' .. n .. ' pass')
@@ -113,6 +113,12 @@ function Loop()
         end
         r.ImGui_SameLine(ctx)
         draw_status(results.dsp_algo)
+
+        if r.ImGui_Button(ctx, 'Accessor Resampling', 155, 24) then
+            run('run_accessor_resampling.lua', 'accessor_rs')
+        end
+        r.ImGui_SameLine(ctx)
+        draw_status(results.accessor_rs)
 
         r.ImGui_Spacing(ctx)
 

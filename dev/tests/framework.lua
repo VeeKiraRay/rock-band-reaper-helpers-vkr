@@ -2,7 +2,12 @@
 -- Defines Test global with: Test.section, Test.it, Test.expect, Test.report.
 -- Results are written to the REAPER console (View > Show REAPER console).
 
-Test = { _pass = 0, _fail = 0 }
+-- Test.after (optional): a function run after every Test.it, pass or fail.
+-- Set by suites whose tests mutate project state, so that a test which errors
+-- part-way -- and therefore never reaches its own cleanup -- cannot leave that
+-- state behind for the tests after it. Failures inside the hook are swallowed:
+-- a broken teardown must not be reported as a test failure.
+Test = { _pass = 0, _fail = 0, after = nil }
 
 function Test.section(name)
     r.ShowConsoleMsg('\n-- ' .. name .. '\n')
@@ -10,6 +15,7 @@ end
 
 function Test.it(name, fn)
     local ok, err = pcall(fn)
+    if Test.after then pcall(Test.after) end
     if ok then
         Test._pass = Test._pass + 1
         r.ShowConsoleMsg('  PASS  ' .. name .. '\n')

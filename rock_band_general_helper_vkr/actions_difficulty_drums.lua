@@ -440,7 +440,7 @@ local function CheckDrumsGeneralDensity(events, diff_label)
         if run_len >= MIN_RUN_LEN then
             local bpm = 60.0 / GetDrumsBeatDur(events[run_start].s)
             if bpm >= bpm_threshold then
-                issues[#issues + 1] = ('%s\xe2\x80\x93%s: %d consecutive 8th notes at %.0f BPM (reduce timekeeping density above %d BPM on %s)'):format(
+                issues[#issues + 1] = ('%s-%s: %d consecutive 8th notes at %.0f BPM (reduce timekeeping density above %d BPM on %s)'):format(
                     FormatTime(events[run_start].s), FormatTime(events[j].s), run_len, bpm, bpm_threshold, DIFF_NAMES[diff_label])
             end
             i = j + 1
@@ -706,7 +706,7 @@ function ValidateDrumsDiff(diff_label)
     end
     local track = r.GetTrack(0, S.diff_drums_idx)
     if not track then
-        S.status      = 'Error: PART DRUMS track no longer exists \xe2\x80\x94 refresh tracks.'
+        S.status      = 'Error: PART DRUMS track no longer exists - refresh tracks.'
         S.last_result = nil
         return
     end
@@ -717,18 +717,18 @@ function ValidateDrumsDiff(diff_label)
     local events         = GroupDrumsHits(notes)
 
     if #notes == 0 then
-        S.status = ('Validate Drums %s: no notes in %s\xe2\x80\x93%s (%d\xe2\x80\x93%d).'):format(
+        S.status = ('Validate Drums %s: no notes in %s-%s (%d-%d).'):format(
             diff_label, PitchName(rng.lo), PitchName(rng.hi), rng.lo, rng.hi)
         S.last_result = sel_s
-            and ('No %s notes (%s\xe2\x80\x93%s) in the current time selection.'):format(
+            and ('No %s notes (%s-%s) in the current time selection.'):format(
                 DIFF_NAMES[diff_label], PitchName(rng.lo), PitchName(rng.hi))
-            or  ('No %s notes (%s\xe2\x80\x93%s) on PART DRUMS track.'):format(
+            or  ('No %s notes (%s-%s) on PART DRUMS track.'):format(
                 DIFF_NAMES[diff_label], PitchName(rng.lo), PitchName(rng.hi))
         return
     end
 
     local scope  = sel_s and ' [time selection]' or ''
-    local header = ('Drums %s Validation  [%s\xe2\x80\x93%s, %d\xe2\x80\x93%d]%s'):format(
+    local header = ('Drums %s Validation  [%s-%s, %d-%d]%s'):format(
         DIFF_NAMES[diff_label], PitchName(rng.lo), PitchName(rng.hi), rng.lo, rng.hi, scope)
     local report, total = RunDrumsChecks(diff_label, events, header, rng, track, sel_s, sel_e)
 
@@ -782,7 +782,7 @@ function ValidateAllDrums()
     end
     local track = r.GetTrack(0, S.diff_drums_idx)
     if not track then
-        S.status      = 'Error: PART DRUMS track no longer exists \xe2\x80\x94 refresh tracks.'
+        S.status      = 'Error: PART DRUMS track no longer exists - refresh tracks.'
         S.last_result = nil
         return
     end
@@ -804,12 +804,12 @@ function ValidateAllDrums()
 
         if #notes == 0 then
             summary[#summary + 1] = dl .. ':empty'
-            all_lines[#all_lines + 1] = ('=== %s ===  (no notes in range %d\xe2\x80\x93%d)'):format(
+            all_lines[#all_lines + 1] = ('=== %s ===  (no notes in range %d-%d)'):format(
                 DIFF_NAMES[dl], rng.lo, rng.hi)
             all_lines[#all_lines + 1] = ''
             prev_dl, prev_events, prev_count = dl, {}, 0
         else
-            local header        = ('=== Drums %s  [%d\xe2\x80\x93%d] ==='):format(DIFF_NAMES[dl], rng.lo, rng.hi)
+            local header        = ('=== Drums %s  [%d-%d] ==='):format(DIFF_NAMES[dl], rng.lo, rng.hi)
             local report, total = RunDrumsChecks(dl, events, header, rng, track, sel_s, sel_e)
 
             if dl ~= 'X' and prev_dl == ADJACENT_HIGHER[dl] then
@@ -864,7 +864,7 @@ function CopyDrumsDiff(diff_label, force)
     end
     local track = r.GetTrack(0, S.diff_drums_idx)
     if not track then
-        S.status      = 'Error: PART DRUMS track no longer exists \xe2\x80\x94 refresh tracks.'
+        S.status      = 'Error: PART DRUMS track no longer exists - refresh tracks.'
         S.last_result = nil
         return
     end
@@ -882,7 +882,7 @@ function CopyDrumsDiff(diff_label, force)
 
     if #src_notes == 0 then
         S.status      = ('Copy to %s: no notes on %s to copy.'):format(DIFF_NAMES[diff_label], DIFF_NAMES[src_dl])
-        S.last_result = ('%s range (%d\xe2\x80\x93%d) has no notes%s.'):format(
+        S.last_result = ('%s range (%d-%d) has no notes%s.'):format(
             DIFF_NAMES[src_dl], src_rng.lo, src_rng.hi, sel_s and ' in the current time selection' or '')
         return
     end

@@ -14,9 +14,9 @@ local function reset()
 end
 
 ----------------------------------------------------------------------
--- ConvertDrums — external_drums.mid (standard GM drum notation)
+-- ConvertDrums - external_drums.mid (standard GM drum notation)
 ----------------------------------------------------------------------
-Test.section('ConvertDrums — GM drums fixture')
+Test.section('ConvertDrums - GM drums fixture')
 
 Test.it('preview: reads source notes and reports lane counts', function()
     reset()
@@ -33,9 +33,9 @@ Test.it('preview: reads source notes and reports lane counts', function()
 end)
 
 ----------------------------------------------------------------------
--- ConvertGuitar — external_guitar.mid (any pitched MIDI)
+-- ConvertGuitar - external_guitar.mid (any pitched MIDI)
 ----------------------------------------------------------------------
-Test.section('ConvertGuitar — external guitar fixture')
+Test.section('ConvertGuitar - external guitar fixture')
 
 Test.it('preview: reads source notes and reports gem assignments', function()
     reset()
@@ -51,9 +51,9 @@ Test.it('preview: reads source notes and reports gem assignments', function()
 end)
 
 ----------------------------------------------------------------------
--- Piano source actions — all share mc_keys_src_idx from external_piano.mid
+-- Piano source actions - all share mc_keys_src_idx from external_piano.mid
 ----------------------------------------------------------------------
-Test.section('Piano → Keys — external_piano.mid')
+Test.section('Piano → Keys - external_piano.mid')
 
 Test.it('SplitHands preview: partitions notes by pitch into RH and LH', function()
     reset()
@@ -96,9 +96,9 @@ Test.it('ConvertKeys5 preview: assigns 5-lane gem positions (96-100)', function(
 end)
 
 ----------------------------------------------------------------------
--- ValidateGuitar — rb_guitar.mid (RB gem pitches 96-100 already authored)
+-- ValidateGuitar - rb_guitar.mid (RB gem pitches 96-100 already authored)
 ----------------------------------------------------------------------
-Test.section('ValidateGuitar — RB guitar fixture')
+Test.section('ValidateGuitar - RB guitar fixture')
 
 Test.it('reads RB guitar gems and reports validation result', function()
     reset()
@@ -112,9 +112,9 @@ Test.it('reads RB guitar gems and reports validation result', function()
 end)
 
 ----------------------------------------------------------------------
--- Pro Keys — rb_pro_keys.mid (separate tracks per difficulty + animation)
+-- Pro Keys - rb_pro_keys.mid (separate tracks per difficulty + animation)
 ----------------------------------------------------------------------
-Test.section('Pro Keys — rb_pro_keys.mid')
+Test.section('Pro Keys - rb_pro_keys.mid')
 
 Test.it('ConvertProKeys preview: copies Expert C2-C4 notes to animation track', function()
     reset()
@@ -182,10 +182,10 @@ Test.it('ValidateAllProKeys: validates all four difficulty tracks', function()
 end)
 
 ----------------------------------------------------------------------
--- 5-Lane Keys — rb_keys.mid (single track, all difficulties by pitch range)
+-- 5-Lane Keys - rb_keys.mid (single track, all difficulties by pitch range)
 -- Expert 96-100 | Hard 84-88 | Medium 72-75 | Easy 60-62
 ----------------------------------------------------------------------
-Test.section('5-Lane Keys — rb_keys.mid')
+Test.section('5-Lane Keys - rb_keys.mid')
 
 Test.it('CopyKeys5Diff H: copies Expert notes onto the Hard range', function()
     reset()
@@ -251,11 +251,11 @@ Test.it('ValidateAllKeys5: validates all four difficulty pitch ranges', function
 end)
 
 ----------------------------------------------------------------------
--- Guitar/Bass — rb_guitar.mid / rb_bass.mid (single track, all difficulties
+-- Guitar/Bass - rb_guitar.mid / rb_bass.mid (single track, all difficulties
 -- by pitch range, same shape as rb_keys.mid)
 -- Expert 96-100 | Hard 84-88 | Medium 72-75 | Easy 60-62
 ----------------------------------------------------------------------
-Test.section('Guitar/Bass difficulty — rb_guitar.mid / rb_bass.mid')
+Test.section('Guitar/Bass difficulty - rb_guitar.mid / rb_bass.mid')
 
 Test.it('CopyGtrBassDiff gtr H: copies Expert notes onto the Hard range', function()
     reset()
@@ -333,11 +333,11 @@ Test.it('ValidateGtrBassDiff bass H: runs the cross-difficulty progression check
 end)
 
 ----------------------------------------------------------------------
--- Drums difficulty — rb_drums.mid (single track, all difficulties by
+-- Drums difficulty - rb_drums.mid (single track, all difficulties by
 -- pitch range, same shape as rb_keys.mid)
 -- Expert 96-100 | Hard 84-88 | Medium 72-76 | Easy 60-64
 ----------------------------------------------------------------------
-Test.section('Drums difficulty — rb_drums.mid')
+Test.section('Drums difficulty - rb_drums.mid')
 
 Test.it('CopyDrumsDiff H: copies Expert notes onto the Hard range', function()
     reset()
@@ -377,7 +377,7 @@ Test.it('ValidateAllDrums: validates all four difficulty pitch ranges', function
 end)
 
 ----------------------------------------------------------------------
--- Pattern Replace difficulty filter — GetPatternPitchRange + SetSearchPattern
+-- Pattern Replace difficulty filter - GetPatternPitchRange + SetSearchPattern
 ----------------------------------------------------------------------
 Test.section('Pattern Replace difficulty filter')
 
@@ -479,10 +479,10 @@ Test.it('SetSearchPattern with Difficulty=All spans every tier on PART DRUMS', f
 end)
 
 ----------------------------------------------------------------------
--- Pattern navigation — Go Prev / Go Next / List Search
+-- Pattern navigation - Go Prev / Go Next / List Search
 -- Synthetic track (not a fixture) so match positions are exactly known.
 ----------------------------------------------------------------------
-Test.section('Pattern navigation — Go Prev / Go Next / List Search')
+Test.section('Pattern navigation - Go Prev / Go Next / List Search')
 
 -- Create an empty MIDI-item-bearing track named `name`, `len_s` seconds long
 -- from project time 0. Returns (take, item, track_idx).
@@ -501,7 +501,7 @@ Test.it('ListPatternMatches finds every recurrence; Go Next/Go Prev step between
     local ppq_per_measure = ppq_per_qn * 4  -- default 4/4
 
     -- A single Expert-range kick (pitch 96) at the start of measures 1, 3, 5
-    -- (0-indexed: 0, 2, 4) — an unambiguous, exactly-known recurrence.
+    -- (0-indexed: 0, 2, 4) - an unambiguous, exactly-known recurrence.
     for _, m in ipairs({ 0, 2, 4 }) do
         local sp = m * ppq_per_measure
         r.MIDI_InsertNote(take, false, false, sp, sp + 1, 0, 96, 100, false)
@@ -556,10 +556,10 @@ Test.it('ListPatternMatches finds every recurrence; Go Next/Go Prev step between
 end)
 
 ----------------------------------------------------------------------
--- Midi note length adjustment — AdjustMidiNoteLengths
+-- Midi note length adjustment - AdjustMidiNoteLengths
 -- Synthetic tracks so exact PPQ-tick results can be asserted.
 ----------------------------------------------------------------------
-Test.section('Midi note length adjustment — AdjustMidiNoteLengths')
+Test.section('Midi note length adjustment - AdjustMidiNoteLengths')
 
 Test.it('Non-sustains: unifies every note shorter than 1/4 note to the selected note size', function()
     reset()
@@ -792,10 +792,10 @@ Test.it('Non-sustains: a chord (same start tick) is counted once, not per pitch'
 end)
 
 ----------------------------------------------------------------------
--- Venue — rb_venue_events.mid (EVENTS + VENUE tracks, no instrument awareness data)
+-- Venue - rb_venue_events.mid (EVENTS + VENUE tracks, no instrument awareness data)
 -- Venue actions locate tracks by name via FindTrackByName, not S index.
 ----------------------------------------------------------------------
-Test.section('Venue — rb_venue_events.mid (always-playing fallback)')
+Test.section('Venue - rb_venue_events.mid (always-playing fallback)')
 
 Test.it('ListVenueEvents: reads VENUE track and reports events', function()
     reset()
@@ -824,11 +824,11 @@ Test.it('GenerateVenueEvents: generates events; instruments default to always-pl
 end)
 
 ----------------------------------------------------------------------
--- Venue with awareness — rb_venue_all_references.mid
+-- Venue with awareness - rb_venue_all_references.mid
 -- Contains PART DRUMS/GUITAR/BASS/etc. with [idle] and [play] text events.
 -- GenerateVenueEvents uses these to weight camera shot selection per instrument.
 ----------------------------------------------------------------------
-Test.section('Venue — rb_venue_all_references.mid (with idle/play awareness)')
+Test.section('Venue - rb_venue_all_references.mid (with idle/play awareness)')
 
 Test.it('GenerateVenueEvents: weights cameras using instrument play states', function()
     reset()
