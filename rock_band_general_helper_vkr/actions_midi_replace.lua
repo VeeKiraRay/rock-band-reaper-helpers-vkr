@@ -301,10 +301,31 @@ local function GoToPatternMatch(direction)
 
     local cur_ppq = r.MIDI_GetPPQPosFromProjTime(take, r.GetCursorPosition())
     local EPS = 0.5
+
+    -- Going back, step out of the match the cursor is sitting in rather than
+    -- snapping to its start. Without this, a cursor anywhere inside an instance
+    -- makes Go Prev jump backwards by a fraction of a measure to that same
+    -- instance's start instead of reaching the previous one. Go Next needs no
+    -- equivalent: a match the cursor is inside starts behind it, so it is
+    -- already excluded. Anchor on the latest containing match so overlapping
+    -- matches still step one at a time.
+    local anchor = cur_ppq
+    local dur    = S.mr_search_dur_ppq or 0
+    if direction < 0 and dur > 0 then
+        local containing = nil
+        for _, w in ipairs(match_positions) do
+            if cur_ppq >= w - EPS and cur_ppq < w + dur
+               and (not containing or w > containing) then
+                containing = w
+            end
+        end
+        if containing then anchor = containing end
+    end
+
     local best = nil
     for _, w in ipairs(match_positions) do
         if direction < 0 then
-            if w < cur_ppq - EPS and (not best or w > best) then best = w end
+            if w < anchor - EPS and (not best or w > best) then best = w end
         else
             if w > cur_ppq + EPS and (not best or w < best) then best = w end
         end

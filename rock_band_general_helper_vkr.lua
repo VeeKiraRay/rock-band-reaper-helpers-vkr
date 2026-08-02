@@ -1,6 +1,6 @@
 -- @description Rock Band General Helper
 -- @author VeeKiraRay
--- @version 0.9.39
+-- @version 0.9.40
 -- @about
 --   Utility actions for Rock Band authoring in REAPER.
 --
@@ -21,6 +21,14 @@
 --   This @about block keeps only the 5 most recent versions.
 --   Full history: CHANGELOG.md in the repo.
 --
+--   v0.9.40
+--     - MIDI tab > Pattern: fixed "Go Prev" doing nothing useful when the edit
+--       cursor sat inside a match. It treated the current match's own start as
+--       a valid "previous" target, so pressing it jumped backwards to the start
+--       of the instance you were already in rather than reaching the previous
+--       one - and from mid-pattern it took two presses to actually move. Go
+--       Prev now steps out of the instance under the cursor first. Go Next was
+--       never affected. Caught by the MIDI fixture test suite.
 --   v0.9.39
 --     - MIDI tab > Pattern: new "Go Prev" / "Go Next" buttons move the edit
 --       cursor between Search-pattern matches; "List Search" reports every
@@ -105,24 +113,6 @@
 --       (actions_guitar_guide.lua). actions_guitar_guide.lua's local
 --       TAB_OPEN tuning table is gone, now reads GUITAR_TAB_OPEN from the
 --       shared lib.
---   v0.9.35
---     - Venue > Camera pacing: new "Vocal phrase start" mode - camera cuts land
---       exactly on PART VOCALS phrase-marker (pitch 105) note starts instead
---       of a fixed interval; "Include jitter" has no effect (and is grayed
---       out) in this mode. Themes gen uses every phrase in the song; Section
---       gen only phrases starting inside the current section (a phrase
---       tailing in from the previous section doesn't count, one that runs
---       into the next section does); Manual gen's "Advance camera pacing"
---       jumps the playhead straight to the next phrase start (new
---       FindNextVocalPhraseStartPpq) and does nothing at or past the last
---       phrase. If no phrase markers are found, the recurring camera loop is
---       skipped for that generation but forced/bookend camera events still
---       happen, and every other event category (lighting, postproc,
---       keyframes) generates normally. New CollectVocalPhraseStarts
---       (venue_lighting.lua) wraps CollectInstNotePositions for PART VOCALS;
---       GenerateCameraEvents gained an optional phrase_positions_16ths param.
---       RB3_PHRASE_PITCH is now a shared global (venue_camera.lua) instead of
---       a local duplicated in actions_venue_sing_along.lua.
 r = reaper  -- global so all dofile'd modules can use it
 
 if not r.ImGui_CreateContext then
