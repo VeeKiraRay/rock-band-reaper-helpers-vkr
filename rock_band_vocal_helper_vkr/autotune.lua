@@ -224,7 +224,7 @@ function FormatAutoTuneYINResult(result)
         lines[#lines + 1] = ''
         lines[#lines + 1] = ('Octave mismatches: %d (correct pitch class, wrong octave).')
             :format(result.octave_mismatches)
-        lines[#lines + 1] = ('Reference spans %s\xe2\x80\x93%s. Consider enabling pitch range constraints:')
+        lines[#lines + 1] = ('Reference spans %s-%s. Consider enabling pitch range constraints:')
             :format(PitchName(result.ref_min_pitch), PitchName(result.ref_max_pitch))
         lines[#lines + 1] = ('  Min pitch: %d (%s),  Max pitch: %d (%s)')
             :format(result.ref_min_pitch, PitchName(result.ref_min_pitch),
@@ -232,30 +232,44 @@ function FormatAutoTuneYINResult(result)
     end
 
     lines[#lines + 1] = ''
-    lines[#lines + 1] = 'These are starting values \xe2\x80\x94 review and fine-tune the sliders as needed.'
+    lines[#lines + 1] = 'These are starting values - review and fine-tune the sliders as needed.'
     return table.concat(lines, '\n')
 end
 
 ----------------------------------------------------------------------
 -- YIN auto-tune from reference
 ----------------------------------------------------------------------
+-- Widest max freq the sweep will try. Passed to OpenYINContext so the analysis
+-- rate is fixed for the whole search: the rate is derived from max_freq, and a
+-- rate that changed per candidate would invalidate the CMND cache and multiply
+-- audio reads on an operation that already blocks the UI.
+--
+-- In practice this pins auto-tune to the source rate, so it gets none of the
+-- speedup the runtime detector does. That is a deliberate trade, and it does
+-- not skew the results: 24 kHz and 48 kHz were measured to give identical
+-- pitches across the vocal range, so the tuned parameters remain valid for the
+-- reduced-rate detector that will actually run.
+local MAX_HZ_ABSOLUTE = 2000
+
 function AutoTuneYIN(audio_item, ref_notes)
-    local yin_ctx, err = OpenYINContext(audio_item)
+    local yin_ctx, err = OpenYINContext(audio_item, { max_freq = MAX_HZ_ABSOLUTE })
     if not yin_ctx then return nil, err end
     S.action_yctx = yin_ctx
 
-    local sr  = yin_ctx.sr
-    local nch = yin_ctx.nch
+    local sr = yin_ctx.analysis_sr
 
     local CANDIDATES_COARSE = {
         yin_threshold = { 0.05, 0.08, 0.10, 0.12, 0.15, 0.18, 0.20, 0.25, 0.30, 0.40 },
         yin_min_hz    = { 40, 60, 80, 100, 130, 160, 200 },
         yin_max_hz    = { 400, 600, 800, 1000, 1300, 1600, 2000 },
-        yin_window_ms = { 10, 15, 20, 25, 30, 40, 50, 70 },
+        -- Trimmed at the short end: tau_max is now set by min freq alone, so a
+        -- small window no longer buys a cheaper CMND, and measurement shows it
+        -- buys no accuracy either.
+        yin_window_ms = { 20, 25, 30, 40, 50, 70 },
     }
 
     -- CMND cache keyed by window_ms. Built lazily; each entry is a list of
-    -- per-note { d, n_samps, tau_max } or false when the note is too short.
+    -- per-note { d, tau_max } or false when the note is too short.
     -- Computed up to tau for 40 Hz (the lowest possible candidate min freq) so
     -- that any min/max freq combination can be evaluated without re-reading audio.
     local cmnd_cache      = {}
@@ -267,27 +281,21 @@ function AutoTuneYIN(audio_item, ref_notes)
         for ni, n in ipairs(ref_notes) do
             local note_len = n.e - n.s
             local win_s    = math.min(window_ms / 1000, note_len * 0.8)
-            if win_s < 0.01 then
+            local tau_max, n_samps = YINWindowSize(sr, win_s, MIN_HZ_ABSOLUTE)
+            if win_s < 0.01 or not tau_max then
                 entries[ni] = false
             else
-                local n_samps = math.max(2, math.floor(win_s * sr))
-                local tau_max = math.min(math.floor(sr / MIN_HZ_ABSOLUTE),
-                                         math.floor(n_samps / 2) - 1)
-                local t_off   = n.s + note_len * 0.3 - yin_ctx.item_pos
-                if t_off < 0 then t_off = 0 end
-
-                local buf = r.new_array(n_samps * nch)
-                buf.clear()
-                r.GetAudioAccessorSamples(yin_ctx.accessor, sr, nch, t_off, n_samps, buf)
-
-                local mono = {}
-                for i = 1, n_samps do
-                    local s = 0
-                    for c = 0, nch - 1 do s = s + buf[(i - 1) * nch + c + 1] end
-                    mono[i] = nch > 1 and s / nch or s
-                end
-
-                entries[ni] = { d = ComputeCMND(mono, tau_max), n_samps = n_samps, tau_max = tau_max }
+                -- High-pass at MIN_HZ_ABSOLUTE, not at the candidate min freq:
+                -- a min-freq-dependent cutoff would make the cache
+                -- min-freq-dependent too, multiplying the audio reads on an
+                -- operation that already blocks the UI. The runtime detector
+                -- filters at its own min_freq, so auto-tune under-filters
+                -- slightly - it errs toward params that work with less
+                -- filtering, never toward params that need more.
+                local mono = ReadMonoWindow(yin_ctx, n.s + note_len * 0.3,
+                                            n_samps, MIN_HZ_ABSOLUTE)
+                local d    = ComputeCMND(mono, tau_max)
+                entries[ni] = d and { d = d, tau_max = tau_max } or false
             end
         end
         cmnd_cache[window_ms] = entries
@@ -306,12 +314,17 @@ function AutoTuneYIN(audio_item, ref_notes)
             if not e then
                 total = total + 6
             else
-                local tau_max = math.min(tau_max_hz, e.tau_max, math.floor(e.n_samps / 2) - 1)
+                -- e.d is computed out to MIN_HZ_ABSOLUTE; a higher candidate
+                -- min freq just searches less of it.
+                local tau_max = math.min(tau_max_hz, e.tau_max)
                 if tau_max < tau_min then
                     total = total + 6
                 else
+                    -- min_conf is held fixed rather than swept, so scores stay
+                    -- comparable across candidates.
                     local p = SearchYINTau(e.d, tau_min, tau_max, params.yin_threshold,
-                                          sr, params.yin_min_hz, params.yin_max_hz)
+                                          sr, params.yin_min_hz, params.yin_max_hz,
+                                          S.yin_min_confidence)
                     if p then
                         local diff = math.abs(p - n.pitch) % 12
                         total = total + math.min(diff, 12 - diff)
@@ -385,10 +398,11 @@ function AutoTuneYIN(audio_item, ref_notes)
         local e = final_entries and final_entries[ni]
         local p
         if e then
-            local tau_max = math.min(tau_max_hz_f, e.tau_max, math.floor(e.n_samps / 2) - 1)
+            local tau_max = math.min(tau_max_hz_f, e.tau_max)
             if tau_max >= tau_min_final then
                 p = SearchYINTau(e.d, tau_min_final, tau_max, best.yin_threshold,
-                                sr, best.yin_min_hz, best.yin_max_hz)
+                                sr, best.yin_min_hz, best.yin_max_hz,
+                                S.yin_min_confidence)
             end
         end
         if p then

@@ -205,7 +205,7 @@ function PhraseSimilarityAction()
     if #phrase_markers == 0 then
         S.status = 'No phrase markers found.'
         S.last_result =
-            'No phrase markers (pitch 105) on the destination track \xe2\x80\x94 cannot compare phrases.\n' ..
+            'No phrase markers (pitch 105) on the destination track - cannot compare phrases.\n' ..
             'Add phrase markers first using Rock Band authoring tools.'
         return
     end
@@ -323,7 +323,7 @@ function PhraseSimilarityAction()
     end)
 
     if #groups == 0 then
-        local msg = ('Compared %d phrase%s \xe2\x80\x94 no groups at %d%% similarity threshold.')
+        local msg = ('Compared %d phrase%s - no groups at %d%% similarity threshold.')
             :format(#phrases, #phrases == 1 and '' or 's', threshold)
         S.status = msg
         S.last_result = msg .. '\n\nTry lowering the threshold to find more distant matches.'

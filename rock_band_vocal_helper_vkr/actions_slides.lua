@@ -139,6 +139,7 @@ function ScanPitchSlidesAction()
         min_freq  = S.yin_min_freq,
         max_freq  = S.yin_max_freq,
         window_ms = S.yin_window_ms,
+        min_conf  = S.yin_min_confidence,
     })
     if not yctx then S.status = 'Error'; S.last_result = yerr; return end
     S.action_yctx = yctx

@@ -47,7 +47,7 @@ HARM_MODES = {
 -- nil fields are left unchanged by ApplyYINPreset - style-only presets omit
 -- frequency bounds and pitch range.
 YIN_PRESETS = {
-    { label = 'Low male (bass\xe2\x80\x93baritone)',
+    { label = 'Low male (bass-baritone)',
       threshold = 0.12, min_freq = 70,  max_freq = 470,  window_ms = 40,
       min_pitch = 40, max_pitch = 69 },   -- E2..A4
     { label = 'Male (tenor / typical rock)',
@@ -56,7 +56,7 @@ YIN_PRESETS = {
     { label = 'High male (high tenor / belt)',
       threshold = 0.15, min_freq = 130, max_freq = 700,  window_ms = 30,
       min_pitch = 48, max_pitch = 76 },   -- C3..E5
-    { label = 'Female (alto\xe2\x80\x93mezzo)',
+    { label = 'Female (alto-mezzo)',
       threshold = 0.15, min_freq = 160, max_freq = 900,  window_ms = 25,
       min_pitch = 53, max_pitch = 81 },   -- F3..A5
     { label = 'High female / falsetto (soprano)',
@@ -114,6 +114,9 @@ DEFAULTS = {
     yin_min_freq          = 80,
     yin_max_freq          = 1000,
     yin_window_ms         = 30,
+    yin_min_confidence    = 0.5,
+    yin_rms_gate          = 0.005,
+    yin_vote_windows      = 3,
     tuner_rms_threshold   = 0.005,
 
     velocity          = 100,
@@ -153,6 +156,9 @@ S = {
     yin_min_freq          = DEFAULTS.yin_min_freq,
     yin_max_freq          = DEFAULTS.yin_max_freq,
     yin_window_ms         = DEFAULTS.yin_window_ms,
+    yin_min_confidence    = DEFAULTS.yin_min_confidence,
+    yin_rms_gate          = DEFAULTS.yin_rms_gate,
+    yin_vote_windows      = DEFAULTS.yin_vote_windows,
     tuner_rms_threshold   = DEFAULTS.tuner_rms_threshold,
 
     velocity          = DEFAULTS.velocity,
@@ -222,6 +228,7 @@ S = {
     tuner_pitch          = nil,     -- last detected MIDI note number
     tuner_pitch_name     = nil,     -- e.g. "A4"
     tuner_pitch_hz       = nil,     -- nominal Hz for the detected note
+    tuner_confidence     = nil,     -- 0..1 periodicity of the last detection
     tuner_pitch_ts       = nil,     -- project time of last detection
     tuner_history        = {},      -- up to 10 recent note names, [1] = newest
     tuner_prev_pitch     = nil,     -- MIDI note of detection before the current one
@@ -247,10 +254,13 @@ function ResetPitch()
     S.min_pitch         = DEFAULTS.min_pitch
     S.max_pitch_enabled = DEFAULTS.max_pitch_enabled
     S.max_pitch         = DEFAULTS.max_pitch
-    S.yin_threshold     = DEFAULTS.yin_threshold
-    S.yin_min_freq      = DEFAULTS.yin_min_freq
-    S.yin_max_freq      = DEFAULTS.yin_max_freq
-    S.yin_window_ms     = DEFAULTS.yin_window_ms
+    S.yin_threshold      = DEFAULTS.yin_threshold
+    S.yin_min_freq       = DEFAULTS.yin_min_freq
+    S.yin_max_freq       = DEFAULTS.yin_max_freq
+    S.yin_window_ms      = DEFAULTS.yin_window_ms
+    S.yin_min_confidence = DEFAULTS.yin_min_confidence
+    S.yin_rms_gate       = DEFAULTS.yin_rms_gate
+    S.yin_vote_windows   = DEFAULTS.yin_vote_windows
 end
 
 function ResetMIDIOutput()
@@ -289,5 +299,8 @@ function ResetYIN()
     S.yin_min_freq        = DEFAULTS.yin_min_freq
     S.yin_max_freq        = DEFAULTS.yin_max_freq
     S.yin_window_ms       = DEFAULTS.yin_window_ms
+    S.yin_min_confidence  = DEFAULTS.yin_min_confidence
+    S.yin_rms_gate        = DEFAULTS.yin_rms_gate
+    S.yin_vote_windows    = DEFAULTS.yin_vote_windows
     S.tuner_rms_threshold = DEFAULTS.tuner_rms_threshold
 end

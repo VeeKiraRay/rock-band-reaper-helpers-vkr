@@ -1,18 +1,9 @@
 -- Live pitch tuner: polls the audio source track at the playhead every 100 ms.
--- Requires: S, r, SampleYINAt, OpenYINContext, CloseYINContext, PitchName (globals)
+-- Requires: S, r, SampleYINAt, OpenYINContext, CloseYINContext, QuickRMS,
+--           PitchName (globals)
 
 local TUNER_INTERVAL_S  = 0.1    -- poll every 100 ms
 local TUNER_IDLE_STOP_S = 60     -- auto-stop if no new pitch detected for 60 s
-
-local function QuickRMS(yctx, t, win_s)
-    local samps = math.max(1, math.floor(yctx.sr * win_s))
-    local buf   = r.new_array(samps)
-    local t_off = math.max(0, t - yctx.item_pos)
-    r.GetAudioAccessorSamples(yctx.accessor, yctx.sr, 1, t_off, samps, buf)
-    local sum_sq = 0
-    for i = 1, samps do sum_sq = sum_sq + buf[i] * buf[i] end
-    return math.sqrt(sum_sq / samps)
-end
 
 local function FindItemAtPos(track, t)
     for i = 0, r.CountTrackMediaItems(track) - 1 do
@@ -34,6 +25,7 @@ local function OpenContextForItem(item)
         min_freq  = S.yin_min_freq,
         max_freq  = S.yin_max_freq,
         window_ms = S.yin_window_ms,
+        min_conf  = S.yin_min_confidence,
     })
     if not ctx then return nil, err end
     S.tuner_yctx       = ctx
@@ -74,6 +66,7 @@ function StartTuner()
     S.tuner_prev_pitch     = nil
     S.tuner_pitch_name     = nil
     S.tuner_pitch_hz       = nil
+    S.tuner_confidence     = nil
     S.tuner_pitch_ts       = nil
     S.tuner_quiet_since    = nil
     S.tuner_history        = {}
@@ -157,7 +150,7 @@ function RunTuner()
         return
     end
 
-    local note = SampleYINAt(S.tuner_yctx, play_pos, win_s)
+    local note, conf = SampleYINAt(S.tuner_yctx, play_pos, win_s)
 
     if note then
         local name = PitchName(note)
@@ -166,6 +159,7 @@ function RunTuner()
         S.tuner_pitch         = note
         S.tuner_pitch_name    = name
         S.tuner_pitch_hz      = hz
+        S.tuner_confidence    = conf
         S.tuner_pitch_ts      = play_pos
         S.tuner_last_detect_t = now   -- reset the 60 s auto-stop timer
         S.tuner_quiet_since   = nil

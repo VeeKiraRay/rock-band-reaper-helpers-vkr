@@ -87,23 +87,67 @@ TIPS = {
 
     yin_min_freq =
         "Lowest pitch frequency to detect (Hz).\n\n" ..
-        "Set near the lowest note expected in the vocal part.\n" ..
+        "Set a little BELOW the lowest note expected in the vocal part - a note\n" ..
+        "sitting right on this bound can be rejected instead of detected.\n" ..
         "Typical male bass: ~80 Hz (E2). Typical tenor: ~130 Hz (C3).\n\n" ..
         "Must be lower than Max frequency. Wider range = slightly slower analysis.",
 
     yin_max_freq =
         "Highest pitch frequency to detect (Hz).\n\n" ..
-        "Set near the highest note expected in the vocal part.\n" ..
+        "Set a little ABOVE the highest note expected in the vocal part. A note\n" ..
+        "landing within about 1%% of this bound can be rejected rather than\n" ..
+        "detected, so leave a semitone or so of room: for a part topping out at\n" ..
+        "B5 (988 Hz), prefer 1050-1100 over exactly 1000.\n" ..
         "Typical soprano: ~1000 Hz (B5). Most pop vocals stay under 800 Hz.\n\n" ..
-        "Must be higher than Min frequency.",
+        "Must be higher than Min frequency. This also sets the analysis sample\n" ..
+        "rate, so a very high value makes detection slower.",
 
     yin_window_ms =
-        "Length of the audio window analysed per note for pitch detection (ms).\n\n" ..
-        "YIN reads this many milliseconds from around 30%% into each note " ..
-        "to find the steady-state vowel region.\n\n" ..
-        "LONGER -> more stable estimate; requires a note at least this long.\n" ..
-        "SHORTER -> works on short notes but may be noisier.\n\n" ..
-        "30 ms is a good default for most vocals.",
+        "Comparison width used per note for pitch detection (ms).\n\n" ..
+        "YIN analyses this much audio from around 30%% into each note, to find " ..
+        "the steady-state vowel region. It reads a little extra beyond the " ..
+        "window so that every candidate pitch is compared over the same width.\n\n" ..
+        "LONGER -> averages over more audio; costs proportionally more CPU and " ..
+        "requires a note at least this long.\n" ..
+        "SHORTER -> works on shorter notes and is faster.\n\n" ..
+        "30 ms is a good default. Raising it does not measurably improve " ..
+        "accuracy, so prefer adjusting Min frequency first - that is what sets " ..
+        "how far the detector searches.",
+
+    yin_min_confidence =
+        "Minimum periodicity (0..1) a detection must reach to be accepted.\n\n" ..
+        "Voiced vowels are strongly periodic and score high. Breath, unvoiced\n" ..
+        "consonants (\"sss\", \"shh\") and noise score low - they are loud, so a\n" ..
+        "level gate alone lets them through, but they carry no pitch.\n\n" ..
+        "HIGHER -> only clearly pitched audio is accepted; more notes fall back\n" ..
+        "to the Default pitch instead of getting a wrong one.\n" ..
+        "LOWER -> accepts shakier readings.\n\n" ..
+        "0.50 is the default and matches how earlier versions behaved.",
+
+    yin_vote_windows =
+        "How many points across each note are analysed before deciding its pitch.\n\n" ..
+        "One sample can land on a consonant, a breath or a pitch bend and get\n" ..
+        "that note wrong. Sampling several points and taking the median means a\n" ..
+        "bad instant has to outvote the rest instead of deciding on its own.\n\n" ..
+        "1 - fastest; one sample 30%% into the note (how earlier versions worked).\n" ..
+        "3 - recommended. On test notes with a mid-note consonant this lifts\n" ..
+        "    correct detections from 20%% to 100%%, and with vibrato from 72%% to\n" ..
+        "    85%%. When the first two agree the third is skipped, so most notes\n" ..
+        "    cost two windows rather than three.\n" ..
+        "5 - marginally better on vibrato, ~67%% slower than 3. Rarely worth it.\n\n" ..
+        "Notes too short to fit the samples fall back to a single one.",
+
+    yin_rms_gate =
+        "Minimum audio level (0..1) required before pitch detection runs on a\n" ..
+        "note, when generating or applying pitches.\n\n" ..
+        "Min confidence cannot do this job: YIN's periodicity measure ignores\n" ..
+        "level entirely, so quiet instrument bleed sitting in a gap between\n" ..
+        "phrases scores just as confident as the vocal itself. Only a level\n" ..
+        "gate rejects it.\n\n" ..
+        "HIGHER -> notes landing on quiet audio fall back to the Default pitch\n" ..
+        "instead of taking a pitch from bleed or room tone.\n" ..
+        "LOWER -> analyses quieter passages; set to 0 to disable the gate.\n\n" ..
+        "0.005 is a good default for clean vocal stems.",
 
     tuner_rms_threshold =
         "Minimum audio level (0..1) required before pitch detection runs in the tuner.\n\n" ..

@@ -500,7 +500,7 @@ function SnapDraft()
     S.status = ('Snap draft: %d notes.'):format(#snapped)
     S.last_result = table.concat({
         ('Snap draft notes: %d in, %d out'):format(#draft, #snapped),
-        ('Range: %s \xe2\x80\x94 %s%s'):format(
+        ('Range: %s - %s%s'):format(
             FormatTime(midi_target.range_start), FormatTime(midi_target.range_end),
             midi_target.has_selection and ' [time selection]' or ' [whole MIDI item]'),
     }, '\n')

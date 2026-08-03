@@ -9,6 +9,25 @@ over 5. See `CLAUDE.md` → "Changelog / `@about` trimming" for the rule.
 
 `rock_band_general_helper_vkr.lua`
 
+**v0.9.35**
+- Venue > Camera pacing: new "Vocal phrase start" mode - camera cuts land
+  exactly on PART VOCALS phrase-marker (pitch 105) note starts instead
+  of a fixed interval; "Include jitter" has no effect (and is grayed
+  out) in this mode. Themes gen uses every phrase in the song; Section
+  gen only phrases starting inside the current section (a phrase
+  tailing in from the previous section doesn't count, one that runs
+  into the next section does); Manual gen's "Advance camera pacing"
+  jumps the playhead straight to the next phrase start (new
+  FindNextVocalPhraseStartPpq) and does nothing at or past the last
+  phrase. If no phrase markers are found, the recurring camera loop is
+  skipped for that generation but forced/bookend camera events still
+  happen, and every other event category (lighting, postproc,
+  keyframes) generates normally. New CollectVocalPhraseStarts
+  (venue_lighting.lua) wraps CollectInstNotePositions for PART VOCALS;
+  GenerateCameraEvents gained an optional phrase_positions_16ths param.
+  RB3_PHRASE_PITCH is now a shared global (venue_camera.lua) instead of
+  a local duplicated in actions_venue_sing_along.lua.
+
 **v0.9.34**
 - Workflow sub-tab: new "Show only unfinished" checkbox hides checked
   items (and any section whose items are all checked) so a long
@@ -543,6 +562,23 @@ over 5. See `CLAUDE.md` → "Changelog / `@about` trimming" for the rule.
 ## Rock Band Vocal Helper
 
 `rock_band_vocal_helper_vkr.lua`
+
+**v1.10**
+- UI consistency pass matching the general helper's conventions:
+  row labels now sit to the left of their slider/combo/checkbox and
+  align into a shared column (LabelColWidth()) instead of relying on
+  ImGui's native trailing label; radio rows use RadioGroupWidth() for
+  uniform option widths. Applied across General, Tuner, Pitch, Lyrics,
+  Pitch slide, Harmonies, and Validation tabs (WIP Note Placement tab
+  intentionally left as-is, to be redone later).
+- General tab split into Actions (Refresh tracks) and Settings (WIP
+  tabs, then Save/Load last) sub-tabs, mirroring the general helper.
+- Pitch tab split into Placement and Snap sub-tabs; the "Pitch range"
+  Min/Max pitch rows now read label -> slider -> enable checkbox
+  (checkbox moved from the slider's left to its right). Pitch tab
+  content moved to a new ui_pitch.lua module (DrawPitchTab).
+- Lyrics tab buttons grouped under File (Auto-detect, Browse...) and
+  Actions (Clear lyrics, Assign lyrics) section headers.
 
 **v1.9**
 - Related buttons now share a uniform width per group (BtnGroupWidth(),

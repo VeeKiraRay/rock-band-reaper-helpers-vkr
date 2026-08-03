@@ -24,8 +24,10 @@ function DrawPitchTab(ctx)
 
             local lbl_col_bi = LabelColWidth({
                 'Vocal style preset', 'YIN threshold', 'Min frequency (Hz)',
-                'Max frequency (Hz)', 'YIN window (ms)', 'Min pitch', 'Max pitch',
+                'Max frequency (Hz)', 'YIN window (ms)', 'Min confidence',
+                'Min RMS level', 'Samples per note', 'Min pitch', 'Max pitch',
             })
+            local radio_w_bi = RadioGroupWidth({ '1', '3', '5' })
 
             r.ImGui_Text(ctx, 'Built-in detection settings')
             if Btn('Auto-tune YIN from reference', BTN_H) then
@@ -61,6 +63,26 @@ function DrawPitchTab(ctx)
             _, S.yin_window_ms = r.ImGui_SliderDouble(ctx, '##yinwin_ph',
                 S.yin_window_ms, 10, 100, '%.0f')
             SliderTooltip(TIPS.yin_window_ms)
+            r.ImGui_Text(ctx, 'Min confidence')
+            r.ImGui_SameLine(ctx, lbl_col_bi)
+            r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
+            _, S.yin_min_confidence = r.ImGui_SliderDouble(ctx, '##yinconf_ph',
+                S.yin_min_confidence, 0.0, 0.95, '%.2f')
+            SliderTooltip(TIPS.yin_min_confidence)
+            r.ImGui_Text(ctx, 'Min RMS level')
+            r.ImGui_SameLine(ctx, lbl_col_bi)
+            r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
+            _, S.yin_rms_gate = r.ImGui_SliderDouble(ctx, '##yinrms_ph',
+                S.yin_rms_gate, 0.0, 0.1, '%.4f')
+            SliderTooltip(TIPS.yin_rms_gate)
+            r.ImGui_Text(ctx, 'Samples per note')
+            for i, n in ipairs({ 1, 3, 5 }) do
+                r.ImGui_SameLine(ctx, lbl_col_bi + (i - 1) * radio_w_bi)
+                if r.ImGui_RadioButton(ctx, n .. '##yinvw_ph', S.yin_vote_windows == n) then
+                    S.yin_vote_windows = n
+                end
+                Tooltip(TIPS.yin_vote_windows)
+            end
 
             r.ImGui_Spacing(ctx)
             r.ImGui_Text(ctx, 'Pitch range constraints')

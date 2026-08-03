@@ -203,6 +203,9 @@ function AssignPitches(notes, ref_track, audio_item, force_mode)
             min_freq  = S.yin_min_freq,
             max_freq  = S.yin_max_freq,
             window_ms = S.yin_window_ms,
+            min_conf  = S.yin_min_confidence,
+            rms_gate  = S.yin_rms_gate,
+            vote_windows = S.yin_vote_windows,
         })
         if not yin_ctx then return nil, err end
         S.action_yctx = yin_ctx

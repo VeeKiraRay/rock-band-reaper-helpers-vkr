@@ -103,7 +103,7 @@ function SnapToKeyAction()
 
     if #notes == 0 then
         S.status = 'No notes in range.'
-        S.last_result = ('Range: %s \xe2\x80\x94 %s%s\nNo vocal notes found.'):format(
+        S.last_result = ('Range: %s - %s%s\nNo vocal notes found.'):format(
             FormatTime(range_start), FormatTime(range_end),
             has_sel and ' [time selection]' or ' [whole MIDI item]')
         return
@@ -185,14 +185,14 @@ function SnapToKeyAction()
         end
     end
     r.Undo_EndBlock2(0,
-        ('Vocal Helper VKR: Snap to key \xe2\x80\x94 %d note%s moved')
+        ('Vocal Helper VKR: Snap to key - %d note%s moved')
             :format(moved, moved == 1 and '' or 's'), -1)
     r.PreventUIRefresh(-1)
 
     local key_name = HARM_NOTE_NAMES[root + 1] .. (quality == 1 and ' minor' or ' major')
     local lines = {
         ('Snap to key: %s'):format(key_name),
-        ('Range: %s \xe2\x80\x94 %s%s'):format(
+        ('Range: %s - %s%s'):format(
             FormatTime(range_start), FormatTime(range_end),
             has_sel and ' [time selection]' or ' [whole MIDI item]'),
         ('Notes: %d total, %d snapped, %d already in key')

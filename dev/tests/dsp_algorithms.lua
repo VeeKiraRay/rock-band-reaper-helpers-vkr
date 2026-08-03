@@ -535,3 +535,88 @@ Test.it('does not mutate the caller\'s vote list', function()
     Test.expect(votes[1] == 69 and votes[2] == 45 and votes[3] == 57,
         'input order must be preserved for the confidence lookup')
 end)
+
+----------------------------------------------------------------------
+-- Reduced-rate analysis. Detection reads the accessor at YINAnalysisRate
+-- rather than the source rate; CMND cost falls with the square of the ratio.
+-- The floor exists because 16 kHz was measured to be genuinely lossy.
+----------------------------------------------------------------------
+
+Test.section('YINAnalysisRate')
+
+Test.it('typical vocal settings drop a 48 kHz source to the 24 kHz floor', function()
+    Test.expect(YINAnalysisRate(48000, 1000) == 24000,
+        'max_freq 1000 -> 24000, got ' .. tostring(YINAnalysisRate(48000, 1000)))
+    Test.expect(YINAnalysisRate(48000, 620) == 24000,
+        'max_freq 620 is under the floor -> 24000')
+end)
+
+Test.it('a high max_freq keeps the rate up (24x rule)', function()
+    -- The Piano/keys preset: 2000 * 24 = 48000, i.e. no downsampling. This is
+    -- the configuration where 24 kHz measured worse, so it must not be used.
+    Test.expect(YINAnalysisRate(48000, 2000) == 48000,
+        'max_freq 2000 -> 48000, got ' .. tostring(YINAnalysisRate(48000, 2000)))
+    Test.expect(YINAnalysisRate(96000, 2000) == 48000,
+        'max_freq 2000 -> 48000 even from a 96 kHz source')
+end)
+
+Test.it('never exceeds the source rate', function()
+    Test.expect(YINAnalysisRate(22050, 1000) == 22050,
+        'a 22.05 kHz source cannot be upsampled to the 24 kHz floor')
+    Test.expect(YINAnalysisRate(16000, 2000) == 16000,
+        'a 16 kHz source stays at 16 kHz')
+end)
+
+Test.it('defaults sanely when max_freq is absent', function()
+    Test.expect(YINAnalysisRate(48000, nil) == 24000, 'nil max_freq -> floor')
+end)
+
+Test.section('YIN core - reduced-rate equivalence')
+
+-- The property that justifies analysing below the source rate: the same tone
+-- yields the same MIDI pitch at 24 kHz as at 48 kHz. Measured over 396 cases
+-- (MIDI 40-83 x 3 noise levels x 3 seeds) both scored 396/396 with 0.00 cents
+-- mean deviation; 16 kHz scored 378/396 and is deliberately not used.
+local function detect_at(freq, sr, noise, seed)
+    local tau_max, n = YINWindowSize(sr, 0.03, MIN_HZ)
+    if not tau_max then return nil end
+    local tau_min = math.max(1, math.floor(sr / MAX_HZ))
+    if tau_max < tau_min then return nil end
+    local mono = make_tone(freq, sr, n, 20)
+    if noise and noise > 0 then
+        mono = mix(mono, scale(make_noise(n, seed), noise))
+    end
+    local d = ComputeCMND(mono, tau_max)
+    if not d then return nil end
+    return SearchYINTau(d, tau_min, tau_max, YIN_THR, sr, MIN_HZ, MAX_HZ)
+end
+
+Test.it('24 kHz agrees with 48 kHz across the vocal range', function()
+    -- Real equal-tempered pitches, and MAX_HZ (1000) is left clear of the
+    -- topmost one on purpose - a tone sitting on the bound is rejected at any
+    -- rate, which is a separate effect from sample rate.
+    local mismatched = {}
+    for _, midi in ipairs({ 40, 45, 50, 55, 60, 64, 69, 74, 79, 82 }) do
+        local f = 440 * 2 ^ ((midi - 69) / 12)
+        for _, nz in ipairs({ 0, 0.08 }) do
+            local a = detect_at(f, 48000, nz, 21)
+            local b = detect_at(f, 24000, nz, 21)
+            if a ~= b then
+                mismatched[#mismatched + 1] =
+                    string.format('midi %d noise %.2f: 48k=%s 24k=%s',
+                        midi, nz, tostring(a), tostring(b))
+            end
+        end
+    end
+    Test.expect(#mismatched == 0,
+        'rates must agree; ' .. table.concat(mismatched, '; '))
+end)
+
+Test.it('24 kHz still identifies pitches correctly, not just consistently', function()
+    for _, midi in ipairs({ 43, 55, 67, 79 }) do
+        local f = 440 * 2 ^ ((midi - 69) / 12)
+        local p = detect_at(f, 24000, 0.08, 33)
+        Test.expect(p == midi,
+            string.format('midi %d at 24 kHz -> %s', midi, tostring(p)))
+    end
+end)

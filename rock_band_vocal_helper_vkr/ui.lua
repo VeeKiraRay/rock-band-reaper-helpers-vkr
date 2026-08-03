@@ -107,6 +107,7 @@ function Loop()
         S.tuner_prev_pitch  = nil
         S.tuner_pitch_name  = nil
         S.tuner_pitch_hz    = nil
+        S.tuner_confidence  = nil
         S.tuner_pitch_ts    = nil
         S.tuner_quiet_since = nil
         S.tuner_history     = {}
@@ -239,8 +240,8 @@ function Loop()
                 SectionHeader('YIN Detection', 'Reset##yin_tur', ResetYIN, TIPS.reset_yin)
                 local lbl_col_tur = LabelColWidth({
                     'Vocal style preset', 'YIN threshold', 'Min frequency (Hz)',
-                    'Max frequency (Hz)', 'Window (ms)', 'Min RMS level',
-                    'Min pitch', 'Max pitch',
+                    'Max frequency (Hz)', 'Window (ms)', 'Min confidence',
+                    'Min RMS level', 'Min pitch', 'Max pitch',
                 })
                 YINPresetCombo('##tur', lbl_col_tur)
                 local _
@@ -269,6 +270,12 @@ function Loop()
                 _, S.yin_window_ms = r.ImGui_SliderInt(ctx, '##yinwin_tur',
                     S.yin_window_ms, 10, 100)
                 SliderTooltip(TIPS.yin_window_ms)
+                r.ImGui_Text(ctx, 'Min confidence')
+                r.ImGui_SameLine(ctx, lbl_col_tur)
+                r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
+                _, S.yin_min_confidence = r.ImGui_SliderDouble(ctx, '##yinconf_tur',
+                    S.yin_min_confidence, 0.0, 0.95, '%.2f')
+                SliderTooltip(TIPS.yin_min_confidence)
                 r.ImGui_Text(ctx, 'Min RMS level')
                 r.ImGui_SameLine(ctx, lbl_col_tur)
                 r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
@@ -339,7 +346,7 @@ function Loop()
                     end
                 end
                 r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Text(), 0xFFFFFFFF)
-                r.ImGui_Text(ctx, S.tuner_pitch_name or '\xe2\x80\x94')
+                r.ImGui_Text(ctx, S.tuner_pitch_name or '-')
                 r.ImGui_PopStyleColor(ctx)
                 if arrow ~= '' then
                     r.ImGui_SameLine(ctx)
@@ -353,6 +360,14 @@ function Loop()
                     r.ImGui_SameLine(ctx)
                     r.ImGui_Text(ctx, 'at ' .. r.format_timestr_pos(S.tuner_pitch_ts, '', 0))
                 end
+                -- Confidence: amber below 0.75 so a shaky reading looks shaky.
+                if S.tuner_confidence then
+                    r.ImGui_SameLine(ctx)
+                    local conf_col = S.tuner_confidence >= 0.75 and 0xAAAAAAFF or 0xFFC04CFF
+                    r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Text(), conf_col)
+                    r.ImGui_Text(ctx, ('(%.0f%% conf)'):format(S.tuner_confidence * 100))
+                    r.ImGui_PopStyleColor(ctx)
+                end
 
                 -- History strip (dimmed, newest on left)
                 if #S.tuner_history > 0 then
@@ -364,8 +379,8 @@ function Loop()
 
                 local quiet_delay = (r.GetPlayState() & 1 ~= 0) and 1.5 or 0.0
                 if S.tuner_quiet_since and r.time_precise() - S.tuner_quiet_since > quiet_delay then
-                    S.status = 'Quiet \xe2\x80\x94 no pitch detected'
-                elseif S.status == 'Quiet \xe2\x80\x94 no pitch detected' then
+                    S.status = 'Quiet - no pitch detected'
+                elseif S.status == 'Quiet - no pitch detected' then
                     S.status = ''
                 end
 

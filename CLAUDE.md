@@ -73,7 +73,7 @@ dofile(_mdir .. 'defaults.lua')                   -- script-specific modules
 | File | Contents |
 |---|---|
 | `lib/reaper_imgui_helpers.lua` | `PitchName`, `Tooltip`, `SliderTooltip`, `Btn`, `BtnWidth`, `BtnGroupWidth`, `LabelColWidth`, `RadioGroupWidth`, `SectionHeader`, `GetTrackList`, `TrackCombo`, `FormatTime`, `GetTimeSelection` |
-| `lib/reaper_dsp.lua` | `ComputeRMSContour`, `OpenYINContext`, `DetectPitchYIN`, `SampleYINAt`, `GateAndSplit`, `ApplyMinOffset` |
+| `lib/reaper_dsp.lua` | `ComputeRMSContour`, `OpenYINContext`, `YINWindowSize`, `ReadMonoWindow`, `QuickRMS`, `ComputeCMND`, `SearchYINTau`, `MedianVote`, `DetectPitchYIN`, `SampleYINAt`, `GateAndSplit`, `ApplyMinOffset` |
 | `lib/reaper_midi_helpers.lua` | `FindMIDIItem`, `FindFirstMIDIItem`, `ReadAllMIDINotesOnTrack`, `ClearNotesAtPitchesInRange`, `InsertNotes`, … |
 
 ### Global vs local function rules
