@@ -120,7 +120,8 @@ actions_validation.lua:
   19. Validation actions          ValidatePhrases, PhraseSimilarityAction
 
 actions_harmonies.lua:
-  20. Harmonies actions           HarmoniesAction
+  20. Harmonies actions           DiatonicThirdOffset, ResolvePreservedPitches,
+                                  HarmoniesAction
 
 actions_slides.lua:
   21. Slide scan action           ScanPitchSlidesAction; ClassifySlide (local)
@@ -160,7 +161,7 @@ ui.lua:
 | `rock_band_vocal_helper_vkr/actions_lyrics.lua`     | `ParseLyricsFile`, `ParseLyricsLines`, `ClearLyricsInRange`, `ClearLyricsAction`, `AssignLyricsAction`; `ReadLyricsFileContent`, `ClearLyricEvents` (local) |
 | `rock_band_vocal_helper_vkr/actions_phrases.lua`    | `CreatePhrasesAction`, `NoteLenPPQ`; `SnapDown`, `SnapUp`, `NearestBeatPpq`, `NearestHalfBeatPpq`, `NearestQuarterBeatPpq`, `NearestMeasurePpq`, `CollectScopedAndLyrics`, `FindMismatches`, `RunPhase1`, `GrowEdge`, `RunPhase2` (local) |
 | `rock_band_vocal_helper_vkr/actions_validation.lua` | `ValidatePhrases`, `PhraseSimilarityAction`, `EditDistance`; `(no local helpers)`                                                            |
-| `rock_band_vocal_helper_vkr/actions_harmonies.lua`  | `HarmoniesAction`, `DiatonicThirdOffset`; `ApplyLyricSuffix`, `ResolveHarmTracks` (local)                                                   |
+| `rock_band_vocal_helper_vkr/actions_harmonies.lua`  | `HarmoniesAction`, `DiatonicThirdOffset`, `ResolvePreservedPitches`; `ApplyLyricSuffix`, `ResolveHarmTracks`, `MeasureLengthAt`, `ReadTargetNotesInRange` (local) |
 | `rock_band_vocal_helper_vkr/actions_slides.lua`     | `ScanPitchSlidesAction`; `ClassifySlide` (local)                                                                                             |
 | `rock_band_vocal_helper_vkr/actions_snap_key.lua`   | `SnapToKeyAction`, `NearestScalePitch`; `NextScalePitch` (local)                                                                             |
 | `rock_band_vocal_helper_vkr/ui_slides.lua`          | `DrawPitchSlideTab(ctx)`                                                                                                                     |
@@ -174,7 +175,7 @@ ui.lua:
 - `actions_lyrics.lua`: `ReadLyricsFileContent`, `ClearLyricEvents`
 - `actions_phrases.lua`: `SnapDown`, `SnapUp`, `NearestBeatPpq`, `NearestHalfBeatPpq`, `NearestQuarterBeatPpq`, `NearestMeasurePpq`, `CollectScopedAndLyrics`, `FindMismatches`, `RunPhase1`, `GrowEdge`, `RunPhase2`
 - `actions_validation.lua`: (none — `EditDistance` promoted to global for testability)
-- `actions_harmonies.lua`: `ApplyLyricSuffix`, `ResolveHarmTracks`
+- `actions_harmonies.lua`: `ApplyLyricSuffix`, `ResolveHarmTracks`, `MeasureLengthAt`, `ReadTargetNotesInRange`
 - `actions_slides.lua`: `ClassifySlide`
 - `actions_snap_key.lua`: `NextScalePitch`
 - `helpers.lua`: `TrackHasAudio`, `TrackHasMIDI`
@@ -375,10 +376,11 @@ Copies vocal notes from a source MIDI track to up to three destination tracks, a
 **Destinations.** Three rows (`harm_dst1/2/3`), each with:
 
 - Enable checkbox (`harm_dst1/2/3_enabled`, persisted as `hd1e/hd2e/hd3e`)
-- Mode dropdown (`harm_dst1/2/3_mode`, persisted as `hd1m/hd2m/hd3m`)
+- **Target track** dropdown (`harm_dst1/2/3_idx`, session-only)
+- **Copy style** dropdown (`harm_dst1/2/3_mode`, persisted as `hd1m/hd2m/hd3m`)
 - Lyric suffix: **Unpitched** appends `#` (`harm_dst1/2/3_lyric_unpitched`, persisted), **Hidden** appends `$` (`harm_dst1/2/3_lyric_hidden`, persisted). Both can be active — `#` is inserted before `$`. Duplicates not added if the source lyric already ends with the suffix.
 
-**Modes** (indices into `HARM_MODES` in `defaults.lua`):
+**Copy styles** (indices into `HARM_MODES` in `defaults.lua`):
 
 | Index | Label                 | Description                            |
 | ----- | --------------------- | -------------------------------------- |
@@ -393,6 +395,35 @@ Copies vocal notes from a source MIDI track to up to three destination tracks, a
 | 8     | Fixed 5th above       | +7 st                                  |
 | 9     | Fixed 4th below       | −5 st                                  |
 | 10    | Fixed 5th below       | −7 st                                  |
+| 11    | Preserve target pitches | Pitch taken from the destination track, not the source |
+
+New styles must be **appended** — the index is what gets persisted, so inserting
+mid-table silently changes every saved project's selection.
+
+**Preserve target pitches** is a timing-only re-sync: positions, lengths, splits
+and lyrics come from the source, pitches come from whatever was already on the
+destination. Its purpose is the point after a harmony part has been authored by
+hand, when its pitches no longer follow any preset and only the lead's timing has
+changed.
+
+Pitch assignment is `ResolvePreservedPitches(new_notes, old_notes, windows)` in
+`actions_harmonies.lua` — deliberately free of REAPER calls (hence the
+precomputed `windows`) so `dev/tests/vocal_algorithms.lua` can unit test it. Each
+copied note falls into exactly one of four categories, counted and reported as
+indented lines under that destination's result line:
+
+| Category   | Rule                                                        | Result line |
+| ---------- | ----------------------------------------------------------- | ----------- |
+| `existing` | Overlaps a destination note (largest overlap wins)           | `Existing pitches applied` |
+| `closest`  | No overlap; nearest destination note start within the window | `Matching closest pitch applied` |
+| `carried`  | Shares a donor with the previous note — a note split for a slide. Pitch is `donor + (source interval since the run's first note)` | `Slide interval carried` |
+| `source`   | Nothing within the window; source pitch copied unchanged     | `No matching close pitch source applied` |
+
+The window is one measure at the note's own position
+(`HARM_PRESERVE_SEARCH_MEASURES` in `defaults.lua`, applied via the local
+`MeasureLengthAt`), so it follows the tempo rather than being a fixed number of
+seconds. A `carried` pitch landing outside C1–C5 aborts the whole action before
+anything is written, matching how the interval styles' range check behaves.
 
 **Diatonic modes** require the key settings: `harm_key_root` (0–11, default A=9, persisted as `hkr`) and `harm_key_quality` (0=major, 1=minor, persisted as `hkq`). Implemented by `DiatonicThirdOffset(note, root, quality, dir)` in `actions_harmonies.lua` using `HARM_SCALE`.
 
@@ -400,7 +431,7 @@ Copies vocal notes from a source MIDI track to up to three destination tracks, a
 
 **Scope:** active time selection, or full source item after confirmation.
 
-**Action:** `HarmoniesAction()` in `actions_harmonies.lua`. Local helpers: `ResolveHarmTracks` (finds source/destination MIDI items), `ApplyLyricSuffix` (adds `#`/`$` to copied lyrics), `DiatonicThirdOffset`.
+**Action:** `HarmoniesAction()` in `actions_harmonies.lua`. It resolves every destination's final note list *before* opening the undo block, so an out-of-range pitch on destination 3 leaves 1 and 2 untouched. Globals: `DiatonicThirdOffset`, `ResolvePreservedPitches`. Local helpers: `ResolveHarmTracks` (finds source/destination MIDI items), `ApplyLyricSuffix` (adds `#`/`$` to copied lyrics), `MeasureLengthAt`, `ReadTargetNotesInRange`.
 
 **Track indices** (`harm_src_idx`, `harm_dst1/2/3_idx`) are session-only — not persisted.
 
@@ -576,7 +607,8 @@ Assign Lyrics only ever guarantees word *i* ↔ the *i*-th vocal-range note — 
 - [ ] Generate (replace): clears all existing vocal-range notes in the range, then inserts fresh detections; result panel says "Replaced".
 - [ ] Draft Snap: rough hand-drawn notes snap to audio onsets; pitches assigned from configured pitch source.
 - [ ] Snap to Key Scale: notes shift to nearest scale degree; phrase markers preserved; avoid-collision pushes duplicates to next scale degree.
-- [ ] Harmonies: Apply copies notes to enabled destinations with correct pitch interval; diatonic mode respects key selection; lyric suffixes appended; phrase markers copied when checked.
+- [ ] Harmonies: Apply copies notes to enabled destinations with correct pitch interval; diatonic mode respects key selection; lyric suffixes appended; phrase markers copied when checked. Target track / Copy style labels align with Source and Key, and grey out with a disabled row.
+- [ ] Harmonies, Copy style = Preserve target pitches: destination pitches survive; note starts, ends, splits and lyrics match the source; a source note split for a slide gives the second half `first half + source interval`; a note with nothing within a measure keeps the source pitch; the four counts in the result panel sum to the vocal note count.
 - [ ] Validate phrases: runs without error; flags violations grouped by phrase position; no project modification.
 - [ ] Phrase Similarity: groups similar phrases; flags differing notes; same-key vs contour mode both work.
 - [ ] Scan pitch slides: shows warning when no time selection; result in global panel.

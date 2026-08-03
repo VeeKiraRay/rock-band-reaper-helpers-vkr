@@ -378,9 +378,9 @@ TIPS = {
         "MIDI source track to copy vocal notes from.\n\n" ..
         "The first MIDI item on this track is used. Typically 'PART VOCALS'.",
 
-    harm_dst1 = "First destination track for the harmony copy.",
-    harm_dst2 = "Second destination track for the harmony copy.",
-    harm_dst3 = "Third destination track for the harmony copy.",
+    harm_dst1 = "Track the first destination writes to. Typically 'HARM1'.",
+    harm_dst2 = "Track the second destination writes to. Typically 'HARM2'.",
+    harm_dst3 = "Track the third destination writes to. Typically 'HARM3'.",
 
     harm_dst_enabled =
         "Enable or disable this destination row.\n\n" ..
@@ -391,7 +391,17 @@ TIPS = {
         "Diatonic modes use the key set in the Key section and apply the\n" ..
         "correct interval for each individual note (e.g. +3 or +4 st depending\n" ..
         "on the scale degree). Fixed modes add the same semitone offset to every note.\n\n" ..
-        "The 4th and 5th are included but will not fit most songs.",
+        "The 4th and 5th are included but will not fit most songs.\n\n" ..
+        "'Preserve target pitches' ignores intervals entirely. Each copied note\n" ..
+        "takes its pitch from the note already on the destination track, so the\n" ..
+        "source's positions, lengths, splits and lyrics are re-synced without\n" ..
+        "losing hand-authored pitches. Use it once a harmony part is authored and\n" ..
+        "only the lead's timing has changed.\n\n" ..
+        "When nothing on the destination overlaps a note, the nearest destination\n" ..
+        "note within one measure donates its pitch. A note split in two for a\n" ..
+        "slide keeps the destination pitch on the first half and carries the\n" ..
+        "source's own interval onto the rest. If nothing is close enough, the\n" ..
+        "source pitch is copied unchanged. The result panel counts each case.",
 
     harm_key =
         "Song key used for 'Diatonic 3rd' modes.\n\n" ..

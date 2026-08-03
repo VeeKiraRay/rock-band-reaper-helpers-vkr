@@ -34,7 +34,15 @@ HARM_MODES = {
     { label = 'Fixed 5th above (+7 st)',        diatonic = false, offset =  7 },
     { label = 'Fixed 4th below (-5 st)',        diatonic = false, offset = -5 },
     { label = 'Fixed 5th below (-7 st)',        diatonic = false, offset = -7 },
+    -- Timing-only re-sync: takes each note's pitch from the note already on the
+    -- destination track instead of transposing the source. Appended last so
+    -- saved projects keep their existing mode index.
+    { label = 'Preserve target pitches',        diatonic = false, preserve = true },
 }
+
+-- How far a note may look for a donor pitch in "Preserve target pitches" mode
+-- when nothing on the destination overlaps it, in measures.
+HARM_PRESERVE_SEARCH_MEASURES = 1
 
 -- YIN vocal-style presets. Frequency bounds follow standard voice-classification
 -- ranges with a small margin; a min freq above ~half the sung range excludes the

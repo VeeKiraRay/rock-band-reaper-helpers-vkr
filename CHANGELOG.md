@@ -563,6 +563,20 @@ over 5. See `CLAUDE.md` → "Changelog / `@about` trimming" for the rule.
 
 `rock_band_vocal_helper_vkr.lua`
 
+**v1.11**
+- Pitch tab: removed the "Pitch source" selector. Placement is now two
+  sub-tabs, Placement - Built-in and Placement - Reference, each
+  setting the active pitch source while open (mirrors the general
+  helper's Tab Input pattern). Apply pitch changes appears in both.
+- Harmonies: "Copy phrase markers & overdrive" split into two
+  independent checkboxes/settings - Copy phrase markers (pitch 105)
+  and Copy overdrive (pitch 116, new RB3_OVERDRIVE_PITCH constant).
+- Lyrics tab: "File: ..." renamed to "Selected: ..." in normal text
+  color (was greyed out), avoiding repeating "File" under its new
+  section header.
+- Min/max pitch enable checkbox tooltips now say "Uncheck" instead of
+  "Disable".
+
 **v1.10**
 - UI consistency pass matching the general helper's conventions:
   row labels now sit to the left of their slider/combo/checkbox and

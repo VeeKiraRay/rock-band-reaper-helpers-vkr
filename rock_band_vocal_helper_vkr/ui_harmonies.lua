@@ -7,11 +7,12 @@ function DrawHarmoniesTab(ctx)
 
     r.ImGui_Spacing(ctx)
 
+    local lbl_col = LabelColWidth({ 'Source', 'Target track', 'Copy style', 'Key' })
+
     ---- Source ----
-    local lbl_col_src = LabelColWidth({ 'Source' })
     r.ImGui_Text(ctx, 'Source')
     Tooltip(TIPS.harm_src)
-    r.ImGui_SameLine(ctx, lbl_col_src)
+    r.ImGui_SameLine(ctx, lbl_col)
     r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
     S.harm_src_idx = FilteredTrackCombo('##harm_src', S.harm_src_idx, midi_tracks)
     Tooltip(TIPS.harm_src)
@@ -55,9 +56,15 @@ function DrawHarmoniesTab(ctx)
 
         local row_off = not S[d.en]
         if row_off then r.ImGui_BeginDisabled(ctx) end
+        r.ImGui_Text(ctx, 'Target track')
+        Tooltip(TIPS[d.tip])
+        r.ImGui_SameLine(ctx, lbl_col)
         r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
         S[d.idx] = FilteredTrackCombo(d.trk_id, S[d.idx], tracks)
         Tooltip(TIPS[d.tip])
+        r.ImGui_Text(ctx, 'Copy style')
+        Tooltip(TIPS.harm_dst_mode)
+        r.ImGui_SameLine(ctx, lbl_col)
         r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
         if r.ImGui_BeginCombo(ctx, d.mode_id, HARM_MODES[S[d.mode] + 1].label) then
             for mi, m in ipairs(HARM_MODES) do
@@ -86,10 +93,9 @@ function DrawHarmoniesTab(ctx)
 
     ---- Key section ----
     if not any_diatonic then r.ImGui_BeginDisabled(ctx) end
-    local lbl_col_key = LabelColWidth({ 'Key' })
     r.ImGui_Text(ctx, 'Key')
     Tooltip(TIPS.harm_key)
-    r.ImGui_SameLine(ctx, lbl_col_key)
+    r.ImGui_SameLine(ctx, lbl_col)
     r.ImGui_SetNextItemWidth(ctx, WIDTH_SHORT)
     if r.ImGui_BeginCombo(ctx, '##harm_kr', HARM_NOTE_NAMES[S.harm_key_root + 1]) then
         for i, name in ipairs(HARM_NOTE_NAMES) do

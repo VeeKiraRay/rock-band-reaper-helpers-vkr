@@ -223,3 +223,90 @@ Test.it('HarmoniesAction: copies PART VOCALS to HARM1 in unison (mode 0)', funct
     Test.expect(S.status ~= 'Ready.', 'HarmoniesAction did not update S.status')
     Test.expect(not S.status:find('^Error'), 'HarmoniesAction errored: ' .. S.status)
 end)
+
+-- Vocal-range notes on a track's first MIDI item, as { s, e, pitch } sorted by s.
+local function ReadVocalNotes(track_idx)
+    local _, take = FindFirstMIDIItem(r.GetTrack(0, track_idx))
+    if not take then return nil end
+    local out = {}
+    local _, nc = r.MIDI_CountEvts(take)
+    for i = 0, nc - 1 do
+        local ok, _, _, sppq, eppq, _, p = r.MIDI_GetNote(take, i)
+        if ok and p >= RB3_MIN_PITCH and p <= RB3_MAX_PITCH then
+            out[#out + 1] = {
+                s     = r.MIDI_GetProjTimeFromPPQPos(take, sppq),
+                e     = r.MIDI_GetProjTimeFromPPQPos(take, eppq),
+                pitch = p,
+            }
+        end
+    end
+    table.sort(out, function(a, b) return a.s < b.s end)
+    return out, take
+end
+
+local function PreserveModeIndex()
+    for i, m in ipairs(HARM_MODES) do
+        if m.preserve then return i - 1 end
+    end
+    return nil
+end
+
+Test.it('HarmoniesAction: preserve mode keeps destination pitches, takes source timing', function()
+    reset()
+    local base, n = LoadFixture('rb_vocal_and_harm.mid')
+    Test.expect(n > 0, 'rb_vocal_and_harm.mid created no tracks')
+
+    local src_idx  = FindFixtureTrack('PART VOCALS', base) or FindFixtureTrack('VOCALS', base)
+    local dst1_idx = FindFixtureTrack('HARM1', base)
+    Test.expect(src_idx  ~= nil, 'no PART VOCALS track found in rb_vocal_and_harm.mid')
+    Test.expect(dst1_idx ~= nil, 'no HARM1 track found in rb_vocal_and_harm.mid')
+
+    local preserve_mode = PreserveModeIndex()
+    Test.expect(preserve_mode ~= nil, 'no preserve entry in HARM_MODES')
+
+    local src_notes = ReadVocalNotes(src_idx)
+    Test.expect(src_notes and #src_notes > 0, 'PART VOCALS has no vocal notes')
+
+    -- Seed HARM1 with a distinctive pitch pattern at the source's own timings,
+    -- so preserve mode has an unambiguous donor for every note.
+    local _, dst_take = ReadVocalNotes(dst1_idx)
+    Test.expect(dst_take ~= nil, 'no MIDI take on HARM1')
+    local dnc = select(2, r.MIDI_CountEvts(dst_take))
+    for i = dnc - 1, 0, -1 do r.MIDI_DeleteNote(dst_take, i) end
+
+    local seeded, expected = {}, {}
+    for i, sn in ipairs(src_notes) do
+        expected[i] = 60 + (i % 5)   -- unrelated to the source pitches
+        seeded[i]   = { s = sn.s, e = sn.e, pitch = expected[i] }
+    end
+    InsertNotes(dst_take, seeded, S.velocity)
+
+    S.harm_src_idx      = src_idx
+    S.harm_dst1_idx     = dst1_idx
+    S.harm_dst1_enabled = true
+    S.harm_dst1_mode    = preserve_mode
+    S.harm_dst2_enabled = false
+    S.harm_dst3_enabled = false
+
+    HarmoniesAction()
+
+    local got = ReadVocalNotes(dst1_idx)
+    CleanupFixture(base)
+
+    Test.expect(not S.status:find('^Error'), 'HarmoniesAction errored: ' .. S.status)
+    Test.expect(got and #got == #src_notes,
+        ('HARM1 should have %d notes, has %s'):format(#src_notes, got and #got or 'nil'))
+
+    local pitch_ok, time_ok = true, true
+    for i = 1, #src_notes do
+        if not got[i] or got[i].pitch ~= expected[i] then pitch_ok = false end
+        if not got[i] or math.abs(got[i].s - src_notes[i].s) > 0.002
+                      or math.abs(got[i].e - src_notes[i].e) > 0.002 then
+            time_ok = false
+        end
+    end
+    Test.expect(pitch_ok, 'HARM1 kept its own pitches')
+    Test.expect(time_ok,  'HARM1 note starts/ends match the source')
+    Test.expect(S.last_result and S.last_result:find('Existing pitches applied', 1, true),
+        'result panel reports the preserve breakdown')
+end)

@@ -33,7 +33,7 @@ The script window has a persistent track-selector row at the top and a status/re
 | **Pitch** tab          | Pitch source for Apply pitch changes: Built-in detection (YIN) or Reference MIDI; Snap to Key Scale |
 | **Lyrics** tab         | Select a lyrics file, assign or clear lyric events                                                  |
 | **Pitch slide** tab    | Scan existing notes for pitch slides (glides, scoops, bends)                                        |
-| **Harmonies** tab      | Copy lead vocal notes to up to three harmony tracks with pitch interval options                     |
+| **Harmonies** tab      | Copy lead vocal notes to up to three harmony tracks, transposed or keeping the target's own pitches |
 | **Validation** tab     | Validate phrase markers; check phrase similarity to catch copy errors                               |
 | Status / Undo          | Below the tab bar — result of the last action, and the Undo button                                  |
 
@@ -86,7 +86,7 @@ Settings are saved per-project using REAPER's project state. Click **Save** to s
 
 Settings are loaded automatically when the script opens (if a save exists for the current project) and when you switch REAPER project tabs.
 
-**What is saved:** all Detection sliders, Pitch source selection and all pitch settings (including YIN parameters), Velocity, Slide Scan settings, Harmonies destination enabled/mode/lyric-suffix options, Harmonies key selection, Copy phrase markers, Snap to Key Scale settings (key, scale, avoid-collision), Phrase Similarity threshold and mode, and the Show WIPs toggle.
+**What is saved:** all Detection sliders, Pitch source selection and all pitch settings (including YIN parameters), Velocity, Slide Scan settings, Harmonies destination enabled/copy style/lyric-suffix options, Harmonies key selection, Copy phrase markers, Snap to Key Scale settings (key, scale, avoid-collision), Phrase Similarity threshold and mode, and the Show WIPs toggle.
 
 **What is not saved:** track selections. If your project follows the naming convention (`VOCALS AUDIO`, `PART VOCALS`, `HARM1–3`) the script will re-select the right tracks automatically. The Harmonies key-detection results are session-only and reset on each open.
 
@@ -348,6 +348,8 @@ The scan also uses the **YIN threshold**, **Min frequency**, and **Max frequency
 
 The **Harmonies** tab copies lead vocal notes from a source MIDI track to up to three destination tracks, transposing each by a chosen pitch interval. Lyrics from the source are copied at the same time. Use this to build Rock Band-style harmony parts (HARM1, HARM2, HARM3) from a completed lead vocal (PART VOCALS) without manual copy-and-paste.
 
+It also handles the reverse case: once the harmony parts are authored, the [Preserve target pitches](#preserve-target-pitches) copy style pushes later timing fixes from the lead down to them without overwriting the pitches you picked.
+
 ### Setting up tracks
 
 The script auto-selects tracks by name on startup and on project switch:
@@ -366,10 +368,10 @@ All four dropdowns can be changed manually. Destination tracks do not need to co
 Each destination row (Destination 1, 2, 3) has three controls:
 
 - **Enabled checkbox** — enable or disable that destination. Disabled rows are greyed out. At least one destination must be enabled to apply.
-- **Track dropdown** — the MIDI track to write harmony notes into.
-- **Mode dropdown** — the pitch interval applied to copied notes (see [Interval modes](#interval-modes) below).
+- **Target track** — the MIDI track to write harmony notes into.
+- **Copy style** — how copied notes are pitched (see [Copy styles](#copy-styles) below).
 
-Below the mode dropdown, two per-destination checkboxes control lyric suffixes:
+Below the Copy style dropdown, two per-destination checkboxes control lyric suffixes:
 
 | Checkbox                 | Suffix added | Effect in Rock Band                                                                                                                                                                            |
 | ------------------------ | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -378,9 +380,9 @@ Below the mode dropdown, two per-destination checkboxes control lyric suffixes:
 
 If a source lyric already ends with `#` or `$`, the suffix is not duplicated. When both checkboxes are on, `#` is appended before `$`.
 
-### Interval modes
+### Copy styles
 
-| Mode                  | Semitone offset | Notes                                                                                  |
+| Copy style            | Semitone offset | Notes                                                                                  |
 | ---------------------- | --------------- | ------------------------------------------------------------------------------------ |
 | Copy as-is            | 0               | Exact copy at the same pitch.                                                          |
 | Fixed minor 3rd above | +3              | Same offset applied to every note.                                                     |
@@ -393,8 +395,26 @@ If a source lyric already ends with `#` or `$`, the suffix is not duplicated. Wh
 | Fixed 5th above       | +7              | Will not fit most songs without clipping the vocal range.                              |
 | Fixed 4th below       | −5              | Will not fit most songs without clipping the vocal range.                              |
 | Fixed 5th below       | −7              | Will not fit most songs without clipping the vocal range.                              |
+| Preserve target pitches | none          | Pitch comes from the target track instead of the source. See below.                     |
 
 Before writing any MIDI, the script checks that every transposed note would land within the RB3 vocal range (C1–C5). If any note would go out of range the action is aborted with a clear error identifying the note and destination — no MIDI is modified.
+
+### Preserve target pitches
+
+Once you have authored a harmony part by hand, its pitches follow the actual recording and no longer match any interval preset. If you later fix the lead — split a note for a slide, nudge a start, trim a length — re-applying an interval preset would push those timing changes down but throw away every pitch you picked.
+
+**Preserve target pitches** copies the source's positions, lengths, splits and lyrics exactly as the other styles do, but takes each note's pitch from whatever was already on the target track. Notes whose pitch has not changed get rewritten with the same pitch, so the two tracks end up back in sync on timing without you losing any tuning work.
+
+Each copied note gets its pitch from one of four rules, and the result panel counts how many notes landed in each:
+
+| Result line                              | Rule                                                                                                                                                 |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Existing pitches applied**             | The note overlaps a note already on the target track, and takes its pitch. Where several overlap, the one sharing the most time wins.                 |
+| **Matching closest pitch applied**       | Nothing overlaps — the note moved far enough to clear its old position. The nearest target note starting within one measure donates its pitch.        |
+| **Slide interval carried**               | The note shares a donor with the note before it, which is what a note split in two for a slide looks like. The first half keeps the target pitch; each later half gets that pitch plus the source's own interval, so the slide's direction and size survive. |
+| **No matching close pitch source applied** | Nothing on the target track within a measure — a genuinely new note. The source pitch is copied unchanged, with no interval applied, so it stands out for retuning by hand. |
+
+The Key section stays greyed out for this style — no scale is involved. If a carried slide interval would push a note outside C1–C5, the action aborts before writing anything, the same as an out-of-range interval preset.
 
 ### Key section
 
@@ -555,7 +575,7 @@ These are intentional trade-offs or REAPER API constraints, not bugs. Documented
 
 4. **Track selections are not persisted across sessions.** Track indices are positional and would be brittle to save. Smart defaults (matching `VOCALS AUDIO` / `PART VOCALS` track names) cover the common case; otherwise re-pick on each open.
 
-5. **Harmony mode indices are positional.** The interval mode for each destination is saved as an index into the mode list. If the list order changes between script versions, saved modes may map to different intervals. Check destination mode settings after a script update.
+5. **Harmony copy style indices are positional.** The copy style for each destination is saved as an index into the style list. New styles are appended to the end of the list so existing saves keep their meaning, but if the order ever changes between script versions, saved styles may map to different intervals. Check destination copy styles after a script update.
 
 6. **YIN samples a fixed window at 30% into the note.** Works well for sustained vowels but may land on a consonant for very fast syllables. The 30% offset is a heuristic that avoids the attack transient while staying inside the note.
 

@@ -1,6 +1,6 @@
 -- @description Rock Band Vocal Helper
 -- @author VeeKiraRay
--- @version 1.15
+-- @version 1.16
 -- @about
 --   Analyses a vocal audio track and appends MIDI notes to an existing MIDI
 --   item on a destination track, one note per detected syllable or phrase.
@@ -13,6 +13,20 @@
 --   This @about block keeps only the 5 most recent versions.
 --   Full history: CHANGELOG.md in the repo.
 --
+--   v1.16
+--     - Harmonies: each destination's two dropdowns are now labelled Target
+--       track and Copy style, aligned into the same column as Source and Key.
+--     - Harmonies: new Copy style, "Preserve target pitches". It copies the
+--       source's positions, lengths, splits and lyrics as usual but takes each
+--       note's pitch from the note already on the destination track, so a
+--       harmony part that was authored by hand can be re-synced after the lead's
+--       timing changes without losing its pitches. Where a copied note overlaps
+--       a destination note, that note's pitch is used; where it doesn't, the
+--       nearest destination note within one measure donates its pitch; a note
+--       split in two for a slide keeps the destination pitch on the first half
+--       and carries the source's own interval onto the rest; and where nothing
+--       is close enough, the source pitch is copied unchanged. The result panel
+--       counts all four cases separately.
 --   v1.15
 --     Pitch detection overhaul. Every figure below is from the synthetic test
 --     harness in dev/tests/dsp_algorithms.lua; see dev/PITCH_DETECTION_FINDINGS.md
@@ -79,19 +93,6 @@
 --       Applied across General, Tuner, Pitch, Pitch slide, Harmonies, and
 --       Validation tabs (WIP Note Placement tab intentionally left as-is,
 --       to be redone later).
---   v1.11
---     - Pitch tab: removed the "Pitch source" selector. Placement is now two
---       sub-tabs, Placement - Built-in and Placement - Reference, each
---       setting the active pitch source while open (mirrors the general
---       helper's Tab Input pattern). Apply pitch changes appears in both.
---     - Harmonies: "Copy phrase markers & overdrive" split into two
---       independent checkboxes/settings - Copy phrase markers (pitch 105)
---       and Copy overdrive (pitch 116, new RB3_OVERDRIVE_PITCH constant).
---     - Lyrics tab: "File: ..." renamed to "Selected: ..." in normal text
---       color (was greyed out), avoiding repeating "File" under its new
---       section header.
---     - Min/max pitch enable checkbox tooltips now say "Uncheck" instead of
---       "Disable".
 --
 --   Workflow:
 --     1. Pick the audio source track and the MIDI destination track.

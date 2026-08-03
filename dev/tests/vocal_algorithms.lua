@@ -1,6 +1,8 @@
 -- Algorithm unit tests for vocal helper pure-Lua functions:
--- EditDistance, NearestScalePitch, DiatonicThirdOffset, ScoreNotes.
--- HARM_SCALE must be loaded (from vocal defaults.lua) before running these tests.
+-- EditDistance, NearestScalePitch, DiatonicThirdOffset, ResolvePreservedPitches,
+-- ScoreNotes.
+-- HARM_SCALE and the RB3_* pitch constants must be loaded (from vocal
+-- defaults.lua) before running these tests.
 
 ----------------------------------------------------------------------
 Test.section('EditDistance')
@@ -86,6 +88,121 @@ Test.it('G (67) in C major, 3rd above → +4 semitones (B)', function()
     -- scale deg 5 (G) + 2 = deg 7 (B); B-G = 4 semitones
     local off = DiatonicThirdOffset(67, 0, 0, 1)
     Test.expect(off == 4, 'G→B diatonic 3rd above = +4')
+end)
+
+----------------------------------------------------------------------
+Test.section('ResolvePreservedPitches')
+
+-- Helpers: a 1-second window on every note unless a test says otherwise.
+local function windows_of(new_notes, w)
+    local out = {}
+    for i = 1, #new_notes do out[i] = w or 1.0 end
+    return out
+end
+
+local function categories(assigned)
+    local out = {}
+    for i, a in ipairs(assigned) do out[i] = a.category end
+    return table.concat(out, ',')
+end
+
+-- Calls ResolvePreservedPitches and fails the test if it errored, so the cases
+-- below can index the result directly.
+local function resolve_ok(new_notes, old_notes, w)
+    local a, c = ResolvePreservedPitches(new_notes, old_notes, w)
+    Test.expect(a ~= nil, 'unexpected error: ' .. tostring(c))
+    return a or {}, c or { existing = -1, closest = -1, carried = -1, source = -1 }
+end
+
+Test.it('overlapping destination note donates its pitch', function()
+    local new_notes = { { s = 0.0, e = 1.0, src_pitch = 60 } }
+    local old_notes = { { s = 0.0, e = 1.0, pitch = 67 } }
+    local a, c = resolve_ok(new_notes, old_notes, windows_of(new_notes))
+    Test.expect(a[1].pitch == 67, 'kept destination pitch 67, got ' .. tostring(a[1].pitch))
+    Test.expect(a[1].category == 'existing', 'category existing, got ' .. a[1].category)
+    Test.expect(c.existing == 1, 'existing count 1')
+end)
+
+Test.it('largest overlap wins when two destination notes overlap', function()
+    local new_notes = { { s = 0.9, e = 2.0, src_pitch = 60 } }
+    local old_notes = { { s = 0.0, e = 1.0, pitch = 62 },   -- 0.1 s overlap
+                        { s = 1.0, e = 2.0, pitch = 71 } }  -- 1.0 s overlap
+    local a = resolve_ok(new_notes, old_notes, windows_of(new_notes))
+    Test.expect(a[1].pitch == 71, 'largest overlap donates, got ' .. tostring(a[1].pitch))
+end)
+
+Test.it('note nudged clear of its donor takes the nearest pitch in window', function()
+    local new_notes = { { s = 2.0, e = 2.4, src_pitch = 60 } }
+    local old_notes = { { s = 1.5, e = 1.9, pitch = 65 } }   -- 0.5 s away, no overlap
+    local a, c = resolve_ok(new_notes, old_notes, windows_of(new_notes))
+    Test.expect(a[1].pitch == 65, 'nearest pitch 65, got ' .. tostring(a[1].pitch))
+    Test.expect(a[1].category == 'closest', 'category closest, got ' .. a[1].category)
+    Test.expect(c.closest == 1, 'closest count 1')
+end)
+
+Test.it('no destination note inside the window falls back to the source pitch', function()
+    local new_notes = { { s = 10.0, e = 10.4, src_pitch = 60 } }
+    local old_notes = { { s = 1.5, e = 1.9, pitch = 65 } }
+    local a, c = resolve_ok(new_notes, old_notes, windows_of(new_notes))
+    Test.expect(a[1].pitch == 60, 'source pitch 60 copied as-is, got ' .. tostring(a[1].pitch))
+    Test.expect(a[1].category == 'source', 'category source, got ' .. a[1].category)
+    Test.expect(c.source == 1, 'source count 1')
+end)
+
+Test.it('empty destination puts every note in the source category', function()
+    local new_notes = { { s = 0.0, e = 0.5, src_pitch = 60 },
+                        { s = 1.0, e = 1.5, src_pitch = 62 } }
+    local a, c = resolve_ok(new_notes, {}, windows_of(new_notes))
+    Test.expect(c.source == 2, 'both notes fall back, got ' .. c.source)
+    Test.expect(a[1].pitch == 60 and a[2].pitch == 62, 'source pitches copied unchanged')
+end)
+
+Test.it('note split for a slide carries the source interval onto the second half', function()
+    -- Destination held one note; the source has since been split, rising +3.
+    local new_notes = { { s = 0.0, e = 0.5, src_pitch = 57 },
+                        { s = 0.5, e = 1.0, src_pitch = 60 } }
+    local old_notes = { { s = 0.0, e = 1.0, pitch = 64 } }
+    local a, c = resolve_ok(new_notes, old_notes, windows_of(new_notes))
+    Test.expect(a[1].pitch == 64, 'first half keeps 64, got ' .. tostring(a[1].pitch))
+    Test.expect(a[2].pitch == 67, 'second half = 64 + 3, got ' .. tostring(a[2].pitch))
+    Test.expect(categories(a) == 'existing,carried',
+        'categories existing,carried - got ' .. categories(a))
+    Test.expect(c.existing == 1 and c.carried == 1, 'one existing, one carried')
+end)
+
+Test.it('a carried pitch outside the vocal range is an error, not a clamp', function()
+    local new_notes = { { s = 0.0, e = 0.5, src_pitch = 60 },
+                        { s = 0.5, e = 1.0, src_pitch = 72 } }   -- +12
+    local old_notes = { { s = 0.0, e = 1.0, pitch = RB3_MAX_PITCH } }
+    local a, err = ResolvePreservedPitches(new_notes, old_notes, windows_of(new_notes))
+    Test.expect(a == nil, 'expected nil on out-of-range carried pitch')
+    Test.expect(type(err) == 'string' and #err > 0, 'expected an error string')
+end)
+
+Test.it('a note with no donor breaks the run, so the next note is not carried', function()
+    local new_notes = { { s = 0.0, e = 0.5, src_pitch = 57 },   -- donor
+                        { s = 5.0, e = 5.5, src_pitch = 60 },   -- nothing near
+                        { s = 0.5, e = 1.0, src_pitch = 62 } }  -- same donor as #1
+    -- Tight windows so note 2 finds nothing.
+    local old_notes = { { s = 0.0, e = 1.0, pitch = 64 } }
+    local a = resolve_ok(new_notes, old_notes, windows_of(new_notes, 0.2))
+    Test.expect(categories(a) == 'existing,source,existing',
+        'run broken by the orphan note - got ' .. categories(a))
+    Test.expect(a[3].pitch == 64, 'note 3 starts a fresh run at 64, got ' .. tostring(a[3].pitch))
+end)
+
+Test.it('the four category counts sum to the number of notes', function()
+    local new_notes = { { s = 0.0, e = 0.5, src_pitch = 57 },
+                        { s = 0.5, e = 1.0, src_pitch = 59 },
+                        { s = 2.2, e = 2.6, src_pitch = 60 },
+                        { s = 9.0, e = 9.5, src_pitch = 62 } }
+    local old_notes = { { s = 0.0, e = 1.0, pitch = 64 },
+                        { s = 1.5, e = 2.0, pitch = 66 } }
+    local a, c = resolve_ok(new_notes, old_notes, windows_of(new_notes))
+    local total = c.existing + c.closest + c.carried + c.source
+    Test.expect(total == #new_notes,
+        ('counts sum to %d, expected %d'):format(total, #new_notes))
+    Test.expect(#a == #new_notes, 'one assignment per note')
 end)
 
 ----------------------------------------------------------------------

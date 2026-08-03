@@ -2,8 +2,9 @@
 -- @author VeeKiraRay
 -- @about
 --   Algorithm unit tests for ScoreNotes, NearestScalePitch, DiatonicThirdOffset,
---   and EditDistance. These functions operate on plain Lua tables with no REAPER
---   API calls. Run from the REAPER Actions list or triggered via the test launcher.
+--   ResolvePreservedPitches, and EditDistance. These functions operate on plain
+--   Lua tables with no REAPER API calls.
+--   Run from the REAPER Actions list or triggered via the test launcher.
 --   Results appear in the REAPER console (View > Show REAPER console).
 
 r = reaper
@@ -28,6 +29,7 @@ r.ClearConsole()
 r.ShowConsoleMsg('======  Vocal Helper - algorithm unit tests  ======\n')
 
 dofile(_tdir .. 'framework.lua')
+dofile(_root .. 'lib/reaper_imgui_helpers.lua')  -- PitchName (used in error strings)
 dofile(_root .. 'lib/reaper_dsp.lua')
 dofile(_mdir .. 'defaults.lua')           -- S, HARM_SCALE, RB3_* constants
 dofile(_mdir .. 'autotune.lua')           -- ScoreNotes
