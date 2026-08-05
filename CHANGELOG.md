@@ -9,6 +9,17 @@ over 5. See `CLAUDE.md` → "Changelog / `@about` trimming" for the rule.
 
 `rock_band_general_helper_vkr.lua`
 
+**v0.9.37**
+- Tab Input's Guitar/Bass guide: removed the "Notes are in play
+  order" checkbox and palette mode. Palette mode flattened every
+  chord into independent single-note gem events (no chord grouping
+  at all), which doesn't reflect real RB charting - the guide now
+  always uses the chord-shape-aware assignment the checked state
+  already provided, matching how the real Guitar tab converter
+  (ConvertGuitar) has always behaved (it never had a palette-mode
+  equivalent). S.mc_gtr_tab_ordered and its ExtState key (mcgtor)
+  are gone.
+
 **v0.9.36**
 - Guitar tab converter and Tab Input's Guitar/Bass guide are now
   chord-quality-aware: a real-guitar interval like a power chord's

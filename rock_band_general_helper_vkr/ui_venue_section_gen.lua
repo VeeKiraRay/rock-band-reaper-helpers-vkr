@@ -137,17 +137,13 @@ function DrawVenueSectionGenTab()
         end
 
         -- Keyframe align (per-section; disabled for auto/no lighting)
-        local _kfa_labels = {
-            'Section start', 'Closest beat', 'Downbeat',
-            'Guitar notes', 'Bass notes', 'Keys notes',
-            'Drum kicks', 'Drum snare',
-        }
+        local _kfa_labels = KF_ALIGN_LABELS  -- shared with the other gen tabs (venue_lighting.lua)
         local _kf_dis = not _is_manual
         if _kf_dis then r.ImGui_BeginDisabled(ctx) end
         r.ImGui_Text(ctx, 'Keyframe align')
         r.ImGui_SameLine(ctx, lbl_col)
         r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
-        local _kfa_preview = _kfa_labels[S.venue_keyframe_align + 1] or 'Section start'
+        local _kfa_preview = _kfa_labels[S.venue_keyframe_align + 1] or _kfa_labels[1]
         if r.ImGui_BeginCombo(ctx, '##vkfa', _kfa_preview) then
             for _ki, _kl in ipairs(_kfa_labels) do
                 local _ksel = (_ki - 1 == S.venue_keyframe_align)

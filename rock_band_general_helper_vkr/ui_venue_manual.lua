@@ -4,15 +4,64 @@
 -- TODO: the five combo+Add rows repeat the same boilerplate - if this file
 -- grows, factor a row helper modeled on ui_venue_events.lua's _draw_prc_row.
 -- Requires globals: r, ctx, S, TIPS, Tooltip, SliderTooltip, RunAction,
---                   RenderCamPacingRow, RenderKeyframeAlignCombo,
+--                   RenderCamPacingRow, MakeProjectPoll, FindNamedTrackMIDI,
 --                   InsertVenueEventAtPlayhead, AdvanceCameraPacing,
 --                   GenerateManualKeyframes, RemoveVenueEventsByType,
+--                   MANUAL_LIGHTING_SET, GetTakePPQPerQN, NO_LIGHTING_AT_PLAYHEAD_MSG,
 --                   COOP_POOL, DIRECTED_POOL, DIRECTED_LABELS, DIRECTED_TIPS,
 --                   LIGHTING_LABELS, LIGHTING_TIPS, POSTPROC_LABELS, POSTPROC_TIPS,
---                   MANUAL_LIGHTING_SET, BeginVenueTooltip, DrawVenueTooltipSprite,
+--                   KF_ALIGN_LABELS, BeginVenueTooltip, DrawVenueTooltipSprite,
 --                   EndVenueTooltip
 
+-- Cached VENUE take and the PPQ of every manual lighting event on it, refreshed via
+-- MakeProjectPoll (at most every 1 s and only when the project changed; 5 s fallback) -
+-- same pattern as ui_venue_events.lua. Backs the "is there a manual lighting event under
+-- the playhead?" check that gates [first] insertion and keyframe generation. The
+-- positions are cached rather than re-read per frame because the playhead moves
+-- constantly while the event list does not, and a finished VENUE track carries thousands
+-- of text events. The cached take is validated every frame (item deletion / project
+-- switch invalidates the pointer between polls), and this tab's own Add buttons force a
+-- rescan so the gate reopens the frame after a lighting event is added. Correctness never
+-- depends on this cache - both actions re-check the take for themselves.
+local _poll         = MakeProjectPoll(1.0, 5.0)
+local _venue_take
+local _manual_lt    = nil   -- array of manual lighting PPQ positions
+local _lt_tol       = 0     -- match tolerance in ticks (see FindManualLightingAtPpq)
+local _force_rescan = false
+
+local function _ScanManualLighting(take)
+    local out = {}
+    local _, _, _, text_count = r.MIDI_CountEvts(take)
+    for i = 0, text_count - 1 do
+        local ok, _, _, evt_ppq, evt_type, msg = r.MIDI_GetTextSysexEvt(take, i)
+        if ok and evt_type == 1 and MANUAL_LIGHTING_SET[msg] then
+            out[#out + 1] = evt_ppq
+        end
+    end
+    return out, math.floor(GetTakePPQPerQN(take) / 32)
+end
+
 function DrawVenueManualTab()
+    local _take_valid = _venue_take and r.ValidatePtr2(0, _venue_take, 'MediaItem_Take*')
+    if _poll(_force_rescan) or (_venue_take and not _take_valid) then
+        _force_rescan = false
+        local _, _, _tk = FindNamedTrackMIDI('VENUE')
+        _venue_take = _tk
+        _take_valid = _venue_take ~= nil
+        _manual_lt  = nil
+        if _take_valid then _manual_lt, _lt_tol = _ScanManualLighting(_venue_take) end
+    end
+    -- No VENUE take at all: leave the keyframe controls enabled rather than locking the
+    -- tab on a stale/missing cache - the actions report the missing track themselves.
+    local _lt_at_playhead = true
+    if _take_valid and _manual_lt then
+        local _cur_ppq = r.MIDI_GetPPQPosFromProjTime(_venue_take, r.GetCursorPosition())
+        _lt_at_playhead = false
+        for _, _p in ipairs(_manual_lt) do
+            if math.abs(_p - _cur_ppq) <= _lt_tol then _lt_at_playhead = true; break end
+        end
+    end
+
     r.ImGui_TextWrapped(ctx, 'Insert individual venue events at the playhead position')
     r.ImGui_Spacing(ctx)
 
@@ -179,24 +228,20 @@ function DrawVenueManualTab()
     if Btn('Add##mg_lt_add', 0) then
         local _ev = '[lighting (' .. S.venue_mg_lighting .. ')]'
         RunAction(function() InsertVenueEventAtPlayhead(_ev) end)
+        _force_rescan = true
     end
     if _mg_lt_dis then r.ImGui_EndDisabled(ctx) end
-    local _mg_is_manual = S.venue_mg_lighting ~= '' and
-        MANUAL_LIGHTING_SET['[lighting (' .. S.venue_mg_lighting .. ')]']
 
-    -- Keyframe settings (shown only when a manual lighting preset is selected)
-    local _kf_dis = not _mg_is_manual
+    -- Keyframe settings: usable only on a manual lighting event's own tick, since
+    -- [first] has to share it. Snapshot once (BeginDisabled balance).
+    local _kf_dis = not _lt_at_playhead
     if _kf_dis then r.ImGui_BeginDisabled(ctx) end
 
     r.ImGui_Text(ctx, 'Keyframe align')
     r.ImGui_SameLine(ctx, _lbl_col)
     r.ImGui_SetNextItemWidth(ctx, 230)
-    local _mg_kfa_labels = {
-        'Playhead', 'Closest beat', 'Downbeat',
-        'Guitar notes', 'Bass notes', 'Keys notes',
-        'Drum kicks', 'Drum snare',
-    }
-    local _mg_kfa_prev = _mg_kfa_labels[S.venue_keyframe_align + 1] or 'Playhead'
+    local _mg_kfa_labels = KF_ALIGN_LABELS  -- shared with RenderKeyframeAlignCombo
+    local _mg_kfa_prev = _mg_kfa_labels[S.venue_keyframe_align + 1] or _mg_kfa_labels[1]
     if r.ImGui_BeginCombo(ctx, '##mg_kfa', _mg_kfa_prev) then
         for _ki, _kl in ipairs(_mg_kfa_labels) do
             local _ksel = (_ki - 1 == S.venue_keyframe_align)
@@ -207,26 +252,22 @@ function DrawVenueManualTab()
         end
         r.ImGui_EndCombo(ctx)
     end
-    Tooltip('Where the [first]/[next] keyframe sequence begins.\n\n' ..
-            'Playhead:      [first] at the current edit cursor position.\n' ..
-            'Closest beat:  snapped to the nearest beat boundary.\n' ..
-            'Downbeat:      [first] at cursor; [next] from the next measure start.\n\n' ..
-            'Instrument modes emit [next] only at beat/half-beat/quarter-beat grid points where\n' ..
-            'qualifying notes actually exist on the named track:\n' ..
-            '  Guitar notes - PART GUITAR (pitches 96-100)\n' ..
-            '  Bass notes   - PART BASS   (pitches 96-100)\n' ..
-            '  Keys notes   - PART KEYS   (pitches 96-100)\n' ..
-            '  Drum kicks   - PART DRUMS  (pitch 96)\n' ..
-            '  Drum snare   - PART DRUMS  (pitch 97)')
+    Tooltip(TIPS.venue_keyframe_align)
     r.ImGui_SameLine(ctx)
     if Btn('Add##mg_kf_btn', 0) then
         RunAction(GenerateManualKeyframes)
+        _force_rescan = true
     end
-    Tooltip('Generate [first]/[next] keyframe events from the playhead to the next\n' ..
-            'lighting event, the time selection end (if active), or the VENUE item end.\n\n' ..
-            'Clears any existing [first]/[next]/[previous] events in that range first.\n' ..
-            'Only available when a manual lighting preset is selected above.\n' ..
-            'Fully undoable.')
+    Tooltip(TIPS.venue_mg_kf_add)
+    if _kf_dis then
+        -- Step out of the disabled scope just for this label: a disabled widget never
+        -- reports hover, so a tooltip drawn inside it could never explain the block.
+        r.ImGui_EndDisabled(ctx)
+        r.ImGui_SameLine(ctx)
+        r.ImGui_TextDisabled(ctx, '(blocked)')
+        Tooltip(NO_LIGHTING_AT_PLAYHEAD_MSG)
+        r.ImGui_BeginDisabled(ctx)
+    end
 
     if S.venue_keyframe_align >= 3 then
         r.ImGui_Spacing(ctx)
@@ -330,8 +371,15 @@ function DrawVenueManualTab()
     if Btn('Add##mg_sp_add', 0) then
         local _ev = S.venue_mg_special
         RunAction(function() InsertVenueEventAtPlayhead(_ev) end)
+        _force_rescan = true
     end
     if _mg_sp_dis then r.ImGui_EndDisabled(ctx) end
+    -- [first] is the only special event tied to a lighting event's position.
+    if S.venue_mg_special == '[first]' and not _lt_at_playhead then
+        r.ImGui_SameLine(ctx)
+        r.ImGui_TextDisabled(ctx, '(blocked)')
+        Tooltip(NO_LIGHTING_AT_PLAYHEAD_MSG)
+    end
 
     -- ---- Camera pacing ----
     r.ImGui_Spacing(ctx)

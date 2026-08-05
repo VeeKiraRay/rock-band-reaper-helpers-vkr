@@ -3,9 +3,13 @@
 --           PickRandom, JitteredInterval, RB3_PHRASE_PITCH, r, S
 --           (globals from venue_camera.lua and venue_themes.lua)
 -- Globals exported: MANUAL_LIGHTING_SET, LIGHTING_OFFSET_16THS, INST_KF_MODES,
---   FindNextMeasureStartPpq, CollectInstNotePositions, CollectVocalPhraseStarts,
---   GenerateKeyframesForSpan, GenerateLightingEvents, GenerateThemedSectionEvents,
---   KeyframeSubdivQN
+--   KF_ALIGN_LABELS, FindNextMeasureStartPpq, CollectInstNotePositions,
+--   CollectVocalPhraseStarts, GenerateKeyframesForSpan, GenerateLightingEvents,
+--   GenerateThemedSectionEvents, KeyframeSubdivQN, SnapPpqToHalfBeat
+--
+-- Keyframe placement rule: [first] always lands on the SAME tick as the manual
+-- lighting event it drives - it is that event's own initial keyframe. The
+-- S.venue_keyframe_align modes below decide only where the FIRST [next] lands.
 
 local MANUAL_LIGHTING_POOL = {
     '[lighting (verse)]', '[lighting (chorus)]',
@@ -26,6 +30,16 @@ local AUTO_LIGHTING_POOL = {
 
 MANUAL_LIGHTING_SET = {}
 for _, v in ipairs(MANUAL_LIGHTING_POOL) do MANUAL_LIGHTING_SET[v] = true end
+
+-- Keyframe alignment mode labels (S.venue_keyframe_align, 0-based - mode N is
+-- KF_ALIGN_LABELS[N + 1]). Shared by every tab that draws the selector, so the
+-- wording can't drift between them. Each label names where the first [next]
+-- lands; [first] is always on the lighting event itself.
+KF_ALIGN_LABELS = {
+    'Keyframe rate only', 'Closest beat', 'Downbeat',
+    'Guitar notes', 'Bass notes', 'Keys notes',
+    'Drum kicks', 'Drum snare',
+}
 
 -- Instrument track info for keyframe alignment modes 3-7 (S.venue_keyframe_align).
 INST_KF_MODES = {
@@ -54,6 +68,16 @@ end
 
 local function SnapPpqToNearestBeat(ppq_pos, ppq)
     return math.floor(ppq_pos / ppq + 0.5) * ppq
+end
+
+-- Half-beat snap - the grid venue_generator.lua's insert_text and
+-- actions_venue_section.lua's insert_snapped apply to every non-keyframe event.
+-- Keyframes are inserted unsnapped, so a [first] meant to share a lighting
+-- event's tick has to be snapped here to match where that event will land.
+-- Idempotent: re-snapping an already-snapped value returns it unchanged.
+function SnapPpqToHalfBeat(ppq_pos, ppq)
+    local half_beat = math.floor(ppq / 2 + 0.5)
+    return math.floor(ppq_pos / half_beat + 0.5) * half_beat
 end
 
 -- Returns the PPQ position of the start of the NEXT measure after ppq_pos.
@@ -119,8 +143,12 @@ end
 
 -- Returns an array of {ppq, text} keyframe events ('[first]'/'[next]') for one manual-lighting
 -- span [start_ppq, end_ppq), using the shared S.venue_keyframe_align / S.venue_kf_inst_subdiv
--- settings and the given rate in beats. Same algorithm as GenerateManualKeyframes's body
--- (actions_venue_manual.lua), parameterized so it can be reused per-span by other callers.
+-- settings and the given rate in beats.
+--
+-- start_ppq IS the manual lighting event's own tick (both callers - the Keyframes tab's
+-- per-span walk and Manual gen's playhead - guarantee that), so [first] always goes there.
+-- In "Closest beat" mode the beat the sequence used to start on becomes the first [next]
+-- instead; the other modes' [next] trains are unchanged.
 function GenerateKeyframesForSpan(take, start_ppq, end_ppq, ppq, kf_rate_beats)
     local ctrl_events = {}
     local align    = S.venue_keyframe_align
@@ -152,11 +180,13 @@ function GenerateKeyframesForSpan(take, start_ppq, end_ppq, ppq, kf_rate_beats)
         end
     else
         -- Standard modes 0-2
-        local first_ppq
+        -- Mode 1 ("Closest beat") snaps to the nearest beat; that position is now the
+        -- first [next] rather than [first], which stays on the lighting event.
+        local snap_ppq
         if align == 1 then
-            first_ppq = math.max(start_ppq, math.floor(start_ppq / ppq + 0.5) * ppq)
+            snap_ppq = math.max(start_ppq, math.floor(start_ppq / ppq + 0.5) * ppq)
         else
-            first_ppq = start_ppq
+            snap_ppq = start_ppq
         end
 
         local next_ppq
@@ -165,13 +195,16 @@ function GenerateKeyframesForSpan(take, start_ppq, end_ppq, ppq, kf_rate_beats)
             next_ppq  = nms < end_ppq and nms or nil
         else
             -- Anchor [next] to the nearest beat to the span start so the [next] grid lands on
-            -- whole beats even when [first] is not beat-aligned (modes 0 & 1).
+            -- whole beats even when the lighting event is not beat-aligned (modes 0 & 1).
             local beat_anchor = math.floor(start_ppq / ppq + 0.5) * ppq
             next_ppq = beat_anchor + kf_ticks
         end
 
-        if first_ppq < end_ppq then
-            ctrl_events[#ctrl_events + 1] = { ppq = first_ppq, text = '[first]' }
+        if start_ppq < end_ppq then
+            ctrl_events[#ctrl_events + 1] = { ppq = start_ppq, text = '[first]' }
+        end
+        if snap_ppq > start_ppq and snap_ppq < end_ppq then
+            ctrl_events[#ctrl_events + 1] = { ppq = snap_ppq, text = '[next]' }
         end
         if next_ppq then
             local pos_ppq = next_ppq
@@ -262,17 +295,24 @@ local function ProcessThemeSection(sec, theme, take, range_start_ppq, range_end_
             local kf_end  = math.min(range_end_ppq, sec_end_ppq)
             local align   = S.venue_keyframe_align
 
+            -- [first] shares the lighting event's tick, blend-in included - it is that
+            -- event's own initial keyframe. Snapped to the half-beat grid the callers
+            -- will snap the lighting event onto (keyframes themselves go in unsnapped),
+            -- so the two land on exactly the same tick.
+            local first_kf_ppq = SnapPpqToHalfBeat(lt_ppq_abs, ppq)
+            if first_kf_ppq < kf_end then
+                ctrl_events[#ctrl_events + 1] = {
+                    tick = math.floor(first_kf_ppq - range_start_ppq + 0.5),
+                    text = '[first]',
+                }
+            end
+
             if align >= 3 and inst_note_positions then
-                -- Instrument-aware mode: [first] at section start; [next] only at
-                -- beat or half-beat grid positions that have at least one qualifying note.
+                -- Instrument-aware mode: [next] only at beat or half-beat grid positions
+                -- that have at least one qualifying note. The section start gets no
+                -- keyframe of its own - every [next] here is backed by a real note.
                 local subdiv_qn    = KeyframeSubdivQN(S.venue_kf_inst_subdiv)
                 local subdiv_ticks = math.floor(subdiv_qn * ppq)
-                if sec_ppq < kf_end then
-                    ctrl_events[#ctrl_events + 1] = {
-                        tick = math.floor(sec_ppq - range_start_ppq + 0.5),
-                        text = '[first]',
-                    }
-                end
                 -- Find the first beat/half-beat grid line strictly after sec_ppq.
                 -- Uses the tempo map so sparse marker projects and off-beat section
                 -- starts are all handled correctly (same pattern as FindNextMeasureStartPpq).
@@ -305,12 +345,15 @@ local function ProcessThemeSection(sec, theme, take, range_start_ppq, range_end_
                     or math.random(KEYFRAME_MIN_BEATS, KEYFRAME_MAX_BEATS)
                 local kf_ticks = kf_beats * ppq
 
-                -- [first] position: section start, or snapped to nearest beat (mode 1)
-                local first_ppq
+                -- Anchor for the [next] train: section start, or snapped to the nearest
+                -- beat (mode 1). This is where [first] used to sit - with [first] now on
+                -- the lighting event (blend-in beats earlier), the anchor becomes the
+                -- first [next] instead, so the reaction grid keeps its old positions.
+                local anchor_ppq
                 if align == 1 then
-                    first_ppq = math.max(sec_ppq, SnapPpqToNearestBeat(sec_ppq, ppq))
+                    anchor_ppq = math.max(sec_ppq, SnapPpqToNearestBeat(sec_ppq, ppq))
                 else
-                    first_ppq = sec_ppq
+                    anchor_ppq = sec_ppq
                 end
 
                 -- [next] start: downbeat mode begins from next measure boundary (mode 2)
@@ -319,13 +362,15 @@ local function ProcessThemeSection(sec, theme, take, range_start_ppq, range_end_
                     local nms = FindNextMeasureStartPpq(take, sec_ppq, ppq)
                     next_ppq  = nms < kf_end and nms or nil
                 else
-                    next_ppq = first_ppq + kf_ticks
+                    next_ppq = anchor_ppq + kf_ticks
                 end
 
-                if first_ppq < kf_end then
+                -- Skipped when zero blend-in put the lighting event on the anchor
+                -- itself - [first] is already there.
+                if anchor_ppq < kf_end and anchor_ppq > first_kf_ppq then
                     ctrl_events[#ctrl_events + 1] = {
-                        tick = math.floor(first_ppq - range_start_ppq + 0.5),
-                        text = '[first]',
+                        tick = math.floor(anchor_ppq - range_start_ppq + 0.5),
+                        text = '[next]',
                     }
                 end
                 if next_ppq then

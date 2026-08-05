@@ -1,10 +1,17 @@
 -- Manual gen actions: single-event insertion at the playhead, playhead advance,
 -- keyframe generation, and selective event removal.
--- Requires: FindNamedTrackMIDI, GetTakePPQPerQN, MANUAL_LIGHTING_SET, INST_KF_MODES,
---           FindNextMeasureStartPpq, CollectInstNotePositions, ResolveUserCamInterval,
---           JitteredInterval, CAM_INTERVAL_16THS, CAM_JITTER, KeyframeSubdivQN,
+-- Requires: FindNamedTrackMIDI, GetTakePPQPerQN, MANUAL_LIGHTING_SET,
+--           GenerateKeyframesForSpan, ResolveUserCamInterval,
+--           JitteredInterval, CAM_INTERVAL_16THS, CAM_JITTER,
 --           DeleteTextEventsInRange, ClearVenueKeyframesInRange, CategorizeVenueEvent,
 --           FindTrackByName, FindFirstMIDIItem, RB3_PHRASE_PITCH, r, S (globals)
+
+-- Reason shown wherever a [first] is refused, in the UI's blocked hover and in the
+-- action's own status line, so both read the same.
+NO_LIGHTING_AT_PLAYHEAD_MSG =
+    '[first] must sit on the same tick as the manual lighting event it drives - ' ..
+    'no manual lighting event ([lighting (verse|chorus|manual_cool|manual_warm|' ..
+    'dischord|stomp)]) found at the playhead.'
 
 local function _find_venue_track_and_take()
     local track, item, take = FindNamedTrackMIDI('VENUE')
@@ -21,11 +28,35 @@ end
 
 -- ---------------------------------------------------------------------------
 
+-- Returns the manual lighting event text at ppq_pos on the take, or nil when there is
+-- none. tol defaults to a 1/128 note (ppq/32 ticks) - enough to absorb cursor/grid
+-- rounding, far too small to reach a neighbouring lighting event (those are seconds
+-- apart). Pure function of (take, ppq_pos) so tests can drive it without a playhead.
+function FindManualLightingAtPpq(take, ppq_pos, tol)
+    tol = tol or math.floor(GetTakePPQPerQN(take) / 32)
+    local _, _, _, text_count = r.MIDI_CountEvts(take)
+    for i = 0, text_count - 1 do
+        local ok, _, _, evt_ppq, evt_type, msg = r.MIDI_GetTextSysexEvt(take, i)
+        if ok and evt_type == 1 and MANUAL_LIGHTING_SET[msg]
+                and math.abs(evt_ppq - ppq_pos) <= tol then
+            return msg
+        end
+    end
+    return nil
+end
+
 function InsertVenueEventAtPlayhead(text)
     local track, item, take = _find_venue_track_and_take()
     if not track then return end
 
     local abs_ppq = r.MIDI_GetPPQPosFromProjTime(take, r.GetCursorPosition())
+
+    -- Re-validate here, never trusting the UI frame's cached check (same discipline as
+    -- InsertEventsEvent). Returns before any Undo_* call, so a refusal leaves no undo point.
+    if text == '[first]' and not FindManualLightingAtPpq(take, abs_ppq) then
+        S.status = NO_LIGHTING_AT_PLAYHEAD_MSG
+        return
+    end
 
     r.PreventUIRefresh(1)
     r.Undo_BeginBlock2(0)
@@ -95,16 +126,6 @@ end
 -- ---------------------------------------------------------------------------
 
 function GenerateManualKeyframes()
-    if S.venue_mg_lighting == '' then
-        S.status = 'Select a manual lighting preset first (lighting dropdown above).'
-        return
-    end
-    local full_ev = '[lighting (' .. S.venue_mg_lighting .. ')]'
-    if not MANUAL_LIGHTING_SET[full_ev] then
-        S.status = 'Keyframe gen requires a manual lighting preset: verse, chorus, manual_cool, manual_warm, dischord, or stomp.'
-        return
-    end
-
     local track, item, take = _find_venue_track_and_take()
     if not track then return end
 
@@ -112,6 +133,14 @@ function GenerateManualKeyframes()
     local half_beat = math.floor(ppq / 2 + 0.5)
 
     local start_ppq = r.MIDI_GetPPQPosFromProjTime(take, r.GetCursorPosition())
+
+    -- The keyframe train belongs to the lighting event under the playhead - that event,
+    -- not the lighting dropdown, decides whether generation is allowed, so an existing
+    -- [lighting (...)] can be re-keyframed without re-picking it above.
+    if not FindManualLightingAtPpq(take, start_ppq) then
+        S.status = NO_LIGHTING_AT_PLAYHEAD_MSG
+        return
+    end
 
     local item_start_sec = r.GetMediaItemInfo_Value(item, 'D_POSITION')
     local item_end_sec   = item_start_sec + r.GetMediaItemInfo_Value(item, 'D_LENGTH')
@@ -143,68 +172,10 @@ function GenerateManualKeyframes()
         return
     end
 
-    -- Compute keyframe events
-    local ctrl_events = {}
-    local align   = S.venue_keyframe_align
-    local kf_beats = S.venue_mg_kf_rate
-    local kf_ticks = kf_beats * ppq
-
-    if align >= 3 and INST_KF_MODES[align] then
-        local inst_info    = INST_KF_MODES[align]
-        local inst_pos     = CollectInstNotePositions(
-            inst_info.track_name, inst_info.pitch_min, inst_info.pitch_max,
-            take, start_ppq, end_ppq)
-        local subdiv_qn    = KeyframeSubdivQN(S.venue_kf_inst_subdiv)
-        local subdiv_ticks = math.floor(subdiv_qn * ppq)
-
-        ctrl_events[#ctrl_events + 1] = { ppq = start_ppq, text = '[first]' }
-
-        local sec_qn    = r.TimeMap_timeToQN(r.MIDI_GetProjTimeFromPPQPos(take, start_ppq))
-        local grid_qn   = math.ceil(sec_qn / subdiv_qn + 1e-6) * subdiv_qn
-        local pos_ppq   = r.MIDI_GetPPQPosFromProjTime(take, r.TimeMap_QNToTime(grid_qn))
-        local tolerance = math.floor(ppq / 32)
-        local ni        = 1
-        while pos_ppq < end_ppq do
-            while ni <= #inst_pos and inst_pos[ni] < pos_ppq - tolerance do
-                ni = ni + 1
-            end
-            if ni <= #inst_pos and inst_pos[ni] <= pos_ppq + tolerance then
-                ctrl_events[#ctrl_events + 1] = { ppq = pos_ppq, text = '[next]' }
-            end
-            pos_ppq = pos_ppq + subdiv_ticks
-        end
-    else
-        -- Standard modes 0-2
-        local first_ppq
-        if align == 1 then
-            first_ppq = math.max(start_ppq, math.floor(start_ppq / ppq + 0.5) * ppq)
-        else
-            first_ppq = start_ppq
-        end
-
-        local next_ppq
-        if align == 2 then
-            local nms = FindNextMeasureStartPpq(take, start_ppq, ppq)
-            next_ppq  = nms < end_ppq and nms or nil
-        else
-            -- Anchor [next] to the nearest beat to the playhead so the [next] grid
-            -- lands on whole beats even when [first] is not beat-aligned (modes 0 & 1).
-            -- beat_anchor + kf_ticks is always > start_ppq since kf_ticks >= 1 beat.
-            local beat_anchor = math.floor(start_ppq / ppq + 0.5) * ppq
-            next_ppq = beat_anchor + kf_ticks
-        end
-
-        if first_ppq < end_ppq then
-            ctrl_events[#ctrl_events + 1] = { ppq = first_ppq, text = '[first]' }
-        end
-        if next_ppq then
-            local pos_ppq = next_ppq
-            while pos_ppq < end_ppq do
-                ctrl_events[#ctrl_events + 1] = { ppq = pos_ppq, text = '[next]' }
-                pos_ppq = pos_ppq + kf_ticks
-            end
-        end
-    end
+    -- Same span algorithm the Keyframes tab runs per manual lighting event; the playhead
+    -- check above guarantees start_ppq is a lighting event's own tick, which is what
+    -- GenerateKeyframesForSpan assumes when it anchors [first] there.
+    local ctrl_events = GenerateKeyframesForSpan(take, start_ppq, end_ppq, ppq, S.venue_mg_kf_rate)
 
     if #ctrl_events == 0 then
         S.status = 'No keyframe positions found in range.'

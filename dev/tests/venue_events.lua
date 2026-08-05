@@ -279,6 +279,189 @@ Test.it('project change fires at min 0, held back inside the min window', functi
 end)
 
 ----------------------------------------------------------------------
+Test.section('GenerateKeyframesForSpan ([first] on the lighting event)')
+----------------------------------------------------------------------
+-- start_ppq is always the manual lighting event's own tick, so [first] belongs
+-- there. Align modes only decide where the first [next] lands. Modes 0 and 1 are
+-- pure tick arithmetic - no take needed (only mode 2 and the instrument modes
+-- consult the tempo map / instrument tracks).
+
+local KF_PPQ = 960  -- ticks per quarter note
+
+-- Run one span with the given align mode, restoring the shared setting after.
+local function KfSpan(align, start_ppq, end_ppq, rate_beats)
+    local saved = S.venue_keyframe_align
+    S.venue_keyframe_align = align
+    local ok, res = pcall(GenerateKeyframesForSpan, nil, start_ppq, end_ppq, KF_PPQ, rate_beats)
+    S.venue_keyframe_align = saved
+    if not ok then error(res, 2) end
+    return res
+end
+
+-- Positions of every event carrying `text`, in emission order.
+local function KfPositions(events, text)
+    local out = {}
+    for _, ev in ipairs(events) do
+        if ev.text == text then out[#out + 1] = ev.ppq end
+    end
+    return out
+end
+
+Test.it('exactly one [first], always on start_ppq, always the earliest event', function()
+    for _, align in ipairs({ 0, 1 }) do
+        for _, start_ppq in ipairs({ 0, 700, 960, 2 * KF_PPQ }) do
+            local evs   = KfSpan(align, start_ppq, start_ppq + 16 * KF_PPQ, 2)
+            local firsts = KfPositions(evs, '[first]')
+            Test.expect(#firsts == 1,
+                ('align %d, start %d: expected 1 [first], got %d'):format(align, start_ppq, #firsts))
+            Test.expect(firsts[1] == start_ppq,
+                ('align %d: [first] at %d, expected the lighting event tick %d')
+                    :format(align, firsts[1], start_ppq))
+            Test.expect(evs[1].text == '[first]', 'the [first] must be emitted before any [next]')
+            for _, p in ipairs(KfPositions(evs, '[next]')) do
+                Test.expect(p > start_ppq,
+                    ('align %d: a [next] landed at %d, on or before [first]'):format(align, p))
+            end
+        end
+    end
+end)
+
+Test.it('Keyframe rate only: no keyframe at the anchor, first [next] one rate on', function()
+    -- Off-beat start: the [next] grid still anchors to the nearest beat (0 here).
+    local evs   = KfSpan(0, 240, 16 * KF_PPQ, 2)
+    local nexts = KfPositions(evs, '[next]')
+    Test.expect(nexts[1] == 2 * KF_PPQ,
+        ('expected the first [next] at %d (beat anchor + 2 beats), got %s')
+            :format(2 * KF_PPQ, tostring(nexts[1])))
+    Test.expect(nexts[2] == 4 * KF_PPQ, 'the [next] train continues at the keyframe rate')
+end)
+
+Test.it('Closest beat: the snapped beat is now a [next], not the [first]', function()
+    -- start 700 -> nearest beat is 960, forward of the lighting event.
+    local evs   = KfSpan(1, 700, 16 * KF_PPQ, 2)
+    local nexts = KfPositions(evs, '[next]')
+    Test.expect(KfPositions(evs, '[first]')[1] == 700,
+        '[first] must stay on the lighting event, not move to the snapped beat')
+    Test.expect(nexts[1] == KF_PPQ,
+        ('expected a [next] on the snapped beat %d, got %s'):format(KF_PPQ, tostring(nexts[1])))
+    Test.expect(nexts[2] == 3 * KF_PPQ,
+        'the train continues one rate past the beat anchor')
+end)
+
+Test.it('Closest beat: a beat-aligned lighting event gets no duplicate at its own tick', function()
+    local evs = KfSpan(1, KF_PPQ, 16 * KF_PPQ, 2)
+    local at_start = 0
+    for _, ev in ipairs(evs) do
+        if ev.ppq == KF_PPQ then at_start = at_start + 1 end
+    end
+    Test.expect(at_start == 1,
+        ('expected exactly 1 event on the lighting tick, got %d'):format(at_start))
+    Test.expect(KfPositions(evs, '[next]')[1] == 3 * KF_PPQ,
+        'first [next] one rate past the beat anchor')
+end)
+
+Test.it('a span too short for any keyframe yields nothing', function()
+    Test.expect(#KfSpan(0, 5 * KF_PPQ, 5 * KF_PPQ, 2) == 0, 'zero-length span')
+end)
+
+----------------------------------------------------------------------
+Test.section('GenerateThemedSectionEvents ([first] follows the blend-in)')
+----------------------------------------------------------------------
+-- Themes gen and Section gen both route through this. The lighting event is
+-- placed lightpreset_blendin beats BEFORE the section start; [first] has to
+-- follow it there, leaving the section start to carry the first [next].
+
+do
+    -- Theme pinned to one manual lightpreset so the random pick is deterministic.
+    local function ThemeWithBlendin(blendin, kf_rate)
+        return { section_presets = { default = {
+            allowed_lightpresets = { 'stomp' },
+            lightpreset_blendin  = blendin,
+            keyframe_rate        = kf_rate,
+        } } }
+    end
+
+    -- Runs one section through the generator on a throwaway MIDI take, returning
+    -- lt_events, ctrl_events and the absolute PPQ of the section start.
+    local function RunThemedSection(align, blendin, kf_rate)
+        local idx   = CreateEmptyFixtureTrack('KF THEME TEST')
+        local item  = r.CreateNewMIDIItemInProj(r.GetTrack(0, idx), 0, 60, false)
+        local take  = r.GetActiveTake(item)
+        local saved = S.venue_keyframe_align
+        S.venue_keyframe_align = align
+        local ok, res = pcall(function()
+            local ppq        = GetTakePPQPerQN(take)
+            local sec        = { name = 'verse', num = nil,
+                                 t_start = r.TimeMap_QNToTime(8), t_end = r.TimeMap_QNToTime(24) }
+            local range_s    = 0
+            local range_e    = r.MIDI_GetPPQPosFromProjTime(take, r.TimeMap_QNToTime(32))
+            local lt, ctrl   = GenerateThemedSectionEvents(
+                { sec }, ThemeWithBlendin(blendin, kf_rate), take, range_s, range_e, ppq)
+            return { lt = lt, ctrl = ctrl, ppq = ppq, range_s = range_s,
+                     sec_ppq = r.MIDI_GetPPQPosFromProjTime(take, sec.t_start) }
+        end)
+        S.venue_keyframe_align = saved
+        CleanupFixture(idx)
+        if not ok then error(res, 2) end
+        return res
+    end
+
+    Test.it('[first] lands on the lighting event tick, not the section start', function()
+        local g = RunThemedSection(0, 2, 2)   -- 2-beat blend-in
+        Test.expect(#g.lt == 1, 'expected one lighting event, got ' .. #g.lt)
+        local lt_abs    = g.range_s + g.lt[1].tick
+        local first_abs = nil
+        for _, ev in ipairs(g.ctrl) do
+            if ev.text == '[first]' then
+                Test.expect(first_abs == nil, 'more than one [first] emitted')
+                first_abs = g.range_s + ev.tick
+            end
+        end
+        Test.expect(first_abs ~= nil, 'no [first] emitted for a manual lightpreset')
+        -- The callers half-beat-snap lighting events and insert keyframes unsnapped,
+        -- so this is the equality that decides whether they share a tick on the track.
+        Test.expect(SnapPpqToHalfBeat(lt_abs, g.ppq) == first_abs,
+            ('[first] at %d does not land on the snapped lighting event at %d')
+                :format(first_abs, SnapPpqToHalfBeat(lt_abs, g.ppq)))
+        Test.expect(first_abs < g.sec_ppq,
+            '[first] should have moved back to the blend-in position')
+    end)
+
+    Test.it('the section start now carries the first [next]', function()
+        local g = RunThemedSection(0, 2, 2)
+        local at_sec = nil
+        for _, ev in ipairs(g.ctrl) do
+            if g.range_s + ev.tick == g.sec_ppq then at_sec = ev.text end
+        end
+        Test.expect(at_sec == '[next]',
+            'expected [next] at the section start, got ' .. tostring(at_sec))
+    end)
+
+    Test.it('zero blend-in: [first] on the section start, no duplicate event there', function()
+        local g = RunThemedSection(0, 0, 2)
+        local at_sec = {}
+        for _, ev in ipairs(g.ctrl) do
+            if g.range_s + ev.tick == g.sec_ppq then at_sec[#at_sec + 1] = ev.text end
+        end
+        Test.expect(#at_sec == 1 and at_sec[1] == '[first]',
+            'expected exactly one [first] at the section start, got ' ..
+            table.concat(at_sec, ','))
+    end)
+
+    Test.it('instrument modes: [first] moves, but the section start gets no [next]', function()
+        local g = RunThemedSection(3, 2, 2)   -- 3 = Guitar notes
+        local first_abs
+        for _, ev in ipairs(g.ctrl) do
+            if ev.text == '[first]' then first_abs = g.range_s + ev.tick end
+            Test.expect(not (ev.text == '[next]' and g.range_s + ev.tick == g.sec_ppq),
+                'instrument modes must not emit a [next] at the (note-less) section start')
+        end
+        Test.expect(first_abs ~= nil and first_abs < g.sec_ppq,
+            '[first] should still follow the lighting event back to the blend-in position')
+    end)
+end
+
+----------------------------------------------------------------------
 Test.section('EVENTS track integration')
 ----------------------------------------------------------------------
 

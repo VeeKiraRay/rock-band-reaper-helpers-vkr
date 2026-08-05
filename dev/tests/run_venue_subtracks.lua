@@ -32,6 +32,7 @@ dofile(_tdir .. 'framework.lua')
 dofile(_tdir .. 'fixture_helpers.lua')
 dofile(_gdir .. 'defaults.lua')                   -- S
 dofile(_gdir .. 'helpers.lua')                    -- FindTrackByName, FindNamedTrackMIDI, GetTakePPQPerQN
+dofile(_gdir .. 'venue_lighting.lua')             -- MANUAL_LIGHTING_SET (FindManualLightingAtPpq)
 dofile(_gdir .. 'venue_generator.lua')            -- DeleteTextEventsInRange, ClearVenueTextEventsInRange
 dofile(_gdir .. 'actions_venue_subtracks.lua')    -- code under test
 dofile(_gdir .. 'actions_venue_manual.lua')       -- RemoveVenueEventsByType regression

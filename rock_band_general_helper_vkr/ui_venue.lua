@@ -73,11 +73,7 @@ end
 
 -- col_offset: if set, use SameLine(col_offset) to align the dropdown with other rows.
 function RenderKeyframeAlignCombo(col_offset)
-    local _kfa_labels = {
-        'Section start', 'Closest beat', 'Downbeat',
-        'Guitar notes', 'Bass notes', 'Keys notes',
-        'Drum kicks', 'Drum snare',
-    }
+    local _kfa_labels = KF_ALIGN_LABELS  -- shared with Manual gen (venue_lighting.lua)
     r.ImGui_Text(ctx, 'Keyframe align')
     if col_offset then
         r.ImGui_SameLine(ctx, col_offset)
@@ -85,7 +81,7 @@ function RenderKeyframeAlignCombo(col_offset)
         r.ImGui_SameLine(ctx)
     end
     r.ImGui_SetNextItemWidth(ctx, 170)
-    local _kfa_preview = _kfa_labels[S.venue_keyframe_align + 1] or 'Section start'
+    local _kfa_preview = _kfa_labels[S.venue_keyframe_align + 1] or _kfa_labels[1]
     if r.ImGui_BeginCombo(ctx, '##vkfa', _kfa_preview) then
         for _ki, _kl in ipairs(_kfa_labels) do
             local _ksel = (_ki - 1 == S.venue_keyframe_align)

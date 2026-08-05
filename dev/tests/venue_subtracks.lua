@@ -473,4 +473,56 @@ else
         if not ok then error(err, 2) end
     end)
 
+    ------------------------------------------------------------------
+    Test.section('FindManualLightingAtPpq / [first] gating (actions_venue_manual.lua)')
+    ------------------------------------------------------------------
+
+    Test.it('matches only a MANUAL lighting event, on or within tolerance of the tick', function()
+        WithVenueFixture(function(_, _, take)
+            local ppq = GetTakePPQPerQN(take)
+            InsertEvt(take, 1, '[lighting (stomp)]')       -- manual
+            InsertEvt(take, 3, '[lighting (loop_warm)]')   -- auto: needs no keyframes
+            InsertEvt(take, 5, '[coop_all_far]')
+            local p = function(t) return r.MIDI_GetPPQPosFromProjTime(take, t) end
+
+            Test.expect(FindManualLightingAtPpq(take, p(1)) == '[lighting (stomp)]',
+                'exact tick should match the manual lighting event')
+            Test.expect(FindManualLightingAtPpq(take, p(1) + math.floor(ppq / 64)) ~= nil,
+                'a tick inside the tolerance window should still match')
+            Test.expect(FindManualLightingAtPpq(take, p(1) + ppq) == nil,
+                'a whole beat away is outside the tolerance window')
+            Test.expect(FindManualLightingAtPpq(take, p(3)) == nil,
+                'an auto lighting preset drives no keyframes and must not match')
+            Test.expect(FindManualLightingAtPpq(take, p(5)) == nil, 'camera event must not match')
+            Test.expect(FindManualLightingAtPpq(take, p(8)) == nil, 'empty spot must not match')
+        end, 10)
+    end)
+
+    Test.it('InsertVenueEventAtPlayhead refuses a [first] with no lighting event under it', function()
+        WithVenueFixture(function(_, _, take)
+            local cur0 = r.GetCursorPosition()
+            local ok, err = pcall(function()
+                InsertEvt(take, 1, '[lighting (stomp)]')
+
+                r.SetEditCurPos(8, false, false)          -- bare spot
+                S.status = 'Ready.'
+                InsertVenueEventAtPlayhead('[first]')
+                Test.expect(#ReadMsgs(take) == 1, 'nothing should have been inserted')
+                Test.expect(S.status == NO_LIGHTING_AT_PLAYHEAD_MSG,
+                    'expected the shared refusal message, got: ' .. tostring(S.status))
+
+                r.SetEditCurPos(1, false, false)          -- on the lighting event
+                InsertVenueEventAtPlayhead('[first]')
+                Test.expect(#ReadMsgs(take) == 2, '[first] should be allowed on the lighting tick')
+
+                -- Other special events are never gated by this rule.
+                r.SetEditCurPos(8, false, false)
+                InsertVenueEventAtPlayhead('[next]')
+                Test.expect(#ReadMsgs(take) == 3, '[next] must remain insertable anywhere')
+            end)
+            r.SetEditCurPos(cur0, false, false)
+            if not ok then error(err, 2) end
+        end, 10)
+    end)
+
 end

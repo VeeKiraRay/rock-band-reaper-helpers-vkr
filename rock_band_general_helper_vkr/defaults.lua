@@ -317,10 +317,15 @@ TIPS = {
                       "Replaces all existing text events in the generation range.\n\n" ..
                       "Respects time selection: if a range is selected, only that range is\n" ..
                       "regenerated and events outside it are preserved.",
-    venue_keyframe_align = "Where the [first]/[next] keyframe sequence for manual lighting begins.\n\n" ..
-                           "Section start: exactly at the [prc_*] section event (default).\n" ..
-                           "Closest beat:  snapped to the nearest beat boundary.\n" ..
-                           "Downbeat:      [first] at section start; [next] from the next measure boundary.\n\n" ..
+    venue_keyframe_align = "Where the FIRST [next] of a manual lighting keyframe sequence lands.\n\n" ..
+                           "[first] is not affected: it always sits on the manual lighting event's\n" ..
+                           "own tick - it is that event's initial keyframe.\n\n" ..
+                           "Keyframe rate only: first [next] one keyframe rate after the closest beat\n" ..
+                           "                    (no extra keyframe at the section start).\n" ..
+                           "Closest beat:       first [next] on the beat closest to the section start,\n" ..
+                           "                    then every keyframe rate.\n" ..
+                           "Downbeat:           first [next] on the next measure boundary,\n" ..
+                           "                    then every keyframe rate.\n\n" ..
                            "Instrument modes ignore the theme's keyframe_rate and emit [next]\n" ..
                            "only at subdivision grid points (beat/half-beat/quarter-beat) where notes actually exist:\n" ..
                            "  Guitar notes - reads PART GUITAR (pitches 96-100)\n" ..
@@ -328,6 +333,14 @@ TIPS = {
                            "  Keys notes   - reads PART KEYS   (pitches 96-100)\n" ..
                            "  Drum kicks   - reads PART DRUMS  (pitch 96 only)\n" ..
                            "  Drum snare   - reads PART DRUMS  (pitch 97 only)",
+
+    venue_mg_kf_add = "Generate [first]/[next] keyframe events from the playhead to the next\n" ..
+                      "lighting event, the time selection end (if active), or the VENUE item end.\n\n" ..
+                      "[first] goes on the playhead, which must be the tick of a manual lighting\n" ..
+                      "event ([lighting (verse|chorus|manual_cool|manual_warm|dischord|stomp)]) -\n" ..
+                      "the whole row is blocked anywhere else.\n\n" ..
+                      "Clears any existing [first]/[next]/[previous] events in that range first.\n" ..
+                      "Fully undoable.",
 
     venue_kf_inst_subdiv = "Subdivision grid for instrument-aware keyframe alignment.\n\n" ..
                            "Every beat:         check each beat boundary (max 4 [next] per measure in 4/4).\n" ..
@@ -386,13 +399,17 @@ TIPS = {
                          "keyframes. Leave blank to skip lighting for this section.",
     venue_sec_postproc = "Post-process effect (.pp file) for this section.\n\n" ..
                          "Leave blank to skip.",
-    venue_sec_kr       = "Keyframe rate in beats: how often [first]/[next] events are placed.\n\n" ..
+    venue_sec_kr       = "Keyframe rate in beats: how often [next] events are placed.\n\n" ..
+                         "Does not affect [first], which always sits on the lighting event's\n" ..
+                         "own tick. Keyframe align decides where the first [next] lands.\n\n" ..
                          "Only used when the chosen lighting preset is a manual type\n" ..
                          "(verse, chorus, manual_cool, manual_warm, dischord, stomp).\n\n" ..
                          "Ctrl+click to type an exact value.",
     venue_sec_lt_blend = "Place the lighting event this many beats BEFORE the section start.\n\n" ..
                          "Useful for smooth lighting transitions into the section.\n" ..
                          "Clamped to the item start if it would reach before the beginning.\n\n" ..
+                         "[first] follows the lighting event to this position; the section start\n" ..
+                         "then carries the first [next] instead.\n\n" ..
                          "Ctrl+click to type an exact value.",
     venue_sec_pp_blend = "Place the post-process event this many beats BEFORE the section start.\n\n" ..
                          "Clamped to the item start if it would reach before the beginning.\n\n" ..
@@ -407,6 +424,8 @@ TIPS = {
                           "(manual_cool), (manual_warm), (dischord), (stomp)) already on the\n" ..
                           "VENUE track and regenerate its [first]/[next] keyframes, running from\n" ..
                           "that lighting event to the next lighting event of any kind.\n\n" ..
+                          "[first] is placed on the lighting event's own tick; Keyframe align\n" ..
+                          "decides where the first [next] lands.\n\n" ..
                           "Only [first]/[next]/[previous] events are cleared and replaced -\n" ..
                           "camera, lighting, post-process, and bonus FX are untouched.\n\n" ..
                           "Respects an active time selection (only lighting events inside the\n" ..

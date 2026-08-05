@@ -318,14 +318,14 @@ function GenerateVenueEvents()
     ClearVenueTextEventsInRange(take, range_start_ppq, range_end_ppq)
 
     local count     = 0
-    local half_beat = math.floor(ppq / 2 + 0.5)  -- ticks per half-beat (snap grid)
     -- no_snap: skip snapping - keyframe ctrl_events from GenerateThemedSectionEvents are
     -- already placed on their own alignment grid (possibly finer than half-beat, e.g.
     -- quarter-beat instrument-aware modes); re-snapping would collapse those positions
-    -- onto the nearest half-beat/beat.
+    -- onto the nearest half-beat/beat. A [first] carrying a lighting event's tick is
+    -- pre-snapped by SnapPpqToHalfBeat there so it still lands on that event exactly.
     local function insert_text(tick_offset, text, no_snap)
         local abs_ppq = range_start_ppq + tick_offset
-        local snapped = no_snap and abs_ppq or (math.floor(abs_ppq / half_beat + 0.5) * half_beat)
+        local snapped = no_snap and abs_ppq or SnapPpqToHalfBeat(abs_ppq, ppq)
         r.MIDI_InsertTextSysexEvt(take, false, false, snapped, 1, text)
         count = count + 1
     end

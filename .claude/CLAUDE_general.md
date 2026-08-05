@@ -173,7 +173,7 @@ Every Validate action (all four sub-tabs, H/M/E only — never Expert) also runs
 *Themes gen sub-tab* — whole-song generation driven by a `.rbtheme` file.
 - **Theme combo** — select a `.rbtheme` file from the `resources/themes/` folder (themes are not shipped with the project; add `.rbtheme` files to enable). Shows `(select a theme)` when none loaded; Generate button is disabled until a theme is chosen. If the `resources/themes/` folder is empty a warning is displayed and all inputs are disabled.
 - **Camera pacing** — override the theme's camera cut rate, or keep Theme default.
-- **Keyframe align** — global alignment mode for `[first]`/`[next]` keyframe events across all sections.
+- **Keyframe align** — global alignment mode for keyframe events across all sections. See "Keyframe placement rule" below: it decides where the first `[next]` lands, never where `[first]` goes.
 - **Generate venue events** — generates camera cuts, lighting changes, manual lighting control keyframes, and postproc effects on the VENUE track. Filters camera pools based on which PART instrument tracks are present and unmuted. Respects time selection (partial regeneration). Fully undoable.
 
 *Section gen sub-tab* — per-section manual configuration.
@@ -186,18 +186,30 @@ Every Validate action (all four sub-tabs, H/M/E only — never Expert) also runs
 *Manual gen sub-tab* — shot-by-shot event insertion at the playhead.
 - **Normal camera** — pick any `[coop_*]` shot; **Add** inserts it at the edit cursor.
 - **Directed camera** — pick any `[directed_*]` shot including BRE events; **Add** inserts it.
-- **Lighting** — pick any lighting preset; **Add** inserts `[lighting (name)]`. When a manual preset is selected, shows Keyframe align (with an **Add** button next to it that generates keyframes) + Subdivision (own row, instrument-aware modes only) + Keyframe rate controls.
+- **Lighting** — pick any lighting preset; **Add** inserts `[lighting (name)]`.
+- **Keyframe align** (with an **Add** button next to it that generates keyframes) + Subdivision (own row, instrument-aware modes only) + Keyframe rate. The whole row is enabled only when the playhead sits on a manual lighting event — see "`[first]` gating" below.
 - **Post proc** — pick any `[*.pp]` effect; **Add** inserts it.
-- **Special** — `[bonusfx]`, `[bonusfx_optional]`, `[first]`, `[next]`, `[previous]`; **Add** inserts the chosen event.
+- **Special** — `[bonusfx]`, `[bonusfx_optional]`, `[first]`, `[next]`, `[previous]`; **Add** inserts the chosen event. `[first]` is gated (below); the others are insertable anywhere.
 - **Camera pacing** — shared camera pacing override (same state as other gen tabs).
 - **Advance camera pacing** — moves the edit cursor forward by one jittered camera interval.
-- Keyframe align's **Add** button generates `[first]`/`[next]` from cursor to the next lighting event / time selection end / VENUE item end. Clears existing keyframe events in the range first. Only available when a manual lighting preset is selected. Fully undoable.
+- Keyframe align's **Add** button generates `[first]`/`[next]` from cursor to the next lighting event / time selection end / VENUE item end (delegating to the shared `GenerateKeyframesForSpan`). Clears existing keyframe events in the range first. Fully undoable.
+- **`[first]` gating** — a `[first]` only means something on a manual lighting event's own tick, so both the Special row's `[first]` and the entire keyframe row require one at the playhead (`FindManualLightingAtPpq`, tolerance ~1/128 note). Blocked state shows a `(blocked)` marker whose hover carries the shared `NO_LIGHTING_AT_PLAYHEAD_MSG`, the same string the refused action puts in `S.status` — the "(blocked)" affordance the Events tab already used. The gate reads the event **under the playhead**, not the Lighting dropdown, so an existing `[lighting (stomp)]` can be re-keyframed without re-picking it. The UI caches the manual lighting positions behind a `MakeProjectPoll` (as in `ui_venue_events.lua`) and only compares the playhead against that short list per frame — the cursor moves constantly while the event list doesn't, and a finished VENUE track carries thousands of text events. Both actions re-check the take for themselves, and a refusal returns before any `Undo_*` call so it leaves no undo point.
+  - Since the keyframe row is disabled in the blocked state and a disabled ImGui widget reports no hover, the `(blocked)` label is drawn in a brief `EndDisabled`/`BeginDisabled` gap so its tooltip is reachable.
 - **Remove** — category dropdown (Camera / Lighting / Post proc / Special) + **Remove** button; removes matching events from time selection (if active) or full song. Fully undoable.
 
 *Keyframes sub-tab* — bulk regeneration of `[first]`/`[next]` keyframes for every manual lighting event already on the VENUE track.
 - **Keyframe align** + subdivision (when an instrument-aware mode is selected) — shared global state, same as the other gen tabs.
 - **Keyframe rate** — this tab's own value (`S.venue_kf_rate`), independent of Manual gen's rate.
 - **Regenerate keyframes** — scans the VENUE track for `[lighting (...)]` events that are manual (`verse`, `chorus`, `manual_cool`, `manual_warm`, `dischord`, `stomp`); for each one inside the processing range, clears and regenerates its `[first]`/`[next]`/`[previous]` events running from that lighting event to the next lighting event of any kind. Camera, lighting, postproc, and bonus FX are never touched. Respects time selection (only lighting events whose own position is inside the selection are regenerated — a section already in progress from before the selection is left untouched); otherwise processes the whole song. Fully undoable.
+
+**Keyframe placement rule** (all four generating tabs — Themes gen, Section gen, Keyframes, Manual gen):
+
+- **`[first]` always shares its manual lighting event's tick.** It is that event's own initial keyframe. Nothing moves it — not the align mode, not the blend-in.
+- **Align modes decide only where the first `[next]` lands.** Mode 0 `Keyframe rate only` (one rate past the closest beat, nothing at the anchor), 1 `Closest beat`, 2 `Downbeat`, 3–7 instrument-note-driven. Labels live in one shared `KF_ALIGN_LABELS` (`venue_lighting.lua`); mode indices are the persisted `S.venue_keyframe_align` values, so never renumber them.
+- **The position that used to carry `[first]` becomes the first `[next]`** — the section start under a blend-in (Themes/Section gen), or the snapped beat in "Closest beat" mode. The rest of the `[next]` train keeps its old positions; this is a relabel plus one added event, never a re-timed grid. Skipped when that position already *is* the lighting tick (zero blend-in), so no duplicate lands there.
+- **Instrument-aware modes (3–7) are the exception**: no `[next]` at the section start, because every `[next]` in those modes must be backed by a real note.
+- **Snapping trap:** `venue_generator.lua`'s `insert_text` and `actions_venue_section.lua`'s `insert_snapped` half-beat-snap lighting events but insert keyframes unsnapped (`no_snap = true`, so finer instrument-aware positions survive). A `[first]` meant to share a lighting event's tick must therefore be pre-snapped with the shared `SnapPpqToHalfBeat` (`venue_lighting.lua`) — `ProcessThemeSection` does this. Emitting it at the raw position lands it a few ticks off the event it belongs to.
+- `GenerateManualKeyframes` (Manual gen) calls `GenerateKeyframesForSpan` rather than duplicating it — the two were verbatim copies before v0.9.42. `GenerateKeyframesForSpan` assumes its `start_ppq` **is** a lighting event's tick; both callers guarantee that (the Keyframes tab walks lighting events, Manual gen gates on the playhead).
 
 ---
 
@@ -214,7 +226,7 @@ Every Validate action (all four sub-tabs, H/M/E only — never Expert) also runs
 | `rock_band_general_helper_vkr/venue_themes.lua` | `ThemeDisplayLabel`, `LoadVenueThemes`, `GetSectionPreset`, `GetThemeCameraInterval`, `BuildLightingPool`, `BuildPostprocPool` (global); `POSTPROC_VALID_SET`, `LIGHTING_VALID_SET`, `CAMERA_PACING`, `Tokenize`, `ParseSexpr`, `ParseThemeFile`, `InterpretSectionPreset`, `InterpretTheme` (local) |
 | `rock_band_general_helper_vkr/venue_camera.lua` | `COOP_POOL`, `DIRECTED_POOL`, `PickRandom`, `JitteredInterval`, `CategorizeCoopPool`, `WeightedPickCoopEvent`, `FindCompanion`, `ComputeIdleState`, `GenerateCameraEvents`, `ResolveUserCamInterval` (global); camera constants (`CAM_INTERVAL_16THS` etc., partially global); `WeightedPickInstrument` (local) |
 | `rock_band_general_helper_vkr/venue_sprites.lua` | `LoadVenueSprite`, `DrawVenueTooltipSprite`, `BeginVenueTooltip`, `EndVenueTooltip`, `VenueSpriteFoldersFound` (global); `DIRECTED_SPRITE_NAMES`, `VENUE_SPRITE_ROOT` (module-level globals). JPEG-only. Checks `resources/img/spritesheets/{category}/` (large) then `resources/img/spritesheets/{category} small/` (small) — no third-party fallback. Frame count is read from the filename (`{key}_f{N}_spritesheet.jpg`). Display size scales by `S.venue_preview_scale` (1 or 2). Cache stores `{image, frame_count, cols, rows}` per sprite. |
-| `rock_band_general_helper_vkr/venue_lighting.lua` | `MANUAL_LIGHTING_SET`, `LIGHTING_OFFSET_16THS`, `INST_KF_MODES`, `FindNextMeasureStartPpq`, `CollectInstNotePositions`, `GenerateKeyframesForSpan`, `GenerateLightingEvents`, `GenerateThemedSectionEvents` (global); `MANUAL_LIGHTING_POOL`, `AUTO_LIGHTING_POOL`, lighting constants, `SnapPpqToNearestBeat`, `ProcessThemeSection` (local) |
+| `rock_band_general_helper_vkr/venue_lighting.lua` | `MANUAL_LIGHTING_SET`, `LIGHTING_OFFSET_16THS`, `INST_KF_MODES`, `KF_ALIGN_LABELS`, `FindNextMeasureStartPpq`, `CollectInstNotePositions`, `GenerateKeyframesForSpan`, `GenerateLightingEvents`, `GenerateThemedSectionEvents`, `SnapPpqToHalfBeat` (global); `MANUAL_LIGHTING_POOL`, `AUTO_LIGHTING_POOL`, lighting constants, `SnapPpqToNearestBeat`, `ProcessThemeSection` (local) |
 | `rock_band_general_helper_vkr/venue_generator.lua` | `GenerateVenueEvents`, `DeleteTextEventsInRange` (predicate-driven deleter backing all clear functions), `ClearVenueTextEventsInRange`, `ClearVenueNonCameraEventsInRange`, `ClearVenueExceptLPInRange`, `ClearVenueKeyframesInRange` (global) |
 | `rock_band_general_helper_vkr/workflow.lua` | `ParseWorkflowContent`, `ParseWorkflowFile`, `LoadWorkflowFiles`, `EscapeWF`, `UnescapeWF` (global); `FindBraceGroups`, `StripBraceGroups` (local) — Workflow sub-tab's `.txt` template parser (pure over string content) + `resources/workflow/` folder scanner |
 | `rock_band_general_helper_vkr/actions_workflow.lua` | `CompositeKey`, `PruneToWorkflowEntries`, `SaveWorkflowState`, `LoadWorkflowState`, `SelectWorkflowFile`, `ToggleWorkflowItem`, `ComputeWorkflowStats` (global) — Workflow checklist state, persistence (`workflow_v1` ExtState key), template-switch pruning, and the pure progress-count helper |
@@ -326,7 +338,8 @@ venue_sprites.lua              → LoadVenueSprite, DrawVenueTooltipSprite, Begi
                                   EndVenueTooltip; VENUE_SPRITE_ROOT, VENUE_SPRITE_SELF_ROOT,
                                   DIRECTED_SPRITE_NAMES, POSTPROC_SPRITE_NAMES (module globals)
 venue_lighting.lua             → MANUAL_LIGHTING_SET, LIGHTING_OFFSET_16THS, INST_KF_MODES,
-                                  FindNextMeasureStartPpq, CollectInstNotePositions,
+                                  KF_ALIGN_LABELS, FindNextMeasureStartPpq,
+                                  CollectInstNotePositions, SnapPpqToHalfBeat,
                                   GenerateKeyframesForSpan, GenerateLightingEvents,
                                   GenerateThemedSectionEvents
 venue_generator.lua            → GenerateVenueEvents, DeleteTextEventsInRange, ClearVenueTextEventsInRange,
@@ -360,7 +373,9 @@ actions_difficulty_5k.lua      → ValidateKeys5Diff, ValidateAllKeys5, CopyKeys
 actions_difficulty_gtrbass.lua → CopyGtrBassDiff, ValidateGtrBassDiff, ValidateAllGtrBass
 actions_difficulty_drums.lua   → CopyDrumsDiff, ValidateDrumsDiff, ValidateAllDrums
 actions_venue_manual.lua       → InsertVenueEventAtPlayhead, AdvanceCameraPacing,
-                                  GenerateManualKeyframes, RemoveVenueEventsByType
+                                  GenerateManualKeyframes, RemoveVenueEventsByType,
+                                  FindManualLightingAtPpq, FindNextVocalPhraseStartPpq,
+                                  NO_LIGHTING_AT_PLAYHEAD_MSG
 actions_venue_events.lua       → FindEventsTake, ScanEventsTextEvents, NextSectionEvent,
                                   ValidatePlainInsert, InsertEventsEvent, AddSectionEvent,
                                   ClearAllEventsTexts, InsertEventsBookends
@@ -655,7 +670,7 @@ Camera events that require an unavailable instrument are removed from the pool b
 4. **Camera cuts (directed)** — 1–4 cuts placed at random positions in the middle 80% of the camera end bound, each followed by a 2× cooldown before the next coop cut.
 5. **Final coop cut** — placed 8 sixteenths before the camera end bound.
 6. **Lighting changes** — placed from 32 sixteenths in, at jittered intervals, up to the range end. Each picks from the combined manual + auto pool.
-7. **Control keyframes (`[first]`/`[next]`)** — generated only for manual lighting events. `[first]` at the lighting event position, then `[next]` every 1–4 beats until the next lighting change.
+7. **Control keyframes (`[first]`/`[next]`)** — generated only for manual lighting events. `[first]` on the lighting event's own tick, then `[next]` every 1–4 beats until the next lighting change (see "Keyframe placement rule" above).
 8. **Bookend: `[lighting (blackout_spot)]`** — placed at the final anchor when one is resolved, else 32 sixteenths (2 measures) before the range end.
 
 ### Song-start bookends and the music-start anchor
