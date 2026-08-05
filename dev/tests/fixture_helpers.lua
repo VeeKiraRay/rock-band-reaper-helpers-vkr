@@ -54,6 +54,12 @@ end
 
 -- Import a MIDI file from _FIXTURE_DIR. Returns (first_abs_idx, n_tracks_added).
 -- Deselects all tracks first so REAPER creates new tracks for each MIDI track.
+--
+-- Fixture caveat: these files are truncated excerpts of real charts, so most of
+-- them end with note-ons that have no matching note-off (verifiable with any
+-- MIDI parser). REAPER imports each of those as a note whose end sits at ppq 0
+-- -- an end *before* its start. Any test that asserts on note lengths, or on
+-- what a copy/transform did to a note's end, must skip notes where e <= s.
 function LoadFixture(filename)
     local path = _FIXTURE_DIR .. filename
     local n_before = r.CountTracks(0)

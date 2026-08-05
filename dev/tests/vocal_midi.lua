@@ -293,20 +293,52 @@ Test.it('HarmoniesAction: preserve mode keeps destination pitches, takes source 
     local got = ReadVocalNotes(dst1_idx)
     CleanupFixture(base)
 
-    Test.expect(not S.status:find('^Error'), 'HarmoniesAction errored: ' .. S.status)
+    -- ResolvePreservedPitches bails with 'Range error on Destination N.', which
+    -- does not start with 'Error' - check both, or an early bail-out shows up
+    -- as a confusing pitch/timing failure instead of the abort it really is.
+    Test.expect(not (S.status:find('^Error') or S.status:find('error')),
+        'HarmoniesAction errored: ' .. S.status .. ' / ' .. tostring(S.last_result))
     Test.expect(got and #got == #src_notes,
         ('HARM1 should have %d notes, has %s'):format(#src_notes, got and #got or 'nil'))
 
-    local pitch_ok, time_ok = true, true
+    -- Report the first offender with its numbers - a bare true/false here says
+    -- nothing about whether a failure is tick quantisation or a real shift.
+    --
+    -- Note ends are compared only where the source note has one. The fixtures
+    -- are truncated excerpts of real charts, so their last few note-ons have no
+    -- matching note-off (rb_vocal_and_harm.mid: pitch 105 at tick 22680 and the
+    -- final vocal note at 22864, on every track; most other fixtures are the
+    -- same). REAPER imports such a note with its end at ppq 0 - i.e. an end
+    -- *before* its start - and MIDI_InsertNote clamps that to a minimum-length
+    -- note on the way out, so the copy legitimately does not reproduce a
+    -- nonsense end. Starts are still checked for every note.
+    local pitch_bad, time_bad, max_dt, ends_checked = nil, nil, 0, 0
     for i = 1, #src_notes do
-        if not got[i] or got[i].pitch ~= expected[i] then pitch_ok = false end
-        if not got[i] or math.abs(got[i].s - src_notes[i].s) > 0.002
-                      or math.abs(got[i].e - src_notes[i].e) > 0.002 then
-            time_ok = false
+        local g, sn = got[i], src_notes[i]
+        if not g then
+            pitch_bad = pitch_bad or ('note %d missing'):format(i)
+            break
+        end
+        if not pitch_bad and g.pitch ~= expected[i] then
+            pitch_bad = ('note %d: got pitch %d, expected %d'):format(i, g.pitch, expected[i])
+        end
+        local ds  = g.s - sn.s
+        local de  = sn.e > sn.s and (g.e - sn.e) or 0
+        if sn.e > sn.s then ends_checked = ends_checked + 1 end
+        max_dt = math.max(max_dt, math.abs(ds), math.abs(de))
+        if not time_bad and (math.abs(ds) > 0.002 or math.abs(de) > 0.002) then
+            time_bad = ('note %d: start %+.4fs / end %+.4fs off source '
+                .. '(got %.4f-%.4f, source %.4f-%.4f)')
+                :format(i, ds, de, g.s, g.e, sn.s, sn.e)
         end
     end
-    Test.expect(pitch_ok, 'HARM1 kept its own pitches')
-    Test.expect(time_ok,  'HARM1 note starts/ends match the source')
+    Test.expect(not pitch_bad, 'HARM1 kept its own pitches - ' .. tostring(pitch_bad))
+    Test.expect(not time_bad,
+        ('HARM1 note starts/ends match the source - %s (max delta %.4fs over %d notes)')
+        :format(tostring(time_bad), max_dt, #src_notes))
+    Test.expect(ends_checked >= #src_notes - 1,
+        ('only %d of %d source notes had a usable end - fixture more truncated than expected')
+        :format(ends_checked, #src_notes))
     Test.expect(S.last_result and S.last_result:find('Existing pitches applied', 1, true),
         'result panel reports the preserve breakdown')
 end)
