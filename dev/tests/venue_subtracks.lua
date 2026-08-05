@@ -22,6 +22,61 @@ Test.it('classifies every category correctly, special is the catch-all', functio
 end)
 
 ----------------------------------------------------------------------
+Test.section('ResolveBlendSource (pure - Manual gen Blend button)')
+----------------------------------------------------------------------
+
+do
+    local function E(ppq, msg) return { ppq = ppq, msg = msg } end
+    local TOL = 30
+
+    Test.it('two differing events: copies the later one, reports the earlier', function()
+        local src, prev = ResolveBlendSource({ E(100, 'stomp'), E(500, 'verse') }, 900, TOL)
+        Test.expect(src and src.msg == 'verse', 'expected the most recent event as source')
+        Test.expect(prev and prev.msg == 'stomp', 'expected the one before it as prev')
+    end)
+
+    Test.it('two identical events: refused, a blend is already in place', function()
+        local src, code, a, b =
+            ResolveBlendSource({ E(100, 'stomp'), E(500, 'stomp') }, 900, TOL)
+        Test.expect(src == nil and code == 'blended', 'expected a blended refusal')
+        Test.expect(a and a.ppq == 500 and b and b.ppq == 100,
+            'both offending events should come back for the report')
+    end)
+
+    Test.it('a single event copies, with no prev to compare against', function()
+        local src, prev = ResolveBlendSource({ E(100, 'stomp') }, 900, TOL)
+        Test.expect(src and src.msg == 'stomp', 'the only event should still be copied')
+        Test.expect(prev == nil, 'there is no earlier event to report')
+    end)
+
+    Test.it('nothing before the cursor is refused, not treated as empty-and-fine', function()
+        Test.expect(select(2, ResolveBlendSource({}, 900, TOL)) == 'none', 'empty list')
+        Test.expect(select(2, ResolveBlendSource({ E(1000, 'a'), E(2000, 'b') }, 900, TOL))
+            == 'none', 'every event after the cursor')
+    end)
+
+    Test.it('an event on the playhead is refused, and wins over every other outcome', function()
+        local src, code, a = ResolveBlendSource({ E(100, 'stomp'), E(900, 'verse') }, 900, TOL)
+        Test.expect(src == nil and code == 'occupied' and a.msg == 'verse', 'exact tick')
+        Test.expect(select(2, ResolveBlendSource({ E(100, 'x'), E(915, 'y') }, 900, TOL))
+            == 'occupied', 'inside the tolerance window')
+        Test.expect(ResolveBlendSource({ E(100, 'x'), E(940, 'y') }, 900, TOL) ~= nil,
+            'just outside the window should not be treated as occupied')
+        -- Would otherwise be 'blended': occupied is checked first.
+        Test.expect(select(2, ResolveBlendSource({ E(500, 'a'), E(900, 'a') }, 900, TOL))
+            == 'occupied', 'occupied outranks blended')
+    end)
+
+    Test.it('events after the cursor are ignored when picking the pair', function()
+        local src, prev =
+            ResolveBlendSource({ E(100, 'a'), E(500, 'b'), E(2000, 'b') }, 900, TOL)
+        Test.expect(src and src.ppq == 500, 'the trailing event must not become the source')
+        Test.expect(prev and prev.ppq == 100,
+            'nor may it make this look like an existing blend')
+    end)
+end
+
+----------------------------------------------------------------------
 -- These tests create a track named VENUE (plus subtracks); never run them against a
 -- project that already has one.
 if FindTrackByName('VENUE') then
@@ -495,6 +550,172 @@ else
                 'an auto lighting preset drives no keyframes and must not match')
             Test.expect(FindManualLightingAtPpq(take, p(5)) == nil, 'camera event must not match')
             Test.expect(FindManualLightingAtPpq(take, p(8)) == nil, 'empty spot must not match')
+        end, 10)
+    end)
+
+    Test.it('RegenerateVenueKeyframes: a restatement starts no span and ends none', function()
+        -- Guard against an active time selection in the host project affecting the range.
+        local sel_s0, sel_e0 = r.GetSet_LoopTimeRange(false, false, 0, 0, false)
+        r.GetSet_LoopTimeRange(true, false, 0, 0, false)
+
+        local ok, err = pcall(function()
+            WithVenueFixture(function(_, _, take)
+                local ppq = GetTakePPQPerQN(take)
+                local qn  = function(n)
+                    return r.MIDI_GetPPQPosFromProjTime(take, r.TimeMap_QNToTime(n))
+                end
+                local function InsertAtQN(n, msg)
+                    r.MIDI_InsertTextSysexEvt(take, false, false, qn(n), 1, msg, false)
+                end
+                -- stomp at QN 4, its blend-in restatement a beat before the real change
+                -- to verse at QN 20.
+                InsertAtQN(4,  '[lighting (stomp)]')
+                InsertAtQN(19, '[lighting (stomp)]')
+                InsertAtQN(20, '[lighting (verse)]')
+
+                local align0, rate0 = S.venue_keyframe_align, S.venue_kf_rate
+                S.venue_keyframe_align = 0
+                S.venue_kf_rate        = 4
+                RegenerateVenueKeyframes()
+                S.venue_keyframe_align, S.venue_kf_rate = align0, rate0
+                Test.expect(S.status:find('Regenerated'),
+                    'expected a regenerated report, got: ' .. S.status)
+
+                -- Collect the regenerated keyframes by position.
+                local firsts, nexts = {}, {}
+                local _, _, _, n = r.MIDI_CountEvts(take)
+                for i = 0, n - 1 do
+                    local o, _, _, p, ty, msg = r.MIDI_GetTextSysexEvt(take, i)
+                    if o and ty == 1 then
+                        if msg == '[first]' then firsts[p] = true
+                        elseif msg == '[next]' then nexts[p] = true end
+                    end
+                end
+
+                Test.expect(firsts[qn(4)], 'the stomp that changed the preset needs a [first]')
+                Test.expect(not firsts[qn(19)],
+                    'the restatement must not start a second sequence')
+                Test.expect(firsts[qn(20)], 'the change to verse needs a [first]')
+                -- The first span runs through its own restatement to the real change,
+                -- so at rate 4 it puts a [next] on QN 8/12/16 - past QN 19 would be
+                -- QN 20, which is the span end.
+                Test.expect(nexts[qn(16)],
+                    "the first span's train should run past its restatement")
+            end, 30)
+        end)
+
+        r.GetSet_LoopTimeRange(true, false, sel_s0, sel_e0, false)
+        if not ok then error(err, 2) end
+    end)
+
+    Test.it('BlendVenuePresetAtPlayhead copies the active preset, then refuses a second time', function()
+        WithVenueFixture(function(_, _, take)
+            local cur0 = r.GetCursorPosition()
+            local ok, err = pcall(function()
+                InsertEvt(take, 1, '[lighting (stomp)]')
+                InsertEvt(take, 3, '[lighting (verse)]')
+                InsertEvt(take, 2, '[ProFilm_a.pp]')
+
+                r.SetEditCurPos(6, false, false)
+                BlendVenuePresetAtPlayhead('lighting')
+
+                Test.expect(#ReadMsgs(take) == 4, 'expected one event inserted')
+                Test.expect(S.last_result and S.last_result:find('%[lighting %(verse%)%]'),
+                    'the report should name the copied event: ' .. tostring(S.last_result))
+                local at_cur = 0
+                local p = r.MIDI_GetPPQPosFromProjTime(take, 6)
+                local _, _, _, n = r.MIDI_CountEvts(take)
+                for i = 0, n - 1 do
+                    local o, _, _, evp, ty, msg = r.MIDI_GetTextSysexEvt(take, i)
+                    if o and ty == 1 and msg == '[lighting (verse)]'
+                            and math.abs(evp - p) < 2 then
+                        at_cur = at_cur + 1
+                    end
+                end
+                Test.expect(at_cur == 1, 'the copy should sit on the playhead')
+
+                -- The last two lighting events now match: a blend is already in place.
+                r.SetEditCurPos(8, false, false)
+                BlendVenuePresetAtPlayhead('lighting')
+                Test.expect(#ReadMsgs(take) == 4, 'a refusal must insert nothing')
+                Test.expect(S.status:find('Already blended'),
+                    'expected the blended refusal, got: ' .. S.status)
+            end)
+            r.SetEditCurPos(cur0, false, false)
+            if not ok then error(err, 2) end
+        end, 10)
+    end)
+
+    Test.it('Blend keeps lighting and post-process separate', function()
+        WithVenueFixture(function(_, _, take)
+            local cur0 = r.GetCursorPosition()
+            local ok, err = pcall(function()
+                InsertEvt(take, 1, '[lighting (stomp)]')
+                InsertEvt(take, 2, '[ProFilm_a.pp]')
+                InsertEvt(take, 3, '[ProFilm_b.pp]')
+
+                r.SetEditCurPos(6, false, false)
+                BlendVenuePresetAtPlayhead('postproc')
+                Test.expect(S.last_result and S.last_result:find('ProFilm_b%.pp'),
+                    'postproc blend must copy the .pp event, got: ' .. tostring(S.last_result))
+
+                -- Only one lighting event exists - copied, with nothing to compare.
+                r.SetEditCurPos(7, false, false)
+                BlendVenuePresetAtPlayhead('lighting')
+                Test.expect(S.last_result:find('%[lighting %(stomp%)%]'),
+                    'lighting blend must ignore the .pp events: ' .. tostring(S.last_result))
+                Test.expect(S.last_result:find('only'),
+                    'expected the single-event note in the report')
+            end)
+            r.SetEditCurPos(cur0, false, false)
+            if not ok then error(err, 2) end
+        end, 10)
+    end)
+
+    Test.it('Blend refuses on an occupied spot and with nothing before the playhead', function()
+        WithVenueFixture(function(_, _, take)
+            local cur0 = r.GetCursorPosition()
+            local ok, err = pcall(function()
+                InsertEvt(take, 5, '[lighting (stomp)]')
+
+                r.SetEditCurPos(5, false, false)          -- right on the event
+                BlendVenuePresetAtPlayhead('lighting')
+                Test.expect(#ReadMsgs(take) == 1, 'occupied refusal must insert nothing')
+                Test.expect(S.status:find('already at the playhead'),
+                    'expected the occupied refusal, got: ' .. S.status)
+
+                r.SetEditCurPos(2, false, false)          -- before every lighting event
+                BlendVenuePresetAtPlayhead('lighting')
+                Test.expect(#ReadMsgs(take) == 1, 'empty refusal must insert nothing')
+                Test.expect(S.status:find('nothing to blend from'),
+                    'expected the none refusal, got: ' .. S.status)
+            end)
+            r.SetEditCurPos(cur0, false, false)
+            if not ok then error(err, 2) end
+        end, 10)
+    end)
+
+    Test.it('FindActiveVenuePresetsBefore returns the nearest preceding lighting + postproc', function()
+        WithVenueFixture(function(_, _, take)
+            InsertEvt(take, 1, '[lighting (stomp)]')
+            InsertEvt(take, 2, '[ProFilm_a.pp]')
+            InsertEvt(take, 3, '[lighting (verse)]')
+            InsertEvt(take, 4, '[coop_all_far]')     -- must be ignored
+            local p = function(t) return r.MIDI_GetPPQPosFromProjTime(take, t) end
+
+            local lt, lt_ppq, pp, pp_ppq = FindActiveVenuePresetsBefore(take, p(5))
+            Test.expect(lt == '[lighting (verse)]', 'expected the LAST lighting, got ' .. tostring(lt))
+            Test.expect(lt_ppq == p(3), 'wrong lighting position')
+            Test.expect(pp == '[ProFilm_a.pp]', 'expected the postproc, got ' .. tostring(pp))
+            Test.expect(pp_ppq == p(2), 'wrong postproc position')
+
+            -- Strictly before: an event exactly at the query point does not count.
+            lt = FindActiveVenuePresetsBefore(take, p(3))
+            Test.expect(lt == '[lighting (stomp)]',
+                'expected the earlier lighting, got ' .. tostring(lt))
+
+            local n_lt, _, n_pp = FindActiveVenuePresetsBefore(take, p(0.5))
+            Test.expect(n_lt == nil and n_pp == nil, 'nothing precedes the start')
         end, 10)
     end)
 

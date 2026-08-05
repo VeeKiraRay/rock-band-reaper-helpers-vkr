@@ -41,13 +41,27 @@ function RegenerateVenueKeyframes()
     -- range, from its ppq to the next lighting event's ppq (any kind), clamped to range end.
     -- A trigger outside the range never starts a span - its keyframes are left untouched even
     -- if part of its train would otherwise fall inside the range.
+    --
+    -- Restatements are skipped on both ends: an event repeating the lighting event
+    -- immediately before it doesn't change the active preset, so it starts no keyframe
+    -- sequence and doesn't end the running one either - the train carries on through it.
+    -- That is what a blend-in duplicate is (EmitBlendDuplicates, venue_lighting.lua), and
+    -- matching the rule here is what makes generating and regenerating agree. Only the
+    -- ADJACENT event is compared, so two sections sharing a preset with a different one
+    -- between them are each treated as a real change.
     local spans = {}
     for i, ev in ipairs(lighting_events) do
-        if MANUAL_LIGHTING_SET[ev.msg]
+        local restates = lighting_events[i - 1] and lighting_events[i - 1].msg == ev.msg
+        if MANUAL_LIGHTING_SET[ev.msg] and not restates
                 and ev.ppq >= range_start_ppq and ev.ppq < range_end_ppq then
             local span_end = range_end_ppq
-            if lighting_events[i + 1] and lighting_events[i + 1].ppq < span_end then
-                span_end = lighting_events[i + 1].ppq
+            for j = i + 1, #lighting_events do
+                if lighting_events[j].msg ~= ev.msg then
+                    if lighting_events[j].ppq < span_end then
+                        span_end = lighting_events[j].ppq
+                    end
+                    break
+                end
             end
             if span_end > ev.ppq then
                 spans[#spans + 1] = { start_ppq = ev.ppq, end_ppq = span_end }

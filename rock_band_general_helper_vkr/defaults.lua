@@ -334,6 +334,27 @@ TIPS = {
                            "  Drum kicks   - reads PART DRUMS  (pitch 96 only)\n" ..
                            "  Drum snare   - reads PART DRUMS  (pitch 97 only)",
 
+    venue_mg_blend_lt = "Copy the lighting preset that is currently running to the playhead, so\n" ..
+                        "the game BLENDS into the next lighting event instead of cutting to it.\n\n" ..
+                        "Place the anchor a beat or two BEFORE where the new preset goes, then\n" ..
+                        "add that preset at the boundary. Same thing Themes gen and Section gen\n" ..
+                        "write automatically from a section's lightpreset_blendin.\n\n" ..
+                        "Reads the VENUE track, not the dropdown above - it copies whatever is\n" ..
+                        "actually playing. Refused, with a report naming what it found, when the\n" ..
+                        "last two lighting events already match (a blend is in place), when a\n" ..
+                        "lighting event is already on the playhead, or when none precedes it.\n\n" ..
+                        "The copy carries no keyframes: only a preset CHANGE starts a\n" ..
+                        "[first]/[next] sequence. Fully undoable.",
+    venue_mg_blend_pp = "Copy the post-process effect that is currently running to the playhead,\n" ..
+                        "so the game BLENDS into the next one instead of cutting to it.\n\n" ..
+                        "Place the anchor a beat or two BEFORE where the new effect goes, then\n" ..
+                        "add that effect at the boundary. Same thing Themes gen and Section gen\n" ..
+                        "write automatically from a section's postproc_blendin.\n\n" ..
+                        "Reads the VENUE track, not the dropdown above - it copies whatever is\n" ..
+                        "actually playing. Refused, with a report naming what it found, when the\n" ..
+                        "last two post-process events already match (a blend is in place), when\n" ..
+                        "one is already on the playhead, or when none precedes it.\n\n" ..
+                        "Fully undoable.",
     venue_mg_kf_add = "Generate [first]/[next] keyframe events from the playhead to the next\n" ..
                       "lighting event, the time selection end (if active), or the VENUE item end.\n\n" ..
                       "[first] goes on the playhead, which must be the tick of a manual lighting\n" ..
@@ -405,14 +426,23 @@ TIPS = {
                          "Only used when the chosen lighting preset is a manual type\n" ..
                          "(verse, chorus, manual_cool, manual_warm, dischord, stomp).\n\n" ..
                          "Ctrl+click to type an exact value.",
-    venue_sec_lt_blend = "Place the lighting event this many beats BEFORE the section start.\n\n" ..
-                         "Useful for smooth lighting transitions into the section.\n" ..
-                         "Clamped to the item start if it would reach before the beginning.\n\n" ..
-                         "[first] follows the lighting event to this position; the section start\n" ..
-                         "then carries the first [next] instead.\n\n" ..
+    venue_sec_lt_blend = "Blend into this section's lighting instead of cutting to it.\n\n" ..
+                         "This section's own lighting event always sits ON the section start.\n" ..
+                         "This many beats before it, the PREVIOUSLY active lighting preset is\n" ..
+                         "re-stated as a blend anchor, which is what makes the game fade rather\n" ..
+                         "than snap. 0 = hard cut at the section start.\n\n" ..
+                         "The duplicate carries no keyframes: it restates a preset that is\n" ..
+                         "already running, and only a preset CHANGE starts a [first]/[next]\n" ..
+                         "sequence - the train from the original event runs on through it.\n\n" ..
+                         "Skipped when the preset is not changing, or when the blend point\n" ..
+                         "would fall at or before the event it copies.\n\n" ..
                          "Ctrl+click to type an exact value.",
-    venue_sec_pp_blend = "Place the post-process event this many beats BEFORE the section start.\n\n" ..
-                         "Clamped to the item start if it would reach before the beginning.\n\n" ..
+    venue_sec_pp_blend = "Blend into this section's post-process instead of cutting to it.\n\n" ..
+                         "This section's own post-process event always sits ON the section start.\n" ..
+                         "This many beats before it, the PREVIOUSLY active effect is re-stated as\n" ..
+                         "a blend anchor. 0 = hard cut at the section start.\n\n" ..
+                         "Skipped when the effect is not changing, or when the blend point would\n" ..
+                         "fall at or before the event it copies.\n\n" ..
                          "Ctrl+click to type an exact value.",
     venue_sec_dircut   = "Insert a forced directed camera cut at the section start.\n\n" ..
                          "Select a directed event name, or leave blank for no forced cut.\n" ..

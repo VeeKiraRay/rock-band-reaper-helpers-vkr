@@ -365,40 +365,55 @@ Test.it('a span too short for any keyframe yields nothing', function()
 end)
 
 ----------------------------------------------------------------------
-Test.section('GenerateThemedSectionEvents ([first] follows the blend-in)')
+Test.section('GenerateThemedSectionEvents (blend-in duplicates the OUTGOING preset)')
 ----------------------------------------------------------------------
--- Themes gen and Section gen both route through this. The lighting event is
--- placed lightpreset_blendin beats BEFORE the section start; [first] has to
--- follow it there, leaving the section start to carry the first [next].
+-- Themes gen and Section gen both route through this. A section's own lighting
+-- and postproc events always sit ON its section start; lightpreset_blendin /
+-- postproc_blendin only say how many beats earlier the PREVIOUSLY active preset
+-- is re-stated as a blend anchor.
 
 do
-    -- Theme pinned to one manual lightpreset so the random pick is deterministic.
-    local function ThemeWithBlendin(blendin, kf_rate)
-        return { section_presets = { default = {
-            allowed_lightpresets = { 'stomp' },
-            lightpreset_blendin  = blendin,
-            keyframe_rate        = kf_rate,
-        } } }
+    -- Presets pinned to one lightpreset/postproc each so the random picks are
+    -- deterministic. Section 'a' is the outgoing preset, 'b' the incoming one.
+    local function TwoSectionTheme(a_lt, a_pp, b_lt, b_pp, lp_blend, pp_blend, kf_rate)
+        local function preset(lt, pp, lpb, ppb)
+            return {
+                allowed_lightpresets = lt and { lt } or nil,
+                allowed_postprocs    = pp and { pp } or nil,
+                lightpreset_blendin  = lpb,
+                postproc_blendin     = ppb,
+                keyframe_rate        = kf_rate,
+            }
+        end
+        return { section_presets = {
+            versea = preset(a_lt, a_pp, 0, 0),
+            verseb = preset(b_lt, b_pp, lp_blend, pp_blend),
+        } }
     end
 
-    -- Runs one section through the generator on a throwaway MIDI take, returning
-    -- lt_events, ctrl_events and the absolute PPQ of the section start.
-    local function RunThemedSection(align, blendin, kf_rate)
+    -- Runs `sec_qns` sections (start QN per entry, each running to the next start or
+    -- +16 QN) through the generator on a throwaway MIDI take. Section i takes its
+    -- preset from names[i]. Returns the raw event arrays plus absolute helpers.
+    local function RunThemed(align, theme, names, sec_qns, incoming)
         local idx   = CreateEmptyFixtureTrack('KF THEME TEST')
-        local item  = r.CreateNewMIDIItemInProj(r.GetTrack(0, idx), 0, 60, false)
+        local item  = r.CreateNewMIDIItemInProj(r.GetTrack(0, idx), 0, 120, false)
         local take  = r.GetActiveTake(item)
         local saved = S.venue_keyframe_align
         S.venue_keyframe_align = align
         local ok, res = pcall(function()
-            local ppq        = GetTakePPQPerQN(take)
-            local sec        = { name = 'verse', num = nil,
-                                 t_start = r.TimeMap_QNToTime(8), t_end = r.TimeMap_QNToTime(24) }
-            local range_s    = 0
-            local range_e    = r.MIDI_GetPPQPosFromProjTime(take, r.TimeMap_QNToTime(32))
-            local lt, ctrl   = GenerateThemedSectionEvents(
-                { sec }, ThemeWithBlendin(blendin, kf_rate), take, range_s, range_e, ppq)
-            return { lt = lt, ctrl = ctrl, ppq = ppq, range_s = range_s,
-                     sec_ppq = r.MIDI_GetPPQPosFromProjTime(take, sec.t_start) }
+            local ppq  = GetTakePPQPerQN(take)
+            local secs, starts = {}, {}
+            for i, qn in ipairs(sec_qns) do
+                local t_end = sec_qns[i + 1] and r.TimeMap_QNToTime(sec_qns[i + 1])
+                               or r.TimeMap_QNToTime(qn + 16)
+                secs[i] = { name = names[i], num = nil,
+                            t_start = r.TimeMap_QNToTime(qn), t_end = t_end }
+                starts[i] = r.MIDI_GetPPQPosFromProjTime(take, secs[i].t_start)
+            end
+            local range_e = r.MIDI_GetPPQPosFromProjTime(take, r.TimeMap_QNToTime(64))
+            local lt, ctrl, pp = GenerateThemedSectionEvents(
+                secs, theme, take, 0, range_e, ppq, incoming)
+            return { lt = lt, ctrl = ctrl, pp = pp, ppq = ppq, starts = starts }
         end)
         S.venue_keyframe_align = saved
         CleanupFixture(idx)
@@ -406,58 +421,179 @@ do
         return res
     end
 
-    Test.it('[first] lands on the lighting event tick, not the section start', function()
-        local g = RunThemedSection(0, 2, 2)   -- 2-beat blend-in
-        Test.expect(#g.lt == 1, 'expected one lighting event, got ' .. #g.lt)
-        local lt_abs    = g.range_s + g.lt[1].tick
-        local first_abs = nil
-        for _, ev in ipairs(g.ctrl) do
-            if ev.text == '[first]' then
-                Test.expect(first_abs == nil, 'more than one [first] emitted')
-                first_abs = g.range_s + ev.tick
-            end
+    -- Absolute ticks of every event in `events` whose text is `text` (range starts at 0).
+    local function TicksOf(events, text)
+        local out = {}
+        for _, ev in ipairs(events) do
+            if ev.text == text then out[#out + 1] = ev.tick end
         end
-        Test.expect(first_abs ~= nil, 'no [first] emitted for a manual lightpreset')
-        -- The callers half-beat-snap lighting events and insert keyframes unsnapped,
-        -- so this is the equality that decides whether they share a tick on the track.
-        Test.expect(SnapPpqToHalfBeat(lt_abs, g.ppq) == first_abs,
-            ('[first] at %d does not land on the snapped lighting event at %d')
-                :format(first_abs, SnapPpqToHalfBeat(lt_abs, g.ppq)))
-        Test.expect(first_abs < g.sec_ppq,
-            '[first] should have moved back to the blend-in position')
+        return out
+    end
+
+    Test.it("a section's own lighting and postproc land ON its section start", function()
+        local g = RunThemed(0, TwoSectionTheme('stomp', 'ProFilm_a.pp',
+                                               'verse', 'ProFilm_b.pp', 1, 2, 2),
+                            { 'versea', 'verseb' }, { 8, 24 })
+        Test.expect(TicksOf(g.lt, '[lighting (verse)]')[1] == g.starts[2],
+            'the incoming lighting must not be moved off the section start')
+        Test.expect(TicksOf(g.pp, '[ProFilm_b.pp]')[1] == g.starts[2],
+            'the incoming postproc must not be moved off the section start')
     end)
 
-    Test.it('the section start now carries the first [next]', function()
-        local g = RunThemedSection(0, 2, 2)
-        local at_sec = nil
-        for _, ev in ipairs(g.ctrl) do
-            if g.range_s + ev.tick == g.sec_ppq then at_sec = ev.text end
-        end
-        Test.expect(at_sec == '[next]',
-            'expected [next] at the section start, got ' .. tostring(at_sec))
+    Test.it('the outgoing preset is duplicated at each blend point', function()
+        -- lightpreset_blendin 1, postproc_blendin 2 - the user's m9b4 / m9b3 example.
+        local g = RunThemed(0, TwoSectionTheme('stomp', 'ProFilm_a.pp',
+                                               'verse', 'ProFilm_b.pp', 1, 2, 2),
+                            { 'versea', 'verseb' }, { 8, 24 })
+        local lt_dups = TicksOf(g.lt, '[lighting (stomp)]')
+        local pp_dups = TicksOf(g.pp, '[ProFilm_a.pp]')
+        Test.expect(#lt_dups == 2, 'expected the original + one duplicate, got ' .. #lt_dups)
+        Test.expect(#pp_dups == 2, 'expected the original + one duplicate, got ' .. #pp_dups)
+        Test.expect(lt_dups[1] == g.starts[1], 'section 1 keeps its own event in place')
+        Test.expect(lt_dups[2] == g.starts[2] - 1 * g.ppq,
+            ('lighting duplicate expected at %d (1 beat early), got %d')
+                :format(g.starts[2] - g.ppq, lt_dups[2]))
+        Test.expect(pp_dups[2] == g.starts[2] - 2 * g.ppq,
+            ('postproc duplicate expected at %d (2 beats early), got %d')
+                :format(g.starts[2] - 2 * g.ppq, pp_dups[2]))
+        Test.expect(lt_dups[2] ~= pp_dups[2],
+            'differing blendin values must put the two duplicates on different ticks')
     end)
 
-    Test.it('zero blend-in: [first] on the section start, no duplicate event there', function()
-        local g = RunThemedSection(0, 0, 2)
+    Test.it('a blend duplicate is a bare lighting event - no [first] of its own', function()
+        local g = RunThemed(0, TwoSectionTheme('stomp', 'ProFilm_a.pp',
+                                               'verse', 'ProFilm_b.pp', 1, 2, 2),
+                            { 'versea', 'verseb' }, { 8, 24 })
+        local blend_ppq = SnapPpqToHalfBeat(g.starts[2] - 1 * g.ppq, g.ppq)
+        local firsts    = TicksOf(g.ctrl, '[first]')
+        local found = {}
+        for _, t in ipairs(firsts) do found[t] = true end
+        Test.expect(not found[blend_ppq],
+            'the duplicate restates a running preset - it must not restart the sequence')
+        Test.expect(found[g.starts[1]] and found[g.starts[2]],
+            'both sections should still have a [first] on their own start')
+        Test.expect(#firsts == 2,
+            'expected 2 [first]s (one per section), got ' .. #firsts)
+    end)
+
+    Test.it("the outgoing section's [next] train runs through the blend zone", function()
+        -- Sections at QN 8 and 24, 4-beat lighting blend (blend point QN 20), rate 4.
+        -- Nothing restarts the sequence at the blend point any more, so section 1's
+        -- train keeps its full length right up to the section boundary.
+        local g = RunThemed(0, TwoSectionTheme('stomp', 'ProFilm_a.pp',
+                                               'verse', 'ProFilm_b.pp', 4, 4, 4),
+                            { 'versea', 'verseb' }, { 8, 24 })
+        local qn    = function(n) return g.starts[1] + (n - 8) * g.ppq end
+        local nexts = {}
+        for _, t in ipairs(TicksOf(g.ctrl, '[next]')) do nexts[t] = true end
+        Test.expect(nexts[qn(12)] and nexts[qn(16)], "section 1's train should run")
+        Test.expect(nexts[qn(20)],
+            'the [next] on the blend point should no longer be clamped away')
+    end)
+
+    Test.it('a section keeping the previous preset gets no [first]', function()
+        -- Lighting unchanged across the boundary: nothing changes, so nothing restarts.
+        local g = RunThemed(0, TwoSectionTheme('stomp', 'ProFilm_a.pp',
+                                               'stomp', 'ProFilm_b.pp', 1, 2, 2),
+                            { 'versea', 'verseb' }, { 8, 24 })
+        local found = {}
+        for _, t in ipairs(TicksOf(g.ctrl, '[first]')) do found[t] = true end
+        Test.expect(found[g.starts[1]], 'the first section still starts the sequence')
+        Test.expect(not found[g.starts[2]],
+            'a section restating the running preset must not restart the sequence')
+        -- Its own lighting event and [next] train are unaffected.
+        Test.expect(TicksOf(g.lt, '[lighting (stomp)]')[2] == g.starts[2],
+            'the section should still emit its own lighting event')
+        local past = false
+        for _, t in ipairs(TicksOf(g.ctrl, '[next]')) do
+            if t > g.starts[2] then past = true end
+        end
+        Test.expect(past, 'the [next] train should still run inside the second section')
+    end)
+
+    Test.it('an unchanged preset gets no duplicate, judged per kind', function()
+        -- Lighting is the same across both sections, postproc changes.
+        local g = RunThemed(0, TwoSectionTheme('stomp', 'ProFilm_a.pp',
+                                               'stomp', 'ProFilm_b.pp', 1, 2, 2),
+                            { 'versea', 'verseb' }, { 8, 24 })
+        Test.expect(#TicksOf(g.lt, '[lighting (stomp)]') == 2,
+            'unchanged lighting must not gain a duplicate (2 = one per section)')
+        Test.expect(#TicksOf(g.pp, '[ProFilm_a.pp]') == 2,
+            'the changed postproc should still be duplicated once')
+    end)
+
+    Test.it('a blendin longer than the previous section emits no duplicate', function()
+        -- Section 1 is 2 QN long; section 2 asks for an 8-beat lighting blend, which
+        -- would place the copy before the event it copies.
+        local g = RunThemed(0, TwoSectionTheme('stomp', 'ProFilm_a.pp',
+                                               'verse', 'ProFilm_b.pp', 8, 8, 2),
+                            { 'versea', 'verseb' }, { 8, 10 })
+        Test.expect(#TicksOf(g.lt, '[lighting (stomp)]') == 1,
+            'expected only section 1s own lighting event, no duplicate ahead of it')
+        Test.expect(#TicksOf(g.pp, '[ProFilm_a.pp]') == 1,
+            'expected only section 1s own postproc event, no duplicate ahead of it')
+    end)
+
+    Test.it('incoming: the first section blends out of the caller-supplied preset', function()
+        local theme = TwoSectionTheme(nil, nil, 'verse', 'ProFilm_b.pp', 1, 2, 2)
+        local g = RunThemed(0, theme, { 'verseb' }, { 8 }, {
+            lt_text = '[lighting (intro)]', pp_text = '[ProFilm_a.pp]', sec_ppq = 0,
+        })
+        Test.expect(TicksOf(g.lt, '[lighting (intro)]')[1] == g.starts[1] - 1 * g.ppq,
+            'the incoming lighting should be re-stated at the blend point')
+        Test.expect(TicksOf(g.pp, '[ProFilm_a.pp]')[1] == g.starts[1] - 2 * g.ppq,
+            'the incoming postproc should be re-stated at its own blend point')
+    end)
+
+    Test.it('no incoming: the first section emits no duplicate', function()
+        local g = RunThemed(0, TwoSectionTheme(nil, nil, 'verse', 'ProFilm_b.pp', 1, 2, 2),
+                            { 'verseb' }, { 8 })
+        Test.expect(#g.lt == 1 and g.lt[1].tick == g.starts[1],
+            'nothing known to blend out of - only the section own event')
+        Test.expect(#g.pp == 1 and g.pp[1].tick == g.starts[1], 'same for postproc')
+    end)
+
+    Test.it('zero blend-in: [first] on the section start, nothing else there', function()
+        local g = RunThemed(0, TwoSectionTheme('stomp', 'ProFilm_a.pp',
+                                               'verse', 'ProFilm_b.pp', 0, 0, 2),
+                            { 'versea', 'verseb' }, { 8, 24 })
         local at_sec = {}
         for _, ev in ipairs(g.ctrl) do
-            if g.range_s + ev.tick == g.sec_ppq then at_sec[#at_sec + 1] = ev.text end
+            if ev.tick == g.starts[2] then at_sec[#at_sec + 1] = ev.text end
         end
         Test.expect(#at_sec == 1 and at_sec[1] == '[first]',
             'expected exactly one [first] at the section start, got ' ..
             table.concat(at_sec, ','))
+        Test.expect(#TicksOf(g.lt, '[lighting (stomp)]') == 1, 'no duplicate without blendin')
     end)
 
-    Test.it('instrument modes: [first] moves, but the section start gets no [next]', function()
-        local g = RunThemedSection(3, 2, 2)   -- 3 = Guitar notes
-        local first_abs
+    Test.it('every [first] sits on a manual lighting event, never orphaned', function()
+        local g = RunThemed(0, TwoSectionTheme('stomp', 'ProFilm_a.pp',
+                                               'verse', 'ProFilm_b.pp', 1, 2, 2),
+                            { 'versea', 'verseb' }, { 8, 24 })
+        -- The callers half-beat-snap lighting events and insert keyframes unsnapped,
+        -- so this is the equality that decides whether they share a tick on the track.
+        local lt_ticks = {}
+        for _, ev in ipairs(g.lt) do
+            if MANUAL_LIGHTING_SET[ev.text] then
+                lt_ticks[SnapPpqToHalfBeat(ev.tick, g.ppq)] = true
+            end
+        end
+        for _, t in ipairs(TicksOf(g.ctrl, '[first]')) do
+            Test.expect(lt_ticks[t],
+                ('[first] at %d has no manual lighting event on that tick'):format(t))
+        end
+    end)
+
+    Test.it('instrument modes: no [next] at the section start', function()
+        local g = RunThemed(3, TwoSectionTheme('stomp', 'ProFilm_a.pp',
+                                               'verse', 'ProFilm_b.pp', 1, 2, 2),
+                            { 'versea', 'verseb' }, { 8, 24 })   -- 3 = Guitar notes
         for _, ev in ipairs(g.ctrl) do
-            if ev.text == '[first]' then first_abs = g.range_s + ev.tick end
-            Test.expect(not (ev.text == '[next]' and g.range_s + ev.tick == g.sec_ppq),
+            Test.expect(not (ev.text == '[next]' and ev.tick == g.starts[2]),
                 'instrument modes must not emit a [next] at the (note-less) section start')
         end
-        Test.expect(first_abs ~= nil and first_abs < g.sec_ppq,
-            '[first] should still follow the lighting event back to the blend-in position')
+        Test.expect(#TicksOf(g.ctrl, '[first]') >= 2, 'each lighting event still gets a [first]')
     end)
 end
 

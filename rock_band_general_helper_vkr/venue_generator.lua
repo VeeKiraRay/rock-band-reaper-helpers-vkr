@@ -44,6 +44,28 @@ function ClearVenueExceptLPInRange(take, start_ppq, end_ppq)
     end)
 end
 
+-- Last [lighting (...)] and last [*.pp] text event strictly before ppq_pos - the preset
+-- state already active going into a section. Backs Section gen's blend duplicates, which
+-- re-state the outgoing preset ahead of the section boundary (EmitBlendDuplicates,
+-- venue_lighting.lua) and so need to know what was playing; Themes gen carries the same
+-- information forward through its own section walk instead.
+-- Returns lt_text, lt_ppq, pp_text, pp_ppq - each nil when nothing precedes ppq_pos.
+function FindActiveVenuePresetsBefore(take, ppq_pos)
+    local lt_text, lt_ppq, pp_text, pp_ppq
+    local _, _, _, text_count = r.MIDI_CountEvts(take)
+    for i = 0, text_count - 1 do
+        local ok, _, _, evt_ppq, evt_type, msg = r.MIDI_GetTextSysexEvt(take, i)
+        if ok and evt_type == 1 and evt_ppq < ppq_pos then
+            if msg:find('^%[lighting') then
+                if not lt_ppq or evt_ppq > lt_ppq then lt_text, lt_ppq = msg, evt_ppq end
+            elseif msg:find('%.pp%]$') then
+                if not pp_ppq or evt_ppq > pp_ppq then pp_text, pp_ppq = msg, evt_ppq end
+            end
+        end
+    end
+    return lt_text, lt_ppq, pp_text, pp_ppq
+end
+
 -- Deletes only [first]/[next]/[previous] text events in range. Leaves camera, lighting,
 -- postproc, and bonusfx untouched.
 function ClearVenueKeyframesInRange(take, start_ppq, end_ppq)
@@ -341,6 +363,9 @@ function GenerateVenueEvents()
     -- bookends into GenerateCameraEvents so the regular loop's first cut doesn't immediately
     -- repeat whatever the bookends just placed.
     local last_spot              = {}
+    -- Preset state the first themed section blends out of (GenerateThemedSectionEvents'
+    -- `incoming`), when the bookend below actually fires.
+    local incoming_presets       = nil
     if song_start_ppq >= range_start_ppq and song_start_ppq < range_end_ppq then
         local tick = math.floor(song_start_ppq - range_start_ppq + 0.5)
         insert_text(tick, '[coop_all_far]')
@@ -350,6 +375,11 @@ function GenerateVenueEvents()
         forced_pp_count    = 1
         last_bookend_16ths = tick / sixteenth_ticks
         last_spot           = { ['[coop_all_far]'] = true }
+        incoming_presets    = {
+            lt_text = '[lighting (intro)]',
+            pp_text = '[ProFilm_a.pp]',
+            sec_ppq = SnapPpqToHalfBeat(song_start_ppq, ppq),  -- as insert_text placed it
+        }
     end
 
     -- First randomly-generated camera cut: weighted pick with play-state awareness,
@@ -430,7 +460,7 @@ function GenerateVenueEvents()
 
     if theme and #sections > 0 then
         lt_events, ctrl_events, pp_events = GenerateThemedSectionEvents(
-            sections, theme, take, range_start_ppq, range_end_ppq, ppq)
+            sections, theme, take, range_start_ppq, range_end_ppq, ppq, incoming_presets)
         for _, ev in ipairs(lt_events)   do insert_text(ev.tick, ev.text) end
         for _, ev in ipairs(ctrl_events) do insert_text(ev.tick, ev.text, true) end
         for _, ev in ipairs(pp_events)   do insert_text(ev.tick, ev.text) end

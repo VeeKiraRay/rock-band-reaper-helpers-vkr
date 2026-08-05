@@ -1,6 +1,6 @@
 -- @description Rock Band General Helper
 -- @author VeeKiraRay
--- @version 0.9.42
+-- @version 0.9.43
 -- @about
 --   Utility actions for Rock Band authoring in REAPER.
 --
@@ -21,6 +21,65 @@
 --   This @about block keeps only the 5 most recent versions.
 --   Full history: CHANGELOG.md in the repo.
 --
+--   v0.9.43
+--     - Venue: corrected what lightpreset_blendin / postproc_blendin mean.
+--       They were implemented as "place THIS section's lighting/postproc
+--       event N beats before the section start", which blends nothing - it
+--       just moves the hard cut earlier, and makes the new section's preset
+--       run over the last N beats of the previous section. RB3 changes
+--       preset when the section begins either way; the blendin value says
+--       how many beats ahead of that boundary the PREVIOUSLY active preset
+--       is re-stated, giving the game an anchor to interpolate from. A
+--       section's own events now always sit on its section start, and the
+--       outgoing preset is duplicated ahead of it instead:
+--         m3     [lighting (stomp)]  [ProFilm_a.pp]
+--         m9 b3  [ProFilm_a.pp]                     (postproc_blendin 2)
+--         m9 b4  [lighting (stomp)]  [first]        (lightpreset_blendin 1)
+--         m10    [lighting (verse)]  [ProFilm_b.pp]  [first]
+--       This changes what every shipped theme produces - they all set
+--       blendin. blendin 0 / absent still means a hard cut at the section
+--       start, so the snap behaviour is unchanged and still reachable.
+--       A duplicate is skipped when the preset is not actually changing
+--       (lighting and postproc judged independently) or when it would land
+--       at or before the event it copies. New BlendPpq /
+--       EmitBlendDuplicates and a two-pass ResolveThemeSection /
+--       EmitThemeSection split of the old ProcessThemeSection
+--       (venue_lighting.lua) - emitting a section needs the previous
+--       section's picks, which isn't visible one section at a time.
+--       Section gen, which only ever sees one section, reads the outgoing
+--       preset off the VENUE track (new FindActiveVenuePresetsBefore,
+--       venue_generator.lua) and no longer clears back over those events.
+--     - Venue > Manual gen: new "Blend" button beside "Add" on the Lighting
+--       and Post proc rows. It copies the preset of that type currently
+--       running to the playhead - the same blend anchor Themes gen and
+--       Section gen place from lightpreset_blendin / postproc_blendin - so
+--       a hand-authored transition fades instead of cutting. Park the
+--       playhead a beat or two before the boundary, click Blend, then add
+--       the new preset at the boundary itself. It reads the VENUE track
+--       rather than the dropdown above, so it copies whatever is actually
+--       playing, and reports the event it copied with the position it came
+--       from. Refused, with a report naming what it found and where, when
+--       the last two events of that type already match (a blend is already
+--       in place), when one is already on the playhead, or when none
+--       precedes it; a refusal creates no undo point. New
+--       ResolveBlendSource (pure, so the rule is testable without a
+--       playhead) and BlendVenuePresetAtPlayhead, actions_venue_manual.lua.
+--     - Venue: [first] now marks a preset CHANGE. A lighting event that
+--       restates the preset already running - a blend duplicate, or a
+--       section that kept the previous section's preset - no longer
+--       restarts the keyframe sequence; the train from the event that did
+--       start it simply carries on through. This is what lets the
+--       Keyframes tab agree with the generators: it can't see sections or
+--       blendin values, only the events on the track, so "regenerate"
+--       would otherwise put a [first] back on every blend duplicate.
+--       Enforced in three places from the same rule - the section emitter
+--       (venue_lighting.lua), RegenerateVenueKeyframes' span walk, which
+--       now neither starts nor ends a span on an event repeating the one
+--       immediately before it, and Manual gen's span-end clamp, which no
+--       longer lets a duplicate of the preset being keyframed cut the
+--       train short. Only ADJACENT events are compared, so two sections
+--       sharing a preset with a different one between them are each still
+--       a real change.
 --   v0.9.42
 --     - Venue: [first] keyframes now land on the SAME tick as the manual
 --       lighting event they drive - [first] is that event's own initial
@@ -113,34 +172,6 @@
 --       take-PPQ ticks (never seconds or QN floats) so results land
 --       exactly on REAPER's own note-length grid. New
 --       actions_midi_length.lua (AdjustMidiNoteLengths).
---   v0.9.38
---     - Fixed a combo-wrap collision: when a passage has more distinct
---       chord shapes in one lane-spread group than that group has combo
---       alternatives (e.g. 4 different power chords but only 3: G+Y/R+B/
---       Y+O), a same-combo collision was possible between two shapes that
---       are actually back-to-back in the passage (modulo-wrapping could
---       collide the lowest- and highest-pitched shapes; a simpler
---       pitch-rank-only fix could still collide genuinely adjacent
---       chords). BuildShapeGemMap now assigns the first (lowest-pitched)
---       shapes in a group a unique combo each, then gives every
---       additional (higher-pitched) shape whichever already-claimed combo
---       minimizes conflicts against shapes it's actually adjacent to
---       ANYWHERE in the passage - built from a real adjacency table over
---       the event sequence, with a bounded refinement pass - so two
---       genuinely back-to-back chords only ever end up looking identical
---       when it's truly unavoidable (more distinct shapes than combos),
---       never just because they happen to be pitch-neighbors. Reused
---       shapes get "(*Wrap)" appended to their reason string in both the
---       Guitar tab converter's preview and Tab Input's guide report; the
---       shape that legitimately claimed the combo first is never flagged.
---       New AssignByConflict helper (actions_guitar.lua); BuildShapeGemMap
---       gained a third return value (shared: key->true). Safety cap: past
---       200 distinct shapes in one group (MAX_CONFLICT_SHAPES), skips the
---       search and falls back to plain clamp-to-last - real songs stay far
---       below this; it only guards against a mis-selected source track
---       (e.g. a drum track) producing a huge, near-random shape vocabulary
---       that would otherwise make the search's worst case visibly freeze
---       REAPER's single-threaded UI.
 r = reaper  -- global so all dofile'd modules can use it
 
 if not r.ImGui_CreateContext then

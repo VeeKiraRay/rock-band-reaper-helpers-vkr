@@ -1,8 +1,9 @@
 -- Section-by-section venue event generator.
 -- Requires: venue_generator.lua (ClearVenueTextEventsInRange, ClearVenueNonCameraEventsInRange,
---                                 ClearVenueExceptLPInRange), venue_camera.lua (FindCompanion, …),
+--                                 ClearVenueExceptLPInRange, FindActiveVenuePresetsBefore),
+--           venue_camera.lua (FindCompanion, …),
 --           venue_lighting.lua (GenerateThemedSectionEvents, FindNextMeasureStartPpq,
---                               CollectVocalPhraseStarts),
+--                               CollectVocalPhraseStarts, SnapPpqToHalfBeat),
 --           venue_awareness.lua (ReadEventSections, ReadInstrumentPlayStates),
 --           venue_themes.lua (GetSectionPreset, BuildLightingPool, BuildPostprocPool,
 --                             GetThemeCameraInterval),
@@ -157,8 +158,22 @@ function GenerateSectionEvent()
     local sec_end_ppq   = r.MIDI_GetPPQPosFromProjTime(take, sec.t_end)
     local item_start_ppq = r.MIDI_GetPPQPosFromProjTime(take, item_start_sec)
 
+    -- Preset state going into this section, read BEFORE anything is cleared (the clear
+    -- below reaches into the blend zone and would remove the very events being looked
+    -- up). Feeds GenerateThemedSectionEvents' `incoming` so the blend duplicates
+    -- re-state whatever was actually playing - Themes gen gets this from its own
+    -- section walk, but Section gen only ever sees one section.
+    local in_lt_text, in_lt_ppq, in_pp_text, in_pp_ppq =
+        FindActiveVenuePresetsBefore(take, sec_start_ppq)
+
     local max_blendin    = math.max(cfg.light_blendin, cfg.pp_blendin)
     local clear_start_ppq = math.max(item_start_ppq, sec_start_ppq - max_blendin * ppq)
+    -- Never clear back over the incoming preset's own events: a previous section
+    -- shorter than this section's blendin would otherwise lose its lighting/postproc
+    -- outright, since EmitBlendDuplicates refuses to place a duplicate at or before
+    -- the event it copies.
+    if in_lt_ppq and clear_start_ppq <= in_lt_ppq then clear_start_ppq = in_lt_ppq + 1 end
+    if in_pp_ppq and clear_start_ppq <= in_pp_ppq then clear_start_ppq = in_pp_ppq + 1 end
 
     -- Camera setup
     local muted       = GetMutedInstruments()
@@ -401,7 +416,15 @@ function GenerateSectionEvent()
     local pp_count   = 0
     if syn_theme then
         local lt_events, ctrl_events, pp_events = GenerateThemedSectionEvents(
-            { sec }, syn_theme, take, clear_start_ppq, sec_end_ppq, ppq)
+            { sec }, syn_theme, take, clear_start_ppq, sec_end_ppq, ppq,
+            (in_lt_text or in_pp_text) and {
+                lt_text  = in_lt_text, lt_ppq = in_lt_ppq,
+                pp_text  = in_pp_text, pp_ppq = in_pp_ppq,
+                -- The outgoing section's own rate isn't recoverable from the track,
+                -- so the duplicate's keyframes use this section's - it only governs
+                -- the handful of beats inside the blend zone.
+                kf_beats = cfg.keyframe_rate > 0 and cfg.keyframe_rate or nil,
+            } or nil)
         for _, ev in ipairs(lt_events)   do
             insert_snapped(clear_start_ppq + ev.tick, ev.text)
             total_inserted = total_inserted + 1

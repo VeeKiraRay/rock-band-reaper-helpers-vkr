@@ -99,11 +99,49 @@ Sections without a number (e.g. `[prc_intro]`) match the bare key `intro`.
 | `allowed_lightpresets` | list of names | Lighting preset names (bare, without `[lighting (...)]` wrapper). One is picked at random per section instance. Valid names listed in `LIGHTING_VALID_SET` in `venue_themes.lua`. |
 | `allowed_postprocs` | list of `.pp` filenames | Post-process effect filenames. One picked at random. Valid set: 30 entries in `POSTPROC_VALID_SET`. Emitted as `[ProFilm_a.pp]` — filename wrapped in brackets. |
 | `keyframe_rate` | integer (beats) | `[first]`/`[next]` interval for manual lighting presets. Required if `allowed_lightpresets` includes any manual preset (`verse`, `chorus`, `manual_cool`, `manual_warm`, `dischord`, `stomp`). |
-| `lightpreset_blendin` | number (beats) | Place the lighting event this many beats BEFORE the section start. If clamped before range start, falls back to range start. |
-| `postproc_blendin` | number (beats) | Place the postproc event this many beats BEFORE the section start. Same clamping as `lightpreset_blendin`. When absent, postproc lands at section start. |
+| `lightpreset_blendin` | number (beats) | Blend into this section's lighting instead of cutting to it: re-state the **previously active** lighting preset this many beats before the section start. This section's own event never moves off the section start. Absent/0 = hard cut. See "Blend-in" below. |
+| `postproc_blendin` | number (beats) | Same for post-process, with its own independent offset. |
 | `camera_pacing` | string | Per-section camera pace override, overrides global `camera_pacing` for that section's duration. Same values as global. |
 | `dircut_at_start` | string | Bare directed event name (e.g. `directed_all`). Inserts `[directed_all]` as a forced camera cut at the section start. Does NOT insert a random directed cut for that position — forced only. |
 | `bonusfx_at_start` | flag | Inserts `[bonusfx]` at section start (half-beat snapped). |
+
+### Blend-in
+
+`lightpreset_blendin` / `postproc_blendin` do **not** move the section's own
+events earlier. RB3 switches preset "when this section begins" either way; the
+blendin value says how far ahead of that boundary the **outgoing** preset is
+duplicated, giving the game an anchor to interpolate from instead of snapping.
+
+`[lighting (stomp)]` + `[ProFilm_a.pp]` at m3, next section at m10 picking
+`[lighting (verse)]` + `[ProFilm_b.pp]` with `lightpreset_blendin 1` and
+`postproc_blendin 2`:
+
+```
+m3     [lighting (stomp)]  [ProFilm_a.pp]  [first]   <- section 1, untouched
+m9 b3  [ProFilm_a.pp]                         <- duplicate, postproc_blendin 2
+m9 b4  [lighting (stomp)]                     <- duplicate, lightpreset_blendin 1
+m10 b1 [lighting (verse)]  [ProFilm_b.pp]  [first]
+```
+
+The blendin values belong to the **incoming** section (the doc's "how many
+beats BEFORE *this* section"); the duplicated content is the outgoing preset.
+Details, all in `BlendPpq` / `EmitBlendDuplicates` (`venue_lighting.lua`):
+
+- The duplicate is a **bare lighting event** — no `[first]`, no `[next]`. It
+  restates a preset that is already running, and only a preset *change* starts
+  a keyframe sequence, so section 1's train just carries on through it to the
+  boundary. (See "Keyframe placement rule" in `CLAUDE_general.md`; the
+  Keyframes tab re-derives the same rule from the track, which is what makes
+  regenerating reproduce what was generated.)
+- Skipped when the preset isn't changing (lighting and postproc judged
+  independently), or when the blend point would land at or before the event it
+  copies — a section shorter than the next one's blendin, or a first section
+  sitting on the song-start bookend.
+- Themes gen carries the outgoing preset forward through its own section walk
+  and seeds the first section from the song-start bookend; Section gen only
+  ever sees one section, so it reads the outgoing preset off the VENUE track
+  via `FindActiveVenuePresetsBefore` (`venue_generator.lua`) and passes it in
+  as `GenerateThemedSectionEvents`' `incoming` argument.
 
 ### Valid lighting preset names (bare)
 `verse`, `chorus`, `manual_cool`, `manual_warm`, `dischord`, `stomp` (manual — require `[first]`/`[next]`)

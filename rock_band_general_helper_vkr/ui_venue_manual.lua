@@ -7,6 +7,7 @@
 --                   RenderCamPacingRow, MakeProjectPoll, FindNamedTrackMIDI,
 --                   InsertVenueEventAtPlayhead, AdvanceCameraPacing,
 --                   GenerateManualKeyframes, RemoveVenueEventsByType,
+--                   BlendVenuePresetAtPlayhead, Btn, BtnGroupWidth,
 --                   MANUAL_LIGHTING_SET, GetTakePPQPerQN, NO_LIGHTING_AT_PLAYHEAD_MSG,
 --                   COOP_POOL, DIRECTED_POOL, DIRECTED_LABELS, DIRECTED_TIPS,
 --                   LIGHTING_LABELS, LIGHTING_TIPS, POSTPROC_LABELS, POSTPROC_TIPS,
@@ -89,6 +90,10 @@ function DrawVenueManualTab()
         'Normal camera', 'Directed camera', 'Lighting', 'Keyframe align',
         'Keyframe rate', 'Post proc', 'Special', 'Camera pacing', 'Remove',
     })
+    -- Every row's button starts at the same x (all combos are 230 wide), so size
+    -- them all to the widest label in the group - otherwise the two rows that also
+    -- carry Blend would leave the Add column ragged.
+    local _bw_add = BtnGroupWidth({ 'Add', 'Blend' })
 
     -- ---- Normal camera ----
     r.ImGui_Text(ctx, 'Normal camera')
@@ -126,7 +131,7 @@ function DrawVenueManualTab()
     r.ImGui_SameLine(ctx)
     local _mg_coop_dis = S.venue_mg_coop == ''
     if _mg_coop_dis then r.ImGui_BeginDisabled(ctx) end
-    if Btn('Add##mg_coop_add', 0) then
+    if Btn('Add##mg_coop_add', 0, _bw_add) then
         local _ev = S.venue_mg_coop
         RunAction(function() InsertVenueEventAtPlayhead(_ev) end)
     end
@@ -176,7 +181,7 @@ function DrawVenueManualTab()
     r.ImGui_SameLine(ctx)
     local _mg_dir_dis = S.venue_mg_directed == ''
     if _mg_dir_dis then r.ImGui_BeginDisabled(ctx) end
-    if Btn('Add##mg_dir_add', 0) then
+    if Btn('Add##mg_dir_add', 0, _bw_add) then
         local _ev = '[' .. S.venue_mg_directed .. ']'
         RunAction(function() InsertVenueEventAtPlayhead(_ev) end)
     end
@@ -225,12 +230,20 @@ function DrawVenueManualTab()
     r.ImGui_SameLine(ctx)
     local _mg_lt_dis = S.venue_mg_lighting == ''
     if _mg_lt_dis then r.ImGui_BeginDisabled(ctx) end
-    if Btn('Add##mg_lt_add', 0) then
+    if Btn('Add##mg_lt_add', 0, _bw_add) then
         local _ev = '[lighting (' .. S.venue_mg_lighting .. ')]'
         RunAction(function() InsertVenueEventAtPlayhead(_ev) end)
         _force_rescan = true
     end
     if _mg_lt_dis then r.ImGui_EndDisabled(ctx) end
+    -- Blend copies whatever is already on the track, so it never reads the dropdown
+    -- and stays clickable with no preset selected - hence outside the guard above.
+    r.ImGui_SameLine(ctx)
+    if Btn('Blend##mg_lt_blend', 0, _bw_add) then
+        RunAction(function() BlendVenuePresetAtPlayhead('lighting') end)
+        _force_rescan = true
+    end
+    Tooltip(TIPS.venue_mg_blend_lt)
 
     -- Keyframe settings: usable only on a manual lighting event's own tick, since
     -- [first] has to share it. Snapshot once (BeginDisabled balance).
@@ -254,7 +267,7 @@ function DrawVenueManualTab()
     end
     Tooltip(TIPS.venue_keyframe_align)
     r.ImGui_SameLine(ctx)
-    if Btn('Add##mg_kf_btn', 0) then
+    if Btn('Add##mg_kf_btn', 0, _bw_add) then
         RunAction(GenerateManualKeyframes)
         _force_rescan = true
     end
@@ -338,11 +351,16 @@ function DrawVenueManualTab()
     r.ImGui_SameLine(ctx)
     local _mg_pp_dis = S.venue_mg_postproc == ''
     if _mg_pp_dis then r.ImGui_BeginDisabled(ctx) end
-    if Btn('Add##mg_pp_add', 0) then
+    if Btn('Add##mg_pp_add', 0, _bw_add) then
         local _ev = '[' .. S.venue_mg_postproc .. ']'
         RunAction(function() InsertVenueEventAtPlayhead(_ev) end)
     end
     if _mg_pp_dis then r.ImGui_EndDisabled(ctx) end
+    r.ImGui_SameLine(ctx)
+    if Btn('Blend##mg_pp_blend', 0, _bw_add) then
+        RunAction(function() BlendVenuePresetAtPlayhead('postproc') end)
+    end
+    Tooltip(TIPS.venue_mg_blend_pp)
 
     -- ---- Special ----
     r.ImGui_Text(ctx, 'Special')
@@ -368,7 +386,7 @@ function DrawVenueManualTab()
     r.ImGui_SameLine(ctx)
     local _mg_sp_dis = S.venue_mg_special == ''
     if _mg_sp_dis then r.ImGui_BeginDisabled(ctx) end
-    if Btn('Add##mg_sp_add', 0) then
+    if Btn('Add##mg_sp_add', 0, _bw_add) then
         local _ev = S.venue_mg_special
         RunAction(function() InsertVenueEventAtPlayhead(_ev) end)
         _force_rescan = true

@@ -9,6 +9,35 @@ over 5. See `CLAUDE.md` → "Changelog / `@about` trimming" for the rule.
 
 `rock_band_general_helper_vkr.lua`
 
+**v0.9.38**
+- Fixed a combo-wrap collision: when a passage has more distinct
+  chord shapes in one lane-spread group than that group has combo
+  alternatives (e.g. 4 different power chords but only 3: G+Y/R+B/
+  Y+O), a same-combo collision was possible between two shapes that
+  are actually back-to-back in the passage (modulo-wrapping could
+  collide the lowest- and highest-pitched shapes; a simpler
+  pitch-rank-only fix could still collide genuinely adjacent
+  chords). BuildShapeGemMap now assigns the first (lowest-pitched)
+  shapes in a group a unique combo each, then gives every
+  additional (higher-pitched) shape whichever already-claimed combo
+  minimizes conflicts against shapes it's actually adjacent to
+  ANYWHERE in the passage - built from a real adjacency table over
+  the event sequence, with a bounded refinement pass - so two
+  genuinely back-to-back chords only ever end up looking identical
+  when it's truly unavoidable (more distinct shapes than combos),
+  never just because they happen to be pitch-neighbors. Reused
+  shapes get "(*Wrap)" appended to their reason string in both the
+  Guitar tab converter's preview and Tab Input's guide report; the
+  shape that legitimately claimed the combo first is never flagged.
+  New AssignByConflict helper (actions_guitar.lua); BuildShapeGemMap
+  gained a third return value (shared: key->true). Safety cap: past
+  200 distinct shapes in one group (MAX_CONFLICT_SHAPES), skips the
+  search and falls back to plain clamp-to-last - real songs stay far
+  below this; it only guards against a mis-selected source track
+  (e.g. a drum track) producing a huge, near-random shape vocabulary
+  that would otherwise make the search's worst case visibly freeze
+  REAPER's single-threaded UI.
+
 **v0.9.37**
 - Tab Input's Guitar/Bass guide: removed the "Notes are in play
   order" checkbox and palette mode. Palette mode flattened every

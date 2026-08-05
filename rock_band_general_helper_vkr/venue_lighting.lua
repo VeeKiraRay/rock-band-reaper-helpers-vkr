@@ -268,39 +268,131 @@ function GenerateLightingEvents(range_16ths, ppq, pool_override)
     return lt_events, ctrl_events
 end
 
--- Generates lighting, keyframe control, and postproc events for each detected
--- [prc_*] section using the active theme. Tick offsets are from range_start_ppq.
-local function ProcessThemeSection(sec, theme, take, range_start_ppq, range_end_ppq, ppq,
-                                   lt_events, ctrl_events, pp_events, inst_note_positions)
+-- Resolves one section's theme picks without emitting anything, so the emit pass
+-- can see each section's neighbours (see GenerateThemedSectionEvents). Returns nil
+-- when the section falls outside the range or the theme has no preset for it.
+--
+-- blend_lt_ppq / blend_pp_ppq are where the PREVIOUS section's preset gets
+-- re-stated to blend into this one - see BlendPpq.
+local function ResolveThemeSection(sec, theme, take, range_start_ppq, range_end_ppq, ppq)
     local sec_start_ppq = r.MIDI_GetPPQPosFromProjTime(take, sec.t_start)
     local sec_end_ppq   = r.MIDI_GetPPQPosFromProjTime(take, sec.t_end)
-    if sec_start_ppq >= range_end_ppq or sec_end_ppq <= range_start_ppq then return end
+    if sec_start_ppq >= range_end_ppq or sec_end_ppq <= range_start_ppq then return nil end
 
     local preset = GetSectionPreset(theme, sec.name, sec.num)
-    if not preset then return end
+    if not preset then return nil end
 
     local lt_pool = BuildLightingPool(preset)
     local pp_pool = BuildPostprocPool(preset)
+    local sec_ppq = math.max(range_start_ppq, sec_start_ppq)
 
-    local blendin_ticks  = (preset.lightpreset_blendin or 0) * ppq
-    local lt_ppq_abs     = math.max(range_start_ppq, sec_start_ppq - blendin_ticks)
-    local lt_tick_offset = math.floor(lt_ppq_abs - range_start_ppq + 0.5)
+    return {
+        sec_ppq      = sec_ppq,
+        sec_end_ppq  = sec_end_ppq,
+        lt_text      = (lt_pool and #lt_pool > 0) and lt_pool[math.random(#lt_pool)] or nil,
+        pp_text      = (pp_pool and #pp_pool > 0) and pp_pool[math.random(#pp_pool)] or nil,
+        kf_beats     = preset.keyframe_rate
+                       or math.random(KEYFRAME_MIN_BEATS, KEYFRAME_MAX_BEATS),
+        blend_lt_ppq = sec_ppq - (preset.lightpreset_blendin or 0) * ppq,
+        blend_pp_ppq = sec_ppq - (preset.postproc_blendin    or 0) * ppq,
+    }
+end
 
-    if lt_pool and #lt_pool > 0 then
-        local lt_text = lt_pool[math.random(#lt_pool)]
-        lt_events[#lt_events + 1] = { tick = lt_tick_offset, text = lt_text }
+-- Where the OUTGOING preset gets re-stated ahead of section `res`, or nil for none.
+-- kind is 'lt' (lighting) or 'pp' (postproc).
+--
+-- This is what lightpreset_blendin / postproc_blendin actually mean: the incoming
+-- section's own events never move off the section start (RB3 changes preset "when
+-- this section begins" either way) - the blendin value only says how far ahead of
+-- that the previously active preset is duplicated, giving the game something to
+-- blend FROM instead of hard-cutting.
+--
+--   m3     [lighting (stomp)]  [ProFilm_a.pp]     <- previous section
+--   m9 b3  [ProFilm_a.pp]                         <- duplicate, postproc_blendin 2
+--   m9 b4  [lighting (stomp)]                     <- duplicate, lightpreset_blendin 1
+--   m10    [lighting (verse)]  [ProFilm_b.pp]     <- this section, on its start
+--
+-- Returns nil when the preset isn't actually changing (nothing to blend), or when
+-- the blend point would fall at or before the event it copies - a section shorter
+-- than the next one's blendin, or a first section sitting on the song-start bookend,
+-- would otherwise place the copy ahead of its own source.
+--
+-- prev.lt_ppq / prev.pp_ppq: where the source events actually sit, when the caller
+-- knows them separately (Section gen reads them off the track). A resolved section
+-- carries both at its own start, so prev.sec_ppq is the fallback for each.
+local function BlendPpq(res, prev, range_start_ppq, kind)
+    if not prev then return nil end
+    local text      = prev[kind .. '_text']
+    local blend_ppq = res['blend_' .. kind .. '_ppq']
+    local src_ppq   = prev[kind .. '_ppq'] or prev.sec_ppq
+    if not text or text == res[kind .. '_text'] then return nil end
+    if blend_ppq >= res.sec_ppq or blend_ppq < range_start_ppq then return nil end
+    if src_ppq and blend_ppq <= src_ppq then return nil end
+    return blend_ppq
+end
 
-        if MANUAL_LIGHTING_SET[lt_text] then
-            local sec_ppq = math.max(range_start_ppq, sec_start_ppq)
-            local kf_end  = math.min(range_end_ppq, sec_end_ppq)
-            local align   = S.venue_keyframe_align
+-- Emits the blend-anchor duplicates for section `res` (see BlendPpq above).
+--
+-- Deliberately keyframe-free, even for a manual preset: the duplicate restates a
+-- preset that is already running, so it gets no [first] and the train from the
+-- original event just carries on through it. See "only a preset CHANGE gets
+-- [first]" in EmitThemeSection.
+local function EmitBlendDuplicates(res, prev, range_start_ppq, lt_events, pp_events)
+    if not prev then return end
+    local blend_lt = BlendPpq(res, prev, range_start_ppq, 'lt')
+    local blend_pp = BlendPpq(res, prev, range_start_ppq, 'pp')
 
-            -- [first] shares the lighting event's tick, blend-in included - it is that
-            -- event's own initial keyframe. Snapped to the half-beat grid the callers
-            -- will snap the lighting event onto (keyframes themselves go in unsnapped),
-            -- so the two land on exactly the same tick.
-            local first_kf_ppq = SnapPpqToHalfBeat(lt_ppq_abs, ppq)
-            if first_kf_ppq < kf_end then
+    if blend_lt then
+        lt_events[#lt_events + 1] = {
+            tick = math.floor(blend_lt - range_start_ppq + 0.5),
+            text = prev.lt_text,
+        }
+    end
+
+    if blend_pp then
+        pp_events[#pp_events + 1] = {
+            tick = math.floor(blend_pp - range_start_ppq + 0.5),
+            text = prev.pp_text,
+        }
+    end
+end
+
+-- Emits the lighting, keyframe control, and postproc events for one resolved
+-- section. Tick offsets are from range_start_ppq.
+--
+-- `prev` is the preset state coming into this section - the previous resolved
+-- section, or the caller-supplied `incoming` for the first one.
+local function EmitThemeSection(res, prev, take, range_start_ppq, range_end_ppq,
+                                ppq, lt_events, ctrl_events, pp_events, inst_note_positions)
+    local sec_ppq = res.sec_ppq
+
+    EmitBlendDuplicates(res, prev, range_start_ppq, lt_events, pp_events)
+
+    if res.lt_text then
+        -- The section's own preset lands exactly ON the section start - a blendin
+        -- never moves it, it only adds the duplicate above (RB3 cuts to the preset
+        -- "when this section begins" either way).
+        lt_events[#lt_events + 1] = {
+            tick = math.floor(sec_ppq - range_start_ppq + 0.5), text = res.lt_text }
+
+        if MANUAL_LIGHTING_SET[res.lt_text] then
+            local kf_end = math.min(range_end_ppq, res.sec_end_ppq)
+            local align  = S.venue_keyframe_align
+
+            -- Only a preset CHANGE starts a keyframe sequence. A section that keeps
+            -- the preset already running gets no [first] - the train from the event
+            -- that did start it carries straight on through this boundary. Same rule
+            -- the blend duplicates follow (EmitBlendDuplicates) and the one the
+            -- Keyframes tab re-derives from the track (RegenerateVenueKeyframes), so
+            -- generating and regenerating agree.
+            --
+            -- Where it is emitted, [first] shares the lighting event's tick - it is
+            -- that event's own initial keyframe. Snapped to the half-beat grid the
+            -- callers will snap the lighting event onto (keyframes themselves go in
+            -- unsnapped), so the two land on exactly the same tick.
+            local first_kf_ppq = SnapPpqToHalfBeat(sec_ppq, ppq)
+            local changes      = not (prev and prev.lt_text == res.lt_text)
+            if changes and first_kf_ppq < kf_end then
                 ctrl_events[#ctrl_events + 1] = {
                     tick = math.floor(first_kf_ppq - range_start_ppq + 0.5),
                     text = '[first]',
@@ -341,14 +433,12 @@ local function ProcessThemeSection(sec, theme, take, range_start_ppq, range_end_
                 end
             else
                 -- Standard modes 0-2: use theme keyframe_rate (or random) for [next] spacing
-                local kf_beats = preset.keyframe_rate
-                    or math.random(KEYFRAME_MIN_BEATS, KEYFRAME_MAX_BEATS)
-                local kf_ticks = kf_beats * ppq
+                local kf_ticks = res.kf_beats * ppq
 
                 -- Anchor for the [next] train: section start, or snapped to the nearest
-                -- beat (mode 1). This is where [first] used to sit - with [first] now on
-                -- the lighting event (blend-in beats earlier), the anchor becomes the
-                -- first [next] instead, so the reaction grid keeps its old positions.
+                -- beat (mode 1). Mode 1's snapped beat is the one case where the anchor
+                -- differs from the lighting event's own tick, and it becomes the first
+                -- [next] rather than the [first].
                 local anchor_ppq
                 if align == 1 then
                     anchor_ppq = math.max(sec_ppq, SnapPpqToNearestBeat(sec_ppq, ppq))
@@ -365,8 +455,8 @@ local function ProcessThemeSection(sec, theme, take, range_start_ppq, range_end_
                     next_ppq = anchor_ppq + kf_ticks
                 end
 
-                -- Skipped when zero blend-in put the lighting event on the anchor
-                -- itself - [first] is already there.
+                -- Skipped in every mode but 1, where the anchor IS the lighting
+                -- event's tick and [first] is already there.
                 if anchor_ppq < kf_end and anchor_ppq > first_kf_ppq then
                     ctrl_events[#ctrl_events + 1] = {
                         tick = math.floor(anchor_ppq - range_start_ppq + 0.5),
@@ -387,17 +477,20 @@ local function ProcessThemeSection(sec, theme, take, range_start_ppq, range_end_
         end
     end
 
-    if pp_pool and #pp_pool > 0 then
-        local pp_blendin_ticks = (preset.postproc_blendin or 0) * ppq
-        local pp_ppq_abs       = math.max(range_start_ppq, sec_start_ppq - pp_blendin_ticks)
-        local pp_tick_offset   = math.floor(pp_ppq_abs - range_start_ppq + 0.5)
-        local pp_text          = pp_pool[math.random(#pp_pool)]
-        pp_events[#pp_events + 1] = { tick = pp_tick_offset, text = pp_text }
+    if res.pp_text then
+        -- Same rule as lighting: the section's own postproc lands on the section start.
+        pp_events[#pp_events + 1] = {
+            tick = math.floor(sec_ppq - range_start_ppq + 0.5), text = res.pp_text }
     end
 end
 
+-- `incoming` (optional): the preset state already active going into the first
+-- section, as { lt_text, pp_text, sec_ppq, kf_beats } - Themes gen passes the
+-- forced song-start bookend, Section gen passes what it read off the VENUE track
+-- (FindActiveVenuePresetsBefore). Without it the first section gets no blend
+-- duplicates, since there is nothing known to blend out of.
 function GenerateThemedSectionEvents(sections, theme, take,
-                                     range_start_ppq, range_end_ppq, ppq)
+                                     range_start_ppq, range_end_ppq, ppq, incoming)
     local lt_events   = {}
     local ctrl_events = {}
     local pp_events   = {}
@@ -411,9 +504,20 @@ function GenerateThemedSectionEvents(sections, theme, take,
             take, range_start_ppq, range_end_ppq)
     end
 
+    -- Pass 1: resolve every section's picks up front - emitting a section needs the
+    -- PREVIOUS one's preset, both to duplicate into the blend zone and to tell whether
+    -- this section actually changes the preset (only a change starts a keyframe run).
+    local resolved = {}
     for _, sec in ipairs(sections) do
-        ProcessThemeSection(sec, theme, take, range_start_ppq, range_end_ppq, ppq,
-                            lt_events, ctrl_events, pp_events, inst_note_positions)
+        local res = ResolveThemeSection(sec, theme, take, range_start_ppq, range_end_ppq, ppq)
+        if res then resolved[#resolved + 1] = res end
+    end
+
+    -- Pass 2: emit.
+    for i, res in ipairs(resolved) do
+        EmitThemeSection(res, resolved[i - 1] or (i == 1 and incoming or nil),
+                         take, range_start_ppq, range_end_ppq, ppq,
+                         lt_events, ctrl_events, pp_events, inst_note_positions)
     end
     return lt_events, ctrl_events, pp_events
 end

@@ -4,7 +4,8 @@
 --           GenerateKeyframesForSpan, ResolveUserCamInterval,
 --           JitteredInterval, CAM_INTERVAL_16THS, CAM_JITTER,
 --           DeleteTextEventsInRange, ClearVenueKeyframesInRange, CategorizeVenueEvent,
---           FindTrackByName, FindFirstMIDIItem, RB3_PHRASE_PITCH, r, S (globals)
+--           FindTrackByName, FindFirstMIDIItem, FormatTime, RB3_PHRASE_PITCH,
+--           r, S (globals)
 
 -- Reason shown wherever a [first] is refused, in the UI's blocked hover and in the
 -- action's own status line, so both read the same.
@@ -28,12 +29,17 @@ end
 
 -- ---------------------------------------------------------------------------
 
+-- "On the playhead" tolerance: a 1/128 note, enough to absorb cursor/grid rounding
+-- and far too small to reach a neighbouring event of the same kind (those are
+-- seconds apart). Shared so every check in this tab means the same thing by it.
+local function _spot_tol(take)
+    return math.floor(GetTakePPQPerQN(take) / 32)
+end
+
 -- Returns the manual lighting event text at ppq_pos on the take, or nil when there is
--- none. tol defaults to a 1/128 note (ppq/32 ticks) - enough to absorb cursor/grid
--- rounding, far too small to reach a neighbouring lighting event (those are seconds
--- apart). Pure function of (take, ppq_pos) so tests can drive it without a playhead.
+-- none. Pure function of (take, ppq_pos) so tests can drive it without a playhead.
 function FindManualLightingAtPpq(take, ppq_pos, tol)
-    tol = tol or math.floor(GetTakePPQPerQN(take) / 32)
+    tol = tol or _spot_tol(take)
     local _, _, _, text_count = r.MIDI_CountEvts(take)
     for i = 0, text_count - 1 do
         local ok, _, _, evt_ppq, evt_type, msg = r.MIDI_GetTextSysexEvt(take, i)
@@ -67,6 +73,130 @@ function InsertVenueEventAtPlayhead(text)
     r.UpdateArrange()
 
     S.status = 'Inserted ' .. text .. ' at playhead (VENUE).'
+end
+
+-- ---------------------------------------------------------------------------
+-- Blend: re-state the currently-active lighting/postproc preset at the playhead, so
+-- RB3 fades into the next one instead of cutting to it. Same anchor Themes gen and
+-- Section gen place automatically from lightpreset_blendin / postproc_blendin.
+
+-- Decides what a Blend click should do. `events` is every text event of ONE kind
+-- ({ppq=, msg=}), sorted by ppq. Pure, so tests can drive it without a take.
+-- Returns either
+--   src, prev        - copy src.msg to cur_ppq (prev is nil when src is the only
+--                      candidate; it is only ever returned for the report)
+--   nil, code, a, b  - refused; code is 'occupied' | 'none' | 'blended'
+function ResolveBlendSource(events, cur_ppq, tol)
+    tol = tol or 0
+
+    -- An anchor belongs BEFORE the event it blends into; stacking two of a kind on
+    -- one tick is never wanted. Checked first, so it wins over the outcomes below.
+    for _, ev in ipairs(events) do
+        if math.abs(ev.ppq - cur_ppq) <= tol then return nil, 'occupied', ev end
+    end
+
+    local last, second_last
+    for _, ev in ipairs(events) do
+        if ev.ppq < cur_ppq then second_last = last; last = ev end
+    end
+
+    if not last then return nil, 'none' end
+    -- Two identical adjacent events of a kind ARE a blend anchor (the same
+    -- "restatement" test EmitBlendDuplicates and RegenerateVenueKeyframes use), so
+    -- a third would change nothing.
+    if second_last and second_last.msg == last.msg then
+        return nil, 'blended', last, second_last
+    end
+    return last, second_last
+end
+
+-- kind: 'lighting' or 'postproc' (CategorizeVenueEvent's own names).
+function BlendVenuePresetAtPlayhead(kind)
+    local track, item, take = _find_venue_track_and_take()
+    if not track then return end
+
+    local cur_ppq = r.MIDI_GetPPQPosFromProjTime(take, r.GetCursorPosition())
+    local label   = (kind == 'postproc') and 'post-process' or 'lighting'
+
+    -- Classify with the shared CategorizeVenueEvent rather than re-deriving the
+    -- [lighting / .pp] patterns here (actions_venue_subtracks.lua).
+    local events = {}
+    local _, _, _, text_count = r.MIDI_CountEvts(take)
+    for i = 0, text_count - 1 do
+        local ok, _, _, evt_ppq, evt_type, msg = r.MIDI_GetTextSysexEvt(take, i)
+        if ok and evt_type == 1 and CategorizeVenueEvent(msg) == kind then
+            events[#events + 1] = { ppq = evt_ppq, msg = msg }
+        end
+    end
+    table.sort(events, function(a, b) return a.ppq < b.ppq end)
+
+    local function at(ev)
+        return FormatTime(r.MIDI_GetProjTimeFromPPQPos(take, ev.ppq))
+    end
+
+    local src, prev_or_code, a, b = ResolveBlendSource(events, cur_ppq, _spot_tol(take))
+
+    -- Every refusal returns before any Undo_* call, so it leaves no undo point.
+    if not src then
+        local lines
+        if prev_or_code == 'occupied' then
+            S.status = ('%s is already at the playhead - nothing to blend.'):format(a.msg)
+            lines = {
+                ('Refused: %s already sits at the playhead (%s).'):format(a.msg, at(a)),
+                '',
+                'A blend anchor goes BEFORE the event it blends into - move the cursor',
+                'back a beat or two and try again.',
+            }
+        elseif prev_or_code == 'none' then
+            S.status = ('No %s event before the playhead - nothing to blend from.'):format(label)
+            lines = {
+                ('Refused: no %s event exists before the playhead.'):format(label),
+                '',
+                ('Add the %s preset that should be running first, then blend into the'):format(label),
+                'one that follows it.',
+            }
+        else  -- 'blended'
+            S.status = ('Already blended - the last two %s events are the same.'):format(label)
+            lines = {
+                ('Refused: the two most recent %s events before the playhead are'):format(label),
+                'identical, which is exactly what a blend anchor looks like. Adding a',
+                'third copy would change nothing.',
+                '',
+                ('  %s   %s   (most recent)'):format(a.msg, at(a)),
+                ('  %s   %s'):format(b.msg, at(b)),
+            }
+        end
+        S.last_result = table.concat(lines, '\n')
+        return
+    end
+
+    r.PreventUIRefresh(1)
+    r.Undo_BeginBlock2(0)
+    r.MarkTrackItemsDirty(track, item)
+    r.MIDI_InsertTextSysexEvt(take, false, false, cur_ppq, 1, src.msg)
+    r.Undo_EndBlock2(0, 'RB Blend VENUE ' .. label .. ': ' .. src.msg, -1)
+    r.PreventUIRefresh(-1)
+    r.UpdateArrange()
+
+    local placed_t = FormatTime(r.MIDI_GetProjTimeFromPPQPos(take, cur_ppq))
+    local lines = {
+        ('Copied the active %s preset to the playhead as a blend anchor.'):format(label),
+        '',
+        ('  Source:  %s   %s'):format(src.msg, at(src)),
+        ('  Placed:  %s   %s'):format(src.msg, placed_t),
+        '',
+    }
+    local prev = prev_or_code
+    if prev then
+        lines[#lines + 1] = ('The %s before it was %s (%s), so this is a real change'):format(
+            label, prev.msg, at(prev))
+        lines[#lines + 1] = 'and not an anchor that already exists.'
+    else
+        lines[#lines + 1] = ('It is the only %s event before the playhead, so there was no'):format(label)
+        lines[#lines + 1] = 'existing blend to detect.'
+    end
+    S.status      = ('Blended: copied %s to the playhead.'):format(src.msg)
+    S.last_result = table.concat(lines, '\n')
 end
 
 -- ---------------------------------------------------------------------------
@@ -137,7 +267,8 @@ function GenerateManualKeyframes()
     -- The keyframe train belongs to the lighting event under the playhead - that event,
     -- not the lighting dropdown, decides whether generation is allowed, so an existing
     -- [lighting (...)] can be re-keyframed without re-picking it above.
-    if not FindManualLightingAtPpq(take, start_ppq) then
+    local cur_lt_text = FindManualLightingAtPpq(take, start_ppq)
+    if not cur_lt_text then
         S.status = NO_LIGHTING_AT_PLAYHEAD_MSG
         return
     end
@@ -153,13 +284,15 @@ function GenerateManualKeyframes()
         if sel_end_ppq < end_ppq then end_ppq = sel_end_ppq end
     end
 
-    -- Clamp to next lighting event after cursor
+    -- Clamp to next lighting event after cursor. An event restating the preset being
+    -- keyframed - a blend-in duplicate ahead of the next section - changes nothing and
+    -- must not cut the train short; only a real preset change ends the span.
     local _, _, _, tc = r.MIDI_CountEvts(take)
     local next_lt_ppq = nil
     for i = 0, tc - 1 do
         local ok, _, _, ppq_pos, evt_type, msg = r.MIDI_GetTextSysexEvt(take, i)
         if ok and evt_type == 1 and ppq_pos > start_ppq + half_beat
-                and msg:find('^%[lighting') then
+                and msg:find('^%[lighting') and msg ~= cur_lt_text then
             if not next_lt_ppq or ppq_pos < next_lt_ppq then
                 next_lt_ppq = ppq_pos
             end
