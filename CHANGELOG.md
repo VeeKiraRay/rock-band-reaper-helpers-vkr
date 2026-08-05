@@ -9,6 +9,29 @@ over 5. See `CLAUDE.md` → "Changelog / `@about` trimming" for the rule.
 
 `rock_band_general_helper_vkr.lua`
 
+**v0.9.36**
+- Guitar tab converter and Tab Input's Guitar/Bass guide are now
+  chord-quality-aware: a real-guitar interval like a power chord's
+  perfect fifth always gets a matching lane spread (1-3: GY/RB/YO)
+  instead of whatever pitch-rank pool-cycling happened to land on,
+  and the preview/guide report annotates recognized shapes with
+  their chord name (e.g. "[Power chord]"). This applies by PITCH
+  CLASS, not physical note count: a shape played on 3 strings but
+  harmonically just root+5th+octave (e.g. "x x x 7 7 5") is
+  recognized as a power chord and correctly collapses to a 2-gem
+  1-3 combo, matching real RB charts, instead of being treated as
+  an unrelated 3-note chord. Genuine 3-distinct-pitch-class shapes
+  (real triads etc.) are unaffected - the library has no narrower
+  mapping for those, though the report now names them too when
+  recognized (e.g. "[Major triad]"). Consults
+  lib/reaper_guitar_theory.lua (already used by the Music Theory
+  Helper) via new shared BuildShapeGemMap (actions_guitar.lua),
+  which replaces the near-identical shape->gem map building
+  previously duplicated in AssignGems and AssignGemsForGuide
+  (actions_guitar_guide.lua). actions_guitar_guide.lua's local
+  TAB_OPEN tuning table is gone, now reads GUITAR_TAB_OPEN from the
+  shared lib.
+
 **v0.9.35**
 - Venue > Camera pacing: new "Vocal phrase start" mode - camera cuts land
   exactly on PART VOCALS phrase-marker (pitch 105) note starts instead

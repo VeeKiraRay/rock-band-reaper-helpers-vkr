@@ -114,7 +114,12 @@ local function DeserializeSettings(str)
         -- MIDI note length/sustain adjustment
         elseif k == 'mndi'  then S.mn_diff_idx         = tonumber(v) or S.mn_diff_idx
         elseif k == 'mnnt'  then S.mn_note_type        = tonumber(v) or S.mn_note_type
-        elseif k == 'mnnd'  then S.mn_note_denom       = tonumber(v) or S.mn_note_denom
+        -- Note size: only the values the combo still offers (1/8 was dropped
+        -- when 1/8 became the sustain threshold) - an older project's 1/8
+        -- would render as a blank selection, so keep the current value instead.
+        elseif k == 'mnnd'  then
+            local d = tonumber(v)
+            if d == 16 or d == 32 or d == 64 or d == 128 then S.mn_note_denom = d end
         elseif k == 'mns32' then S.mn_sustain_32nds    = tonumber(v) or S.mn_sustain_32nds
         -- Venue theme
         elseif k == 'vthn'  then S.venue_theme_name      = v

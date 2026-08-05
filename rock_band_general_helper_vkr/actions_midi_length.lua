@@ -6,18 +6,28 @@
 -- QN floats) so results always land exactly on REAPER's own note-length grid
 -- - standard note values divide evenly into GetTakePPQPerQN's tick count.
 
-local SUSTAIN_MIN_DENOM = 4    -- 1/4 note: minimum length to be treated as a sustain
+local SUSTAIN_MIN_DENOM = 8    -- 1/8 note: minimum length to be treated as a sustain
 local FLOOR_DENOM        = 32   -- 1/32 note: minimum length any note can be shortened to
 local SEARCH_WINDOW_32NDS = 16  -- how far ahead (in 32nd notes) to look for "the next note"
+                                -- (16x1/32 = a half note, i.e. half a measure in 4/4)
+
+-- Standard sustain gap per difficulty tier, in 32nd notes (S.mn_diff_idx:
+-- 1=Expert, 2=Hard, 3=Medium, 4=Easy). The UI prefills the gap slider with
+-- this when the tier is chosen; the user is free to override it afterwards.
+local SUSTAIN_GAP_BY_DIFF = { [1] = 3, [2] = 4, [3] = 8, [4] = 16 }
+
+function SustainGapDefaultForDiff(diff_idx)
+    return SUSTAIN_GAP_BY_DIFF[diff_idx]
+end
 
 -- Standard note length in take-relative PPQ ticks, rounded to the nearest tick.
 local function NoteLenPPQ(ppq_per_qn, denom)
     return math.floor(ppq_per_qn * 4 / denom + 0.5)
 end
 
--- Set every non-sustain note's (length < 1/4 note) end position (in [lo,hi]
+-- Set every non-sustain note's (length < 1/8 note) end position (in [lo,hi]
 -- pitch range, inside the scope) to start + the standard length for `denom`.
--- Existing sustains (>= 1/4 note) are left completely untouched. Single pass:
+-- Existing sustains (>= 1/8 note) are left completely untouched. Single pass:
 -- note count and start positions are never touched, so no re-sort/index-shift
 -- concerns. Every matching pitch still gets its own MIDI_SetNote call, but a
 -- chord (multiple notes sharing one start tick, e.g. a Green+Red+Blue chord)
@@ -47,13 +57,18 @@ local function AdjustNonSustainLengths(take, lo, hi, sel_s, sel_e, denom)
     return count
 end
 
--- For every sustain (length >= 1/4 note) in [lo,hi] pitch range inside the
+-- For every sustain (length >= 1/8 note) in [lo,hi] pitch range inside the
 -- scope, set its end position so the gap to the next in-range note is
 -- exactly `gap_32nds` x 1/32 note - widening or narrowing the sustain as
 -- needed. A sustain with no next note within SEARCH_WINDOW_32NDS x 1/32 notes
 -- of its own end is left unchanged (skipped). If honoring the requested gap
 -- would shrink the sustain below the 1/32-note floor, it's clamped to that
 -- floor instead (becomes a non-sustain).
+--
+-- "Next note" is the EARLIEST note starting after the sustain's own start
+-- tick - including one that starts inside the sustain (an already-overlapping
+-- note). Measuring only from the sustain's tail would step over such a note
+-- and stretch the sustain toward a later one, leaving the overlap in place.
 --
 -- Every matching pitch still gets its own MIDI_SetNote call, but a chord
 -- sustain (multiple notes sharing one start tick, e.g. a Green+Red+Blue
@@ -91,10 +106,20 @@ local function AdjustSustainGaps(take, lo, hi, sel_s, sel_e, gap_32nds)
     for i, note in ipairs(notes) do
         local len = note.eppq - note.sppq
         if len >= sustain_min then
+            -- Earliest note starting strictly after this sustain's own start
+            -- tick (notes sharing the start tick are chord-mates, not "next").
+            -- `notes` is start-sorted, so the first such note is the earliest.
+            -- A note starting inside the sustain counts: it's buried under the
+            -- sustain and must be uncovered, however far the next clean note
+            -- is. Only a note at or past the sustain's end is subject to the
+            -- search window - nothing that close means "leave this alone".
             local next_sppq = nil
             for j = i + 1, #notes do
-                if notes[j].sppq >= note.eppq then
-                    if notes[j].sppq - note.eppq <= search_win then next_sppq = notes[j].sppq end
+                if notes[j].sppq > note.sppq then
+                    if notes[j].sppq < note.eppq
+                       or notes[j].sppq - note.eppq <= search_win then
+                        next_sppq = notes[j].sppq
+                    end
                     break
                 end
             end

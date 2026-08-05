@@ -19,13 +19,26 @@ local MN_DIFF_OPTIONS = {
 }
 
 -- MIDI > Length > Midi note: Note size dropdown options (S.mn_note_denom).
+-- No 1/8 entry: 1/8 is the sustain threshold, so a "non-sustain" target can
+-- never land on it.
 local MN_NOTE_SIZE_OPTIONS = {
-    { idx = 8,   label = '1/8' },
     { idx = 16,  label = '1/16' },
     { idx = 32,  label = '1/32' },
     { idx = 64,  label = '1/64' },
     { idx = 128, label = '1/128' },
 }
+
+-- Warn when the selected track isn't the one open in the MIDI editor.
+-- Silent when no editor is open, or when track_idx is unset.
+local function MidiEditorTrackWarning(track_idx)
+    if track_idx < 0 then return end
+    local ed      = r.MIDIEditor_GetActive()
+    local ed_take = ed and r.MIDIEditor_GetTake(ed)
+    local ed_tr   = ed_take and r.GetMediaItemTake_Track(ed_take)
+    if ed_tr and ed_tr ~= r.GetTrack(0, track_idx) then
+        r.ImGui_TextColored(ctx, 0xFFAA00FF, '! Source track not open in the MIDI editor.')
+    end
+end
 
 -- Shared body for each Tab Input mode sub-tab: format selector, mode-specific
 -- option, textarea, and Add note / Run guide. mode: 0=Guitar/Bass, 1=Keys/Pro
@@ -165,19 +178,26 @@ function DrawMIDITab(ctx)
         if r.ImGui_BeginTabItem(ctx, 'Length') then
             SectionHeader('Midi note')
 
-            local lbl_col_mn = LabelColWidth({ 'Midi track', 'Difficulty', 'Note type', 'Note size' })
+            local lbl_col_mn = LabelColWidth({ 'Source track', 'Difficulty', 'Note type', 'Note size' })
 
-            r.ImGui_Text(ctx, 'Midi track')
+            r.ImGui_Text(ctx, 'Source track')
             r.ImGui_SameLine(ctx, lbl_col_mn)
             r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
             S.mn_midi_idx = TrackCombo('##mn_track', S.mn_midi_idx, midi_tracks)
             Tooltip(TIPS.mn_midi_track)
+            MidiEditorTrackWarning(S.mn_midi_idx)
 
+            -- Picking a tier prefills the standard gap for it; a manual slider
+            -- tweak afterwards sticks (only a CHANGE of tier overwrites it).
             r.ImGui_Text(ctx, 'Difficulty')
             r.ImGui_SameLine(ctx, lbl_col_mn)
             r.ImGui_SetNextItemWidth(ctx, WIDTH_SHORT)
+            local prev_diff_mn = S.mn_diff_idx
             S.mn_diff_idx = TrackCombo('##mn_diff', S.mn_diff_idx, MN_DIFF_OPTIONS)
             Tooltip(TIPS.mn_diff)
+            if S.mn_diff_idx ~= prev_diff_mn then
+                S.mn_sustain_32nds = SustainGapDefaultForDiff(S.mn_diff_idx) or S.mn_sustain_32nds
+            end
 
             r.ImGui_Spacing(ctx)
             local radio_w_mn = RadioGroupWidth({ 'Non-sustains', 'Only sustains' })
@@ -242,14 +262,7 @@ function DrawMIDITab(ctx)
             r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
             S.mr_midi_src_idx = TrackCombo('##mr_src', S.mr_midi_src_idx, midi_tracks)
             Tooltip(TIPS.mr_midi_src)
-            if S.mr_midi_src_idx >= 0 then
-                local _ed      = r.MIDIEditor_GetActive()
-                local _ed_take = _ed and r.MIDIEditor_GetTake(_ed)
-                local _ed_tr   = _ed_take and r.GetMediaItemTake_Track(_ed_take)
-                if _ed_tr and _ed_tr ~= r.GetTrack(0, S.mr_midi_src_idx) then
-                    r.ImGui_TextColored(ctx, 0xFFAA00FF, '! Source track not open in the MIDI editor.')
-                end
-            end
+            MidiEditorTrackWarning(S.mr_midi_src_idx)
 
             r.ImGui_Text(ctx, 'Difficulty')
             r.ImGui_SameLine(ctx, lbl_col_pat)

@@ -146,8 +146,10 @@ S = {
     mn_midi_idx           = -1,
     mn_diff_idx           = 1,     -- 1=Expert, 2=Hard, 3=Medium, 4=Easy (no "All")
     mn_note_type          = 0,     -- 0 = All notes, 1 = Only sustains
-    mn_note_denom         = 32,    -- All notes: note size denominator (8/16/32/64/128)
-    mn_sustain_32nds      = 3,     -- Only sustains: gap size in 32nd notes (0-32)
+    mn_note_denom         = 32,    -- All notes: note size denominator (16/32/64/128)
+    mn_sustain_32nds      = 3,     -- Only sustains: gap size in 32nd notes (0-32);
+                                   -- matches SustainGapDefaultForDiff(1) (Expert),
+                                   -- which prefills it when the tier is changed
     -- Pattern Replace (session-only - not persisted)
     mr_midi_src_idx       = -1,
     mr_diff_idx           = 0,     -- 0=All, 1=Expert, 2=Hard, 3=Medium, 4=Easy
@@ -716,23 +718,32 @@ TIPS = {
                 "If shrinking: check that no notes exist beyond the new item end.",
 
     -- MIDI tab - Midi note (length/sustain adjustment)
-    mn_midi_track  = "MIDI track to adjust note lengths on.",
+    mn_midi_track  = "MIDI track to adjust note lengths on.\n\n" ..
+                     "A warning appears below if this is not the track currently open in\n" ..
+                     "the MIDI editor.",
     mn_diff        = "Restricts the adjustment to one difficulty tier's pitch range.\n\n" ..
                      "PART DRUMS/GUITAR/BASS/KEYS: Expert 96-100, Hard 84-88,\n" ..
                      "Medium 72-76, Easy 60-64.\n\n" ..
                      "PART VOCALS/HARM1-3 and PART REAL_KEYS*/PART KEYS_ANIM* always use\n" ..
                      "their own fixed range regardless of this selector.\n\n" ..
-                     "No notes outside the selected range are touched.",
-    mn_note_type   = "Non-sustains: unify every note SHORTER than 1/4 note to the selected\n" ..
-                     "Note size. Existing sustains (>= 1/4 note) are left untouched.\n\n" ..
+                     "No notes outside the selected range are touched.\n\n" ..
+                     "Changing the tier prefills the 32nd note amount with that tier's\n" ..
+                     "standard gap (Expert 3, Hard 4, Medium 8, Easy 16). Adjust it\n" ..
+                     "afterwards and your value sticks.",
+    mn_note_type   = "Non-sustains: unify every note SHORTER than 1/8 note to the selected\n" ..
+                     "Note size. Existing sustains (>= 1/8 note) are left untouched.\n\n" ..
                      "Only sustains: leave note starts and short notes untouched; instead\n" ..
-                     "adjust the gap between each sustain (>= 1/4 note) and the next note.",
+                     "adjust the gap between each sustain (>= 1/8 note) and the next note.",
     mn_note_denom  = "Standard note length every non-sustain note in range is set to (start\n" ..
-                     "position unchanged, only the end position moves). Default: 1/32.",
+                     "position unchanged, only the end position moves). Default: 1/32.\n\n" ..
+                     "1/8 is not offered: that is the sustain threshold.",
     mn_sustain_32nds = "Target gap, in 32nd notes, between a sustain's end and the next note.\n\n" ..
                      "Widens or shortens the sustain as needed to hit this gap exactly.\n" ..
+                     "Prefilled per difficulty tier (Expert 3, Hard 4, Medium 8, Easy 16).\n\n" ..
                      "Only looks up to a half note (16x32nd notes) ahead for a next note -\n" ..
-                     "sustains with nothing that close are left unchanged.",
+                     "sustains with nothing that close are left unchanged. A note starting\n" ..
+                     "INSIDE the sustain always counts as the next note, however far the\n" ..
+                     "following one is, so an overlap is never left behind.",
     mn_adjust      = "Apply the note-length/sustain-gap adjustment to the selected track\n" ..
                      "and difficulty range.\n\n" ..
                      "With a time selection: only adjusts notes starting inside it.\n" ..

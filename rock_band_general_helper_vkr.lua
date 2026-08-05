@@ -1,6 +1,6 @@
 -- @description Rock Band General Helper
 -- @author VeeKiraRay
--- @version 0.9.40
+-- @version 0.9.41
 -- @about
 --   Utility actions for Rock Band authoring in REAPER.
 --
@@ -21,6 +21,33 @@
 --   This @about block keeps only the 5 most recent versions.
 --   Full history: CHANGELOG.md in the repo.
 --
+--   v0.9.41
+--     - MIDI tab > Length > Midi note: fixed sustains being left overlapping
+--       the note after them. "Only sustains" looked for "the next note" by
+--       scanning for the first note starting at or after the sustain's own
+--       END, so a note that started INSIDE the sustain (an existing overlap)
+--       was stepped over and the sustain was sized against a later note
+--       instead - leaving the buried note overlapped, or burying it deeper.
+--       The next note is now the EARLIEST note starting after the sustain's
+--       start tick; one starting inside the sustain always counts, however
+--       far the following clean note is. Unchanged otherwise: chord-mates
+--       sharing the start tick are still not "next", and a sustain whose
+--       next note is more than half a measure (16x32nd notes) past its end
+--       is still left alone.
+--     - MIDI tab > Length > Midi note: a sustain is now any note >= 1/8 note
+--       (was 1/4), matching Rock Band charting. "Only sustains" therefore
+--       also adjusts 1/8-note sustains, and "Non-sustains" only unifies
+--       notes shorter than 1/8 instead of flattening them. 1/8 is no longer
+--       offered in the Note size list (it is the threshold itself); a
+--       project saved with it falls back to the current value on load.
+--     - MIDI tab > Length > Midi note: changing Difficulty prefills the
+--       "32nd note amount" gap with that tier's standard value (Expert 3,
+--       Hard 4, Medium 8, Easy 16). Adjusting the slider afterwards sticks -
+--       only another tier change overwrites it.
+--     - MIDI tab > Length > Midi note: the track selector is now labeled
+--       "Source track" and warns when it is not the track open in the MIDI
+--       editor, as the Pattern sub-tab already did. Both sub-tabs now share
+--       one MidiEditorTrackWarning helper (ui_midi.lua).
 --   v0.9.40
 --     - MIDI tab > Pattern: fixed "Go Prev" doing nothing useful when the edit
 --       cursor sat inside a match. It treated the current match's own start as
@@ -91,28 +118,6 @@
 --       (ConvertGuitar) has always behaved (it never had a palette-mode
 --       equivalent). S.mc_gtr_tab_ordered and its ExtState key (mcgtor)
 --       are gone.
---   v0.9.36
---     - Guitar tab converter and Tab Input's Guitar/Bass guide are now
---       chord-quality-aware: a real-guitar interval like a power chord's
---       perfect fifth always gets a matching lane spread (1-3: GY/RB/YO)
---       instead of whatever pitch-rank pool-cycling happened to land on,
---       and the preview/guide report annotates recognized shapes with
---       their chord name (e.g. "[Power chord]"). This applies by PITCH
---       CLASS, not physical note count: a shape played on 3 strings but
---       harmonically just root+5th+octave (e.g. "x x x 7 7 5") is
---       recognized as a power chord and correctly collapses to a 2-gem
---       1-3 combo, matching real RB charts, instead of being treated as
---       an unrelated 3-note chord. Genuine 3-distinct-pitch-class shapes
---       (real triads etc.) are unaffected - the library has no narrower
---       mapping for those, though the report now names them too when
---       recognized (e.g. "[Major triad]"). Consults
---       lib/reaper_guitar_theory.lua (already used by the Music Theory
---       Helper) via new shared BuildShapeGemMap (actions_guitar.lua),
---       which replaces the near-identical shape->gem map building
---       previously duplicated in AssignGems and AssignGemsForGuide
---       (actions_guitar_guide.lua). actions_guitar_guide.lua's local
---       TAB_OPEN tuning table is gone, now reads GUITAR_TAB_OPEN from the
---       shared lib.
 r = reaper  -- global so all dofile'd modules can use it
 
 if not r.ImGui_CreateContext then

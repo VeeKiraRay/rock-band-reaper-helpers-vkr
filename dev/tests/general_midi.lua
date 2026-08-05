@@ -561,7 +561,7 @@ end)
 ----------------------------------------------------------------------
 Test.section('Midi note length adjustment - AdjustMidiNoteLengths')
 
-Test.it('Non-sustains: unifies every note shorter than 1/4 note to the selected note size', function()
+Test.it('Non-sustains: unifies every note shorter than 1/8 note to the selected note size', function()
     reset()
     local take, item, idx = MakeMidiTrack('PART GUITAR', 20)
     local ppq_per_qn = GetTakePPQPerQN(take)
@@ -701,16 +701,16 @@ Test.it('Only sustains: skips a sustain with no next note within the 16x32nd sea
     CleanupFixture(idx)
 end)
 
-Test.it('Only sustains: a note shorter than 1/4 note is left untouched', function()
+Test.it('Only sustains: a note shorter than 1/8 note is left untouched', function()
     reset()
     local take, item, idx = MakeMidiTrack('PART GUITAR', 20)
     local ppq_per_qn = GetTakePPQPerQN(take)
     local len32      = math.floor(ppq_per_qn * 4 / 32 + 0.5)
 
-    -- An 8th-note-length note (not a sustain: shorter than 1/4 note), and a
+    -- A 16th-note-length note (not a sustain: shorter than 1/8 note), and a
     -- following note close enough that a real sustain would be adjusted.
     local short_sppq = 0
-    local short_eppq = math.floor(ppq_per_qn / 2 + 0.5)  -- 1/8 note
+    local short_eppq = math.floor(ppq_per_qn / 4 + 0.5)  -- 1/16 note
     local next_sppq  = short_eppq + len32
     r.MIDI_InsertNote(take, false, false, short_sppq, short_eppq, 0, 96, 100, false)
     r.MIDI_InsertNote(take, false, false, next_sppq, next_sppq + len32, 0, 96, 100, false)
@@ -789,6 +789,131 @@ Test.it('Non-sustains: a chord (same start tick) is counted once, not per pitch'
             ('chord note %d: expected length %d, got %d'):format(i, len32, eppq - sppq))
     end
     CleanupFixture(idx)
+end)
+
+Test.it('Only sustains: an exactly-1/8-note note counts as a sustain and is adjusted', function()
+    reset()
+    local take, item, idx = MakeMidiTrack('PART GUITAR', 20)
+    local ppq_per_qn = GetTakePPQPerQN(take)
+    local len32      = math.floor(ppq_per_qn * 4 / 32 + 0.5)
+
+    -- Exactly at the sustain threshold (1/8 note), with a next note 4x32nds on.
+    local sustain_sppq = 0
+    local sustain_eppq = math.floor(ppq_per_qn / 2 + 0.5)  -- 1/8 note
+    local next_sppq    = sustain_eppq + 4 * len32
+    r.MIDI_InsertNote(take, false, false, sustain_sppq, sustain_eppq, 0, 96, 100, false)
+    r.MIDI_InsertNote(take, false, false, next_sppq, next_sppq + len32, 0, 96, 100, false)
+
+    S.mn_midi_idx      = idx
+    S.mn_diff_idx      = 1
+    S.mn_note_type     = 1
+    S.mn_sustain_32nds = 2
+    AdjustMidiNoteLengths()
+
+    local ok, _, _, new_sppq, new_eppq = r.MIDI_GetNote(take, 0)
+    Test.expect(ok and new_eppq == next_sppq - 2 * len32,
+        ('expected the 1/8-note sustain adjusted to end at %d, got %d'):format(
+            next_sppq - 2 * len32, new_eppq))
+    CleanupFixture(idx)
+end)
+
+Test.it('Only sustains: a note buried INSIDE the sustain is the next note, not a later one', function()
+    reset()
+    local take, item, idx = MakeMidiTrack('PART GUITAR', 20)
+    local ppq_per_qn = GetTakePPQPerQN(take)
+    local len32      = math.floor(ppq_per_qn * 4 / 32 + 0.5)
+
+    -- A 3-quarter-note sustain that already overlaps a short note at 1 QN.
+    -- Measuring only from the sustain's tail would step over that note and
+    -- size the gap against the one at 3 QN, leaving the overlap in place.
+    local sustain_sppq  = 0
+    local sustain_eppq  = 3 * ppq_per_qn
+    local buried_sppq   = ppq_per_qn
+    local later_sppq    = 3 * ppq_per_qn
+    r.MIDI_InsertNote(take, false, false, sustain_sppq, sustain_eppq, 0, 96, 100, false)
+    r.MIDI_InsertNote(take, false, false, buried_sppq, buried_sppq + len32, 0, 97, 100, false)
+    r.MIDI_InsertNote(take, false, false, later_sppq, later_sppq + len32, 0, 98, 100, false)
+
+    S.mn_midi_idx      = idx
+    S.mn_diff_idx      = 1
+    S.mn_note_type     = 1
+    S.mn_sustain_32nds = 2
+    AdjustMidiNoteLengths()
+
+    local ok, _, _, new_sppq, new_eppq = r.MIDI_GetNote(take, 0)
+    Test.expect(ok and new_sppq == sustain_sppq, 'sustain start must not move')
+    Test.expect(new_eppq == buried_sppq - 2 * len32,
+        ('expected the sustain sized against the buried note (end %d), got %d'):format(
+            buried_sppq - 2 * len32, new_eppq))
+    Test.expect(new_eppq < buried_sppq, 'the sustain must no longer overlap the buried note')
+    CleanupFixture(idx)
+end)
+
+Test.it('Only sustains: a buried note is honored even with no clean next note in the window', function()
+    reset()
+    local take, item, idx = MakeMidiTrack('PART GUITAR', 20)
+    local ppq_per_qn = GetTakePPQPerQN(take)
+    local len32      = math.floor(ppq_per_qn * 4 / 32 + 0.5)
+
+    -- Buried note at 1 QN; the next clean note is 20 QN away, far outside the
+    -- 16x32nd window. The overlap is a defect regardless, so it still wins.
+    local sustain_sppq = 0
+    local sustain_eppq = 2 * ppq_per_qn
+    local buried_sppq  = ppq_per_qn
+    local far_sppq     = 20 * ppq_per_qn
+    r.MIDI_InsertNote(take, false, false, sustain_sppq, sustain_eppq, 0, 96, 100, false)
+    r.MIDI_InsertNote(take, false, false, buried_sppq, buried_sppq + len32, 0, 97, 100, false)
+    r.MIDI_InsertNote(take, false, false, far_sppq, far_sppq + len32, 0, 98, 100, false)
+
+    S.mn_midi_idx      = idx
+    S.mn_diff_idx      = 1
+    S.mn_note_type     = 1
+    S.mn_sustain_32nds = 2
+    AdjustMidiNoteLengths()
+
+    local ok, _, _, _, new_eppq = r.MIDI_GetNote(take, 0)
+    Test.expect(ok and new_eppq == buried_sppq - 2 * len32,
+        ('expected end at %d (buried note), got %d'):format(buried_sppq - 2 * len32, new_eppq))
+    CleanupFixture(idx)
+end)
+
+Test.it('Only sustains: a next note starting exactly at the sustain end is seen', function()
+    reset()
+    local take, item, idx = MakeMidiTrack('PART GUITAR', 20)
+    local ppq_per_qn = GetTakePPQPerQN(take)
+    local len32      = math.floor(ppq_per_qn * 4 / 32 + 0.5)
+
+    -- Sustain end and next note start share a tick (zero gap) - and a third
+    -- note further on that must NOT be the one measured against.
+    local sustain_sppq = 0
+    local sustain_eppq = ppq_per_qn
+    local next_sppq    = ppq_per_qn
+    local later_sppq   = ppq_per_qn + 8 * len32
+    r.MIDI_InsertNote(take, false, false, sustain_sppq, sustain_eppq, 0, 96, 100, false)
+    r.MIDI_InsertNote(take, false, false, next_sppq, next_sppq + len32, 0, 97, 100, false)
+    r.MIDI_InsertNote(take, false, false, later_sppq, later_sppq + len32, 0, 98, 100, false)
+
+    S.mn_midi_idx      = idx
+    S.mn_diff_idx      = 1
+    S.mn_note_type     = 1
+    S.mn_sustain_32nds = 2
+    AdjustMidiNoteLengths()
+
+    local ok, _, _, _, new_eppq = r.MIDI_GetNote(take, 0)
+    Test.expect(ok and new_eppq == next_sppq - 2 * len32,
+        ('expected end at %d, got %d'):format(next_sppq - 2 * len32, new_eppq))
+    CleanupFixture(idx)
+end)
+
+Test.it('SustainGapDefaultForDiff returns the standard gap per tier', function()
+    local want = { [1] = 3, [2] = 4, [3] = 8, [4] = 16 }
+    for diff, gap in pairs(want) do
+        local got = SustainGapDefaultForDiff(diff)
+        Test.expect(got == gap,
+            ('diff %d: expected gap %d, got %s'):format(diff, gap, tostring(got)))
+    end
+    Test.expect(SustainGapDefaultForDiff(0) == nil, 'expected nil for a non-tier index')
+    Test.expect(SustainGapDefaultForDiff(5) == nil, 'expected nil for a non-tier index')
 end)
 
 ----------------------------------------------------------------------
