@@ -4,6 +4,7 @@
 --           GenerateKeyframesForSpan, ResolveUserCamInterval,
 --           JitteredInterval, CAM_INTERVAL_16THS, CAM_JITTER,
 --           DeleteTextEventsInRange, ClearVenueKeyframesInRange, CategorizeVenueEvent,
+--           IsBlendAnchor,
 --           FindTrackByName, FindFirstMIDIItem, FormatTime, RB3_PHRASE_PITCH,
 --           r, S (globals)
 
@@ -101,10 +102,10 @@ function ResolveBlendSource(events, cur_ppq, tol)
     end
 
     if not last then return nil, 'none' end
-    -- Two identical adjacent events of a kind ARE a blend anchor (the same
-    -- "restatement" test EmitBlendDuplicates and RegenerateVenueKeyframes use), so
-    -- a third would change nothing.
-    if second_last and second_last.msg == last.msg then
+    -- Two identical adjacent events of a kind ARE a blend anchor (IsBlendAnchor,
+    -- venue_lighting.lua - the shared rule EmitBlendDuplicates writes and the
+    -- validator reads back), so a third copy would change nothing.
+    if IsBlendAnchor(second_last, last) then
         return nil, 'blended', last, second_last
     end
     return last, second_last

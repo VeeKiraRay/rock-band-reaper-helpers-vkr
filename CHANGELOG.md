@@ -9,6 +9,15 @@ over 5. See `CLAUDE.md` → "Changelog / `@about` trimming" for the rule.
 
 `rock_band_general_helper_vkr.lua`
 
+**v0.9.40**
+- MIDI tab > Pattern: fixed "Go Prev" doing nothing useful when the edit
+  cursor sat inside a match. It treated the current match's own start as
+  a valid "previous" target, so pressing it jumped backwards to the start
+  of the instance you were already in rather than reaching the previous
+  one - and from mid-pattern it took two presses to actually move. Go
+  Prev now steps out of the instance under the cursor first. Go Next was
+  never affected. Caught by the MIDI fixture test suite.
+
 **v0.9.39**
 - MIDI tab > Pattern: new "Go Prev" / "Go Next" buttons move the edit
   cursor between Search-pattern matches; "List Search" reports every

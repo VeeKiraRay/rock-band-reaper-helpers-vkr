@@ -6,7 +6,8 @@
 --   LIGHTING_OFFSET_16THS, INST_KF_MODES,
 --   KF_ALIGN_LABELS, FindNextMeasureStartPpq, CollectInstNotePositions,
 --   CollectVocalPhraseStarts, GenerateKeyframesForSpan, GenerateLightingEvents,
---   GenerateThemedSectionEvents, KeyframeSubdivQN, SnapPpqToHalfBeat
+--   GenerateThemedSectionEvents, KeyframeSubdivQN, SnapPpqToHalfBeat,
+--   IsBlendAnchor
 --
 -- Keyframe placement rule: [first] always lands on the SAME tick as the manual
 -- lighting event it drives - it is that event's own initial keyframe. The
@@ -93,6 +94,20 @@ end
 
 local function SnapPpqToNearestBeat(ppq_pos, ppq)
     return math.floor(ppq_pos / ppq + 0.5) * ppq
+end
+
+-- Two identical ADJACENT events of one kind are a blend anchor: the outgoing preset
+-- restated ahead of the change, so RB3 interpolates into the next one instead of
+-- cutting to it. `a` is the event immediately before `b`; either may be nil at the
+-- start of a track, which is simply "not an anchor".
+--
+-- The one home for the rule, since three places read it back off a track and must
+-- agree: ResolveBlendSource (Manual gen's Blend button refuses to add a third copy),
+-- ValidateVenueLightingBlends (reports changes with no anchor), and the keyframe
+-- restatement test - a duplicate carries no [first] precisely because it is this.
+-- EmitBlendDuplicates is the write side of the same rule.
+function IsBlendAnchor(a, b)
+    return a ~= nil and b ~= nil and a.msg == b.msg
 end
 
 -- Half-beat snap - the grid venue_generator.lua's insert_text and

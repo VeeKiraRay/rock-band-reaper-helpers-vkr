@@ -1,6 +1,6 @@
 -- @description Rock Band General Helper
 -- @author VeeKiraRay
--- @version 0.9.44
+-- @version 0.9.45
 -- @about
 --   Utility actions for Rock Band authoring in REAPER.
 --
@@ -21,6 +21,38 @@
 --   This @about block keeps only the 5 most recent versions.
 --   Full history: CHANGELOG.md in the repo.
 --
+--   v0.9.45
+--     - Venue > Actions: new "Validate" section with a "Validate
+--       lighting/blends" button - a read-only audit of the lighting and post
+--       proc authoring on the VENUE track, checking the same two rules the
+--       generators write from, read back off the track.
+--       [first] keyframes: every manual lighting event that CHANGES the
+--       running preset needs one on its exact tick. A [first] anywhere else
+--       is reported with what to do about it - move it (it is within a beat
+--       of a change that is missing one, so fixing the first list cannot
+--       leave a duplicate behind), or delete it (on a blend anchor, on an
+--       automatic preset that takes no keyframes, on a tick with no lighting
+--       event, or a second copy). An event restating the preset already
+--       running is correctly [first]-free and is never flagged for lacking
+--       one, matching the v0.9.43 rule.
+--       Blends: a preset change fades only when the OUTGOING preset is
+--       restated shortly before it. Changes with no such anchor are listed
+--       for lighting and post proc independently, each naming the outgoing
+--       preset and where it started. A hard cut is valid, so the report says
+--       so - the list is "where a fade would need an anchor", not "where the
+--       track is wrong".
+--       Always reads the whole track (judging a change, or an anchor, needs
+--       the events before it); with a time selection active only issues
+--       inside it are reported. New actions_venue_validate.lua, whose
+--       ValidateVenueLightingBlends is pure over three sorted event arrays -
+--       covered by a new Venue Validate test set with no project fixture.
+--     - Internal: the "two identical adjacent events are a blend anchor" test
+--       is now one shared IsBlendAnchor (venue_lighting.lua). Three features
+--       read it back off a track and have to agree - Manual gen's Blend
+--       button refusing a third copy, the new validator, and the keyframe
+--       restatement rule - and it had been an inline comparison in each.
+--       Also added actions_venue_subtracks.lua to the entry point's
+--       missing-file check, which had only ever listed it for loading.
 --   v0.9.44
 --     - Venue: expanded directed-camera dropdown labels whose abbreviation
 --       could be read as something else. "lt" is "long time", not "lighting":
@@ -192,14 +224,6 @@
 --       "Source track" and warns when it is not the track open in the MIDI
 --       editor, as the Pattern sub-tab already did. Both sub-tabs now share
 --       one MidiEditorTrackWarning helper (ui_midi.lua).
---   v0.9.40
---     - MIDI tab > Pattern: fixed "Go Prev" doing nothing useful when the edit
---       cursor sat inside a match. It treated the current match's own start as
---       a valid "previous" target, so pressing it jumped backwards to the start
---       of the instance you were already in rather than reaching the previous
---       one - and from mid-pattern it took two presses to actually move. Go
---       Prev now steps out of the instance under the cursor first. Go Next was
---       never affected. Caught by the MIDI fixture test suite.
 r = reaper  -- global so all dofile'd modules can use it
 
 if not r.ImGui_CreateContext then
@@ -253,6 +277,8 @@ for _, _f in ipairs({
     _mdir .. 'actions_venue_events.lua',
     _mdir .. 'actions_venue_keyframes.lua',
     _mdir .. 'actions_venue_sing_along.lua',
+    _mdir .. 'actions_venue_subtracks.lua',
+    _mdir .. 'actions_venue_validate.lua',
     _mdir .. 'workflow.lua',
     _mdir .. 'actions_workflow.lua',
     _mdir .. 'tempomap.lua',
@@ -315,6 +341,7 @@ dofile(_mdir .. 'actions_venue_events.lua')
 dofile(_mdir .. 'actions_venue_keyframes.lua')
 dofile(_mdir .. 'actions_venue_sing_along.lua')
 dofile(_mdir .. 'actions_venue_subtracks.lua')
+dofile(_mdir .. 'actions_venue_validate.lua')
 dofile(_mdir .. 'workflow.lua')
 dofile(_mdir .. 'actions_workflow.lua')
 dofile(_mdir .. 'tempomap.lua')

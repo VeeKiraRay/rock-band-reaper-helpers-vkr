@@ -295,6 +295,29 @@ Inspection and utility actions that don't fit the generation sub-tabs.
 
 **List lighting/postproc** finds every `[lighting*]` and `*.pp]` (postproc) text event on the VENUE track and lists them in timeline order of appearance, each with its measure/timestamp location.
 
+**Validate lighting/blends** checks the lighting and post-process authoring on the VENUE track — the keyframe and blend rules described below. It's read-only: it never changes the track, it just tells you what it found and what to do about it.
+
+*Keyframes.* A `[first]` is a manual lighting event's own opening keyframe, so it belongs on that event's **exact tick**. The check reports:
+
+- **Manual lighting changes missing a `[first]`** — a manual preset (`verse`, `chorus`, `manual_cool`, `manual_warm`, `dischord`, `stomp`) that starts running where a different one was running before.
+- **`[first]` events off a lighting change** — every `[first]` that isn't on such an event, each with the reason and the fix: *move it* when it's within a beat of a change that's missing one (so fixing the first list doesn't leave you with two), or *delete it* when it sits on a blend anchor, on an automatic preset (which takes no keyframes), on a tick with no lighting event at all, or is a second copy on a tick that already has one.
+
+An event that repeats the preset already running gets no `[first]` and is never flagged for lacking one — see blending below.
+
+*Blending.* By default a preset change is a **hard cut**: the new lighting snaps in at its event. To make it fade instead, the **outgoing** preset is restated a beat or two before the change, giving the game something to interpolate from:
+
+```
+m3     [lighting (stomp)]  [first]
+m9 b4  [lighting (stomp)]              <- blend anchor: the OLD preset, restated
+m10    [lighting (verse)]  [first]     <- the change itself never moves
+```
+
+The anchor is just a duplicate of the preset that's already playing, so it starts no new keyframe train — the `[first]` at m3 keeps running straight through it. Post-process events blend the same way, independently of lighting.
+
+The check lists **lighting changes** and **post proc changes with no blend anchor**, each naming the outgoing preset and where it started, so you know what to restate and where. A hard cut is a perfectly valid choice, so treat this as a list of places a fade *would* need an anchor rather than a list of mistakes. To add one, park the playhead a beat or two before the change and use **Blend** on the Manual gen sub-tab; the generation sub-tabs place them automatically from a theme's `lightpreset_blendin` / `postproc_blendin`.
+
+The whole track is always read — deciding whether an event is a change, and whether an anchor precedes it, needs the events before it — but if a time selection is active only issues inside it are reported, so you can work through a song a section at a time.
+
 **Generate sing along** derives VENUE sing-along notes for the guitarist (pitch 87, from HARM2) and bassist (pitch 85, from HARM3) out of each harmony track's vocal phrases, merging phrases less than a measure apart into one continuous note. Only the pitch of a harmony track that's present and unmuted is touched — a muted or missing source is left alone. Always processes the whole song. Fully undoable.
 
 **Sub VENUE tracks** splits VENUE's events across 6 category tracks for easier authoring once a song has accumulated a lot of keyframes, then merges them back:

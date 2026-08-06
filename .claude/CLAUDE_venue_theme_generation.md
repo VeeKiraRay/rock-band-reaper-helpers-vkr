@@ -143,6 +143,33 @@ Details, all in `BlendPpq` / `EmitBlendDuplicates` (`venue_lighting.lua`):
   via `FindActiveVenuePresetsBefore` (`venue_generator.lua`) and passes it in
   as `GenerateThemedSectionEvents`' `incoming` argument.
 
+#### Reading a blend back off the track
+
+A blendin value exists only inside a theme; the VENUE track keeps no record of
+it. What survives is the shape: **two identical adjacent events of one kind
+are a blend anchor.** That is the whole rule, and `IsBlendAnchor(a, b)`
+(`venue_lighting.lua`) is the one place it lives, because three unrelated
+features have to agree on it:
+
+| Reader | Uses it to decide |
+|---|---|
+| `ResolveBlendSource` (Manual gen's **Blend** button) | refuse to add a third copy — the pair already *is* an anchor |
+| `ValidateVenueLightingBlends` (Actions ▸ **Validate lighting/blends**) | which preset changes have no anchor before them |
+| keyframe restatement test | a duplicate gets no `[first]` — it starts no train |
+
+Lighting and post proc are judged independently, exactly as
+`EmitBlendDuplicates` decides them. Only **adjacent** events are compared, so
+a preset returning after a different one in between is a fresh change needing
+its own anchor, not one already covered by its earlier run.
+
+Hand authoring produces the same shape: Manual gen's **Blend** button copies
+the currently-running preset to the playhead, which is the identical duplicate
+`EmitBlendDuplicates` would have written. Park the playhead a beat or two
+before the boundary, click Blend, then add the new preset at the boundary
+itself. A change with no anchor is a **hard cut** — legitimate, and what
+blendin 0 / absent produces — so the validator lists them as "where a fade
+would need an anchor", never as errors.
+
 ### Valid lighting preset names (bare)
 `verse`, `chorus`, `manual_cool`, `manual_warm`, `dischord`, `stomp` (manual — require `[first]`/`[next]`)
 `loop_cool`, `loop_warm`, `harmony`, `frenzy`, `silhouettes`, `silhouettes_spot`,

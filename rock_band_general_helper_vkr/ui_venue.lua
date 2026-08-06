@@ -173,6 +173,13 @@ function DrawVenueTab(ctx)
             Tooltip(TIPS.venue_lighting_postproc)
 
             r.ImGui_Separator(ctx)
+            SectionHeader('Validate')
+            if Btn('Validate lighting/blends', BTN_H) then
+                RunAction(ValidateVenueLighting)
+            end
+            Tooltip(TIPS.venue_validate_lighting)
+
+            r.ImGui_Separator(ctx)
             SectionHeader('Quick actions')
             if Btn('Generate sing along', BTN_H) then
                 RunAction(GenerateSingAlong)

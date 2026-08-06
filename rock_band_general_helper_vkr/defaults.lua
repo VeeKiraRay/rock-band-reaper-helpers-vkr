@@ -261,6 +261,22 @@ TIPS = {
                       "and a frequency count of every event used.",
     venue_lighting_postproc = "Find the VENUE track and list every [lighting*] and *.pp] (postproc)\n" ..
                       "text event, in timeline order, each with its measure/timestamp.",
+    venue_validate_lighting =
+                      "Check the VENUE track's lighting and post proc authoring. Read-only.\n\n" ..
+                      "[first] keyframes:\n" ..
+                      "  - every manual lighting event that CHANGES the running preset needs\n" ..
+                      "    a [first] on its exact tick\n" ..
+                      "  - a [first] anywhere else is reported with what to do about it:\n" ..
+                      "    move it (it is a beat or less off a change that is missing one),\n" ..
+                      "    or delete it (on a blend anchor, on an automatic preset, on a\n" ..
+                      "    tick with no lighting event, or a second copy)\n\n" ..
+                      "Blends:\n" ..
+                      "  - a preset change fades only when the OUTGOING preset is restated\n" ..
+                      "    shortly before it. Changes with no such anchor are listed, for\n" ..
+                      "    lighting and post proc independently. A hard cut is valid, so\n" ..
+                      "    these are only issues where you wanted a fade.\n\n" ..
+                      "Always reads the whole track (judging a change needs the events before\n" ..
+                      "it); with a time selection active, only issues inside it are reported.",
     venue_sections  = "Read [prc_*] section markers from the EVENTS track and list the\n" ..
                       "detected song sections with their time ranges.\n\n" ..
                       "Letter-suffix events ([prc_verse_1a], [prc_verse_1b], ...) are grouped\n" ..
