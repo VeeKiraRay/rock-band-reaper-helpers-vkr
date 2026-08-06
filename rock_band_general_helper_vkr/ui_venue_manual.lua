@@ -9,10 +9,12 @@
 --                   GenerateManualKeyframes, RemoveVenueEventsByType,
 --                   BlendVenuePresetAtPlayhead, Btn, BtnGroupWidth,
 --                   MANUAL_LIGHTING_SET, GetTakePPQPerQN, NO_LIGHTING_AT_PLAYHEAD_MSG,
---                   COOP_POOL, DIRECTED_POOL, DIRECTED_LABELS, DIRECTED_TIPS,
---                   LIGHTING_LABELS, LIGHTING_TIPS, POSTPROC_LABELS, POSTPROC_TIPS,
---                   KF_ALIGN_LABELS, BeginVenueTooltip, DrawVenueTooltipSprite,
---                   EndVenueTooltip
+--                   COOP_DISPLAY_GROUPS, COOP_LABELS, DIRECTED_DISPLAY,
+--                   DIRECTED_BRE_NAMES, DIRECTED_LABELS, DIRECTED_TIPS,
+--                   LIGHTING_DISPLAY_GROUPS, LIGHTING_LABELS, LIGHTING_TIPS,
+--                   POSTPROC_DISPLAY, POSTPROC_LABELS, POSTPROC_TIPS,
+--                   KF_ALIGN_LABELS, VenueEventTooltip, RawVenueEventText,
+--                   ComboGroupHeader
 
 -- Cached VENUE take and the PPQ of every manual lighting event on it, refreshed via
 -- MakeProjectPoll (at most every 1 s and only when the project changed; 5 s fallback) -
@@ -66,14 +68,6 @@ function DrawVenueManualTab()
     r.ImGui_TextWrapped(ctx, 'Insert individual venue events at the playhead position')
     r.ImGui_Spacing(ctx)
 
-    -- Build directed name list including bre/brej (excluded from auto-gen DIRECTED_POOL)
-    local _mg_dir_names = {}
-    for _, _dev in ipairs(DIRECTED_POOL) do
-        _mg_dir_names[#_mg_dir_names + 1] = _dev:match('^%[(.-)%]$') or _dev
-    end
-    _mg_dir_names[#_mg_dir_names + 1] = 'directed_bre'
-    _mg_dir_names[#_mg_dir_names + 1] = 'directed_brej'
-
     -- Special events list
     local _special_events = {
         '[bonusfx]', '[bonusfx_optional]', '[first]', '[next]', '[previous]',
@@ -99,34 +93,35 @@ function DrawVenueManualTab()
     r.ImGui_Text(ctx, 'Normal camera')
     r.ImGui_SameLine(ctx, _lbl_col)
     r.ImGui_SetNextItemWidth(ctx, 230)
+    -- _mg_coop_bare / _cbare stay BARE below - VenueEventTooltip takes the bare name as
+    -- its sprite key and brackets it itself. Only the drawn strings go through COOP_LABELS.
     local _mg_coop_bare = S.venue_mg_coop ~= '' and (S.venue_mg_coop:match('^%[(.-)%]$') or S.venue_mg_coop) or ''
-    local _mg_coop_prev = _mg_coop_bare ~= '' and _mg_coop_bare or '(select)'
+    local _mg_coop_prev = _mg_coop_bare ~= ''
+        and (COOP_LABELS[_mg_coop_bare] or _mg_coop_bare)
+        or '(select)'
     if r.ImGui_BeginCombo(ctx, '##mg_coop', _mg_coop_prev) then
         if r.ImGui_Selectable(ctx, '(none)', S.venue_mg_coop == '') then
             S.venue_mg_coop = ''
         end
         if S.venue_mg_coop == '' then r.ImGui_SetItemDefaultFocus(ctx) end
-        for _, _cev in ipairs(COOP_POOL) do
-            local _cbare = _cev:match('^%[(.-)%]$') or _cev
-            local _csel  = (S.venue_mg_coop == _cev)
-            if r.ImGui_Selectable(ctx, _cbare, _csel) then
-                S.venue_mg_coop = _cev
-            end
-            if _csel then r.ImGui_SetItemDefaultFocus(ctx) end
-            if r.ImGui_IsItemHovered(ctx) then
-                if BeginVenueTooltip() then
-                    DrawVenueTooltipSprite('Camera', _cbare)
-                    EndVenueTooltip()
+        for _, _cgrp in ipairs(COOP_DISPLAY_GROUPS) do
+            ComboGroupHeader(_cgrp.name)
+            for _, _cev in ipairs(_cgrp.events) do
+                local _cbare = _cev:match('^%[(.-)%]$') or _cev
+                local _csel  = (S.venue_mg_coop == _cev)
+                if r.ImGui_Selectable(ctx, COOP_LABELS[_cbare] or _cbare, _csel) then
+                    S.venue_mg_coop = _cev
+                end
+                if _csel then r.ImGui_SetItemDefaultFocus(ctx) end
+                if r.ImGui_IsItemHovered(ctx) then
+                    VenueEventTooltip('Camera', _cbare)
                 end
             end
         end
         r.ImGui_EndCombo(ctx)
     end
     if r.ImGui_IsItemHovered(ctx) and S.venue_mg_coop ~= '' then
-        if BeginVenueTooltip() then
-            DrawVenueTooltipSprite('Camera', _mg_coop_bare)
-            EndVenueTooltip()
-        end
+        VenueEventTooltip('Camera', _mg_coop_bare)
     end
     r.ImGui_SameLine(ctx)
     local _mg_coop_dis = S.venue_mg_coop == ''
@@ -149,40 +144,33 @@ function DrawVenueManualTab()
             S.venue_mg_directed = ''
         end
         if S.venue_mg_directed == '' then r.ImGui_SetItemDefaultFocus(ctx) end
-        for _, _dn in ipairs(_mg_dir_names) do
+        local function _draw_dir_row(_dn)
             local _dsel = (S.venue_mg_directed == _dn)
             if r.ImGui_Selectable(ctx, DIRECTED_LABELS[_dn] or _dn, _dsel) then
                 S.venue_mg_directed = _dn
             end
             if _dsel then r.ImGui_SetItemDefaultFocus(ctx) end
             if r.ImGui_IsItemHovered(ctx) then
-                if BeginVenueTooltip() then
-                    DrawVenueTooltipSprite('Camera', _dn)
-                    if DIRECTED_TIPS[_dn] then
-                        r.ImGui_Text(ctx, DIRECTED_TIPS[_dn])
-                    end
-                    EndVenueTooltip()
-                end
+                VenueEventTooltip('Camera', _dn, DIRECTED_TIPS[_dn])
             end
         end
+        for _, _dn in ipairs(DIRECTED_DISPLAY) do _draw_dir_row(_dn) end
+        -- BRE cuts last: they belong to the Big Rock Ending only, so they sit out of
+        -- the alphabetical list rather than between the everyday cuts. Their labels
+        -- already read "Big Rock Ending", so the separator needs no header.
+        r.ImGui_Separator(ctx)
+        for _, _dn in ipairs(DIRECTED_BRE_NAMES) do _draw_dir_row(_dn) end
         r.ImGui_EndCombo(ctx)
     end
     if r.ImGui_IsItemHovered(ctx) and S.venue_mg_directed ~= '' then
-        if BeginVenueTooltip() then
-            DrawVenueTooltipSprite('Camera', S.venue_mg_directed)
-            if DIRECTED_TIPS[S.venue_mg_directed] then
-                r.ImGui_Separator(ctx)
-                r.ImGui_Text(ctx, (DIRECTED_LABELS[S.venue_mg_directed] or S.venue_mg_directed)
-                                 .. ':\n' .. DIRECTED_TIPS[S.venue_mg_directed])
-            end
-            EndVenueTooltip()
-        end
+        VenueEventTooltip('Camera', S.venue_mg_directed, DIRECTED_TIPS[S.venue_mg_directed],
+                          { label = DIRECTED_LABELS[S.venue_mg_directed] or S.venue_mg_directed })
     end
     r.ImGui_SameLine(ctx)
     local _mg_dir_dis = S.venue_mg_directed == ''
     if _mg_dir_dis then r.ImGui_BeginDisabled(ctx) end
     if Btn('Add##mg_dir_add', 0, _bw_add) then
-        local _ev = '[' .. S.venue_mg_directed .. ']'
+        local _ev = RawVenueEventText('Camera', S.venue_mg_directed)
         RunAction(function() InsertVenueEventAtPlayhead(_ev) end)
     end
     if _mg_dir_dis then r.ImGui_EndDisabled(ctx) end
@@ -199,39 +187,30 @@ function DrawVenueManualTab()
             S.venue_mg_lighting = ''
         end
         if S.venue_mg_lighting == '' then r.ImGui_SetItemDefaultFocus(ctx) end
-        for _, _ltn in ipairs(LIGHTING_NAMES) do
-            local _lsel = (S.venue_mg_lighting == _ltn)
-            if r.ImGui_Selectable(ctx, LIGHTING_LABELS[_ltn] or _ltn, _lsel) then
-                S.venue_mg_lighting = _ltn
-            end
-            if _lsel then r.ImGui_SetItemDefaultFocus(ctx) end
-            if r.ImGui_IsItemHovered(ctx) then
-                if BeginVenueTooltip() then
-                    DrawVenueTooltipSprite('Lighting', _ltn)
-                    if LIGHTING_TIPS[_ltn] then
-                        r.ImGui_Text(ctx, LIGHTING_TIPS[_ltn])
-                    end
-                    EndVenueTooltip()
+        for _, _ltgrp in ipairs(LIGHTING_DISPLAY_GROUPS) do
+            ComboGroupHeader(_ltgrp.name)
+            for _, _ltn in ipairs(_ltgrp.names) do
+                local _lsel = (S.venue_mg_lighting == _ltn)
+                if r.ImGui_Selectable(ctx, LIGHTING_LABELS[_ltn] or _ltn, _lsel) then
+                    S.venue_mg_lighting = _ltn
+                end
+                if _lsel then r.ImGui_SetItemDefaultFocus(ctx) end
+                if r.ImGui_IsItemHovered(ctx) then
+                    VenueEventTooltip('Lighting', _ltn, LIGHTING_TIPS[_ltn])
                 end
             end
         end
         r.ImGui_EndCombo(ctx)
     end
     if r.ImGui_IsItemHovered(ctx) and S.venue_mg_lighting ~= '' then
-        if BeginVenueTooltip() then
-            DrawVenueTooltipSprite('Lighting', S.venue_mg_lighting)
-            if LIGHTING_TIPS[S.venue_mg_lighting] then
-                r.ImGui_Text(ctx, (LIGHTING_LABELS[S.venue_mg_lighting] or S.venue_mg_lighting)
-                                 .. ':\n' .. LIGHTING_TIPS[S.venue_mg_lighting])
-            end
-            EndVenueTooltip()
-        end
+        VenueEventTooltip('Lighting', S.venue_mg_lighting, LIGHTING_TIPS[S.venue_mg_lighting],
+                          { label = LIGHTING_LABELS[S.venue_mg_lighting] or S.venue_mg_lighting })
     end
     r.ImGui_SameLine(ctx)
     local _mg_lt_dis = S.venue_mg_lighting == ''
     if _mg_lt_dis then r.ImGui_BeginDisabled(ctx) end
     if Btn('Add##mg_lt_add', 0, _bw_add) then
-        local _ev = '[lighting (' .. S.venue_mg_lighting .. ')]'
+        local _ev = RawVenueEventText('Lighting', S.venue_mg_lighting)
         RunAction(function() InsertVenueEventAtPlayhead(_ev) end)
         _force_rescan = true
     end
@@ -320,39 +299,27 @@ function DrawVenueManualTab()
             S.venue_mg_postproc = ''
         end
         if S.venue_mg_postproc == '' then r.ImGui_SetItemDefaultFocus(ctx) end
-        for _, _ppn in ipairs(POSTPROC_NAMES) do
+        for _, _ppn in ipairs(POSTPROC_DISPLAY) do
             local _psel = (S.venue_mg_postproc == _ppn)
             if r.ImGui_Selectable(ctx, POSTPROC_LABELS[_ppn] or _ppn, _psel) then
                 S.venue_mg_postproc = _ppn
             end
             if _psel then r.ImGui_SetItemDefaultFocus(ctx) end
             if r.ImGui_IsItemHovered(ctx) then
-                if BeginVenueTooltip() then
-                    DrawVenueTooltipSprite('PostProc', _ppn)
-                    if POSTPROC_TIPS[_ppn] then
-                        r.ImGui_Text(ctx, POSTPROC_TIPS[_ppn])
-                    end
-                    EndVenueTooltip()
-                end
+                VenueEventTooltip('PostProc', _ppn, POSTPROC_TIPS[_ppn])
             end
         end
         r.ImGui_EndCombo(ctx)
     end
     if r.ImGui_IsItemHovered(ctx) and S.venue_mg_postproc ~= '' then
-        if BeginVenueTooltip() then
-            DrawVenueTooltipSprite('PostProc', S.venue_mg_postproc)
-            if POSTPROC_TIPS[S.venue_mg_postproc] then
-                r.ImGui_Text(ctx, (POSTPROC_LABELS[S.venue_mg_postproc] or S.venue_mg_postproc)
-                                 .. ':\n' .. POSTPROC_TIPS[S.venue_mg_postproc])
-            end
-            EndVenueTooltip()
-        end
+        VenueEventTooltip('PostProc', S.venue_mg_postproc, POSTPROC_TIPS[S.venue_mg_postproc],
+                          { label = POSTPROC_LABELS[S.venue_mg_postproc] or S.venue_mg_postproc })
     end
     r.ImGui_SameLine(ctx)
     local _mg_pp_dis = S.venue_mg_postproc == ''
     if _mg_pp_dis then r.ImGui_BeginDisabled(ctx) end
     if Btn('Add##mg_pp_add', 0, _bw_add) then
-        local _ev = '[' .. S.venue_mg_postproc .. ']'
+        local _ev = RawVenueEventText('PostProc', S.venue_mg_postproc)
         RunAction(function() InsertVenueEventAtPlayhead(_ev) end)
     end
     if _mg_pp_dis then r.ImGui_EndDisabled(ctx) end

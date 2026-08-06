@@ -1,6 +1,6 @@
 -- @description Rock Band General Helper
 -- @author VeeKiraRay
--- @version 0.9.43
+-- @version 0.9.44
 -- @about
 --   Utility actions for Rock Band authoring in REAPER.
 --
@@ -21,6 +21,58 @@
 --   This @about block keeps only the 5 most recent versions.
 --   Full history: CHANGELOG.md in the repo.
 --
+--   v0.9.44
+--     - Venue: expanded directed-camera dropdown labels whose abbreviation
+--       could be read as something else. "lt" is "long time", not "lighting":
+--       [directed_all_lt] is now "All (Long time)" and [directed_drums_lt]
+--       "Drums (Long time)". "cls" close-ups now say "Close-up" rather than
+--       "Close" (vocals, bass, guitar), the [directed_bre] / [directed_brej]
+--       cuts spell out "Big Rock Ending", and the cam_pr / cam_pt pair -
+--       previously the opaque "(Camera PR)" / "(Camera PT)" - now name what
+--       actually differs between them: "Vocals (Long pre-roll)" / "Vocals
+--       (Long post-roll)", same for guitar. Labels only; the event text
+--       written to the VENUE track is unchanged, as are saved settings
+--       (both store the bare event name).
+--     - Venue > Manual gen: the "Normal camera" dropdown got the same
+--       treatment - it listed raw event names before. The coop_ prefix is
+--       dropped (it is on every entry, so it distinguishes nothing), the
+--       one-letter instrument codes are spelled out, and a two-letter code
+--       reads as a duo: [coop_all_far] is "All (Far)", [coop_d_near] is
+--       "Drums (Near)", [coop_dv_near] is "Duo Drums/Vocals (Near)". The
+--       close-ups drop the redundant word - [coop_g_closeup_hand] is
+--       "Guitar (Hands)", [coop_g_closeup_head] "Guitar (Head)" - since
+--       there is no non-close-up hand or head shot. Hover sprites still
+--       key off the raw name, and the Preview sub-tab still shows the
+--       literal event text, so cross-checking against the MIDI is
+--       unaffected. New COOP_LABELS (venue_camera.lua), covered along
+--       with DIRECTED_LABELS by a new Venue Labels test.
+--     - Venue: every camera / lighting / post proc tooltip in Manual gen
+--       and Section gen now ends with the exact event text that will be
+--       written - [coop_all_far], [lighting (verse)], [ProFilm_a.pp] -
+--       dimmed under a separator, so a friendly label never hides the
+--       raw name. Normal camera, which showed only a sprite, now has
+--       that line as its first text. The 14 tooltips were all
+--       hand-rolled Begin/Draw/Text/End blocks and are now one shared
+--       VenueEventTooltip (venue_sprites.lua), which also settles a
+--       small inconsistency - the directed preview drew a separator
+--       before its description, lighting and post proc did not. Manual
+--       gen's Add buttons build their event text with the same new
+--       RawVenueEventText the tooltip uses, so what you hover and what
+--       lands on the VENUE track cannot drift apart.
+--     - Venue: the option lists are now ordered alphabetically by label
+--       instead of the order they happened to be authored in. Normal
+--       camera is grouped Venue / Solo / Duo (the same buckets the
+--       generator uses), Lighting stays split into Manual (needs
+--       keyframes) / Automatic since only the manual presets take
+--       keyframes, and each group is A-Z within itself. The two Big
+--       Rock Ending cuts sit last in Directed camera, after a separator,
+--       rather than between the everyday cuts. Post proc was already
+--       alphabetical by event name; it now follows the labels, which
+--       moves "Sucky TV" ([shitty_tv.pp]) after "Space Woosh". Display
+--       order only - the event pools keep their authored order, so
+--       generated results, saved section configs and the spritesheet
+--       tooling are all unaffected. New shared SortedByLabel /
+--       ComboGroupHeader (lib/reaper_imgui_helpers.lua).
 --   v0.9.43
 --     - Venue: corrected what lightpreset_blendin / postproc_blendin mean.
 --       They were implemented as "place THIS section's lighting/postproc
@@ -148,30 +200,6 @@
 --       one - and from mid-pattern it took two presses to actually move. Go
 --       Prev now steps out of the instance under the cursor first. Go Next was
 --       never affected. Caught by the MIDI fixture test suite.
---   v0.9.39
---     - MIDI tab > Pattern: new "Go Prev" / "Go Next" buttons move the edit
---       cursor between Search-pattern matches; "List Search" reports every
---       match with its measure/time location (read-only). All three share
---       the Replace All match-scanning walk (new local ScanPatternMatches,
---       actions_midi_replace.lua). Fixed a real bug along the way: the
---       Pattern tab's measure-range label and a few MIDI-tab status
---       messages used UTF-8 en-dash/em-dash byte escapes that ReaImGui's
---       font can't rasterize, rendering as "?" - replaced with plain
---       ASCII dashes in actions_midi_replace.lua, actions_midi_align.lua,
---       and ui_midi.lua.
---     - MIDI tab > Length: new "Midi note" section (above the existing
---       reference-track resize section, now labeled "Midi track") bulk-
---       adjusts note lengths on one track's difficulty tier. "Non-sustains"
---       unifies every note SHORTER than 1/4 note to a selected standard
---       size (1/8 to 1/128, default 1/32) - existing sustains are left
---       untouched; "Only sustains" widens or narrows each sustain's
---       (>= 1/4 note) gap to the next note to an exact 32nd-note amount,
---       searching up to 16x32nd notes ahead - a sustain with nothing that
---       close is left unchanged, and one that would shrink below a
---       1/32-note floor is clamped there instead. All math works in raw
---       take-PPQ ticks (never seconds or QN floats) so results land
---       exactly on REAPER's own note-length grid. New
---       actions_midi_length.lua (AdjustMidiNoteLengths).
 r = reaper  -- global so all dofile'd modules can use it
 
 if not r.ImGui_CreateContext then

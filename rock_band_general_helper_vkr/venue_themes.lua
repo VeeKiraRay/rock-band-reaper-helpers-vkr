@@ -1,5 +1,5 @@
 -- Venue theme file parser and preset API.
--- Requires: r (global)
+-- Requires: r, SortedByLabel (globals)
 
 -- Ordered arrays for UI combo lists (section-by-section editor)
 POSTPROC_NAMES = {
@@ -79,6 +79,12 @@ POSTPROC_LABELS = {
     ['video_a.pp']='Video A', ['video_bw.pp']='Video B+W',
     ['video_security.pp']='Video Security', ['video_trails.pp']='Video Trails',
 }
+
+-- Combo display order: alphabetical by LABEL, which is what the user reads.
+-- POSTPROC_NAMES itself is alphabetical by raw name and stays that way (the
+-- spritesheet extraction tool maps its position to a video window); the two
+-- differ only for shitty_tv.pp, labelled "Sucky TV".
+POSTPROC_DISPLAY = SortedByLabel(POSTPROC_NAMES, POSTPROC_LABELS)
 
 POSTPROC_TIPS = {
     ['bloom.pp']                        = 'Brightens the picture slightly. Adds a choppy low frame-per-second effect.',

@@ -4,9 +4,10 @@
 -- Requires globals: r, ctx, S, TIPS, Tooltip, SliderTooltip, RunAction,
 --                   RenderCamPacingRow, RenderKeyframeAlignCombo,
 --                   LoadVenueSections, GenerateSectionEvent, SectionKey,
---                   DefaultConfig, DIRECTED_POOL, DIRECTED_LABELS, DIRECTED_TIPS,
---                   LIGHTING_LABELS, LIGHTING_TIPS, POSTPROC_LABELS, POSTPROC_TIPS,
---                   BeginVenueTooltip, DrawVenueTooltipSprite, EndVenueTooltip
+--                   DefaultConfig, DIRECTED_DISPLAY, DIRECTED_LABELS, DIRECTED_TIPS,
+--                   LIGHTING_DISPLAY_GROUPS, LIGHTING_LABELS, LIGHTING_TIPS,
+--                   POSTPROC_DISPLAY, POSTPROC_LABELS, POSTPROC_TIPS,
+--                   VenueEventTooltip, ComboGroupHeader
 
 function DrawVenueSectionGenTab()
     local lbl_col = LabelColWidth({
@@ -25,12 +26,6 @@ function DrawVenueSectionGenTab()
         local ms = r.format_timestr_pos(s.t_start, '', 1):match('^(%d+)') or '?'
         local me = r.format_timestr_pos(s.t_end,   '', 1):match('^(%d+)') or '?'
         return nm .. ' (m' .. ms .. '-m' .. me .. ')'
-    end
-
-    -- Build directed name list once per frame (bare names, no brackets)
-    local _dir_names = {}
-    for _, _dev in ipairs(DIRECTED_POOL) do
-        _dir_names[#_dir_names + 1] = _dev:match('^%[(.-)%]$') or _dev
     end
 
     -- Section selector row
@@ -103,37 +98,25 @@ function DrawVenueSectionGenTab()
                 _cfg.lighting = ''
             end
             if _cfg.lighting == '' then r.ImGui_SetItemDefaultFocus(ctx) end
-            for _, _ltn in ipairs(LIGHTING_NAMES) do
-                local _lsel = (_cfg.lighting == _ltn)
-                if r.ImGui_Selectable(ctx, LIGHTING_LABELS[_ltn] or _ltn, _lsel) then
-                    _cfg.lighting = _ltn
-                end
-                if _lsel then r.ImGui_SetItemDefaultFocus(ctx) end
-                if r.ImGui_IsItemHovered(ctx) then
-                    if BeginVenueTooltip() then
-                        DrawVenueTooltipSprite('Lighting', _ltn)
-                        if LIGHTING_TIPS[_ltn] then
-                            r.ImGui_Text(ctx, LIGHTING_TIPS[_ltn])
-                        end
-                        EndVenueTooltip()
+            for _, _ltgrp in ipairs(LIGHTING_DISPLAY_GROUPS) do
+                ComboGroupHeader(_ltgrp.name)
+                for _, _ltn in ipairs(_ltgrp.names) do
+                    local _lsel = (_cfg.lighting == _ltn)
+                    if r.ImGui_Selectable(ctx, LIGHTING_LABELS[_ltn] or _ltn, _lsel) then
+                        _cfg.lighting = _ltn
+                    end
+                    if _lsel then r.ImGui_SetItemDefaultFocus(ctx) end
+                    if r.ImGui_IsItemHovered(ctx) then
+                        VenueEventTooltip('Lighting', _ltn, LIGHTING_TIPS[_ltn])
                     end
                 end
             end
             r.ImGui_EndCombo(ctx)
         end
         if r.ImGui_IsItemHovered(ctx) then
-            if BeginVenueTooltip() then
-                if _cfg.lighting ~= '' then
-                    DrawVenueTooltipSprite('Lighting', _cfg.lighting)
-                end
-                r.ImGui_Text(ctx, TIPS.venue_sec_lighting)
-                if _cfg.lighting ~= '' and LIGHTING_TIPS[_cfg.lighting] then
-                    r.ImGui_Separator(ctx)
-                    r.ImGui_Text(ctx, (LIGHTING_LABELS[_cfg.lighting] or _cfg.lighting)
-                                     .. ':\n' .. LIGHTING_TIPS[_cfg.lighting])
-                end
-                EndVenueTooltip()
-            end
+            VenueEventTooltip('Lighting', _cfg.lighting, LIGHTING_TIPS[_cfg.lighting],
+                              { intro = TIPS.venue_sec_lighting,
+                                label = LIGHTING_LABELS[_cfg.lighting] or _cfg.lighting })
         end
 
         -- Keyframe align (per-section; disabled for auto/no lighting)
@@ -204,37 +187,22 @@ function DrawVenueSectionGenTab()
                 _cfg.postproc = ''
             end
             if _cfg.postproc == '' then r.ImGui_SetItemDefaultFocus(ctx) end
-            for _, _ppn in ipairs(POSTPROC_NAMES) do
+            for _, _ppn in ipairs(POSTPROC_DISPLAY) do
                 local _psel = (_cfg.postproc == _ppn)
                 if r.ImGui_Selectable(ctx, POSTPROC_LABELS[_ppn] or _ppn, _psel) then
                     _cfg.postproc = _ppn
                 end
                 if _psel then r.ImGui_SetItemDefaultFocus(ctx) end
                 if r.ImGui_IsItemHovered(ctx) then
-                    if BeginVenueTooltip() then
-                        DrawVenueTooltipSprite('PostProc', _ppn)
-                        if POSTPROC_TIPS[_ppn] then
-                            r.ImGui_Text(ctx, POSTPROC_TIPS[_ppn])
-                        end
-                        EndVenueTooltip()
-                    end
+                    VenueEventTooltip('PostProc', _ppn, POSTPROC_TIPS[_ppn])
                 end
             end
             r.ImGui_EndCombo(ctx)
         end
         if r.ImGui_IsItemHovered(ctx) then
-            if BeginVenueTooltip() then
-                if _cfg.postproc ~= '' then
-                    DrawVenueTooltipSprite('PostProc', _cfg.postproc)
-                end
-                r.ImGui_Text(ctx, TIPS.venue_sec_postproc)
-                if _cfg.postproc ~= '' and POSTPROC_TIPS[_cfg.postproc] then
-                    r.ImGui_Separator(ctx)
-                    r.ImGui_Text(ctx, (POSTPROC_LABELS[_cfg.postproc] or _cfg.postproc)
-                                     .. ':\n' .. POSTPROC_TIPS[_cfg.postproc])
-                end
-                EndVenueTooltip()
-            end
+            VenueEventTooltip('PostProc', _cfg.postproc, POSTPROC_TIPS[_cfg.postproc],
+                              { intro = TIPS.venue_sec_postproc,
+                                label = POSTPROC_LABELS[_cfg.postproc] or _cfg.postproc })
         end
 
         -- PP blendin
@@ -257,37 +225,22 @@ function DrawVenueSectionGenTab()
                 _cfg.dircut = ''
             end
             if _cfg.dircut == '' then r.ImGui_SetItemDefaultFocus(ctx) end
-            for _, _dcn in ipairs(_dir_names) do
+            for _, _dcn in ipairs(DIRECTED_DISPLAY) do
                 local _dcsel = (_cfg.dircut == _dcn)
                 if r.ImGui_Selectable(ctx, DIRECTED_LABELS[_dcn] or _dcn, _dcsel) then
                     _cfg.dircut = _dcn
                 end
                 if _dcsel then r.ImGui_SetItemDefaultFocus(ctx) end
                 if r.ImGui_IsItemHovered(ctx) then
-                    if BeginVenueTooltip() then
-                        DrawVenueTooltipSprite('Camera', _dcn)
-                        if DIRECTED_TIPS[_dcn] then
-                            r.ImGui_Text(ctx, DIRECTED_TIPS[_dcn])
-                        end
-                        EndVenueTooltip()
-                    end
+                    VenueEventTooltip('Camera', _dcn, DIRECTED_TIPS[_dcn])
                 end
             end
             r.ImGui_EndCombo(ctx)
         end
         if r.ImGui_IsItemHovered(ctx) then
-            if BeginVenueTooltip() then
-                if _cfg.dircut ~= '' then
-                    DrawVenueTooltipSprite('Camera', _cfg.dircut)
-                end
-                r.ImGui_Text(ctx, TIPS.venue_sec_dircut)
-                if _cfg.dircut ~= '' and DIRECTED_TIPS[_cfg.dircut] then
-                    r.ImGui_Separator(ctx)
-                    r.ImGui_Text(ctx, (DIRECTED_LABELS[_cfg.dircut] or _cfg.dircut)
-                                     .. ':\n' .. DIRECTED_TIPS[_cfg.dircut])
-                end
-                EndVenueTooltip()
-            end
+            VenueEventTooltip('Camera', _cfg.dircut, DIRECTED_TIPS[_cfg.dircut],
+                              { intro = TIPS.venue_sec_dircut,
+                                label = DIRECTED_LABELS[_cfg.dircut] or _cfg.dircut })
         end
 
         -- BonusFX checkbox

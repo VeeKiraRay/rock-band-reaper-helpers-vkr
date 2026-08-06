@@ -143,7 +143,11 @@ end
 add_group('Coop Shots')
 for _, ev in ipairs(COOP_POOL) do
     local bare = ev:match('^%[(.-)%]$') or ev
-    EVENTS[#EVENTS + 1] = { label=bare, norm=bare:gsub('[_ ]', ''):lower(), category='Camera' }
+    EVENTS[#EVENTS + 1] = {
+        label    = COOP_LABELS[bare] or bare,
+        norm     = bare:gsub('[_ ]', ''):lower(),
+        category = 'Camera',
+    }
 end
 
 add_group('Lighting')

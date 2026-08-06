@@ -1,6 +1,7 @@
 -- Camera event generation: pools, weighted picking, coop/directed logic.
 -- Requires: GetCoopRequiredInstruments, GetDirectedRequiredInstruments, r, S (globals)
--- Globals exported: COOP_POOL, DIRECTED_POOL, PickRandom, JitteredInterval,
+-- Globals exported: COOP_POOL, COOP_LABELS, COOP_DISPLAY_GROUPS, DIRECTED_POOL,
+--   DIRECTED_DISPLAY, DIRECTED_BRE_NAMES, PickRandom, JitteredInterval,
 --   BuildSuffixPools, CategorizeCoopPool, WeightedPickCoopEvent, FindCompanion,
 --   ComputeIdleState, ComputeSingState, GenerateCameraEvents,
 --   CAM_INTERVAL_16THS, CAM_JITTER, CAM_START_MIN_16THS, CAM_START_MAX_16THS,
@@ -21,6 +22,36 @@ COOP_POOL = {
     '[coop_bg_behind]', '[coop_bg_near]',
     '[coop_bk_behind]', '[coop_bk_near]',
     '[coop_gk_behind]', '[coop_gk_near]',
+}
+
+-- Display labels for the normal (coop) camera combo in Manual gen (keyed by bare name).
+-- "Subject (Variation)": the coop_ prefix carries no information, the one-letter codes are
+-- the instrument (d/v/b/g/k), and a two-letter code is a duo shot - named in the same
+-- letter order the event uses, matching DIRECTED_LABELS' "Duo Guitar/Bass" style.
+-- closeup_hand/closeup_head become (Hands)/(Head): there is no non-close-up hand or head
+-- shot, so the word adds nothing. Vocals' plain closeup keeps (Close-up).
+COOP_LABELS = {
+    coop_all_behind='All (Behind)', coop_all_far='All (Far)', coop_all_near='All (Near)',
+    coop_front_behind='Front (Behind)', coop_front_near='Front (Near)',
+    coop_d_behind='Drums (Behind)', coop_d_near='Drums (Near)',
+    coop_d_closeup_hand='Drums (Hands)', coop_d_closeup_head='Drums (Head)',
+    coop_v_behind='Vocals (Behind)', coop_v_near='Vocals (Near)',
+    coop_v_closeup='Vocals (Close-up)',
+    coop_b_behind='Bass (Behind)', coop_b_near='Bass (Near)',
+    coop_b_closeup_hand='Bass (Hands)', coop_b_closeup_head='Bass (Head)',
+    coop_g_behind='Guitar (Behind)', coop_g_near='Guitar (Near)',
+    coop_g_closeup_hand='Guitar (Hands)', coop_g_closeup_head='Guitar (Head)',
+    coop_k_behind='Keys (Behind)', coop_k_near='Keys (Near)',
+    coop_k_closeup_hand='Keys (Hands)', coop_k_closeup_head='Keys (Head)',
+    coop_dv_near='Duo Drums/Vocals (Near)',
+    coop_bd_near='Duo Bass/Drums (Near)',
+    coop_dg_near='Duo Drums/Guitar (Near)',
+    coop_bv_behind='Duo Bass/Vocals (Behind)', coop_bv_near='Duo Bass/Vocals (Near)',
+    coop_gv_behind='Duo Guitar/Vocals (Behind)', coop_gv_near='Duo Guitar/Vocals (Near)',
+    coop_kv_behind='Duo Keys/Vocals (Behind)', coop_kv_near='Duo Keys/Vocals (Near)',
+    coop_bg_behind='Duo Bass/Guitar (Behind)', coop_bg_near='Duo Bass/Guitar (Near)',
+    coop_bk_behind='Duo Bass/Keys (Behind)', coop_bk_near='Duo Bass/Keys (Near)',
+    coop_gk_behind='Duo Guitar/Keys (Behind)', coop_gk_near='Duo Guitar/Keys (Near)',
 }
 
 -- [directed_bre] and [directed_brej] are intentionally excluded.
@@ -44,29 +75,29 @@ DIRECTED_POOL = {
 
 -- Display labels for the directed cut combo in the section editor (keyed by bare name)
 DIRECTED_LABELS = {
-    directed_all='All', directed_all_cam='All (Camera)', directed_all_lt='All (Lighting)',
+    directed_all='All', directed_all_cam='All (Camera)', directed_all_lt='All (Long time)',
     directed_all_yeah='All (Yeah)', directed_crowd='Crowd',
     directed_drums='Drums', directed_drums_pnt='Drums (Point)',
-    directed_drums_np='Drums (Not playing)', directed_drums_lt='Drums (Lighting)',
+    directed_drums_np='Drums (Not playing)', directed_drums_lt='Drums (Long time)',
     directed_drums_kd='Drums (Kick)',
     directed_vocals='Vocals', directed_vocals_np='Vocals (Not playing)',
-    directed_vocals_cls='Vocals (Close)', directed_vocals_cam_pr='Vocals (Camera PR)',
-    directed_vocals_cam_pt='Vocals (Camera PT)',
+    directed_vocals_cls='Vocals (Close-up)', directed_vocals_cam_pr='Vocals (Long pre-roll)',
+    directed_vocals_cam_pt='Vocals (Long post-roll)',
     directed_stagedive='Stage Dive', directed_crowdsurf='Crowd Surf',
     directed_bass='Bass', directed_crowd_b='Crowd (Bass)',
     directed_bass_np='Bass (Not playing)', directed_bass_cam='Bass (Camera)',
-    directed_bass_cls='Bass (Close)',
+    directed_bass_cls='Bass (Close-up)',
     directed_guitar='Guitar', directed_crowd_g='Crowd (Guitar)',
-    directed_guitar_np='Guitar (Not playing)', directed_guitar_cls='Guitar (Close)',
-    directed_guitar_cam_pr='Guitar (Camera PR)', directed_guitar_cam_pt='Guitar (Camera PT)',
+    directed_guitar_np='Guitar (Not playing)', directed_guitar_cls='Guitar (Close-up)',
+    directed_guitar_cam_pr='Guitar (Long pre-roll)', directed_guitar_cam_pt='Guitar (Long post-roll)',
     directed_keys='Keys', directed_keys_cam='Keys (Camera)',
     directed_keys_np='Keys (Not playing)',
     directed_duo_drums='Duo Drums', directed_duo_bass='Duo Bass',
     directed_duo_guitar='Duo Guitar', directed_duo_kv='Duo Keys/Vocals',
     directed_duo_gb='Duo Guitar/Bass', directed_duo_kb='Duo Keys/Bass',
     directed_duo_kg='Duo Keys/Guitar',
-    directed_bre ='BRE',
-    directed_brej='BRE (Jump)',
+    directed_bre ='Big Rock Ending',
+    directed_brej='Big Rock Ending (Jump)',
 }
 
 DIRECTED_TIPS = {
@@ -83,8 +114,8 @@ DIRECTED_TIPS = {
     directed_vocals        = 'The vocalist has a wide variety of animations like for example: point into the air, point to the crowd, kick into the air or kick the camera.',
     directed_vocals_np     = 'The vocalist has a couple of idle actions: kick into the air or jump.',
     directed_vocals_cls    = 'A dramatic animation that includes: close-up of vocalist holding the mic, holding the mic with both hands, moving head back and forth or falling to the floor or to their knees holding the mic',
-    directed_vocals_cam_pr = 'A large range of animations used for exciting vocal moments. For example: interact with crowd or camera or rock the mic. Longer pre-roll and shorter post-roll than PT version.',
-    directed_vocals_cam_pt = 'A large range of animations used for exciting vocal moments. For example: interact with crowd or camera or rock the mic. Shorter pre-roll and longer post-roll than PR version.',
+    directed_vocals_cam_pr = 'A large range of animations used for exciting vocal moments. For example: interact with crowd or camera or rock the mic. Longer pre-roll and shorter post-roll than [directed_vocals_cam_pt].',
+    directed_vocals_cam_pt = 'A large range of animations used for exciting vocal moments. For example: interact with crowd or camera or rock the mic. Shorter pre-roll and longer post-roll than [directed_vocals_cam_pr].',
     directed_stagedive     = 'The vocalist runs off the stage and jumps into the crowd. This shot usually cuts away as soon as the vocalist jumps into the crowd.',
     directed_crowdsurf     = 'Like the stage dive but includes the vocalist crowd-surfing. Sometimes it shows the vocalist crowd-surfing without jumping off the stage.',
     directed_bass          = 'The bassist performs a wide variety of actions. For example: kick into the air, kick over the camera or bump camera with guitar. No knee sliding and less theatrical than guitar.',
@@ -96,8 +127,8 @@ DIRECTED_TIPS = {
     directed_crowd_g       = 'Guitarist interacts with the audience, like high-fives, showing off for the crowd, etc. Good for more silent breakdown sections.',
     directed_guitar_np     = 'The guitarist performs a wide variety of idle actions. For example kick, kick into the air (not camera).',
     directed_guitar_cls    = "Close-up of the guitarist’s fretboard.",
-    directed_guitar_cam_pr = 'A large range of guitar animations. For example: drop to the floor, show off to camera, show off for crowd. Longer pre-roll and shorter post-roll than PT version.',
-    directed_guitar_cam_pt = 'There are a large range of guitar animations. For example: drop to the floor, show off to camera, show off for crowd. Shorter pre-roll and longer post-roll than PR version.',
+    directed_guitar_cam_pr = 'A large range of guitar animations. For example: drop to the floor, show off to camera, show off for crowd. Longer pre-roll and shorter post-roll than [directed_guitar_cam_pt].',
+    directed_guitar_cam_pt = 'There are a large range of guitar animations. For example: drop to the floor, show off to camera, show off for crowd. Shorter pre-roll and longer post-roll than [directed_guitar_cam_pr].',
     directed_keys          = 'The keyboard player jumps in the air or slams their hands on the keyboard.',
     directed_keys_cam      = 'The keyboardist rocks out and grooves.',
     directed_keys_np       = 'Very few animations available. The keyboard player rocks back and forth.',
@@ -765,3 +796,51 @@ function ResolveUserCamInterval(bpm)
     end
     return nil, false
 end
+
+-- ---------------------------------------------------------------------------
+-- Display order for the camera combos. Built once at load, alphabetically by
+-- label. The pools at the top of this file keep their authored order - other
+-- things depend on it (dev/tools/assets/extract_spritesheets.ps1 maps pool
+-- position to a window in the captured demo video, and the dev demo stores
+-- literal positions), and generation picks at random, never by position.
+-- Built here, at the end of the file, because CategorizeCoopPool has to exist
+-- before this runs.
+-- ---------------------------------------------------------------------------
+
+local function BareOf(ev) return ev:match('^%[(.-)%]$') or ev end
+
+-- Normal camera, grouped the way the generator itself buckets these shots, each
+-- group alphabetical. Holds FULL event strings - that is what the combo assigns
+-- to S.venue_mg_coop. The buckets come from CategorizeCoopPool rather than a
+-- second hand-written split, so the headers can't claim a grouping the generator
+-- doesn't actually use.
+COOP_DISPLAY_GROUPS = {}
+do
+    local _venue, _solo, _duo = CategorizeCoopPool(COOP_POOL)
+    -- solo/duo arrive keyed by instrument code, and pairs() order is undefined -
+    -- flatten first; the label sort is what gives the result a stable order.
+    local function Flatten(by_code)
+        local out = {}
+        for _, shots in pairs(by_code) do
+            for _, ev in ipairs(shots) do out[#out + 1] = ev end
+        end
+        return out
+    end
+    COOP_DISPLAY_GROUPS = {
+        { name = 'Venue', events = SortedByLabel(_venue,         COOP_LABELS, BareOf) },
+        { name = 'Solo',  events = SortedByLabel(Flatten(_solo), COOP_LABELS, BareOf) },
+        { name = 'Duo',   events = SortedByLabel(Flatten(_duo),  COOP_LABELS, BareOf) },
+    }
+end
+
+-- Directed camera: bare names, alphabetical. The BRE cuts are not in here - Manual
+-- gen pins them after this list (they are for the Big Rock Ending only) and Section
+-- gen doesn't offer them at all.
+DIRECTED_DISPLAY = {}
+do
+    local _bare = {}
+    for _, ev in ipairs(DIRECTED_POOL) do _bare[#_bare + 1] = BareOf(ev) end
+    DIRECTED_DISPLAY = SortedByLabel(_bare, DIRECTED_LABELS)
+end
+
+DIRECTED_BRE_NAMES = { 'directed_bre', 'directed_brej' }

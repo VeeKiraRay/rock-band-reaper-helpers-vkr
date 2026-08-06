@@ -227,8 +227,8 @@ Every Validate action (all four sub-tabs, H/M/E only — never Expert) also runs
 | `rock_band_general_helper_vkr/venue.lua` | `ListVenueEvents`, `GetVenueEventsForPreview` (global); `ReadVenueTextEvents`, `BuildCameraGaps`, `GapStats` (local) |
 | `rock_band_general_helper_vkr/venue_awareness.lua` | `GetMutedInstruments`, `GetCoopRequiredInstruments`, `GetDirectedRequiredInstruments`, `FilterPool`, `ReadEventSections`, `ListEventSections`, `FindEventTime` (generic EVENTS-track text-event lookup), `FindMusicStartTime` (thin wrapper over `FindEventTime`), `INST_LETTER_NAMES` (global); `INST_TRACK_NAMES`, `ParsePrcEvent` (local) |
 | `rock_band_general_helper_vkr/venue_themes.lua` | `ThemeDisplayLabel`, `LoadVenueThemes`, `GetSectionPreset`, `GetThemeCameraInterval`, `BuildLightingPool`, `BuildPostprocPool` (global); `POSTPROC_VALID_SET`, `LIGHTING_VALID_SET`, `CAMERA_PACING`, `Tokenize`, `ParseSexpr`, `ParseThemeFile`, `InterpretSectionPreset`, `InterpretTheme` (local) |
-| `rock_band_general_helper_vkr/venue_camera.lua` | `COOP_POOL`, `DIRECTED_POOL`, `PickRandom`, `JitteredInterval`, `CategorizeCoopPool`, `WeightedPickCoopEvent`, `FindCompanion`, `ComputeIdleState`, `GenerateCameraEvents`, `ResolveUserCamInterval` (global); camera constants (`CAM_INTERVAL_16THS` etc., partially global); `WeightedPickInstrument` (local) |
-| `rock_band_general_helper_vkr/venue_sprites.lua` | `LoadVenueSprite`, `DrawVenueTooltipSprite`, `BeginVenueTooltip`, `EndVenueTooltip`, `VenueSpriteFoldersFound` (global); `DIRECTED_SPRITE_NAMES`, `VENUE_SPRITE_ROOT` (module-level globals). JPEG-only. Checks `resources/img/spritesheets/{category}/` (large) then `resources/img/spritesheets/{category} small/` (small) — no third-party fallback. Frame count is read from the filename (`{key}_f{N}_spritesheet.jpg`). Display size scales by `S.venue_preview_scale` (1 or 2). Cache stores `{image, frame_count, cols, rows}` per sprite. |
+| `rock_band_general_helper_vkr/venue_camera.lua` | `COOP_POOL`, `COOP_LABELS`, `DIRECTED_POOL`, `DIRECTED_LABELS`, `DIRECTED_TIPS`, `PickRandom`, `JitteredInterval`, `CategorizeCoopPool`, `WeightedPickCoopEvent`, `FindCompanion`, `ComputeIdleState`, `GenerateCameraEvents`, `ResolveUserCamInterval` (global); camera constants (`CAM_INTERVAL_16THS` etc., partially global); `WeightedPickInstrument` (local) |
+| `rock_band_general_helper_vkr/venue_sprites.lua` | `LoadVenueSprite`, `DrawVenueTooltipSprite`, `BeginVenueTooltip`, `EndVenueTooltip`, `VenueEventTooltip`, `RawVenueEventText`, `VenueSpriteFoldersFound` (global); `DIRECTED_SPRITE_NAMES`, `VENUE_SPRITE_ROOT` (module-level globals). JPEG-only. Checks `resources/img/spritesheets/{category}/` (large) then `resources/img/spritesheets/{category} small/` (small) — no third-party fallback. Frame count is read from the filename (`{key}_f{N}_spritesheet.jpg`). Display size scales by `S.venue_preview_scale` (1 or 2). Cache stores `{image, frame_count, cols, rows}` per sprite. |
 | `rock_band_general_helper_vkr/venue_lighting.lua` | `MANUAL_LIGHTING_SET`, `LIGHTING_OFFSET_16THS`, `INST_KF_MODES`, `KF_ALIGN_LABELS`, `FindNextMeasureStartPpq`, `CollectInstNotePositions`, `GenerateKeyframesForSpan`, `GenerateLightingEvents`, `GenerateThemedSectionEvents`, `SnapPpqToHalfBeat` (global); `MANUAL_LIGHTING_POOL`, `AUTO_LIGHTING_POOL`, lighting constants, `SnapPpqToNearestBeat`, `BlendPpq`, `EmitBlendDuplicates`, `ResolveThemeSection`, `EmitThemeSection` (local) |
 | `rock_band_general_helper_vkr/venue_generator.lua` | `GenerateVenueEvents`, `DeleteTextEventsInRange` (predicate-driven deleter backing all clear functions), `ClearVenueTextEventsInRange`, `ClearVenueNonCameraEventsInRange`, `ClearVenueExceptLPInRange`, `ClearVenueKeyframesInRange`, `FindActiveVenuePresetsBefore` (global) |
 | `rock_band_general_helper_vkr/workflow.lua` | `ParseWorkflowContent`, `ParseWorkflowFile`, `LoadWorkflowFiles`, `EscapeWF`, `UnescapeWF` (global); `FindBraceGroups`, `StripBraceGroups` (local) — Workflow sub-tab's `.txt` template parser (pure over string content) + `resources/workflow/` folder scanner |
@@ -332,13 +332,16 @@ venue_awareness.lua            → GetMutedInstruments, GetCoopRequiredInstrumen
 section_events.lua             → SECTION_EVENT_GROUPS, SECTION_EVENT_BASE (data only)
 venue_themes.lua               → ThemeDisplayLabel, LoadVenueThemes, GetSectionPreset,
                                   GetThemeCameraInterval, BuildLightingPool, BuildPostprocPool
-venue_camera.lua               → COOP_POOL, DIRECTED_POOL, PickRandom, JitteredInterval,
+venue_camera.lua               → COOP_POOL, COOP_LABELS, COOP_DISPLAY_GROUPS,
+                                  DIRECTED_POOL, DIRECTED_DISPLAY, DIRECTED_BRE_NAMES,
+                                  DIRECTED_LABELS, DIRECTED_TIPS, PickRandom, JitteredInterval,
                                   CategorizeCoopPool, WeightedPickCoopEvent, FindCompanion,
                                   ComputeIdleState, GenerateCameraEvents,
                                   ResolveUserCamInterval; camera globals
                                   (CAM_INTERVAL_16THS etc.)
 venue_sprites.lua              → LoadVenueSprite, DrawVenueTooltipSprite, BeginVenueTooltip,
-                                  EndVenueTooltip; VENUE_SPRITE_ROOT, VENUE_SPRITE_SELF_ROOT,
+                                  EndVenueTooltip, VenueEventTooltip, RawVenueEventText;
+                                  VENUE_SPRITE_ROOT, VENUE_SPRITE_SELF_ROOT,
                                   DIRECTED_SPRITE_NAMES, POSTPROC_SPRITE_NAMES (module globals)
 venue_lighting.lua             → MANUAL_LIGHTING_SET, LIGHTING_OFFSET_16THS, INST_KF_MODES,
                                   KF_ALIGN_LABELS, FindNextMeasureStartPpq,

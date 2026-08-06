@@ -2,7 +2,8 @@
 -- Requires: BuildLightingPool, BuildPostprocPool, GetSectionPreset, FindTrackByName,
 --           PickRandom, JitteredInterval, RB3_PHRASE_PITCH, r, S
 --           (globals from venue_camera.lua and venue_themes.lua)
--- Globals exported: MANUAL_LIGHTING_SET, LIGHTING_OFFSET_16THS, INST_KF_MODES,
+-- Globals exported: MANUAL_LIGHTING_SET, LIGHTING_DISPLAY_GROUPS,
+--   LIGHTING_OFFSET_16THS, INST_KF_MODES,
 --   KF_ALIGN_LABELS, FindNextMeasureStartPpq, CollectInstNotePositions,
 --   CollectVocalPhraseStarts, GenerateKeyframesForSpan, GenerateLightingEvents,
 --   GenerateThemedSectionEvents, KeyframeSubdivQN, SnapPpqToHalfBeat
@@ -30,6 +31,30 @@ local AUTO_LIGHTING_POOL = {
 
 MANUAL_LIGHTING_SET = {}
 for _, v in ipairs(MANUAL_LIGHTING_POOL) do MANUAL_LIGHTING_SET[v] = true end
+
+-- Combo display order for lighting: two groups, each alphabetical by label. The
+-- manual/automatic split is functional - only the manual presets react to
+-- [first]/[next] keyframes, and Manual gen gates its whole keyframe row on one
+-- being selected - so alphabetising the 22 presets into a single list would bury
+-- the one distinction that matters. Derived from the two pools above (bare names,
+-- '[lighting (x)]' -> 'x') so this file stays the only place deciding which
+-- presets are manual. LIGHTING_NAMES (venue_themes.lua) keeps its own order.
+LIGHTING_DISPLAY_GROUPS = {}
+do
+    local function BareNames(pool)
+        local out = {}
+        for _, ev in ipairs(pool) do
+            out[#out + 1] = ev:match('^%[lighting %((.-)%)%]$') or ev
+        end
+        return out
+    end
+    LIGHTING_DISPLAY_GROUPS = {
+        { name = 'Manual (needs keyframes)',
+          names = SortedByLabel(BareNames(MANUAL_LIGHTING_POOL), LIGHTING_LABELS) },
+        { name = 'Automatic',
+          names = SortedByLabel(BareNames(AUTO_LIGHTING_POOL),   LIGHTING_LABELS) },
+    }
+end
 
 -- Keyframe alignment mode labels (S.venue_keyframe_align, 0-based - mode N is
 -- KF_ALIGN_LABELS[N + 1]). Shared by every tab that draws the selector, so the

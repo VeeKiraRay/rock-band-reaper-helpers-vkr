@@ -38,6 +38,30 @@ COOP_POOL = {
     '[coop_gk_behind]', '[coop_gk_near]',
 }
 
+COOP_LABELS = {
+    coop_all_behind='All (Behind)', coop_all_far='All (Far)', coop_all_near='All (Near)',
+    coop_front_behind='Front (Behind)', coop_front_near='Front (Near)',
+    coop_d_behind='Drums (Behind)', coop_d_near='Drums (Near)',
+    coop_d_closeup_hand='Drums (Hands)', coop_d_closeup_head='Drums (Head)',
+    coop_v_behind='Vocals (Behind)', coop_v_near='Vocals (Near)',
+    coop_v_closeup='Vocals (Close-up)',
+    coop_b_behind='Bass (Behind)', coop_b_near='Bass (Near)',
+    coop_b_closeup_hand='Bass (Hands)', coop_b_closeup_head='Bass (Head)',
+    coop_g_behind='Guitar (Behind)', coop_g_near='Guitar (Near)',
+    coop_g_closeup_hand='Guitar (Hands)', coop_g_closeup_head='Guitar (Head)',
+    coop_k_behind='Keys (Behind)', coop_k_near='Keys (Near)',
+    coop_k_closeup_hand='Keys (Hands)', coop_k_closeup_head='Keys (Head)',
+    coop_dv_near='Duo Drums/Vocals (Near)',
+    coop_bd_near='Duo Bass/Drums (Near)',
+    coop_dg_near='Duo Drums/Guitar (Near)',
+    coop_bv_behind='Duo Bass/Vocals (Behind)', coop_bv_near='Duo Bass/Vocals (Near)',
+    coop_gv_behind='Duo Guitar/Vocals (Behind)', coop_gv_near='Duo Guitar/Vocals (Near)',
+    coop_kv_behind='Duo Keys/Vocals (Behind)', coop_kv_near='Duo Keys/Vocals (Near)',
+    coop_bg_behind='Duo Bass/Guitar (Behind)', coop_bg_near='Duo Bass/Guitar (Near)',
+    coop_bk_behind='Duo Bass/Keys (Behind)', coop_bk_near='Duo Bass/Keys (Near)',
+    coop_gk_behind='Duo Guitar/Keys (Behind)', coop_gk_near='Duo Guitar/Keys (Near)',
+}
+
 -- [directed_bre] and [directed_brej] excluded (BRE-only, must be placed manually).
 DIRECTED_POOL = {
     '[directed_all]', '[directed_all_cam]', '[directed_all_lt]', '[directed_all_yeah]',
@@ -57,20 +81,20 @@ DIRECTED_POOL = {
 }
 
 DIRECTED_LABELS = {
-    directed_all='All', directed_all_cam='All (Camera)', directed_all_lt='All (Lighting)',
+    directed_all='All', directed_all_cam='All (Camera)', directed_all_lt='All (Long time)',
     directed_all_yeah='All (Yeah)', directed_crowd='Crowd',
     directed_drums='Drums', directed_drums_pnt='Drums (Point)',
-    directed_drums_np='Drums (Not playing)', directed_drums_lt='Drums (Lighting)',
+    directed_drums_np='Drums (Not playing)', directed_drums_lt='Drums (Long time)',
     directed_drums_kd='Drums (Kick+Down)', directed_vocals='Vocals',
-    directed_vocals_np='Vocals (Not playing)', directed_vocals_cls='Vocals (Close)',
-    directed_vocals_cam_pr='Vocals (Camera PR)', directed_vocals_cam_pt='Vocals (Camera PT)',
+    directed_vocals_np='Vocals (Not playing)', directed_vocals_cls='Vocals (Close-up)',
+    directed_vocals_cam_pr='Vocals (Long pre-roll)', directed_vocals_cam_pt='Vocals (Long post-roll)',
     directed_stagedive='Stage Dive', directed_crowdsurf='Crowd Surf',
     directed_bass='Bass', directed_crowd_b='Crowd (Bass)',
     directed_bass_np='Bass (Not playing)', directed_bass_cam='Bass (Camera)',
-    directed_bass_cls='Bass (Close)', directed_guitar='Guitar',
+    directed_bass_cls='Bass (Close-up)', directed_guitar='Guitar',
     directed_crowd_g='Crowd (Guitar)', directed_guitar_np='Guitar (Not playing)',
-    directed_guitar_cls='Guitar (Close)', directed_guitar_cam_pr='Guitar (Camera PR)',
-    directed_guitar_cam_pt='Guitar (Camera PT)', directed_keys='Keys',
+    directed_guitar_cls='Guitar (Close-up)', directed_guitar_cam_pr='Guitar (Long pre-roll)',
+    directed_guitar_cam_pt='Guitar (Long post-roll)', directed_keys='Keys',
     directed_keys_cam='Keys (Camera)', directed_keys_np='Keys (Not playing)',
     directed_duo_drums='Duo: Drums+Vocals', directed_duo_bass='Duo: Bass+Vocals',
     directed_duo_guitar='Duo: Guitar+Vocals', directed_duo_kv='Duo: Keys+Vocals',

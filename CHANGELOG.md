@@ -9,6 +9,31 @@ over 5. See `CLAUDE.md` → "Changelog / `@about` trimming" for the rule.
 
 `rock_band_general_helper_vkr.lua`
 
+**v0.9.39**
+- MIDI tab > Pattern: new "Go Prev" / "Go Next" buttons move the edit
+  cursor between Search-pattern matches; "List Search" reports every
+  match with its measure/time location (read-only). All three share
+  the Replace All match-scanning walk (new local ScanPatternMatches,
+  actions_midi_replace.lua). Fixed a real bug along the way: the
+  Pattern tab's measure-range label and a few MIDI-tab status
+  messages used UTF-8 en-dash/em-dash byte escapes that ReaImGui's
+  font can't rasterize, rendering as "?" - replaced with plain
+  ASCII dashes in actions_midi_replace.lua, actions_midi_align.lua,
+  and ui_midi.lua.
+- MIDI tab > Length: new "Midi note" section (above the existing
+  reference-track resize section, now labeled "Midi track") bulk-
+  adjusts note lengths on one track's difficulty tier. "Non-sustains"
+  unifies every note SHORTER than 1/4 note to a selected standard
+  size (1/8 to 1/128, default 1/32) - existing sustains are left
+  untouched; "Only sustains" widens or narrows each sustain's
+  (>= 1/4 note) gap to the next note to an exact 32nd-note amount,
+  searching up to 16x32nd notes ahead - a sustain with nothing that
+  close is left unchanged, and one that would shrink below a
+  1/32-note floor is clamped there instead. All math works in raw
+  take-PPQ ticks (never seconds or QN floats) so results land
+  exactly on REAPER's own note-length grid. New
+  actions_midi_length.lua (AdjustMidiNoteLengths).
+
 **v0.9.38**
 - Fixed a combo-wrap collision: when a passage has more distinct
   chord shapes in one lane-spread group than that group has combo

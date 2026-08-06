@@ -1,4 +1,4 @@
--- Spritesheet animation helpers for venue editor combo tooltips.
+-- Spritesheet animation helpers and the shared venue event tooltip.
 -- Requires globals: r, ctx, S, SCRIPT_MDIR
 -- Degrades silently if spritesheets are not installed.
 
@@ -209,4 +209,43 @@ end
 function EndVenueTooltip()
     r.ImGui_PopTextWrapPos(ctx)
     r.ImGui_EndTooltip(ctx)
+end
+
+-- The exact text an Add button writes for a bare name. Lighting is the only category
+-- whose event syntax differs from its name; PostProc needs no case of its own (the .pp
+-- is already part of the name), nor does Camera (coop and directed are the bare name in
+-- brackets). Returns nil for no selection, so callers can treat "nothing to show" as nil.
+function RawVenueEventText(category, bare)
+    if not bare or bare == '' then return nil end
+    if category == 'Lighting' then return '[lighting (' .. bare .. ')]' end
+    return '[' .. bare .. ']'
+end
+
+-- One venue event tooltip: sprite, optional intro, optional description, and always the
+-- raw event text - a label in a combo must never be the only name an author can see.
+--   category  'Camera' | 'Lighting' | 'PostProc' (the sprite category)
+--   bare      bare event name, the sprite lookup key; '' or nil = nothing selected
+--   tip       description for this event, or nil
+--   opts.intro  text drawn above the description whether or not anything is selected
+--               (Section gen's combos explain themselves even when empty)
+--   opts.label  display label to head the description with ("Label:\ntip")
+-- Text is drawn with Text/TextDisabled, never TextWrapped: BeginVenueTooltip pins the
+-- wrap position to the sprite width, and TextWrapped would override it with the window
+-- width, widening every tooltip.
+function VenueEventTooltip(category, bare, tip, opts)
+    opts = opts or {}
+    if not BeginVenueTooltip() then return end
+    local has_sel = bare ~= nil and bare ~= ''
+    if has_sel then DrawVenueTooltipSprite(category, bare) end
+    if opts.intro then r.ImGui_Text(ctx, opts.intro) end
+    if has_sel and tip and tip ~= '' then
+        if opts.intro then r.ImGui_Separator(ctx) end
+        r.ImGui_Text(ctx, opts.label and (opts.label .. ':\n' .. tip) or tip)
+    end
+    local raw = RawVenueEventText(category, bare)
+    if raw then
+        r.ImGui_Separator(ctx)
+        r.ImGui_TextDisabled(ctx, raw)
+    end
+    EndVenueTooltip()
 end

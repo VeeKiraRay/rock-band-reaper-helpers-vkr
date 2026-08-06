@@ -1,14 +1,15 @@
 -- UI and main loop for the Venue Demo generator.
 -- Requires: r, ctx, S, TIPS, LIGHTING_NAMES, LIGHTING_LABELS, POSTPROC_NAMES,
---           POSTPROC_LABELS, COOP_POOL, DIRECTED_POOL, GenerateDemoVenue,
+--           POSTPROC_LABELS, COOP_POOL, COOP_LABELS, DIRECTED_POOL, GenerateDemoVenue,
 --           DirectedRequired, CoopRequired, MutedFromCombo (globals)
 
 local WIN_W = 480
 local WIN_H = 520
 
 local function CoopLabel(ev)
-    -- Strip brackets and make readable: [coop_all_far] → coop_all_far
-    return ev:match('^%[(.-)%]$') or ev
+    -- Strip brackets, then use the display label: [coop_all_far] → All (Far)
+    local bare = ev:match('^%[(.-)%]$') or ev
+    return COOP_LABELS[bare] or bare
 end
 
 local function DrawUI()

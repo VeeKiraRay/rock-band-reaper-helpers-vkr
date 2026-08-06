@@ -110,6 +110,36 @@ function Btn(label, height, min_w)
     return r.ImGui_Button(ctx, label, w, height)
 end
 
+-- Sorted copy of `names`, ordered by the label each one displays as, compared
+-- case-insensitively so "Blackout Slow" precedes "BRE" the way a reader expects
+-- (a raw byte compare would put every capitalised entry first). Equal labels fall
+-- back to the name itself, so the result is always deterministic. key_fn maps an
+-- entry to its key in `labels` - needed where a list holds full event text
+-- ('[coop_all_far]') but the label table is keyed bare (coop_all_far).
+-- The source list is never modified: this is a display order, and the authored
+-- order of the underlying pools usually means something else.
+function SortedByLabel(names, labels, key_fn)
+    local out = {}
+    for i, n in ipairs(names) do out[i] = n end
+    table.sort(out, function(a, b)
+        local ka = key_fn and key_fn(a) or a
+        local kb = key_fn and key_fn(b) or b
+        local la = ((labels and labels[ka]) or ka):lower()
+        local lb = ((labels and labels[kb]) or kb):lower()
+        if la == lb then return a < b end
+        return la < lb
+    end)
+    return out
+end
+
+-- Dimmed group heading inside an open combo, preceded by a separator. Callers draw
+-- a '(none)'/'(select)' row before the first group, so the leading separator always
+-- has something above it to separate from.
+function ComboGroupHeader(name)
+    r.ImGui_Separator(ctx)
+    r.ImGui_TextDisabled(ctx, name)
+end
+
 function GetTrackList()
     local list = {}
     for i = 0, r.CountTracks(0) - 1 do
