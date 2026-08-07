@@ -7,7 +7,16 @@
 -- A E, standard tuning) -- also the pure fret-shape -> chord-quality
 -- classifier AssignGemsForGuide's dyad handling consults (see
 -- BuildShapeGemMap in actions_guitar.lua).
-local TAB_GAP_BIG = 10  -- seconds; >> wrap_gap_s -> triggers phrase break in AssignGems
+local TAB_GAP_BIG = 10  -- seconds; >> TAB_PHRASE_GAP_S -> triggers phrase break in AssignGems
+
+-- Phrase-break threshold for the synthetic timeline GuitarTabGuide builds:
+-- events sit 0.01 s apart and a blank tab line inserts TAB_GAP_BIG, so any
+-- value strictly between the two behaves identically. Fixed here rather
+-- than read from S.mc_gtr_wrap_gap_ms, whose slider lives in the WIP Guitar
+-- tab (ui.lua) - phrase breaks in this tab come from blank lines in the
+-- input, and a converter setting the Tab Input tab doesn't expose must not
+-- be able to change that.
+local TAB_PHRASE_GAP_S = 1.0
 
 -- Horizontal: one event per line, 6 space-separated tokens (digit=fret, else=unplayed).
 -- Blank line = phrase break. Supports multi-digit frets (10, 12, etc.).
@@ -99,7 +108,23 @@ end
 -- Distinct shapes across ALL events are sorted by pitch and assigned combos from the pool once.
 -- Gaps > wrap_gap_s are annotated as phrase boundaries in the report but do not reset assignments.
 -- Called only from GuitarTabGuide (ordered mode). Uses shared POOLS / POOLS2_NO14 at file scope.
-local function AssignGemsForGuide(events, wrap_gap_s, max_chord)
+--
+-- Chords are NOT compressed here (max_chord=nil to BuildShapeGemMap). The
+-- Tab Input tab is a reference guide that writes nothing to the project, so
+-- there is no chart to fit and nothing to reduce; GuitarSuggestRBMapping
+-- already derives the gem count from distinct PITCH CLASSES on the full
+-- shape (2 for any dyad width, 3 for a real triad). That's exactly how the
+-- Music Theory helper's Shape Search reaches its answer, and the two tools
+-- must agree - both exist to say how a given chord maps to RB.
+-- Truncating by array index beforehand made them disagree: it could drop a
+-- chord's root and leave a doubled note behind, turning e.g. an open D
+-- major into a bare sixth dyad, or a G5 into three octaves of G with no
+-- suggestable width at all.
+-- allow_14=true for the same reason: an octave dyad should report 1-4, as
+-- Shape Search does. Max chord / Allow 1-4 belong to the WIP Guitar tab's
+-- converter and are not exposed by this tab (see _DrawTabInputBody in
+-- ui_midi.lua) - they must not reach it.
+local function AssignGemsForGuide(events, wrap_gap_s)
     if #events == 0 then return {} end
 
     local function shape_key(sorted_pitches)
@@ -110,7 +135,7 @@ local function AssignGemsForGuide(events, wrap_gap_s, max_chord)
 
     -- Global shape->gem map across all events - see BuildShapeGemMap's own
     -- doc comment (actions_guitar.lua) for the dyad chord-quality logic.
-    local all_shapes, shape_gems, shared = BuildShapeGemMap(events, max_chord)
+    local all_shapes, shape_gems, shared = BuildShapeGemMap(events, nil, true)
 
     -- Split into phrases for report annotations only
     local phrases = {}
@@ -133,9 +158,7 @@ local function AssignGemsForGuide(events, wrap_gap_s, max_chord)
         local seen       = {}
         local seen_order = {}
         for _, ev in ipairs(phrase_evs) do
-            local pitches = CompressChord(ev.pitches, max_chord)
-            table.sort(pitches)
-            local key = shape_key(pitches)
+            local key = shape_key(SortedChordPitches(ev.pitches))
             if not seen[key] then
                 seen[key] = true
                 seen_order[#seen_order + 1] = key
@@ -167,27 +190,14 @@ local function AssignGemsForGuide(events, wrap_gap_s, max_chord)
         assignments[#assignments + 1] = { s = phrase_evs[1].s, reason = meta_reason, is_meta = true }
 
         for _, ev in ipairs(phrase_evs) do
-            local pitches = CompressChord(ev.pitches, max_chord)
-            table.sort(pitches)
+            local pitches = SortedChordPitches(ev.pitches)
             local key  = shape_key(pitches)
             local src  = shape_gems[key]
             local gems = {}
             for _, g in ipairs(src) do gems[#gems + 1] = g end
-            local narrowed_14 = false
-            if not S.mc_gtr_allow_14 and #gems == 2 and gems[2] - gems[1] >= 3 then
-                gems        = { gems[1], gems[1] + 2 }
-                narrowed_14 = true
-            end
-            local n_orig = #ev.pitches
             local reason = string.format('%s  %s \xe2\x86\x92 %s',
                 ChordTypeName(gems), PitchLabel(ev.pitches), GemLabel(gems))
-            if n_orig > #pitches then
-                reason = reason .. string.format('  (compressed %d\xe2\x86\x92%d)', n_orig, #pitches)
-            end
             reason = reason .. ChordQualityLabel(pitches)
-            if narrowed_14 then
-                reason = reason .. '  (1-4 \xe2\x86\x92 1-3: narrowed per setting)'
-            end
             if shared[key] then reason = reason .. '  (*Wrap)' end
             assignments[#assignments + 1] = {
                 s = ev.s, e = ev.e, gems = gems, reason = reason, is_meta = false,
@@ -225,7 +235,7 @@ function GuitarTabGuide()
         S.status = 'No valid notes found in tab input'
         return
     end
-    local assignments = AssignGemsForGuide(events, S.mc_gtr_wrap_gap_ms / 1000, S.mc_gtr_max_chord)
+    local assignments = AssignGemsForGuide(events, TAB_PHRASE_GAP_S)
     local lines = {}
     for _, a in ipairs(assignments) do
         if a.is_meta then

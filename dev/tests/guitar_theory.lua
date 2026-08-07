@@ -193,6 +193,23 @@ Test.it('dissonant/unrecognized pitch set does not crash', function()
     Test.expect(t:find('Unrecognized chord shape'), 'got ' .. tostring(t))
 end)
 
+Test.it('3 pitches / 2 pitch classes falls back to the dyad interval name', function()
+    -- pcs {0,9}: a sixth dyad with the lower note doubled an octave up.
+    -- {0,7} is the only 2-pitch-class set that is also a chord template, so
+    -- without the dyad fallback everything else here reported
+    -- 'Unrecognized chord shape' while GuitarSuggestRBMapping called the
+    -- same shape a 1-3 dyad - and ChordQualityLabel printed nothing.
+    local t = GuitarClassifyChordType({ 45, 57, 66 })
+    Test.expect(t == 'Sixth dyad', 'expected Sixth dyad, got ' .. tostring(t))
+    local width = GuitarSuggestRBMapping({ 45, 57, 66 })
+    Test.expect(width == '1-3', 'classifier and RB mapping agree; got width ' .. tostring(width))
+end)
+
+Test.it('octave-doubled minor third reports the dyad name, not Unrecognized', function()
+    local t = GuitarClassifyChordType({ 40, 43, 52 })  -- pcs {0,3}
+    Test.expect(t == 'Minor third', 'expected Minor third, got ' .. tostring(t))
+end)
+
 ----------------------------------------------------------------------
 
 Test.section('GuitarSuggestRBMapping')

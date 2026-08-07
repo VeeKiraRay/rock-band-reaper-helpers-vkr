@@ -9,6 +9,34 @@ over 5. See `CLAUDE.md` → "Changelog / `@about` trimming" for the rule.
 
 `rock_band_general_helper_vkr.lua`
 
+**v0.9.41**
+- MIDI tab > Length > Midi note: fixed sustains being left overlapping
+  the note after them. "Only sustains" looked for "the next note" by
+  scanning for the first note starting at or after the sustain's own
+  END, so a note that started INSIDE the sustain (an existing overlap)
+  was stepped over and the sustain was sized against a later note
+  instead - leaving the buried note overlapped, or burying it deeper.
+  The next note is now the EARLIEST note starting after the sustain's
+  start tick; one starting inside the sustain always counts, however
+  far the following clean note is. Unchanged otherwise: chord-mates
+  sharing the start tick are still not "next", and a sustain whose
+  next note is more than half a measure (16x32nd notes) past its end
+  is still left alone.
+- MIDI tab > Length > Midi note: a sustain is now any note >= 1/8 note
+  (was 1/4), matching Rock Band charting. "Only sustains" therefore
+  also adjusts 1/8-note sustains, and "Non-sustains" only unifies
+  notes shorter than 1/8 instead of flattening them. 1/8 is no longer
+  offered in the Note size list (it is the threshold itself); a
+  project saved with it falls back to the current value on load.
+- MIDI tab > Length > Midi note: changing Difficulty prefills the
+  "32nd note amount" gap with that tier's standard value (Expert 3,
+  Hard 4, Medium 8, Easy 16). Adjusting the slider afterwards sticks -
+  only another tier change overwrites it.
+- MIDI tab > Length > Midi note: the track selector is now labeled
+  "Source track" and warns when it is not the track open in the MIDI
+  editor, as the Pattern sub-tab already did. Both sub-tabs now share
+  one MidiEditorTrackWarning helper (ui_midi.lua).
+
 **v0.9.40**
 - MIDI tab > Pattern: fixed "Go Prev" doing nothing useful when the edit
   cursor sat inside a match. It treated the current match's own start as

@@ -158,6 +158,19 @@ function GuitarClassifyChordType(pitches)
             end
         end
     end
+
+    -- No template matched. Before giving up, handle the 2-pitch-class case
+    -- the same way GuitarSuggestRBMapping already does (see its n_pcs == 2
+    -- branch): harmonically a dyad voiced with a doubled note. Only {0,7}
+    -- is also a chord template, so without this a doubled sixth or third
+    -- got a width from GuitarSuggestRBMapping but 'Unrecognized' from here
+    -- - and ChordQualityLabel then printed nothing at all. pcs[1] is always
+    -- 0 (relative to the lowest pitch), so pcs[2] is the interval class.
+    if #norm.pcs == 2 then
+        local info = GUITAR_DYAD_INTERVALS[norm.pcs[2]]
+        if info then return info.name, nil end
+    end
+
     return string.format('Unrecognized chord shape (%d distinct notes)', n), nil
 end
 

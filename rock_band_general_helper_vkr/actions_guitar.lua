@@ -153,6 +153,21 @@ local function shape_key(sorted_pitches)
     return table.concat(t, ',')
 end
 
+-- Ascending copy of an event's pitches, optionally compressed first.
+-- The copy matters: CompressChord returns its ARGUMENT unchanged when the
+-- chord already fits (and is skipped entirely when max_chord is nil), so
+-- sorting the result in place would reorder the caller's own ev.pitches -
+-- which the guide/converter reports then print via PitchLabel. Tab input
+-- arrives in string order (high e first), and that's how it should read
+-- back in the report, next to the tab line it came from.
+function SortedChordPitches(pitches, max_chord)
+    local src = max_chord and CompressChord(pitches, max_chord) or pitches
+    local out = {}
+    for i, p in ipairs(src) do out[i] = p end
+    table.sort(out)
+    return out
+end
+
 -- '  [Perfect fifth (power chord)]' for a recognized shape, else '' -
 -- appended to a Phase-2 reason string so the report shows *why* a
 -- particular combo was chosen, not just the combo itself. Works on any
@@ -312,13 +327,23 @@ end
 -- Returns all_shapes (key -> {avg,max,sz,pitches}), shape_gems (key -> gem
 -- combo, global, never reset by gaps between notes), shared (key -> true
 -- for any shape that had to reuse another shape's combo in its group).
-function BuildShapeGemMap(events, max_chord)
+--
+-- max_chord/allow_14 are passed in rather than read from S, because the two
+-- callers are not governed by the same settings. AssignGems (Guitar tab
+-- converter) passes S.mc_gtr_max_chord/S.mc_gtr_allow_14, its own UI
+-- controls. AssignGemsForGuide (Tab Input guide) passes max_chord=nil (no
+-- compression at all) and allow_14=true: the Tab Input tab exposes neither
+-- control, writes nothing to the project, and exists to report the same
+-- answer the Music Theory helper's Shape Search gives - which classifies
+-- the full chord by pitch class and never truncates it. Reading S here
+-- instead let the WIP Guitar tab's settings silently steer the shipped
+-- guide's output.
+function BuildShapeGemMap(events, max_chord, allow_14)
     local all_shapes  = {}   -- key -> {avg, max, sz, pitches}
     local size_orders = {}   -- sz -> [keys in first-seen order, sorted later]
 
     for _, ev in ipairs(events) do
-        local pitches = CompressChord(ev.pitches, max_chord)
-        table.sort(pitches)
+        local pitches = SortedChordPitches(ev.pitches, max_chord)
         local sz  = #pitches
         local key = shape_key(pitches)
         if not all_shapes[key] then
@@ -330,7 +355,7 @@ function BuildShapeGemMap(events, max_chord)
         end
     end
 
-    local pool2      = S.mc_gtr_allow_14 and POOLS[2] or POOLS2_NO14
+    local pool2      = allow_14 and POOLS[2] or POOLS2_NO14
     local pool2_by_w = PoolByWidth(pool2)
     local shape_gems = {}   -- key -> gem combo (global, never reset)
     local shared     = {}   -- key -> true when its combo is shared with another shape
@@ -358,7 +383,14 @@ function BuildShapeGemMap(events, max_chord)
     -- size's own POOLS entry), exactly as before this classification.
     local by_width      = {}   -- spread -> [keys], shared across all sizes
     local fallback_2    = {}   -- sz==2, no principled width
-    local fallback_3    = {}   -- sz -> [keys], sz>=3, no principled width
+    -- Bucketed by min(sz,3), not raw sz: every shape with 3+ notes draws
+    -- from POOLS[3] regardless of how many notes it actually has, so they
+    -- must all compete in ONE AssignByConflict group. Keyed by raw sz, a
+    -- 4-note and a 6-note shape would be assigned independently from the
+    -- same 7 combos and could collide without being flagged (*Wrap).
+    -- Only reachable since the Tab Input guide stopped compressing - the
+    -- converter path caps sz at max_chord, so sz never exceeded 3 before.
+    local fallback_3    = {}   -- min(sz,3) -> [keys], sz>=3, no principled width
     local key_to_group  = {}   -- key -> group id string, for adjacency below
 
     for _, sz in ipairs(sizes) do
@@ -380,9 +412,10 @@ function BuildShapeGemMap(events, max_chord)
                         fallback_2[#fallback_2 + 1] = key
                         key_to_group[key] = 'f2'
                     else
-                        fallback_3[sz] = fallback_3[sz] or {}
-                        fallback_3[sz][#fallback_3[sz] + 1] = key
-                        key_to_group[key] = 'f3:' .. sz
+                        local bucket = math.min(sz, 3)
+                        fallback_3[bucket] = fallback_3[bucket] or {}
+                        fallback_3[bucket][#fallback_3[bucket] + 1] = key
+                        key_to_group[key] = 'f3:' .. bucket
                     end
                 end
             end
@@ -398,9 +431,7 @@ function BuildShapeGemMap(events, max_chord)
     local adjacency = {}   -- key -> { other_key -> count }
     local prev_key
     for _, ev in ipairs(events) do
-        local pitches = CompressChord(ev.pitches, max_chord)
-        table.sort(pitches)
-        local key = shape_key(pitches)
+        local key = shape_key(SortedChordPitches(ev.pitches, max_chord))
         if prev_key and prev_key ~= key then
             local g1, g2 = key_to_group[prev_key], key_to_group[key]
             if g1 and g1 == g2 then
@@ -421,9 +452,9 @@ function BuildShapeGemMap(events, max_chord)
         end
     end
     AssignByConflict(fallback_2, pool2, adjacency, shape_gems, shared)
-    for sz, keys in pairs(fallback_3) do
-        local pool = POOLS[math.min(sz, 3)] or POOLS[1]
-        AssignByConflict(keys, pool, adjacency, shape_gems, shared)
+    for bucket, keys in pairs(fallback_3) do
+        sort_by_pitch(keys, all_shapes)
+        AssignByConflict(keys, POOLS[bucket] or POOLS[1], adjacency, shape_gems, shared)
     end
 
     return all_shapes, shape_gems, shared
@@ -450,7 +481,7 @@ end
 local function AssignGems(events, wrap_gap_s, max_chord)
     if #events == 0 then return {} end
 
-    local all_shapes, shape_gems, shared = BuildShapeGemMap(events, max_chord)
+    local all_shapes, shape_gems, shared = BuildShapeGemMap(events, max_chord, S.mc_gtr_allow_14)
 
     -- Phrase ranges: for report annotations only - do NOT reset gem assignments
     local phrase_ranges = {}
@@ -473,9 +504,7 @@ local function AssignGems(events, wrap_gap_s, max_chord)
         local seen       = {}
         local seen_order = {}
         for i = pr.i_s, pr.i_e do
-            local pitches = CompressChord(events[i].pitches, max_chord)
-            table.sort(pitches)
-            local key = shape_key(pitches)
+            local key = shape_key(SortedChordPitches(events[i].pitches, max_chord))
             if not seen[key] then
                 seen[key] = true
                 seen_order[#seen_order + 1] = key
@@ -520,8 +549,7 @@ local function AssignGems(events, wrap_gap_s, max_chord)
             assignments[#assignments + 1] = { s = ev.s, reason = meta_reason, is_meta = true }
         end
 
-        local pitches = CompressChord(ev.pitches, max_chord)
-        table.sort(pitches)
+        local pitches = SortedChordPitches(ev.pitches, max_chord)
         local n_orig = #ev.pitches
         local key    = shape_key(pitches)
         local src    = shape_gems[key]

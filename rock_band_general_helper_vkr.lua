@@ -1,6 +1,6 @@
 -- @description Rock Band General Helper
 -- @author VeeKiraRay
--- @version 0.9.45
+-- @version 0.9.46
 -- @about
 --   Utility actions for Rock Band authoring in REAPER.
 --
@@ -21,6 +21,37 @@
 --   This @about block keeps only the 5 most recent versions.
 --   Full history: CHANGELOG.md in the repo.
 --
+--   v0.9.46
+--     - Tab Input > Guitar / Bass: the guide no longer truncates a chord
+--       before classifying it, so it now agrees with the Music Theory
+--       helper's Shape Search on every shape. Both tools answer the same
+--       question - how a chord maps to RB - and Shape Search was the one
+--       getting it right. The guide had been reducing each chord to 3
+--       PHYSICAL notes by array position (lowest, middle, highest) before
+--       any harmonic analysis, which could throw away the root and keep a
+--       doubled note: an open D (2 3 2 0 0 -) lost every D and was reported
+--       as a 1-3 chord instead of a 3-note major triad, and a C/G
+--       (0 1 0 2 3 3) lost both C's the same way. Worse, "3 3 0 0 x 3"
+--       became three octaves of G - one pitch class, no suggestable width -
+--       and was charted as a 3-note chord, while the identical G5 voiced as
+--       "- - 0 0 x 3" was correctly a 1-3 power chord. Nothing needed
+--       reducing in the first place: the tab writes nothing to the project,
+--       and the gem count already comes from distinct PITCH CLASSES across
+--       the whole shape (2 for a dyad, 3 for a real triad).
+--     - Tab Input > Guitar / Bass: the guide no longer reads Max chord,
+--       Allow 1-4, or Phrase gap. Those sliders belong to the Guitar tab's
+--       converter and are only visible when WIP tabs are enabled, but they
+--       were steering this tab's output even though it does not offer them.
+--       An octave dyad now correctly reports 1-4, and phrase breaks come
+--       from blank lines in the tab, as documented. The Guitar tab
+--       converter is unaffected - it keeps its own settings and its gem
+--       assignments are unchanged.
+--     - Chord names: a chord voiced with a doubled note now reports its
+--       interval name instead of "Unrecognized chord shape". A power chord
+--       was the only such shape that had a name, so an octave-doubled sixth
+--       or third came back unnamed from the classifier while the RB mapping
+--       happily called it a 1-3 dyad. Affects the chord name shown in both
+--       the Tab Input report and Music Theory > Shape Search.
 --   v0.9.45
 --     - Venue > Actions: new "Validate" section with a "Validate
 --       lighting/blends" button - a read-only audit of the lighting and post
@@ -197,33 +228,6 @@
 --       longer drift. New shared SnapPpqToHalfBeat (venue_lighting.lua)
 --       replaces the half-beat snap duplicated in venue_generator.lua and
 --       actions_venue_section.lua.
---   v0.9.41
---     - MIDI tab > Length > Midi note: fixed sustains being left overlapping
---       the note after them. "Only sustains" looked for "the next note" by
---       scanning for the first note starting at or after the sustain's own
---       END, so a note that started INSIDE the sustain (an existing overlap)
---       was stepped over and the sustain was sized against a later note
---       instead - leaving the buried note overlapped, or burying it deeper.
---       The next note is now the EARLIEST note starting after the sustain's
---       start tick; one starting inside the sustain always counts, however
---       far the following clean note is. Unchanged otherwise: chord-mates
---       sharing the start tick are still not "next", and a sustain whose
---       next note is more than half a measure (16x32nd notes) past its end
---       is still left alone.
---     - MIDI tab > Length > Midi note: a sustain is now any note >= 1/8 note
---       (was 1/4), matching Rock Band charting. "Only sustains" therefore
---       also adjusts 1/8-note sustains, and "Non-sustains" only unifies
---       notes shorter than 1/8 instead of flattening them. 1/8 is no longer
---       offered in the Note size list (it is the threshold itself); a
---       project saved with it falls back to the current value on load.
---     - MIDI tab > Length > Midi note: changing Difficulty prefills the
---       "32nd note amount" gap with that tier's standard value (Expert 3,
---       Hard 4, Medium 8, Easy 16). Adjusting the slider afterwards sticks -
---       only another tier change overwrites it.
---     - MIDI tab > Length > Midi note: the track selector is now labeled
---       "Source track" and warns when it is not the track open in the MIDI
---       editor, as the Pattern sub-tab already did. Both sub-tabs now share
---       one MidiEditorTrackWarning helper (ui_midi.lua).
 r = reaper  -- global so all dofile'd modules can use it
 
 if not r.ImGui_CreateContext then

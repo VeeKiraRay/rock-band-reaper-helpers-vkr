@@ -190,6 +190,8 @@ Converts raw guitar MIDI pitches to Rock Band Expert Guitar gem notes (pitches 9
 - **Context window (measures)** — how many measures ahead the gem-scale planner looks. Wider = smoother transitions; narrower = adapts more quickly to large pitch jumps.
 - **Max chord** — maximum simultaneous gems per chord event (2 or 3).
 
+All three apply to this converter only. The Tab Input tab's Guitar / Bass guide used to read them too even though it doesn't offer them; it no longer does.
+
 ### Actions
 
 - **Preview** — shows a detailed per-note reasoning report without writing anything.

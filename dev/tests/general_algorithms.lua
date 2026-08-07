@@ -197,7 +197,10 @@ end)
 -- shapes that are genuinely back-to-back anywhere in the passage only
 -- share a combo when truly unavoidable (marked in the third return
 -- value, `shared`), not just because they're pitch-adjacent.
--- S.mc_gtr_allow_14 defaults to true (defaults.lua), so pool2 = POOLS[2].
+-- max_chord/allow_14 are explicit arguments, not read from S. These cases
+-- drive the Guitar tab converter's configuration (max_chord=3, allow_14=true
+-- so pool2 = POOLS[2]); the Tab Input guide's configuration (max_chord=nil,
+-- i.e. no compression at all) has its own section further below.
 Test.section('BuildShapeGemMap')
 
 local function ev(s, pitches)
@@ -213,14 +216,14 @@ local function power_chord(root)
 end
 
 Test.it('power chord dyad (interval 7) always gets a 1-3 spread', function()
-    local _, shape_gems = BuildShapeGemMap({ ev(0, { 45, 52 }) }, 3)
+    local _, shape_gems = BuildShapeGemMap({ ev(0, { 45, 52 }) }, 3, true)
     local gems = shape_gems['45,52']
     Test.expect(gems ~= nil, 'shape assigned a combo')
     Test.expect(gems[2] - gems[1] == 2, '1-3 spread (index gap 2); got gap ' .. tostring(gems[2] - gems[1]))
 end)
 
 Test.it('two different power chords (no overflow) each claim a unique combo in pitch order', function()
-    local _, shape_gems, shared = BuildShapeGemMap({ ev(0, { 45, 52 }), ev(1, { 40, 47 }) }, 3)
+    local _, shape_gems, shared = BuildShapeGemMap({ ev(0, { 45, 52 }), ev(1, { 40, 47 }) }, 3, true)
     local a, b = shape_gems['45,52'], shape_gems['40,47']
     -- pool2_by_w[2] = {{0,2},{1,3},{2,4}} (G+Y, R+B, Y+O); N=2 <= 3 combos,
     -- so no overflow - each shape claims a unique slot in ascending-pitch
@@ -243,7 +246,7 @@ Test.it('reproduces the reported real passage: only the genuine overflow shape w
         ev(0, power_chord(50)), ev(1, power_chord(46)), ev(2, power_chord(48)),
         ev(3, power_chord(50)), ev(4, power_chord(46)), ev(5, power_chord(53)),
     }
-    local _, shape_gems, shared = BuildShapeGemMap(events, 3)
+    local _, shape_gems, shared = BuildShapeGemMap(events, 3, true)
     local g46 = shape_gems[table.concat(power_chord(46), ',')]
     local g48 = shape_gems[table.concat(power_chord(48), ',')]
     local g50 = shape_gems[table.concat(power_chord(50), ',')]
@@ -268,7 +271,7 @@ Test.it('overflow shape avoids reusing the combo of the shape it is actually adj
         ev(0, power_chord(40)), ev(1, power_chord(42)),
         ev(2, power_chord(44)), ev(3, power_chord(46)),
     }
-    local _, shape_gems, shared = BuildShapeGemMap(events, 3)
+    local _, shape_gems, shared = BuildShapeGemMap(events, 3, true)
     local kC, kD = table.concat(power_chord(44), ','), table.concat(power_chord(46), ',')
     local gC, gD = shape_gems[kC], shape_gems[kD]
     Test.expect(not (gC[1] == gD[1] and gC[2] == gD[2]),
@@ -285,7 +288,7 @@ Test.it('past MAX_CONFLICT_SHAPES distinct shapes, falls back to plain clamp-to-
     for i = 1, 250 do
         events[i] = ev(i, power_chord(20 + i))
     end
-    local _, shape_gems, shared = BuildShapeGemMap(events, 3)
+    local _, shape_gems, shared = BuildShapeGemMap(events, 3, true)
     local all_clamped = true
     for i = 4, 250 do  -- ranks 1-3 claim unique slots; 4+ are overflow
         local key = table.concat(power_chord(20 + i), ',')
@@ -298,7 +301,7 @@ Test.it('past MAX_CONFLICT_SHAPES distinct shapes, falls back to plain clamp-to-
 end)
 
 Test.it('perfect fourth (interval 5, ambiguous width) falls back to legacy pool cycling', function()
-    local _, shape_gems = BuildShapeGemMap({ ev(0, { 45, 50 }) }, 3)
+    local _, shape_gems = BuildShapeGemMap({ ev(0, { 45, 50 }) }, 3, true)
     local gems = shape_gems['45,50']
     Test.expect(gems ~= nil, 'shape assigned a combo')
     local spread = gems[2] - gems[1]
@@ -306,7 +309,7 @@ Test.it('perfect fourth (interval 5, ambiguous width) falls back to legacy pool 
 end)
 
 Test.it('compound interval (> 1 octave) resolves to G+O directly', function()
-    local _, shape_gems = BuildShapeGemMap({ ev(0, { 40, 64 }) }, 3)
+    local _, shape_gems = BuildShapeGemMap({ ev(0, { 40, 64 }) }, 3, true)
     local gems = shape_gems['40,64']
     Test.expect(gems[1] == 0 and gems[2] == 4, 'G+O for compound interval; got ' ..
         tostring(gems[1]) .. ',' .. tostring(gems[2]))
@@ -319,7 +322,7 @@ Test.it('3-physical-note power chord (root+5th+octave, 2 pitch classes) ' ..
     -- distinct pitch classes (45 and 52 are a 7th apart, 57 is 45+12).
     -- rock_band_music_theory_helper_vkr's GUITAR_CHORDS table documents
     -- this exact shape's rb_mapping as '1-3', not a 3-note chord.
-    local _, shape_gems = BuildShapeGemMap({ ev(0, { 45, 52, 57 }) }, 3)
+    local _, shape_gems = BuildShapeGemMap({ ev(0, { 45, 52, 57 }) }, 3, true)
     local gems = shape_gems['45,52,57']
     Test.expect(gems ~= nil, 'shape assigned a combo')
     Test.expect(#gems == 2, 'collapses to 2 gems, not 3; got ' .. #gems)
@@ -332,12 +335,102 @@ Test.it('ChordQualityLabel recognizes the same 3-physical-note power chord', fun
 end)
 
 Test.it('a genuine 3-distinct-pitch-class shape (real triad) still gets a 3-note chord', function()
-    local _, shape_gems = BuildShapeGemMap({ ev(0, { 40, 45, 50 }) }, 3)
+    local _, shape_gems = BuildShapeGemMap({ ev(0, { 40, 45, 50 }) }, 3, true)
     local gems = shape_gems['40,45,50']
     Test.expect(#gems == 3, 'true 3-pitch-class chord stays a 3-note chord; got ' .. #gems)
 end)
 
 Test.it('single-note shapes are unaffected (unchanged pool cycling)', function()
-    local _, shape_gems = BuildShapeGemMap({ ev(0, { 60 }) }, 3)
+    local _, shape_gems = BuildShapeGemMap({ ev(0, { 60 }) }, 3, true)
     Test.expect(shape_gems['60'][1] == 0, 'lone single-note shape -> gem 0')
+end)
+
+Test.it('BuildShapeGemMap never mutates the caller\'s ev.pitches', function()
+    -- CompressChord returns its argument unchanged when the chord already
+    -- fits, and is skipped entirely when max_chord is nil - so sorting its
+    -- result in place used to reorder the event the caller still owns (and
+    -- goes on to print via PitchLabel). SortedChordPitches copies first.
+    local events = { ev(0, { 64, 60, 55, 52, 48, 43 }) }   -- tab string order, descending
+    BuildShapeGemMap(events, nil, true)
+    BuildShapeGemMap(events, 3, true)
+    Test.expect(table.concat(events[1].pitches, ',') == '64,60,55,52,48,43',
+        'ev.pitches keeps its original order; got ' .. table.concat(events[1].pitches, ','))
+end)
+
+----------------------------------------------------------------------
+-- BuildShapeGemMap: Tab Input guide configuration (max_chord = nil)
+----------------------------------------------------------------------
+-- The Tab Input tab writes nothing to the project, so nothing needs
+-- reducing: it passes max_chord=nil and lets GuitarSuggestRBMapping derive
+-- the gem count from distinct PITCH CLASSES on the full shape. These cases
+-- are the five tab shapes that exposed the old index-based compression -
+-- each one's expected result is what the Music Theory helper's Shape Search
+-- reports for the same shape, which is the behaviour the guide must match.
+Test.section('BuildShapeGemMap (Tab Input guide, uncompressed)')
+
+local function guide_gems(tab)
+    local events = ParseTabHorizontal(tab)
+    local all_shapes, shape_gems = BuildShapeGemMap(events, nil, true)
+    local sorted = SortedChordPitches(events[1].pitches)
+    return shape_gems[table.concat(sorted, ',')], all_shapes, sorted
+end
+
+Test.it('open C/G (0 1 0 2 3 3) is a 3-note chord, not a sixth dyad', function()
+    -- Old behaviour kept pitches[1], pitches[mid], pitches[#pitches] =
+    -- E3+E2+G1: both C's discarded, one pitch class doubled, leaving a
+    -- major sixth -> width 1-3. All three pitch classes must survive.
+    local gems, _, sorted = guide_gems('0 1 0 2 3 3')
+    Test.expect(#sorted == 6, 'shape is not compressed; got ' .. #sorted .. ' pitches')
+    Test.expect(#gems == 3, '3 gems for a real triad; got ' .. #gems .. ' ' .. dump_gems(gems))
+    Test.expect(GuitarClassifyChordType(sorted) == 'Major triad',
+        'classified as a major triad; got ' .. GuitarClassifyChordType(sorted))
+end)
+
+Test.it('open D (2 3 2 0 0 -) is a 3-note chord, not a sixth dyad', function()
+    -- Old behaviour kept F#3+A2+A1 - every D, the root, discarded.
+    local gems, _, sorted = guide_gems('2 3 2 0 0 -')
+    Test.expect(#gems == 3, '3 gems for a real triad; got ' .. #gems .. ' ' .. dump_gems(gems))
+    Test.expect(GuitarClassifyChordType(sorted) == 'Major triad',
+        'classified as a major triad; got ' .. GuitarClassifyChordType(sorted))
+end)
+
+Test.it('both G5 voicings resolve to the same 2-gem 1-3 power chord', function()
+    -- The regression: "3 3 0 0 x 3" (G,D,G,D,G) used to compress to
+    -- G1+G2+G3 - a single pitch class, no suggestable width - and landed in
+    -- the 3-note fallback pool, while the identical chord voiced as
+    -- "- - 0 0 x 3" was correctly 1-3. Same chord, opposite answers.
+    for _, tab in ipairs({ '- - 0 0 x 3', '3 3 0 0 x 3' }) do
+        local gems, _, sorted = guide_gems(tab)
+        Test.expect(#gems == 2, tab .. ': 2 gems; got ' .. #gems .. ' ' .. dump_gems(gems))
+        Test.expect(gems[2] - gems[1] == 2, tab .. ': 1-3 spread; got gap ' .. (gems[2] - gems[1]))
+        Test.expect(GuitarClassifyChordType(sorted) == 'Power chord',
+            tab .. ': classified as a power chord; got ' .. GuitarClassifyChordType(sorted))
+    end
+end)
+
+Test.it('all six open strings (0 0 0 0 0 0) stay a 3-note chord', function()
+    local gems, all_shapes, sorted = guide_gems('0 0 0 0 0 0')
+    Test.expect(#gems == 3, '3 gems; got ' .. #gems .. ' ' .. dump_gems(gems))
+    Test.expect(#all_shapes[table.concat(sorted, ',')].pitches == 6,
+        'all 6 pitches kept in the shape record')
+end)
+
+Test.it('4-note and 6-note fallback shapes share one conflict group', function()
+    -- Both draw from POOLS[3], so they must compete in a single
+    -- AssignByConflict group - bucketed by min(sz,3), not raw sz. Keyed by
+    -- raw sz they were assigned independently and could collide silently.
+    -- Two shapes, no overflow (POOLS[3] has 7 combos) -> distinct combos.
+    local events = {
+        ev(0, { 40, 45, 50, 55 }),          -- 4 notes, 4 pitch classes
+        ev(1, { 52, 57, 62, 67, 71, 76 }),  -- 6 notes, 4 pitch classes
+    }
+    local _, shape_gems, shared = BuildShapeGemMap(events, nil, true)
+    local a = shape_gems['40,45,50,55']
+    local b = shape_gems['52,57,62,67,71,76']
+    Test.expect(a and b, 'both shapes assigned a combo')
+    Test.expect(#a == 3 and #b == 3, 'both get 3 gems from POOLS[3]')
+    Test.expect(table.concat(a, ',') ~= table.concat(b, ','),
+        'the two shapes get different combos; got ' .. dump_gems(a) .. ' and ' .. dump_gems(b))
+    Test.expect(not shared['40,45,50,55'] and not shared['52,57,62,67,71,76'],
+        'neither is marked shared - there was no overflow')
 end)
