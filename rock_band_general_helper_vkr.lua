@@ -1,6 +1,6 @@
 -- @description Rock Band General Helper
 -- @author VeeKiraRay
--- @version 0.9.46
+-- @version 0.9.47
 -- @about
 --   Utility actions for Rock Band authoring in REAPER.
 --
@@ -21,6 +21,22 @@
 --   This @about block keeps only the 5 most recent versions.
 --   Full history: CHANGELOG.md in the repo.
 --
+--   v0.9.47
+--     - Tab Input: horizontal tab now reads LOW to HIGH - the leftmost token
+--       is the low E string. This is standard chord notation, where
+--       "x 3 2 0 1 0" is C major and "3 2 0 0 0 3" is G major; the old
+--       high-to-low order was backwards from how every chord chart, chord
+--       dictionary, and Guitar Pro diagram writes a one-line fret shape.
+--       Applies to all three Tab Input sub-tabs (Guitar/Bass, Keys/Pro Keys
+--       and Vocal share one parser), and to the Music Theory helper's Shape
+--       Search, whose 26 reference shapes were reversed to match (its v0.4).
+--       Existing tab text you have written by hand needs reversing; nothing
+--       stored in a project changes, since the tab boxes are never saved.
+--     - Tab Input: VERTICAL tab is deliberately unchanged - the high e stays
+--       on the top row, which is how ASCII tab is printed everywhere. The
+--       two formats now run in opposite directions, because the two
+--       notations really do. The format tooltip says so, so it doesn't read
+--       as a bug.
 --   v0.9.46
 --     - Tab Input > Guitar / Bass: the guide no longer truncates a chord
 --       before classifying it, so it now agrees with the Music Theory
@@ -29,12 +45,12 @@
 --       getting it right. The guide had been reducing each chord to 3
 --       PHYSICAL notes by array position (lowest, middle, highest) before
 --       any harmonic analysis, which could throw away the root and keep a
---       doubled note: an open D (2 3 2 0 0 -) lost every D and was reported
+--       doubled note: an open D (- 0 0 2 3 2) lost every D and was reported
 --       as a 1-3 chord instead of a 3-note major triad, and a C/G
---       (0 1 0 2 3 3) lost both C's the same way. Worse, "3 3 0 0 x 3"
+--       (3 3 2 0 1 0) lost both C's the same way. Worse, "3 x 0 0 3 3"
 --       became three octaves of G - one pitch class, no suggestable width -
 --       and was charted as a 3-note chord, while the identical G5 voiced as
---       "- - 0 0 x 3" was correctly a 1-3 power chord. Nothing needed
+--       "3 x 0 0 - -" was correctly a 1-3 power chord. Nothing needed
 --       reducing in the first place: the tab writes nothing to the project,
 --       and the gem count already comes from distinct PITCH CLASSES across
 --       the whole shape (2 for a dyad, 3 for a real triad).
@@ -195,39 +211,6 @@
 --       train short. Only ADJACENT events are compared, so two sections
 --       sharing a preset with a different one between them are each still
 --       a real change.
---   v0.9.42
---     - Venue: [first] keyframes now land on the SAME tick as the manual
---       lighting event they drive - [first] is that event's own initial
---       keyframe, not a later "start reacting here" marker. Themes gen and
---       Section gen were the worst offenders: they place the lighting event
---       lightpreset_blendin beats BEFORE the section start (1-4 beats in
---       nearly every shipped theme) but put [first] on the section start, so
---       it was routinely beats late. The section start now carries the first
---       [next] instead, leaving the rest of the keyframe train exactly where
---       it was. Keyframes tab and Manual gen were already anchored on the
---       lighting event except in "Closest beat" mode, where [first] was
---       snapped off it - that snapped beat is now a [next] too.
---       Instrument-aware align modes are the one exception: they add no
---       [next] at the section start, since every [next] there must be backed
---       by a real note.
---     - Venue > Manual gen: inserting a bare [first], and the whole keyframe
---       row (align, subdivision, rate, Add), are now blocked unless the
---       playhead sits on a manual lighting event - hovering the "(blocked)"
---       marker explains why, as the Events tab already did. The keyframe row
---       is gated on the event actually under the playhead rather than the
---       Lighting dropdown, so an existing [lighting (stomp)] can be
---       re-keyframed without re-picking it.
---     - Venue: keyframe align mode 0 renamed to "Keyframe rate only" (was
---       "Section start", and "Playhead" in Manual gen - two label lists that
---       had drifted apart, now one shared KF_ALIGN_LABELS). No align mode
---       decides where [first] goes any more; they only choose where the
---       first [next] lands, and the tooltips now say so. Mode indices are
---       unchanged, so saved settings still load.
---     - Internal: Manual gen's keyframe generation was a verbatim copy of
---       GenerateKeyframesForSpan's body - it now calls it, so the two can no
---       longer drift. New shared SnapPpqToHalfBeat (venue_lighting.lua)
---       replaces the half-beat snap duplicated in venue_generator.lua and
---       actions_venue_section.lua.
 r = reaper  -- global so all dofile'd modules can use it
 
 if not r.ImGui_CreateContext then

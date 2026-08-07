@@ -3,10 +3,16 @@
 -- Tab Input guide
 ----------------------------------------------------------------------
 
--- Tuning table: GUITAR_TAB_OPEN, from lib/reaper_guitar_theory.lua (e B G D
--- A E, standard tuning) -- also the pure fret-shape -> chord-quality
--- classifier AssignGemsForGuide's dyad handling consults (see
--- BuildShapeGemMap in actions_guitar.lua).
+-- Tuning table: GUITAR_TAB_OPEN, from lib/reaper_guitar_theory.lua, indexed
+-- by guitar string number (1 = high e ... 6 = low E) -- also the pure
+-- fret-shape -> chord-quality classifier AssignGemsForGuide's dyad handling
+-- consults (see BuildShapeGemMap in actions_guitar.lua).
+--
+-- The two tab formats below read in OPPOSITE directions, because the two
+-- real-world notations do. Horizontal is single-line fret notation, which
+-- is written low-to-high ("x 3 2 0 1 0" is C major); vertical is ASCII tab,
+-- which is written with the high e on the top row. Both match how they are
+-- printed everywhere, so neither is the odd one out.
 local TAB_GAP_BIG = 10  -- seconds; >> TAB_PHRASE_GAP_S -> triggers phrase break in AssignGems
 
 -- Phrase-break threshold for the synthetic timeline GuitarTabGuide builds:
@@ -18,7 +24,8 @@ local TAB_GAP_BIG = 10  -- seconds; >> TAB_PHRASE_GAP_S -> triggers phrase break
 -- be able to change that.
 local TAB_PHRASE_GAP_S = 1.0
 
--- Horizontal: one event per line, 6 space-separated tokens (digit=fret, else=unplayed).
+-- Horizontal: one event per line, 6 space-separated tokens (digit=fret, else=unplayed),
+-- LOW-to-HIGH - leftmost token is the low E string, as in "x 3 2 0 1 0" (C major).
 -- Blank line = phrase break. Supports multi-digit frets (10, 12, etc.).
 -- Returns { pitches, phrase_idx, tab_str } per event.
 function ParseTabHorizontal(text)
@@ -35,7 +42,8 @@ function ParseTabHorizontal(text)
                 si = si + 1
                 if si > 6 then break end
                 local f = tonumber(tok)
-                if f then pitches[#pitches + 1] = GUITAR_TAB_OPEN[si] + f end
+                -- Token 1 is the low E (string 6), token 6 the high e (string 1).
+                if f then pitches[#pitches + 1] = GUITAR_TAB_OPEN[7 - si] + f end
             end
             if #pitches > 0 then
                 events[#events + 1] = { pitches = pitches, phrase_idx = phrase_idx, tab_str = trimmed }
@@ -46,6 +54,8 @@ function ParseTabHorizontal(text)
 end
 
 -- Vertical: 6 rows of space-separated tokens (digit=fret, else=unplayed); columns = events.
+-- Standard ASCII tab layout, so row 1 is the HIGH e and row 6 the low E - the opposite
+-- of ParseTabHorizontal above, matching how each notation is actually written.
 -- All-non-digit column = phrase break. Supports multi-digit frets.
 -- Returns { pitches, phrase_idx } per event.
 function ParseTabVertical(text)

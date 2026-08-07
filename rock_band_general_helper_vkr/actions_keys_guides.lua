@@ -18,15 +18,16 @@ local function ParseTabToRaws(status_prefix)
     local text = S.mc_gtr_tab_format == 0 and S.mc_gtr_tab_input_h or S.mc_gtr_tab_input_v
     if not text or text:match('^%s*$') then
         S.status = status_prefix .. ': no input.'
-        S.last_result = 'Enter 6-string tab (e B G D A E, use - for unplayed).\n' ..
-                        'Horizontal: one event per line.  Vertical: 6 rows, columns = events.'
+        S.last_result = 'Enter 6-string tab (use - for unplayed).\n' ..
+                        'Horizontal: one event per line, low to high (E A D G B e).\n' ..
+                        'Vertical: 6 rows top-down (e B G D A E), columns = events.'
         return nil
     end
     local raw_events = S.mc_gtr_tab_format == 0 and ParseTabHorizontal(text) or ParseTabVertical(text)
     if #raw_events == 0 then
         S.status = status_prefix .. ': no notes found.'
         S.last_result = 'No notes found. Use digits for played strings, dashes for unplayed.\n' ..
-                        'Example:  5 6 5 - - -'
+                        'Example:  - - - 5 6 5'
         return nil
     end
     local events = {}

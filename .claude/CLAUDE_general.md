@@ -67,7 +67,7 @@ Four WIP tabs appear only when **Show WIPs? = Yes** in the General tab (persiste
   note count — a real-guitar interval like a power chord's perfect fifth always gets a
   matching lane spread (e.g. 1-3: GY/RB/YO) instead of whatever pitch-rank pool-cycling
   happens to land on, even when voiced with a doubled root across 3 strings (e.g.
-  `x x x 7 7 5`, root+5th+octave) — that collapses to the same 2-gem combo a literal
+  `5 7 7 x x x`, root+5th+octave) — that collapses to the same 2-gem combo a literal
   2-note power chord gets, not a 3-note chord. The preview report annotates recognized
   shapes with their chord name (e.g. `[Power chord]`, `[Major triad]`). When more
   distinct shapes share a width/size group than that group has combo alternatives, the

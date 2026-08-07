@@ -41,7 +41,7 @@ Each instrument section gets its own named table(s). Current tables:
 | `RB_LANE_COLORS` | Rows: `color`, `piece` — currently empty; see [`_future_ideas/music_theory_drum_colors.md`](_future_ideas/music_theory_drum_colors.md) |
 | `PRO_VS_4LANE` | Array of plain strings (bullet list) — currently empty; see [`_future_ideas/music_theory_pro_vs_4lane.md`](_future_ideas/music_theory_pro_vs_4lane.md) |
 | `DRUM_PATTERNS` | Rows: `name`, `desc` |
-| `GUITAR_CHORDS` | Rows: `shape`, `type`, `name`, `sound`, `rb_mapping` — see `lib/reaper_guitar_theory.lua`'s header comment for how these were converted/verified from `_future_ideas/GUITAR_THEORY.md` |
+| `GUITAR_CHORDS` | Rows: `shape`, `type`, `name`, `sound`, `rb_mapping`. `shape` is standard low-to-high fret notation (`x 3 2 0 1 0` is C major), the same form `_ParseFretPositions` reads — see the table's own header comment in `defaults.lua` for which rows were regenerated rather than copied from `_external_docs/GUITAR_THEORY.md`, and why that doc's fret numbers must not be trusted |
 | `GUITAR_CHORD_TYPES` | Rows: `name`, `description` — drives the Chord Type Explorer selector; every `GUITAR_CHORDS.type` value appears here exactly once and vice versa |
 | `GUITAR_LANE_TERMS` | Rows: `width`, `combos` — RB lane-combo letter names (GR/RY/... ) per spread width |
 
@@ -61,6 +61,17 @@ matching). That kind of logic belongs in its own `lib/` file (see
 function pure (no `r`/`ctx`/`S`), testable standalone, and reusable by other
 scripts later (the Guitar tab's classifier is intentionally reusable by
 `rock_band_general_helper_vkr`'s Guitar-tab converters in a future task).
+
+**Reference-table data is tested, not trusted.** `dev/tests/run_guitar_theory.lua`
+loads this folder's `defaults.lua` and round-trips **every** `GUITAR_CHORDS` row
+through the live classifier — each shape must parse, classify as its own `type`,
+and have an `rb_mapping` matching `GuitarSuggestRBMapping`; `GUITAR_CHORDS.type`
+and `GUITAR_CHORD_TYPES` must correspond exactly in both directions. Two rows
+deliberately diverge on `type` (the bare fifth, and the slash chord) and carry a
+documented exemption in `dev/tests/guitar_theory.lua`, itself guarded against
+going stale. Add a chord row and it is checked automatically — no test edit
+needed. Hand-authored teaching data has no other safety net, so if you add a new
+lookup table of this kind, give it the same treatment.
 
 ---
 

@@ -195,8 +195,10 @@ Three sub-tabs — **Guitar / Bass**, **Keys / Pro Keys**, **Vocal** — share t
 
 ### Accepted formats
 
-- **Horizontal tab** — one line per event, six space-separated tokens (fret number or `-`), left = highest string down to right = lowest. Multi-digit frets are supported; a blank line marks a phrase break.
-- **Vertical tab** — six rows (one per string), space-separated tokens per row, columns read left-to-right as events; an all-dash column marks a phrase break.
+- **Horizontal tab** — one line per event, six space-separated tokens (fret number, or `-`/`x` for unplayed), left = lowest string (E) up to right = highest (e). This is standard chord notation: `x 3 2 0 1 0` is C major. Multi-digit frets are supported; a blank line marks a phrase break.
+- **Vertical tab** — six rows (one per string), standard ASCII tab layout so the top row is the high e and the bottom the low E. Space-separated tokens per row, columns read left-to-right as events; an all-dash column marks a phrase break.
+
+The two formats run in opposite directions because the two notations really are written that way — a one-line fret shape starts at the low E, ASCII tab puts the high e on top. Both match how you'd find them printed anywhere else, so neither is the odd one out.
 
 **Add note** appends an empty slot to the input (an all-dash line/column) — it doesn't touch the project either.
 

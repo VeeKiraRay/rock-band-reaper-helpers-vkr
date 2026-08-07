@@ -8,7 +8,11 @@
 -- consults GuitarClassifyChordType/GuitarSuggestRBMapping for chord-quality-
 -- aware dyad gem assignment in AssignGems/AssignGemsForGuide).
 
--- Standard tuning, HIGH string to LOW string: e B G D A E.
+-- Open-string pitches indexed by GUITAR STRING NUMBER as guitarists number
+-- them: 1 = high e, 6 = low E. That is the index `shape.str` carries, and
+-- it is independent of the order tokens are typed in -- tab input is
+-- low-to-high (token 1 = the low E = string 6) and the parsers map token
+-- position to string number themselves. See _ParseFretPositions below.
 -- Matches the pre-existing convention in
 -- rock_band_general_helper_vkr/actions_guitar_guide.lua's local TAB_OPEN --
 -- duplicated here deliberately rather than shared, since it's a fixed
@@ -246,28 +250,41 @@ end
 
 ----------------------------------------------------------------------
 -- Parse fret input for the live shape search box. One line, space-separated
--- tokens. Two forms, told apart by token count:
---   Full form (exactly 6 tokens): direct 1:1 positional mapping, token i is
---     string i literally -- fret number or any non-numeric token (e.g. 'x')
---     for muted, edge or interior, no reinterpretation. Same per-line
---     convention as ParseTabHorizontal in
+-- tokens, LOW-to-HIGH: leftmost token is the low E string. That is the
+-- standard convention for single-line fret notation -- "x 3 2 0 1 0" is C
+-- major, "3 2 0 0 0 3" is G major -- and it is what every chord chart,
+-- chord dictionary, and Guitar Pro diagram uses. (Multi-line ASCII tab is
+-- the other way up, high e on the top row; ParseTabVertical in
+-- rock_band_general_helper_vkr/actions_guitar_guide.lua handles that form
+-- and is deliberately NOT reversed. The two notations genuinely run in
+-- opposite directions.)
+--
+-- shape[].str stays a real guitar string NUMBER (1 = high e ... 6 = low E,
+-- as guitarists number them, and as GUITAR_TAB_OPEN is indexed), so the
+-- token position is what gets mapped, not the table.
+--
+-- Two forms, told apart by token count:
+--   Full form (exactly 6 tokens): direct positional mapping, token i is
+--     string 7 - i -- token 1 the low E, token 6 the high e. Fret number or
+--     any non-numeric token (e.g. 'x') for muted, edge or interior, no
+--     reinterpretation. Same per-line convention as ParseTabHorizontal in
 --     rock_band_general_helper_vkr/actions_guitar_guide.lua, so a line
 --     copy-pasted between the two tools behaves identically. This is the
 --     only way to reach a shape anchored above the lowest strings.
 --   Compact form (1-5 tokens): edge mutes are optional noise and are
 --     ignored -- 'x'/'-'/any non-numeric token at the very start or end of
 --     the list (or simply omitting trailing strings) doesn't change the
---     shape, so '7 7 5', 'x x x 7 7 5', '- - - 7 7 5', and '- 7 7 5 -' all
+--     shape, so '5 7 7', '5 7 7 x x x', '5 7 7 - - -', and '- 5 7 7 -' all
 --     parse to the same pitches. Concretely: trim to the span between the
---     first and last NUMERIC token (that span is the "core", length L);
---     the core is right-anchored to the lowest L strings (core position k
---     -> GUITAR_TAB_OPEN[(7 - L) + k - 1]).
+--     first and last NUMERIC token (that span is the "core"); the core
+--     starts at the low E and walks up, so core position k -> string
+--     6 - (k - 1), i.e. GUITAR_TAB_OPEN[7 - k].
 --     Interior mutes (non-numeric tokens strictly between two numeric
 --     tokens) are NOT optional -- they mean "skip this string" and change
---     the interval (e.g. '7 x 5' is an octave; '7 5' is not) -- so they
+--     the interval (e.g. '5 x 7' is an octave; '5 7' is not) -- so they
 --     stay in the core and consume a string slot instead of being dropped.
 --     LIMITATION (by design, not a silent guess): since a short list always
---     anchors to the bottom, a shape meant for strings above the lowest
+--     starts at the low E, a shape meant for strings above the lowest
 --     few (e.g. one that needs the G-B pair specifically, whose open gap is
 --     a major third/4 semitones instead of the perfect-fourth/5-semitone
 --     gap every other adjacent pair has) can't be expressed compactly and
@@ -291,7 +308,8 @@ local function _ParseFretPositions(text)
         local shape = {}
         for i, tok in ipairs(toks) do
             local fret = tonumber(tok)
-            if fret then shape[#shape + 1] = { str = i, fret = fret } end
+            -- Token 1 is the low E (string 6), token 6 the high e (string 1).
+            if fret then shape[#shape + 1] = { str = 7 - i, fret = fret } end
         end
         if #shape == 0 then return nil, 'no frets recognized' end
         return shape
@@ -309,12 +327,13 @@ local function _ParseFretPositions(text)
     end
     if not lo then return nil, 'no frets recognized' end
 
-    local base_pos = 7 - (hi - lo + 1)  -- string index the core's first token maps to
+    -- The core starts at the low E (string 6) and walks up toward the high
+    -- e, so its length never enters into it -- no anchoring math needed.
     local shape = {}
     for i = lo, hi do
         local fret = tonumber(toks[i])
         if fret then
-            shape[#shape + 1] = { str = base_pos + (i - lo), fret = fret }
+            shape[#shape + 1] = { str = 6 - (i - lo), fret = fret }
         end
     end
     if #shape == 0 then return nil, 'no frets recognized' end

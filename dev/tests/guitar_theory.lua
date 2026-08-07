@@ -10,8 +10,8 @@ Test.it('full 6-token form parses muted + fretted strings', function()
     Test.expect(#pitches == 4, 'expected 4 pitches, got ' .. #pitches)
 end)
 
-Test.it('compact form right-anchors to the lowest strings', function()
-    local pitches, err = GuitarParseFretInput('10 7 7')
+Test.it('compact form starts at the low E and walks up', function()
+    local pitches, err = GuitarParseFretInput('7 7 10')
     Test.expect(pitches ~= nil, 'expected pitches, got err=' .. tostring(err))
     Test.expect(#pitches == 3, 'expected 3 pitches, got ' .. #pitches)
     local sorted = { pitches[1], pitches[2], pitches[3] }
@@ -28,10 +28,10 @@ Test.it('edge mutes (explicit, dash, or omitted) are all equivalent', function()
         table.sort(p)
         return p
     end
-    local a = sorted_pitches('7 7 5')
-    local b = sorted_pitches('x x x 7 7 5')
-    local c = sorted_pitches('- - - 7 7 5')
-    local d = sorted_pitches('- 7 7 5 -')
+    local a = sorted_pitches('5 7 7')
+    local b = sorted_pitches('5 7 7 x x x')
+    local c = sorted_pitches('5 7 7 - - -')
+    local d = sorted_pitches('- 5 7 7 -')
     for _, other in ipairs({ b, c, d }) do
         Test.expect(#a == #other, 'pitch count mismatch')
         for i = 1, #a do
@@ -41,8 +41,8 @@ Test.it('edge mutes (explicit, dash, or omitted) are all equivalent', function()
 end)
 
 Test.it('interior mute is preserved (octave) in compact form', function()
-    local full = GuitarParseFretInput('x x x 7 x 5')
-    local compact = GuitarParseFretInput('7 x 5')
+    local full = GuitarParseFretInput('5 x 7 x x x')
+    local compact = GuitarParseFretInput('5 x 7')
     table.sort(full)
     table.sort(compact)
     Test.expect(#full == #compact and full[1] == compact[1] and full[2] == compact[2],
@@ -50,8 +50,8 @@ Test.it('interior mute is preserved (octave) in compact form', function()
 end)
 
 Test.it('interior mute changes the result vs. no mute', function()
-    local with_gap = GuitarParseFretInput('7 x 5')
-    local without_gap = GuitarParseFretInput('7 5')
+    local with_gap = GuitarParseFretInput('5 x 7')
+    local without_gap = GuitarParseFretInput('5 7')
     table.sort(with_gap)
     table.sort(without_gap)
     Test.expect(with_gap[2] - with_gap[1] ~= without_gap[2] - without_gap[1],
@@ -148,41 +148,92 @@ end)
 
 Test.section('GuitarClassifyChordType - chords (round-trip via GUITAR_CHORDS)')
 
--- Each row: {shape string in GuitarParseFretInput's 6-token form, expected type}.
--- These are the same verified shapes shipped in
--- rock_band_music_theory_helper_vkr/defaults.lua's GUITAR_CHORDS table.
-local CHORD_ROUNDTRIP_CASES = {
-    { 'x x x 7 7 5',   'Power chord' },
-    { 'x x x 9 9 7',   'Power chord' },
-    { 'x x x 5 5 3',   'Power chord' },
-    { '1 1 3 x x x',   'Sus2' },
-    { '1 4 3 x x x',   'Sus4' },
-    { 'x 5 0 x 3 x',   'Major triad' },
-    { 'x 0 1 2 x x',   'Major triad' },
-    { 'x 4 0 x 3 x',   'Minor triad' },
-    { 'x 0 0 2 x x',   'Minor triad' },
-    { 'x 5 3 5 3 x',   'Dominant 7' },
-    { 'x 4 3 5 3 x',   'Minor 7' },
-    { 'x 5 4 5 3 x',   'Major 7' },
-    { 'x 4 x 4 3 x',   'Diminished' },
-    { 'x 5 1 x 3 x',   'Augmented' },
-    { 'x 4 3 4 3 x',   'Half-diminished' },
-    { 'x 5 7 5 3 x',   'Add9' },
-    { 'x 5 0 3 3 x',   'Add11' },
+-- Drives every row of the SHIPPED reference table
+-- (rock_band_music_theory_helper_vkr/defaults.lua) rather than a copy of it.
+-- That table is hand-authored teaching content with no other automated
+-- check, so a typo'd or mis-transposed shape has nothing else to catch it -
+-- and a duplicated list here silently stops covering the table the moment
+-- the two drift. Reading GUITAR_CHORDS directly means editing a shape,
+-- adding a row, or changing a type/mapping label is checked against the live
+-- classifier for free.
+
+-- Rows whose teaching-category `type` deliberately differs from what
+-- GuitarClassifyChordType returns. These are documented decisions, not
+-- drift - see the GUITAR_CHORDS header comment in defaults.lua.
+local EXPECTED_TYPE_DIVERGENCE = {
+    -- Root + 5th with no octave. The table folds the bare interval into the
+    -- single 'Power chord' teaching category (one category, not two); the
+    -- classifier keeps its own GUITAR_DYAD_INTERVALS name for a literal
+    -- 2-note interval-7 shape, which is deliberately left untouched.
+    ['3 5 x x x x']  = 'Perfect fifth (power chord)',
+    -- 'Slash chord' is a category, not a classifier output: there is no
+    -- slash template, so the classifier names the triad and reports the
+    -- inverted bass in its second (detail) return value instead. The
+    -- 'slash/inversion shape' case further down asserts that detail.
+    ['10 x x 0 0 x'] = 'Major triad',
 }
 
-for _, case in ipairs(CHORD_ROUNDTRIP_CASES) do
-    local shape_str, expected = case[1], case[2]
-    Test.it(shape_str .. ' -> ' .. expected, function()
-        local pitches = GuitarParseFretInput(shape_str)
+Test.it('every GUITAR_CHORDS shape parses', function()
+    for _, row in ipairs(GUITAR_CHORDS) do
+        local pitches, err = GuitarParseFretInput(row.shape)
+        Test.expect(pitches ~= nil, row.shape .. ' failed to parse: ' .. tostring(err))
+    end
+end)
+
+for _, row in ipairs(GUITAR_CHORDS) do
+    local expected = EXPECTED_TYPE_DIVERGENCE[row.shape] or row.type
+    Test.it(row.shape .. ' -> ' .. expected, function()
+        local pitches = GuitarParseFretInput(row.shape)
         Test.expect(pitches ~= nil, 'shape failed to parse')
         local t = GuitarClassifyChordType(pitches)
         Test.expect(t == expected, 'expected ' .. expected .. ', got ' .. tostring(t))
     end)
 end
 
+Test.it('every GUITAR_CHORDS rb_mapping agrees with GuitarSuggestRBMapping', function()
+    -- No exemptions: the reference table's RB mapping column is the actual
+    -- teaching content, so it must match what the live classifier suggests
+    -- for the very same shape. ('3-note' is the table's shorter spelling of
+    -- the classifier's '3-note chord'.) This caught Sus2/Sus4 shipping a
+    -- '1-4' 2-gem label on regenerated 3-pitch-class voicings.
+    for _, row in ipairs(GUITAR_CHORDS) do
+        local expected = row.rb_mapping == '3-note' and '3-note chord' or row.rb_mapping
+        local width = GuitarSuggestRBMapping(GuitarParseFretInput(row.shape))
+        Test.expect(width == expected,
+            row.shape .. ': table says ' .. row.rb_mapping .. ', classifier says ' .. tostring(width))
+    end
+end)
+
+Test.it('every type divergence exemption still matches a live row', function()
+    -- Stops an exemption outliving the row it was written for, which would
+    -- silently excuse whatever shape later took that string.
+    local shapes = {}
+    for _, row in ipairs(GUITAR_CHORDS) do shapes[row.shape] = true end
+    for shape in pairs(EXPECTED_TYPE_DIVERGENCE) do
+        Test.expect(shapes[shape], 'stale exemption for a shape no longer in GUITAR_CHORDS: ' .. shape)
+    end
+end)
+
+Test.it('GUITAR_CHORDS types and GUITAR_CHORD_TYPES are in exact correspondence', function()
+    -- The Chord Type Explorer selector is built from GUITAR_CHORD_TYPES and
+    -- filters the table by `type`, so a name in one and not the other is
+    -- either an empty selector entry or a row that can never be reached.
+    local described, seen = {}, {}
+    for _, c in ipairs(GUITAR_CHORD_TYPES) do
+        Test.expect(not described[c.name], 'duplicate GUITAR_CHORD_TYPES entry: ' .. c.name)
+        described[c.name] = true
+    end
+    for _, row in ipairs(GUITAR_CHORDS) do
+        Test.expect(described[row.type], 'type has no GUITAR_CHORD_TYPES entry: ' .. row.type)
+        seen[row.type] = true
+    end
+    for name in pairs(described) do
+        Test.expect(seen[name], 'GUITAR_CHORD_TYPES entry with no chord row: ' .. name)
+    end
+end)
+
 Test.it('slash/inversion shape reports Major triad with inversion detail', function()
-    local pitches = GuitarParseFretInput('x 0 0 x x 10')  -- bass = 5th, not root
+    local pitches = GuitarParseFretInput('10 x x 0 0 x')  -- bass = 5th, not root
     local t, detail = GuitarClassifyChordType(pitches)
     Test.expect(t == 'Major triad', 'got ' .. tostring(t))
     Test.expect(detail ~= nil and detail:find('slash/inversion'), 'expected inversion detail, got ' .. tostring(detail))
@@ -235,7 +286,7 @@ Test.it('wide/compound interval (>12) -> width 1-5, unambiguous combo GO', funct
 end)
 
 Test.it('3+ note chord with 3 distinct pitch classes -> width 3-note chord, 7 ambiguous options', function()
-    local pitches = GuitarParseFretInput('x 5 0 x 3 x')  -- Major triad: pcs {0,4,7}
+    local pitches = GuitarParseFretInput('x 3 x 0 5 x')  -- Major triad: pcs {0,4,7}
     local width, combo, opts = GuitarSuggestRBMapping(pitches)
     Test.expect(width == '3-note chord', 'got width=' .. tostring(width))
     Test.expect(combo == nil, 'expected no unambiguous combo')
@@ -243,11 +294,11 @@ Test.it('3+ note chord with 3 distinct pitch classes -> width 3-note chord, 7 am
 end)
 
 Test.it('power chord (root+5th+octave-doubled-root) -> width 1-3, not 3-note chord', function()
-    -- x x x 7 7 5: 3 physical pitches but only 2 pitch classes (root, 5th) --
+    -- 5 7 7 x x x: 3 physical pitches but only 2 pitch classes (root, 5th) --
     -- must agree with the reference table's "1-3" and with
     -- GuitarClassifyChordType's "Power chord", not fall into the physical-
     -- note-count-based 3-note bucket.
-    local pitches = GuitarParseFretInput('x x x 7 7 5')
+    local pitches = GuitarParseFretInput('5 7 7 x x x')
     local width, combo, opts = GuitarSuggestRBMapping(pitches)
     Test.expect(width == '1-3', 'got width=' .. tostring(width))
     Test.expect(combo == nil, 'expected no unambiguous combo')
@@ -270,7 +321,7 @@ end)
 Test.section('GuitarAnalyzeShape - combined pipeline')
 
 Test.it('bundles classification and mapping into one result table', function()
-    local pitches = GuitarParseFretInput('x x x 7 7 5')  -- Power chord
+    local pitches = GuitarParseFretInput('5 7 7 x x x')  -- Power chord
     local result = GuitarAnalyzeShape(pitches)
     Test.expect(result.type_name == 'Power chord', 'got type_name=' .. tostring(result.type_name))
     Test.expect(result.width == '1-3', 'got width=' .. tostring(result.width))
@@ -301,8 +352,8 @@ end)
 
 Test.section('GuitarAnalyzeShapeAllTunings')
 
-Test.it('7 7 5: Standard Power chord A5, Drop D unrecognized -- 2 distinct entries', function()
-    local results = GuitarAnalyzeShapeAllTunings('x x x 7 7 5')
+Test.it('5 7 7: Standard Power chord A5, Drop D unrecognized -- 2 distinct entries', function()
+    local results = GuitarAnalyzeShapeAllTunings('5 7 7 x x x')
     Test.expect(results ~= nil and #results == 2, 'expected 2 distinct entries')
     Test.expect(results[1].tuning_name == 'Standard', 'first entry should be Standard')
     Test.expect(results[1].analysis.type_name == 'Power chord', 'got ' .. tostring(results[1].analysis.type_name))
@@ -326,7 +377,7 @@ Test.it('0 0 0: mirrors the open drop-D power chord example', function()
 end)
 
 Test.it('shape not touching string 6 -> tunings agree, deduped to 1 entry', function()
-    local results = GuitarAnalyzeShapeAllTunings('7 7 x x x x')  -- Perfect fourth, e/B strings
+    local results = GuitarAnalyzeShapeAllTunings('x x x x 7 7')  -- Perfect fourth, e/B strings
     Test.expect(results ~= nil and #results == 1, 'expected tunings to be deduplicated to 1 entry')
 end)
 

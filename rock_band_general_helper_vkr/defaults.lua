@@ -690,11 +690,15 @@ TIPS = {
                        'Respects time selection if active.',
 
     -- Tab Input guide
-    mc_gtr_tab_format  = 'Horizontal: one event per line - 6 space-separated tokens, left = highest string (e),\n' ..
-                         'right = lowest string (E). Use a fret number or dash for unplayed.\n' ..
+    mc_gtr_tab_format  = 'Horizontal: one event per line - 6 space-separated tokens, left = lowest string (E),\n' ..
+                         'right = highest string (e). Standard chord notation: "x 3 2 0 1 0" is C major.\n' ..
+                         'Use a fret number, or a dash/x for unplayed.\n' ..
                          'Supports multi-digit frets (10, 12, etc.). Blank line = phrase break.\n\n' ..
                          'Vertical: standard guitar tab layout - 6 rows (e/B/G/D/A/E),\n' ..
-                         'each row is space-separated tokens, columns = events. All-dash column = phrase break.',
+                         'each row is space-separated tokens, columns = events. All-dash column = phrase break.\n\n' ..
+                         'The two run in opposite directions on purpose - that is how each notation is\n' ..
+                         'really written. A one-line fret shape starts at the low E; ASCII tab puts the\n' ..
+                         'high e on the top row.',
     mc_gtr_add_note    = 'Append a new empty note slot to the input.\n\n' ..
                          'Horizontal: appends a new all-dash line (- - - - - -).\n' ..
                          'Vertical: pads all rows to equal length and appends a new all-dash column.',

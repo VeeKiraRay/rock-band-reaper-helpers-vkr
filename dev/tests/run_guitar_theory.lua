@@ -2,8 +2,11 @@
 -- @author VeeKiraRay
 -- @about
 --   Algorithm unit tests for lib/reaper_guitar_theory.lua: fret parsing,
---   chord-shape classification, and RB lane-combo suggestion. Fully pure
---   (no other module dependencies). Run from the REAPER Actions list or
+--   chord-shape classification, and RB lane-combo suggestion. Also
+--   round-trips the Music Theory helper's shipped GUITAR_CHORDS reference
+--   table through the classifier, so its shapes and labels are checked
+--   against live behaviour rather than trusted. Pure - the two files loaded
+--   below make no REAPER API calls. Run from the REAPER Actions list or
 --   triggered via the test launcher. Results appear in the REAPER console
 --   (View > Show REAPER console).
 
@@ -28,6 +31,11 @@ r.ShowConsoleMsg('======  Guitar Theory - algorithm unit tests  ======\n')
 
 dofile(_tdir .. 'framework.lua')
 dofile(_root .. 'lib/reaper_guitar_theory.lua')
+-- GUITAR_CHORDS / GUITAR_CHORD_TYPES, round-tripped by the chord section.
+-- Defines globals only (S, TIPS, the reference tables) and calls no REAPER
+-- API at load time, so it is safe to pull in here; nothing in this suite
+-- uses the S/TIPS it also sets.
+dofile(_root .. 'rock_band_music_theory_helper_vkr/defaults.lua')
 
 dofile(_tdir .. 'guitar_theory.lua')
 Test.report()

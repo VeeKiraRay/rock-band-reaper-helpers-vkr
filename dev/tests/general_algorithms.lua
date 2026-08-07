@@ -234,7 +234,7 @@ Test.it('two different power chords (no overflow) each claim a unique combo in p
 end)
 
 Test.it('reproduces the reported real passage: only the genuine overflow shape wraps', function()
-    -- "- - 7 7 5 -" / "3 3 1" / "5 5 3" / "7 7 5" / "3 3 1" / "10 10 8"
+    -- "- 5 7 7 - -" / "1 3 3" / "3 5 5" / "5 7 7" / "1 3 3" / "8 10 10"
     -- horizontal tab, in that exact order (roots 50,46,48,50,46,53). Only
     -- 3 combos exist for a 1-3 spread, but there are 4 distinct shapes;
     -- the expected/confirmed mapping is root46->G+Y, root48->R+B,
@@ -317,7 +317,7 @@ end)
 
 Test.it('3-physical-note power chord (root+5th+octave, 2 pitch classes) ' ..
          'collapses to a 2-gem 1-3 combo, not a 3-note chord', function()
-    -- "- - - 7 7 5" horizontal (e,B,G unplayed; D7=57, A7=52, E5=45) - the
+    -- "5 7 7 - - -" horizontal (G,B,e unplayed; E5=45, A7=52, D7=57) - the
     -- exact shape reported as misclassified: 3 physical notes, but only 2
     -- distinct pitch classes (45 and 52 are a 7th apart, 57 is 45+12).
     -- rock_band_music_theory_helper_vkr's GUITAR_CHORDS table documents
@@ -350,7 +350,9 @@ Test.it('BuildShapeGemMap never mutates the caller\'s ev.pitches', function()
     -- fits, and is skipped entirely when max_chord is nil - so sorting its
     -- result in place used to reorder the event the caller still owns (and
     -- goes on to print via PitchLabel). SortedChordPitches copies first.
-    local events = { ev(0, { 64, 60, 55, 52, 48, 43 }) }   -- tab string order, descending
+    -- Deliberately descending, i.e. NOT the order tab input produces - the
+    -- point is that whatever order the caller hands over survives untouched.
+    local events = { ev(0, { 64, 60, 55, 52, 48, 43 }) }
     BuildShapeGemMap(events, nil, true)
     BuildShapeGemMap(events, 3, true)
     Test.expect(table.concat(events[1].pitches, ',') == '64,60,55,52,48,43',
@@ -375,31 +377,31 @@ local function guide_gems(tab)
     return shape_gems[table.concat(sorted, ',')], all_shapes, sorted
 end
 
-Test.it('open C/G (0 1 0 2 3 3) is a 3-note chord, not a sixth dyad', function()
+Test.it('open C/G (3 3 2 0 1 0) is a 3-note chord, not a sixth dyad', function()
     -- Old behaviour kept pitches[1], pitches[mid], pitches[#pitches] =
     -- E3+E2+G1: both C's discarded, one pitch class doubled, leaving a
     -- major sixth -> width 1-3. All three pitch classes must survive.
-    local gems, _, sorted = guide_gems('0 1 0 2 3 3')
+    local gems, _, sorted = guide_gems('3 3 2 0 1 0')
     Test.expect(#sorted == 6, 'shape is not compressed; got ' .. #sorted .. ' pitches')
     Test.expect(#gems == 3, '3 gems for a real triad; got ' .. #gems .. ' ' .. dump_gems(gems))
     Test.expect(GuitarClassifyChordType(sorted) == 'Major triad',
         'classified as a major triad; got ' .. GuitarClassifyChordType(sorted))
 end)
 
-Test.it('open D (2 3 2 0 0 -) is a 3-note chord, not a sixth dyad', function()
+Test.it('open D (- 0 0 2 3 2) is a 3-note chord, not a sixth dyad', function()
     -- Old behaviour kept F#3+A2+A1 - every D, the root, discarded.
-    local gems, _, sorted = guide_gems('2 3 2 0 0 -')
+    local gems, _, sorted = guide_gems('- 0 0 2 3 2')
     Test.expect(#gems == 3, '3 gems for a real triad; got ' .. #gems .. ' ' .. dump_gems(gems))
     Test.expect(GuitarClassifyChordType(sorted) == 'Major triad',
         'classified as a major triad; got ' .. GuitarClassifyChordType(sorted))
 end)
 
 Test.it('both G5 voicings resolve to the same 2-gem 1-3 power chord', function()
-    -- The regression: "3 3 0 0 x 3" (G,D,G,D,G) used to compress to
+    -- The regression: "3 x 0 0 3 3" (G,D,G,D,G) used to compress to
     -- G1+G2+G3 - a single pitch class, no suggestable width - and landed in
     -- the 3-note fallback pool, while the identical chord voiced as
-    -- "- - 0 0 x 3" was correctly 1-3. Same chord, opposite answers.
-    for _, tab in ipairs({ '- - 0 0 x 3', '3 3 0 0 x 3' }) do
+    -- "3 x 0 0 - -" was correctly 1-3. Same chord, opposite answers.
+    for _, tab in ipairs({ '3 x 0 0 - -', '3 x 0 0 3 3' }) do
         local gems, _, sorted = guide_gems(tab)
         Test.expect(#gems == 2, tab .. ': 2 gems; got ' .. #gems .. ' ' .. dump_gems(gems))
         Test.expect(gems[2] - gems[1] == 2, tab .. ': 1-3 spread; got gap ' .. (gems[2] - gems[1]))

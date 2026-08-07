@@ -9,6 +9,40 @@ over 5. See `CLAUDE.md` → "Changelog / `@about` trimming" for the rule.
 
 `rock_band_general_helper_vkr.lua`
 
+**v0.9.42**
+- Venue: [first] keyframes now land on the SAME tick as the manual
+  lighting event they drive - [first] is that event's own initial
+  keyframe, not a later "start reacting here" marker. Themes gen and
+  Section gen were the worst offenders: they place the lighting event
+  lightpreset_blendin beats BEFORE the section start (1-4 beats in
+  nearly every shipped theme) but put [first] on the section start, so
+  it was routinely beats late. The section start now carries the first
+  [next] instead, leaving the rest of the keyframe train exactly where
+  it was. Keyframes tab and Manual gen were already anchored on the
+  lighting event except in "Closest beat" mode, where [first] was
+  snapped off it - that snapped beat is now a [next] too.
+  Instrument-aware align modes are the one exception: they add no
+  [next] at the section start, since every [next] there must be backed
+  by a real note.
+- Venue > Manual gen: inserting a bare [first], and the whole keyframe
+  row (align, subdivision, rate, Add), are now blocked unless the
+  playhead sits on a manual lighting event - hovering the "(blocked)"
+  marker explains why, as the Events tab already did. The keyframe row
+  is gated on the event actually under the playhead rather than the
+  Lighting dropdown, so an existing [lighting (stomp)] can be
+  re-keyframed without re-picking it.
+- Venue: keyframe align mode 0 renamed to "Keyframe rate only" (was
+  "Section start", and "Playhead" in Manual gen - two label lists that
+  had drifted apart, now one shared KF_ALIGN_LABELS). No align mode
+  decides where [first] goes any more; they only choose where the
+  first [next] lands, and the tooltips now say so. Mode indices are
+  unchanged, so saved settings still load.
+- Internal: Manual gen's keyframe generation was a verbatim copy of
+  GenerateKeyframesForSpan's body - it now calls it, so the two can no
+  longer drift. New shared SnapPpqToHalfBeat (venue_lighting.lua)
+  replaces the half-beat snap duplicated in venue_generator.lua and
+  actions_venue_section.lua.
+
 **v0.9.41**
 - MIDI tab > Length > Midi note: fixed sustains being left overlapping
   the note after them. "Only sustains" looked for "the next note" by

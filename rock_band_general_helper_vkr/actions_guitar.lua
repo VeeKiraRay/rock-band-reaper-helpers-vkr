@@ -158,7 +158,7 @@ end
 -- chord already fits (and is skipped entirely when max_chord is nil), so
 -- sorting the result in place would reorder the caller's own ev.pitches -
 -- which the guide/converter reports then print via PitchLabel. Tab input
--- arrives in string order (high e first), and that's how it should read
+-- arrives in string order (low E first), and that's how it should read
 -- back in the report, next to the tab line it came from.
 function SortedChordPitches(pitches, max_chord)
     local src = max_chord and CompressChord(pitches, max_chord) or pitches
@@ -303,7 +303,7 @@ end
 --   (lib/reaper_guitar_theory.lua), which is PITCH-CLASS based, not
 --   physical-note-count based - a shape with 3 physical notes but only 2
 --   distinct pitch classes (e.g. a power chord voiced as root+5th+octave,
---   like "x x x 7 7 5") is recognized as a dyad and assigned the SAME
+--   like "5 7 7 x x x") is recognized as a dyad and assigned the SAME
 --   2-gem combo a literal 2-note power chord would get, dropping the
 --   redundant note from the gem output entirely - this is what real RB
 --   charts do, and is the exact case the reference table in

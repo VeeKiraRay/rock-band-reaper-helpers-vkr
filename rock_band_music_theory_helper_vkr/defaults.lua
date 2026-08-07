@@ -21,14 +21,17 @@ TIPS.guitar_play =
 
 TIPS.guitar_search =
     'Paste a fret shape and see its interval classification and suggested RB mapping.\n\n' ..
+    'Frets read LOW to HIGH: the leftmost is the low E string, as in standard chord\n' ..
+    'notation -- "x 3 2 0 1 0" is C major.\n\n' ..
     'Muted strings at the START or END of the list are optional and can be left out\n' ..
-    'entirely -- "7 7 5", "x x x 7 7 5", and "- 7 7 5 -" all mean the same shape.\n' ..
-    'A short list always anchors to the LOWEST strings.\n\n' ..
+    'entirely -- "5 7 7", "5 7 7 x x x", and "- 5 7 7 -" all mean the same shape.\n' ..
+    'A short list always starts at the low E.\n\n' ..
     'Muted strings BETWEEN played notes are NOT optional -- they mean "skip this\n' ..
-    'string" and change the shape (e.g. "7 x 5" is an octave; "7 5" is not).\n\n' ..
-    'Full form: exactly 6 numbers or "x" (muted), high-to-low, e.g. "x 7 9 9 7 x" --\n' ..
-    'the only way to reach strings above the lowest few (e.g. shapes using the B\n' ..
-    'string). Same convention as the Guitar tab guide\'s tab input in the General Helper.\n\n' ..
+    'string" and change the shape (e.g. "5 x 7" is an octave; "5 7" is not).\n\n' ..
+    'Full form: exactly 6 numbers or "x" (muted), e.g. "x 7 9 9 7 x" -- the only way\n' ..
+    'to reach strings above the lowest few (e.g. shapes using the B string).\n' ..
+    'Same convention as the Guitar tab guide\'s horizontal tab input in the General\n' ..
+    'Helper, so a shape can be pasted between the two.\n\n' ..
     'The shape is also checked against Drop D tuning. If Drop D gives a different\n' ..
     'result than Standard, both are shown -- e.g. try "0 0 0" or "2 2 2".'
 
@@ -104,8 +107,11 @@ DRUM_PATTERNS = {
 
 -- ---------------------------------------------------------------------------
 -- Guitar: real-guitar chord shapes -> Rock Band 5-lane mapping
--- shape: display string, high-to-low (e B G D A E), 'x' = muted/unplayed --
--- same convention as GUITAR_TAB_OPEN in lib/reaper_guitar_theory.lua.
+-- shape: display string, low-to-high (E A D G B e), 'x' = muted/unplayed --
+-- the standard single-line fret notation ("x 3 2 0 1 0" is C major), same
+-- convention _ParseFretPositions in lib/reaper_guitar_theory.lua reads and
+-- the same one the General Helper's horizontal Tab Input takes, so a row
+-- copy-pasted into either box behaves identically.
 -- name: the concrete chord name for THIS example (root + quality, e.g.
 --   'A5', 'Cm7', 'G/D'), computed the same way GuitarClassifyChordType
 --   derives a root (rotate candidate root pitch classes, first template
@@ -114,23 +120,26 @@ DRUM_PATTERNS = {
 --   Sixth dyad, Octave) that aren't conventionally written as a chord
 --   symbol; inventing one would be more confusing than a dash.
 --
--- Converted from _future_ideas/GUITAR_THEORY.md, which was written
--- low-to-high (E A D G B e). Two kinds of conversion happened here, NOT a
--- uniform token reversal:
---   - Power chord / octave / fully-specified triad-and-up rows: the doc's
---     numbers are internally consistent (they really do produce their
---     labeled interval), so these are a straight positional relabel into
---     high-to-low order.
---   - The 2-string third/fourth/sixth "dyad" rows and the Add9/Add11/Slash
---     rows: independent verification found the doc's literal fret numbers
---     do NOT reproduce their own labeled interval/type under any consistent
---     string-pair reading (e.g. "7 8 x" labeled Major third computes to a
---     tritone) -- the doc's numbers read as written-by-feel, not
---     calculated. These rows were regenerated from clean interval/pitch-
---     class math instead (verified against lib/reaper_guitar_theory.lua's
---     classifier -- see dev/tests/guitar_theory.lua's round-trip cases),
---     keeping the doc's original Type/Sound/RB Mapping labels, which are
---     the actually meaningful content.
+-- Originally derived from _external_docs/GUITAR_THEORY.md, which is also
+-- written low-to-high, so these rows now read in the same direction as that
+-- doc again. DO NOT take that as licence to copy fret numbers back out of
+-- it: independent verification found the doc's literal numbers for the
+-- 2-string third/fourth/sixth "dyad" rows and the Add9/Add11/Slash rows do
+-- NOT reproduce their own labeled interval/type under any consistent
+-- string-pair reading (e.g. "7 8 x" labeled Major third computes to a
+-- tritone) -- they read as written-by-feel, not calculated. Those rows were
+-- regenerated here from clean interval/pitch-class math (verified against
+-- lib/reaper_guitar_theory.lua's classifier -- see dev/tests/
+-- guitar_theory.lua's round-trip cases), keeping only the doc's original
+-- Type/Sound/RB Mapping labels, which are the actually meaningful content.
+-- The rows carrying a "(regenerated, see file header)" comment below are
+-- the ones this applies to.
+--
+-- Every shape here was reversed wholesale when the repo moved from
+-- high-to-low to the standard low-to-high fret notation. The reversal was
+-- done mechanically from these already-verified strings and each one was
+-- checked to parse to an identical pitch set, so the classifier round-trip
+-- cases in dev/tests/guitar_theory.lua kept their expectations unchanged.
 --
 -- The former 4th power-chord row (2-note, no octave: 'x x x x 5 3') was
 -- originally its own type, 'Perfect fifth (power chord)'. Per the Wikipedia
@@ -142,49 +151,54 @@ DRUM_PATTERNS = {
 -- classifier's own output string for a bare interval-7 dyad) is untouched.
 -- ---------------------------------------------------------------------------
 GUITAR_CHORDS = {
-    -- Power chords (root + 5th [+ octave]), verified shape reversal
-    { shape = 'x x x 7 7 5', type = 'Power chord', name = 'A5', sound = 'Strong, stable', rb_mapping = '1-3' },
-    { shape = 'x x x 9 9 7', type = 'Power chord', name = 'B5', sound = 'Strong',         rb_mapping = '1-3' },
-    { shape = 'x x x 5 5 3', type = 'Power chord', name = 'G5', sound = 'Strong',         rb_mapping = '1-3' },
-    { shape = 'x x x x 5 3', type = 'Power chord', name = 'G5', sound = 'Strong',         rb_mapping = '1-3' },
+    -- Power chords (root + 5th [+ octave])
+    { shape = '5 7 7 x x x', type = 'Power chord', name = 'A5', sound = 'Strong, stable', rb_mapping = '1-3' },
+    { shape = '7 9 9 x x x', type = 'Power chord', name = 'B5', sound = 'Strong',         rb_mapping = '1-3' },
+    { shape = '3 5 5 x x x', type = 'Power chord', name = 'G5', sound = 'Strong',         rb_mapping = '1-3' },
+    { shape = '3 5 x x x x', type = 'Power chord', name = 'G5', sound = 'Strong',         rb_mapping = '1-3' },
 
     -- 2-string dyads/intervals (regenerated, see file header)
-    { shape = 'x 2 3 x x x', type = 'Minor third',    name = '-', sound = 'Warm',   rb_mapping = '1-2' },
-    { shape = 'x 5 5 x x x', type = 'Major third',    name = '-', sound = 'Sweet',  rb_mapping = '1-2' },
-    { shape = '7 7 x x x x', type = 'Perfect fourth', name = '-', sound = 'Open',   rb_mapping = '1-2 or 1-3' },
-    { shape = 'x x x x 6 2', type = 'Sixth dyad',     name = '-', sound = 'Bright', rb_mapping = '1-3' },
+    { shape = 'x x x 3 2 x', type = 'Minor third',    name = '-', sound = 'Warm',   rb_mapping = '1-2' },
+    { shape = 'x x x 5 5 x', type = 'Major third',    name = '-', sound = 'Sweet',  rb_mapping = '1-2' },
+    { shape = 'x x x x 7 7', type = 'Perfect fourth', name = '-', sound = 'Open',   rb_mapping = '1-2 or 1-3' },
+    { shape = '2 6 x x x x', type = 'Sixth dyad',     name = '-', sound = 'Bright', rb_mapping = '1-3' },
 
-    -- Octave (skip-string) shapes, root + skip + octave; verified shape reversal
-    { shape = 'x x x 7 x 5', type = 'Octave', name = '-', sound = 'Strong',       rb_mapping = '1-4' },
-    { shape = 'x x 5 x 3 x', type = 'Octave', name = '-', sound = 'Strong, wide', rb_mapping = '1-4' },
-    { shape = 'x 5 x 2 x x', type = 'Octave', name = '-', sound = 'Strong',       rb_mapping = '1-4' },
+    -- Octave (skip-string) shapes, root + skip + octave
+    { shape = '5 x 7 x x x', type = 'Octave', name = '-', sound = 'Strong',       rb_mapping = '1-4' },
+    { shape = 'x 3 x 5 x x', type = 'Octave', name = '-', sound = 'Strong, wide', rb_mapping = '1-4' },
+    { shape = 'x x 2 x 5 x', type = 'Octave', name = '-', sound = 'Strong',       rb_mapping = '1-4' },
 
-    -- Suspended chords (regenerated, see file header)
-    { shape = '1 1 3 x x x', type = 'Sus2', name = 'A#sus2', sound = 'Open, airy', rb_mapping = '1-4' },
-    { shape = '1 4 3 x x x', type = 'Sus4', name = 'A#sus4', sound = 'Tense',      rb_mapping = '1-4' },
+    -- Suspended chords (regenerated, see file header). rb_mapping is '3-note'
+    -- and NOT the doc's original '1-4': these rows had their shapes
+    -- regenerated into real 3-pitch-class sus voicings, but kept a mapping
+    -- label written for the doc's own 2-note shape, so they were telling a
+    -- charter to use a 2-gem spread for a 3-note chord. Now agrees with
+    -- GuitarSuggestRBMapping, which the round-trip tests assert for every row.
+    { shape = 'x x x 3 1 1', type = 'Sus2', name = 'A#sus2', sound = 'Open, airy', rb_mapping = '3-note' },
+    { shape = 'x x x 3 4 1', type = 'Sus4', name = 'A#sus4', sound = 'Tense',      rb_mapping = '3-note' },
 
-    -- Triads, verified shape reversal
-    { shape = 'x 5 0 x 3 x', type = 'Major triad', name = 'C',  sound = 'Full, rich',   rb_mapping = '3-note' },
-    { shape = 'x 0 1 2 x x', type = 'Major triad', name = 'E',  sound = 'Full, bright', rb_mapping = '3-note' },
-    { shape = 'x 4 0 x 3 x', type = 'Minor triad', name = 'Cm', sound = 'Dark',         rb_mapping = '3-note' },
-    { shape = 'x 0 0 2 x x', type = 'Minor triad', name = 'Em', sound = 'Dark',         rb_mapping = '3-note' },
+    -- Triads
+    { shape = 'x 3 x 0 5 x', type = 'Major triad', name = 'C',  sound = 'Full, rich',   rb_mapping = '3-note' },
+    { shape = 'x x 2 1 0 x', type = 'Major triad', name = 'E',  sound = 'Full, bright', rb_mapping = '3-note' },
+    { shape = 'x 3 x 0 4 x', type = 'Minor triad', name = 'Cm', sound = 'Dark',         rb_mapping = '3-note' },
+    { shape = 'x x 2 0 0 x', type = 'Minor triad', name = 'Em', sound = 'Dark',         rb_mapping = '3-note' },
 
-    -- 7th chords, verified shape reversal
-    { shape = 'x 5 3 5 3 x', type = 'Dominant 7', name = 'C7',    sound = 'Bluesy', rb_mapping = '3-note' },
-    { shape = 'x 4 3 5 3 x', type = 'Minor 7',    name = 'Cm7',   sound = 'Smooth', rb_mapping = '3-note' },
-    { shape = 'x 5 4 5 3 x', type = 'Major 7',    name = 'Cmaj7', sound = 'Dreamy', rb_mapping = '3-note' },
+    -- 7th chords
+    { shape = 'x 3 5 3 5 x', type = 'Dominant 7', name = 'C7',    sound = 'Bluesy', rb_mapping = '3-note' },
+    { shape = 'x 3 5 3 4 x', type = 'Minor 7',    name = 'Cm7',   sound = 'Smooth', rb_mapping = '3-note' },
+    { shape = 'x 3 5 4 5 x', type = 'Major 7',    name = 'Cmaj7', sound = 'Dreamy', rb_mapping = '3-note' },
 
-    -- Diminished / Augmented / Half-diminished, verified shape reversal
-    { shape = 'x 4 x 4 3 x', type = 'Diminished',      name = 'Cdim',   sound = 'Very tense',       rb_mapping = '3-note' },
-    { shape = 'x 5 1 x 3 x', type = 'Augmented',       name = 'Caug',   sound = 'Bright, unstable', rb_mapping = '3-note' },
-    { shape = 'x 4 3 4 3 x', type = 'Half-diminished', name = 'Cm7b5', sound = 'Dark',             rb_mapping = '3-note' },
+    -- Diminished / Augmented / Half-diminished
+    { shape = 'x 3 4 x 4 x', type = 'Diminished',      name = 'Cdim',   sound = 'Very tense',       rb_mapping = '3-note' },
+    { shape = 'x 3 x 1 5 x', type = 'Augmented',       name = 'Caug',   sound = 'Bright, unstable', rb_mapping = '3-note' },
+    { shape = 'x 3 4 3 4 x', type = 'Half-diminished', name = 'Cm7b5', sound = 'Dark',             rb_mapping = '3-note' },
 
     -- Add9 / Add11 (regenerated, see file header)
-    { shape = 'x 5 7 5 3 x', type = 'Add9',  name = 'Cadd9',  sound = 'Bright', rb_mapping = '3-note' },
-    { shape = 'x 5 0 3 3 x', type = 'Add11', name = 'Cadd11', sound = 'Open',   rb_mapping = '3-note' },
+    { shape = 'x 3 5 7 5 x', type = 'Add9',  name = 'Cadd9',  sound = 'Bright', rb_mapping = '3-note' },
+    { shape = 'x 3 3 0 5 x', type = 'Add11', name = 'Cadd11', sound = 'Open',   rb_mapping = '3-note' },
 
     -- Slash chord (regenerated): triad with the 5th, not the root, in the bass
-    { shape = 'x 0 0 x x 10', type = 'Slash chord', name = 'G/D', sound = 'Bright', rb_mapping = '3-note' },
+    { shape = '10 x x 0 0 x', type = 'Slash chord', name = 'G/D', sound = 'Bright', rb_mapping = '3-note' },
 }
 
 -- ---------------------------------------------------------------------------

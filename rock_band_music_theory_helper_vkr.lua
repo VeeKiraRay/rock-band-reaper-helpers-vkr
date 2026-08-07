@@ -1,6 +1,6 @@
 -- @description Rock Band Music Theory Helper
 -- @author VeeKiraRay
--- @version 0.3.1
+-- @version 0.4
 -- @about
 --   In-DAW reference guide for Rock Band custom charters.
 --   Covers drum notation, RB lane mappings, common patterns, and a Guitar
@@ -13,6 +13,25 @@
 --   sws-extension.org, then restart REAPER. The drum sample pack is a
 --   separate optional download (see resources/INSTALLATION_GUIDE.md) and
 --   is only used by the Drums tab; the Guitar tab needs no extra assets.
+--   v0.4: Guitar fret shapes now read LOW to HIGH -- the leftmost number is
+--         the low E string, as in standard chord notation ("x 3 2 0 1 0" is
+--         C major). They used to read high-to-low, which is backwards from
+--         how every chord chart, chord dictionary, and Guitar Pro diagram
+--         writes them. Affects the Shape Search box and all 26 shapes in the
+--         Chord Type Explorer table, which were reversed to match. The
+--         General Helper's horizontal Tab Input changed the same way in its
+--         v0.9.47, so shapes can still be pasted between the two. Vertical
+--         ASCII tab there is unchanged (high e on the top row) -- the two
+--         notations genuinely run in opposite directions.
+--         Also fixed the Sus2 and Sus4 rows advertising a "1-4" RB mapping
+--         (a two-gem spread) for shapes that are real three-pitch-class sus
+--         voicings and can only be charted as 3-note chords. Their shapes
+--         had been regenerated from interval math but kept a mapping label
+--         written for a different, two-note shape. Both now read "3-note".
+--         Found by new tests that round-trip every row of the chord
+--         reference table through the live classifier -- shape, chord type,
+--         and RB mapping alike -- instead of trusting the hand-authored
+--         table. The table previously had no automated check at all.
 --   v0.3.1: Drums tab now says why playback is unavailable, distinguishing
 --         a missing SWS extension from a missing drum sample pack (it
 --         previously showed the same silent fallback text for both).
