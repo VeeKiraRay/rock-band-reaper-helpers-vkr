@@ -1,6 +1,6 @@
 -- @description Rock Band Vocal Helper
 -- @author VeeKiraRay
--- @version 1.16
+-- @version 1.17
 -- @about
 --   Analyses a vocal audio track and appends MIDI notes to an existing MIDI
 --   item on a destination track, one note per detected syllable or phrase.
@@ -13,6 +13,17 @@
 --   This @about block keeps only the 5 most recent versions.
 --   Full history: CHANGELOG.md in the repo.
 --
+--   v1.17
+--     - The Tuner tab is now also available as a standalone script,
+--       rock_band_pitch_tuner_vkr.lua, so the live readout can stay visible in
+--       its own window while you work in another tab or in the MIDI editor.
+--       That window adds its own audio source track selector and Refresh
+--       tracks button, and never stops on tab navigation (it has no tabs); the
+--       60-second idle auto-stop still applies. It reads the same per-project
+--       settings but never writes them - saving stays in the General tab. The
+--       tab is unchanged; both load the same module files.
+--     - Fixed: closing either window with the tuner running left its audio
+--       accessor open, holding the source audio file until REAPER exited.
 --   v1.16
 --     - Harmonies: each destination's two dropdowns are now labelled Target
 --       track and Copy style, aligned into the same column as Source and Key.
@@ -86,13 +97,6 @@
 --     - Result panel (bottom of every tab): long lines now wrap to the
 --       window's current width (ImGui_PushTextWrapPos(ctx, 0)) instead of
 --       overflowing and requiring the window to be stretched to read them.
---   v1.12
---     - Sliders and combo boxes now use a fixed pixel width
---       (SetNextItemWidth(ctx, 200), matching the general helper's
---       convention) instead of stretching to fill the window on resize.
---       Applied across General, Tuner, Pitch, Pitch slide, Harmonies, and
---       Validation tabs (WIP Note Placement tab intentionally left as-is,
---       to be redone later).
 --
 --   Workflow:
 --     1. Pick the audio source track and the MIDI destination track.
@@ -152,8 +156,11 @@ for _, _f in ipairs({
     _mdir .. 'actions_harmonies.lua',
     _mdir .. 'actions_slides.lua',
     _mdir .. 'actions_snap_key.lua',
+    _mdir .. 'ui_common.lua',
+    _mdir .. 'ui_tuner.lua',
     _mdir .. 'ui_slides.lua',
     _mdir .. 'ui_harmonies.lua',
+    _mdir .. 'ui_pitch.lua',
     _mdir .. 'ui.lua',
 }) do
     if not r.file_exists(_f) then
@@ -182,6 +189,8 @@ dofile(_mdir .. 'actions_validation.lua')
 dofile(_mdir .. 'actions_harmonies.lua')
 dofile(_mdir .. 'actions_slides.lua')
 dofile(_mdir .. 'actions_snap_key.lua')
+dofile(_mdir .. 'ui_common.lua')
+dofile(_mdir .. 'ui_tuner.lua')
 dofile(_mdir .. 'ui_slides.lua')
 dofile(_mdir .. 'ui_harmonies.lua')
 dofile(_mdir .. 'ui_pitch.lua')

@@ -154,6 +154,17 @@ These are the same settings used by the Pitch tab's Built-in detection mode. Adj
 
 The same Min pitch / Max pitch checkbox+slider pairs from the Pitch tab. When enabled, detected pitches outside the range are octave-shifted back in before display. Useful for voices where YIN occasionally lands an octave too low or high.
 
+<a id="standalone-pitch-tuner"></a>
+
+### Standalone Pitch Tuner
+
+`rock_band_pitch_tuner_vkr.lua` (repo root) is a separate script that opens just this tab in its own window — load it the same way as the main scripts (**Actions → Show action list → Load ReaScript**). Handy for keeping the live readout visible while you work in another tab (Pitch, Lyrics) or in the MIDI editor, instead of the tuner stopping the moment you navigate away. Same underlying behaviour as the Tuner tab above, with two differences:
+
+- It has its own **Audio source track** selector and **Refresh tracks** button at the top, since it isn't sharing the main window's track selectors.
+- It never stops on tab navigation — there are no tabs. The 60-second idle auto-stop still applies, and closing the window stops the tuner.
+
+It reads the same per-project settings the vocal helper saves, so YIN thresholds, confidence, Min RMS level and pitch range carry over. Saving stays in the vocal helper's General tab — this window never writes settings, so changes made here apply for the session only.
+
 ---
 
 ## Pitch tab

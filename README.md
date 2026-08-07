@@ -40,9 +40,10 @@ reaper.ShowConsoleMsg('CF_CreatePreview: ' .. tostring(reaper.CF_CreatePreview) 
 
 ## Additional tools
 
-Two smaller scripts round out the toolset, loaded the same way as the main scripts:
+Three smaller scripts round out the toolset, loaded the same way as the main scripts:
 
 - **[Standalone Venue Preview](rock_band_general_helper_vkr/README.md#standalone-venue-preview)** (`rock_band_preview_vkr.lua`) — the General Helper's Venue → Preview sub-tab in its own window, so it can sit next to the generation tabs.
+- **[Standalone Pitch Tuner](rock_band_vocal_helper_vkr/README.md#standalone-pitch-tuner)** (`rock_band_pitch_tuner_vkr.lua`) — the Vocal Helper's Tuner tab in its own window, so the live readout stays visible while you work in another tab.
 - **[Quick actions](rock_band_vocal_helper_vkr/README.md#quick-actions)** (`quick_actions/`) — four no-UI hotkey scripts for fast vocal-note editing in the MIDI editor.
 
 ---

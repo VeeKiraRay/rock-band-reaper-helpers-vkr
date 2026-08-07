@@ -129,18 +129,26 @@ actions_slides.lua:
 actions_snap_key.lua:
   22. Snap to key action          SnapToKeyAction, NearestScalePitch; NextScalePitch (local)
 
+ui_common.lua:
+  23. Shared widgets              FilteredTrackCombo, YINPresetCombo,
+                                  DrawStatusResultPanel (global);
+                                  KeysPresetTrackWarnings (local)
+
+ui_tuner.lua:
+  24. Tuner tab                   DrawTunerTab()
+
 ui_slides.lua:
-  23. Pitch slide tab             DrawPitchSlideTab(ctx)
+  25. Pitch slide tab             DrawPitchSlideTab(ctx)
 
 ui_harmonies.lua:
-  24. Harmonies tab               DrawHarmoniesTab(ctx)
+  26. Harmonies tab               DrawHarmoniesTab(ctx)
 
 ui_pitch.lua:
-  25. Pitch tab                   DrawPitchTab(ctx) — Placement / Snap sub-tabs
+  27. Pitch tab                   DrawPitchTab(ctx) — Placement / Snap sub-tabs
 
 ui.lua:
-  26. UI                          Loop, FilteredTrackCombo (global)
-  27. r.defer(Loop)               start
+  28. UI                          Loop
+  29. r.defer(Loop)               start
 ```
 
 ---
@@ -164,10 +172,12 @@ ui.lua:
 | `rock_band_vocal_helper_vkr/actions_harmonies.lua`  | `HarmoniesAction`, `DiatonicThirdOffset`, `ResolvePreservedPitches`; `ApplyLyricSuffix`, `ResolveHarmTracks`, `MeasureLengthAt`, `ReadTargetNotesInRange` (local) |
 | `rock_band_vocal_helper_vkr/actions_slides.lua`     | `ScanPitchSlidesAction`; `ClassifySlide` (local)                                                                                             |
 | `rock_band_vocal_helper_vkr/actions_snap_key.lua`   | `SnapToKeyAction`, `NearestScalePitch`; `NextScalePitch` (local)                                                                             |
+| `rock_band_vocal_helper_vkr/ui_common.lua`          | `FilteredTrackCombo`, `YINPresetCombo`, `DrawStatusResultPanel(show_undo)` (global); `KeysPresetTrackWarnings` (local) — shared with the standalone tuner |
+| `rock_band_vocal_helper_vkr/ui_tuner.lua`           | `DrawTunerTab()` — body only (no `Begin`/`BeginTabItem`), shared with the standalone tuner                                                    |
 | `rock_band_vocal_helper_vkr/ui_slides.lua`          | `DrawPitchSlideTab(ctx)`                                                                                                                     |
 | `rock_band_vocal_helper_vkr/ui_harmonies.lua`       | `DrawHarmoniesTab(ctx)`                                                                                                                      |
 | `rock_band_vocal_helper_vkr/ui_pitch.lua`           | `DrawPitchTab(ctx)` — Placement - Built-in (detection/range/apply), Placement - Reference (reference track/apply), and Snap (Snap to Key Scale) sub-tabs |
-| `rock_band_vocal_helper_vkr/ui.lua`                 | `FilteredTrackCombo`, `YINPresetCombo` (global), `Loop`, `r.defer(Loop)`; `KeysPresetTrackWarnings` (local)                                  |
+| `rock_band_vocal_helper_vkr/ui.lua`                 | `Loop`, `r.defer(Loop)` — tab bar and everything not shared with the standalone tuner                                                        |
 
 **Local-only functions:**
 
@@ -182,6 +192,7 @@ ui.lua:
 - `settings.lua`: `bool_to_num`, `num_to_bool`, `SerializeSettings`, `DeserializeSettings`
 - `autotune.lua`: `FineCandidates`, `EvaluateParams`
 - `tuner.lua`: `FindItemAtPos`, `OpenContextForItem`
+- `ui_common.lua`: `KeysPresetTrackWarnings`
 
 **Load order:**
 
@@ -206,12 +217,36 @@ actions_validation.lua         → ValidatePhrases, PhraseSimilarityAction
 actions_harmonies.lua          → HarmoniesAction
 actions_slides.lua             → ScanPitchSlidesAction
 actions_snap_key.lua           → SnapToKeyAction
+ui_common.lua                  → FilteredTrackCombo, YINPresetCombo, DrawStatusResultPanel
+ui_tuner.lua                   → DrawTunerTab
 ui_slides.lua                  → DrawPitchSlideTab
 ui_harmonies.lua               → DrawHarmoniesTab
 ui_pitch.lua                   → DrawPitchTab
-ui.lua                         → FilteredTrackCombo, Loop (also calls r.defer(Loop))
+ui.lua                         → Loop (also calls r.defer(Loop))
 [entry point startup]          → LoadSettings(), SetDefaultTracks(), AutoDetectLyricsFile()
 ```
+
+**Second entry point: `rock_band_pitch_tuner_vkr.lua` (repo root).** Standalone Pitch
+Tuner window. It has no module folder of its own — it dofiles a subset of this
+helper's modules: `lib/reaper_imgui_helpers.lua`, `lib/reaper_dsp.lua`, then
+`defaults.lua`, `tips.lua`, `settings.lua`, `helpers.lua`, `tuner.lua`,
+`ui_common.lua`, `ui_tuner.lua`, and runs its own minimal `Loop` calling
+`DrawTunerTab()` + `DrawStatusResultPanel(false)` under its own audio-source
+track combo. Consequences when editing those files:
+
+- They must keep working without the rest of the vocal helper loaded — do not add
+  load-time or call-time dependencies (from the tuner code path) on modules
+  outside this subset. If you add a call into `pipeline.lua`, `actions*.lua` or
+  `autotune.lua` from any of them, guard it (`if X then X() end`) the way the
+  general helper's `settings.lua` guards `SaveSectionConfigs`.
+- **`ui.lua` is deliberately not in the list** and must never be added: its last
+  line is a bare `r.defer(Loop)`, which would spawn the full helper window. That
+  is the whole reason `FilteredTrackCombo`, `YINPresetCombo` and the status/result
+  panel were moved out into `ui_common.lua`.
+- The standalone calls `LoadSettings()` at startup and on project switch, but
+  never `SaveSettings()` (saving stays in the vocal helper's General tab).
+- It pins `S.tuner_tab_active = true` every frame — see the Tab-navigation stop
+  note below.
 
 ---
 
@@ -243,7 +278,11 @@ Read-only — never modifies the project. Polls `SampleYINAt` at the current pla
 
 **Auto-stop:** Timer (`tuner_last_detect_t`) resets on every successful pitch detection. If 60 s pass without any new pitch while the playhead is stationary, `StopTuner` is called automatically with a reason written to `S.status`.
 
-**Tab-navigation stop:** `S.tuner_tab_active` is set `false` before the tab bar each frame and `true` inside the Tuner `BeginTabItem` block. `RunTuner()` checks the previous frame's value at the top of `Loop` — one frame after the user leaves the tab, the tuner stops.
+**Tab-navigation stop:** `S.tuner_tab_active` is set `false` before the tab bar each frame and `true` inside the Tuner `BeginTabItem` block. `RunTuner()` checks the previous frame's value at the top of `Loop` — one frame after the user leaves the tab, the tuner stops. The standalone `rock_band_pitch_tuner_vkr.lua` has no tab bar, so it pins the flag `true` every frame before calling `RunTuner()`; without that the tuner would stop itself on the first frame after starting.
+
+**Window-close stop:** closing either window ends its defer chain, so both call `StopTuner()` when `ImGui_Begin`'s `open` is false. Without it the `CreateTakeAudioAccessor` handle in `S.tuner_yctx` is never destroyed and holds the source audio file open until REAPER exits.
+
+**Standalone window:** the Tuner tab body lives in `ui_tuner.lua` as `DrawTunerTab()` and is drawn by both the tab and `rock_band_pitch_tuner_vkr.lua`. The standalone adds its own audio-source combo + "Refresh tracks" button above it (the main window's live above the tab bar) and a status/result panel below it without the Undo button — it makes no project edits.
 
 **YIN and pitch range settings** — shared with the Pitch and Pitch slide tabs (`S.yin_*`, `S.min_pitch`, `S.max_pitch`). Changes on the Tuner tab are immediately reflected elsewhere and vice versa.
 

@@ -364,6 +364,12 @@ that dofiles the code under test and the set.
                                                modules; documented exception to
                                                the folder-naming rule)
 
+  rock_band_pitch_tuner_vkr.lua              ← standalone Pitch Tuner window
+                                               (same exception — reuses
+                                               rock_band_vocal_helper_vkr/
+                                               ui_common.lua + ui_tuner.lua and
+                                               their dependencies; never ui.lua)
+
   quick_actions/                             ← single-file, no-UI hotkey scripts
     lib/
       vocal_note_snap_core.lua               ← shared cores (not bindable)

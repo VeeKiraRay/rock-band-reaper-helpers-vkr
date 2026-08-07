@@ -722,6 +722,14 @@ over 5. See `CLAUDE.md` → "Changelog / `@about` trimming" for the rule.
 
 `rock_band_vocal_helper_vkr.lua`
 
+**v1.12**
+- Sliders and combo boxes now use a fixed pixel width
+  (SetNextItemWidth(ctx, 200), matching the general helper's
+  convention) instead of stretching to fill the window on resize.
+  Applied across General, Tuner, Pitch, Pitch slide, Harmonies, and
+  Validation tabs (WIP Note Placement tab intentionally left as-is,
+  to be redone later).
+
 **v1.11**
 - Pitch tab: removed the "Pitch source" selector. Placement is now two
   sub-tabs, Placement - Built-in and Placement - Reference, each
