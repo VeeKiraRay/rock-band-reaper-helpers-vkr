@@ -9,6 +9,70 @@ over 5. See `CLAUDE.md` → "Changelog / `@about` trimming" for the rule.
 
 `rock_band_general_helper_vkr.lua`
 
+**v0.9.43**
+- Venue: corrected what lightpreset_blendin / postproc_blendin mean.
+  They were implemented as "place THIS section's lighting/postproc
+  event N beats before the section start", which blends nothing - it
+  just moves the hard cut earlier, and makes the new section's preset
+  run over the last N beats of the previous section. RB3 changes
+  preset when the section begins either way; the blendin value says
+  how many beats ahead of that boundary the PREVIOUSLY active preset
+  is re-stated, giving the game an anchor to interpolate from. A
+  section's own events now always sit on its section start, and the
+  outgoing preset is duplicated ahead of it instead:
+
+  ```
+  m3     [lighting (stomp)]  [ProFilm_a.pp]
+  m9 b3  [ProFilm_a.pp]                     (postproc_blendin 2)
+  m9 b4  [lighting (stomp)]  [first]        (lightpreset_blendin 1)
+  m10    [lighting (verse)]  [ProFilm_b.pp]  [first]
+  ```
+
+  This changes what every shipped theme produces - they all set
+  blendin. blendin 0 / absent still means a hard cut at the section
+  start, so the snap behaviour is unchanged and still reachable.
+  A duplicate is skipped when the preset is not actually changing
+  (lighting and postproc judged independently) or when it would land
+  at or before the event it copies. New BlendPpq /
+  EmitBlendDuplicates and a two-pass ResolveThemeSection /
+  EmitThemeSection split of the old ProcessThemeSection
+  (venue_lighting.lua) - emitting a section needs the previous
+  section's picks, which isn't visible one section at a time.
+  Section gen, which only ever sees one section, reads the outgoing
+  preset off the VENUE track (new FindActiveVenuePresetsBefore,
+  venue_generator.lua) and no longer clears back over those events.
+- Venue > Manual gen: new "Blend" button beside "Add" on the Lighting
+  and Post proc rows. It copies the preset of that type currently
+  running to the playhead - the same blend anchor Themes gen and
+  Section gen place from lightpreset_blendin / postproc_blendin - so
+  a hand-authored transition fades instead of cutting. Park the
+  playhead a beat or two before the boundary, click Blend, then add
+  the new preset at the boundary itself. It reads the VENUE track
+  rather than the dropdown above, so it copies whatever is actually
+  playing, and reports the event it copied with the position it came
+  from. Refused, with a report naming what it found and where, when
+  the last two events of that type already match (a blend is already
+  in place), when one is already on the playhead, or when none
+  precedes it; a refusal creates no undo point. New
+  ResolveBlendSource (pure, so the rule is testable without a
+  playhead) and BlendVenuePresetAtPlayhead, actions_venue_manual.lua.
+- Venue: [first] now marks a preset CHANGE. A lighting event that
+  restates the preset already running - a blend duplicate, or a
+  section that kept the previous section's preset - no longer
+  restarts the keyframe sequence; the train from the event that did
+  start it simply carries on through. This is what lets the
+  Keyframes tab agree with the generators: it can't see sections or
+  blendin values, only the events on the track, so "regenerate"
+  would otherwise put a [first] back on every blend duplicate.
+  Enforced in three places from the same rule - the section emitter
+  (venue_lighting.lua), RegenerateVenueKeyframes' span walk, which
+  now neither starts nor ends a span on an event repeating the one
+  immediately before it, and Manual gen's span-end clamp, which no
+  longer lets a duplicate of the preset being keyframed cut the
+  train short. Only ADJACENT events are compared, so two sections
+  sharing a preset with a different one between them are each still
+  a real change.
+
 **v0.9.42**
 - Venue: [first] keyframes now land on the SAME tick as the manual
   lighting event they drive - [first] is that event's own initial
@@ -721,6 +785,11 @@ over 5. See `CLAUDE.md` → "Changelog / `@about` trimming" for the rule.
 ## Rock Band Vocal Helper
 
 `rock_band_vocal_helper_vkr.lua`
+
+**v1.13**
+- Result panel (bottom of every tab): long lines now wrap to the
+  window's current width (ImGui_PushTextWrapPos(ctx, 0)) instead of
+  overflowing and requiring the window to be stretched to read them.
 
 **v1.12**
 - Sliders and combo boxes now use a fixed pixel width

@@ -143,6 +143,14 @@ function Loop()
                         r.ImGui_EndTabItem(ctx)
                     end
 
+                    ------------------------------------------------
+                    -- General > Other tools sub-tab
+                    ------------------------------------------------
+                    if r.ImGui_BeginTabItem(ctx, 'Other tools') then
+                        DrawGeneralLinksTab()
+                        r.ImGui_EndTabItem(ctx)
+                    end
+
                     r.ImGui_EndTabBar(ctx)
                 end
 

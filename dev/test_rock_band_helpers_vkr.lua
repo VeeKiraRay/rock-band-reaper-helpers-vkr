@@ -32,7 +32,8 @@ local results = { vocal = nil, general = nil, vocal_midi = nil, general_midi = n
                   quick_actions = nil, spritesheet = nil, venue_events = nil,
                   venue_subtracks = nil, venue_phrase_pacing = nil,
                   venue_labels = nil, workflow = nil,
-                  guitar_theory = nil, karplus_strong = nil, wav_writer = nil }
+                  guitar_theory = nil, karplus_strong = nil, wav_writer = nil,
+                  script_links = nil }
 
 local COL_OK  = 0x55DD55FF
 local COL_ERR = 0xFF5555FF
@@ -160,6 +161,14 @@ function Loop()
         end
         r.ImGui_SameLine(ctx)
         draw_status(results.wav_writer)
+
+        r.ImGui_Spacing(ctx)
+
+        if r.ImGui_Button(ctx, 'Script Links Tests', 155, 24) then
+            run('run_script_links.lua', 'script_links')
+        end
+        r.ImGui_SameLine(ctx)
+        draw_status(results.script_links)
 
         r.ImGui_Spacing(ctx)
         r.ImGui_Separator(ctx)

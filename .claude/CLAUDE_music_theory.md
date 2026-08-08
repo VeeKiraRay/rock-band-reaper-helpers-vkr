@@ -27,6 +27,23 @@ rock_band_music_theory_helper_vkr/ui.lua
 
 No `settings.lua`, `helpers.lua`, or `actions.lua` — this is a read-only reference tool.
 
+### Other tools: link target only (deliberate asymmetry)
+
+This script appears as a button in the **General > Other tools** sub-tab of both
+the general and vocal helpers (`SCRIPT_LINK_GROUPS` in
+`lib/reaper_script_links.lua`), but it offers **no reverse link back** — its tab
+bar has only Drums and Guitar, so there is no General tab to host that sub-tab.
+Adding one means introducing a General tab here first; that is the open TODO,
+recorded per `CLAUDE.md` → "UI consistency across scripts". The same asymmetry
+applies to `rock_band_preview_vkr.lua` and `rock_band_pitch_tuner_vkr.lua`,
+which have no tab bar at all by design.
+
+If a General tab is ever added here, wiring the sub-tab up is three lines:
+`lib/reaper_script_links.lua` in the entry point's pre-check + `dofile` lists,
+and a `BeginTabItem(ctx, 'Other tools')` → `DrawGeneralLinksTab()` block. The
+registry needs no change — `FilterScriptLinkGroups` already hides whichever
+script is running.
+
 ---
 
 ## Content data convention

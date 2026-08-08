@@ -21,7 +21,7 @@ The window is organized into tabs plus a status panel at the bottom. Five tabs a
 
 | Tab            | Purpose                                                                              |
 | -------------- | ------------------------------------------------------------------------------------ |
-| **General**    | Audio alignment, song fade out, settings save/load, and a workflow checklist        |
+| **General**    | Audio alignment, song fade out, settings save/load, a workflow checklist, and buttons that open the other tools |
 | **Difficulty** | Copy notes down a tier and validate Pro Keys / Keys / Guitar-Bass / Drums tracks at each difficulty level |
 | **Tab Input**  | Reference guide: parse ASCII tab notation for Guitar/Bass, Keys/Pro Keys, or Vocal  |
 | **MIDI**       | Align, length-sync, or find-and-replace patterns on MIDI items                      |
@@ -44,7 +44,7 @@ The bottom of the window always shows the active time selection (or "No time sel
 
 ## General tab
 
-Contains three sub-tabs: **Actions**, **Settings**, and **Workflow**.
+Contains four sub-tabs: **Actions**, **Settings**, **Workflow**, and **Other tools**.
 
 ### Actions sub-tab
 
@@ -140,6 +140,21 @@ A couple of edge cases are handled predictably rather than guessed at:
 - The tab warns you (above the checklist) if a template file has the same step repeated twice under the same section — almost always a copy-paste slip — or if its `[` / `]` or `{` / `}` brackets don't balance, which usually means a bracket got deleted or mistyped somewhere in the file. Both are just warnings; the rest of the file still loads.
 
 Switching templates (via the combo) immediately drops checked history for any step that doesn't match the newly-selected template — only whichever template is currently selected keeps its checked state around. If a step's section+label happens to match between the old and new template it survives the switch (see [Checking off items](#checking-off-items) above); anything else is gone, including if you switch back later. Keep this in mind if you're bouncing between two templates for the same song — history isn't retained per-template, only for whichever one is currently selected.
+
+---
+
+### Other tools sub-tab
+
+Buttons that open the other tools in this set, so you don't have to go back to REAPER's Actions list to switch between them. Two groups:
+
+- **Main tools** — Vocal Helper, Music Theory Helper.
+- **Standalone windows** — Venue Preview, Pitch Tuner.
+
+Each opens in its own window and runs independently of this one — closing the General Helper doesn't close them, and they keep their own settings. The General Helper itself isn't listed, since you're already in it.
+
+Opening a tool for the first time also **registers it in REAPER's Action list**, which is what lets you give it a keyboard shortcut or a toolbar button afterwards (**Actions → Show action list**, then search for its name). It's never removed again — un-registering would delete the entry along with any shortcut you'd bound to it, and re-adding it later produces a different internal ID, so the shortcut couldn't be restored. Clicking a tool that's already open just says so instead of opening a second copy.
+
+A tool that isn't installed next to this script is greyed out with a note saying which file is missing, rather than failing when you click it. Put the `.lua` files back in one folder and the button re-enables on its own within a couple of seconds — no need to restart the script.
 
 ---
 

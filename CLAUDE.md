@@ -75,6 +75,10 @@ dofile(_mdir .. 'defaults.lua')                   -- script-specific modules
 | `lib/reaper_imgui_helpers.lua` | `PitchName`, `Tooltip`, `SliderTooltip`, `Btn`, `BtnWidth`, `BtnGroupWidth`, `LabelColWidth`, `RadioGroupWidth`, `SectionHeader`, `SortedByLabel`, `ComboGroupHeader`, `GetTrackList`, `TrackCombo`, `FormatTime`, `GetTimeSelection` |
 | `lib/reaper_dsp.lua` | `ComputeRMSContour`, `OpenYINContext`, `YINWindowSize`, `ReadMonoWindow`, `QuickRMS`, `ComputeCMND`, `SearchYINTau`, `MedianVote`, `DetectPitchYIN`, `SampleYINAt`, `GateAndSplit`, `ApplyMinOffset` |
 | `lib/reaper_midi_helpers.lua` | `FindMIDIItem`, `FindFirstMIDIItem`, `ReadAllMIDINotesOnTrack`, `ClearNotesAtPitchesInRange`, `InsertNotes`, … |
+| `lib/reaper_guitar_theory.lua` | `GuitarShapeToPitches`, `GuitarNormalizeIntervals`, `GuitarClassifyChordType`, `GuitarSuggestRBMapping`, `GuitarAnalyzeShape`, `GuitarParseFretInput`, `GuitarAnalyzeShapeAllTunings` — pure, no `r`/`ctx`/`S` |
+| `lib/reaper_script_links.lua` | `SCRIPT_LINK_GROUPS`, `ScriptLinkBasename`, `IsRunningScriptLink`, `FilterScriptLinkGroups`, `LaunchReaScript`, `DrawGeneralLinksTab` — the General > Other tools sub-tab, shared by both helpers |
+| `lib/reaper_karplus_strong.lua` | `KarplusStrongVoice`, `SynthesizeChordSamples` — plucked-string synthesis for chord audition |
+| `lib/reaper_wav_writer.lua` | `WriteMonoWAV16` |
 
 ### Global vs local function rules
 
@@ -100,6 +104,16 @@ Functions called from another file: define without `local`. Functions used only 
 - All tooltip text in `TIPS` table in `defaults.lua`. UI references `TIPS.foo` — never inline strings.
 - Sliders: `SliderTooltip(TIPS.foo)` (appends Ctrl+click hint automatically)
 - Buttons: `Tooltip(TIPS.foo)` (no hint)
+
+**Exception — shared `lib/` modules keep their own strings.** `TIPS` is
+per-script (general helper: `defaults.lua`; vocal helper: `tips.lua`), so a
+module in `lib/` that draws UI for *both* cannot read either one's table
+without having the same strings copied into both files — which is precisely
+the drift the convention exists to prevent. Such a module keeps its tooltip
+text beside the data it describes: `lib/reaper_script_links.lua` builds each
+tooltip from its own registry entry's `desc`. The same pattern appears inside
+a script where a string belongs to a pool rather than to a widget —
+`DIRECTED_TIPS` lives in `venue_camera.lua`, not in `TIPS`.
 
 ### Result reporting
 - Empty lines in `S.last_result` render as `r.ImGui_Spacing` — use for visual breathing room
@@ -347,6 +361,10 @@ that dofiles the code under test and the set.
     reaper_imgui_helpers.lua
     reaper_dsp.lua
     reaper_midi_helpers.lua
+    reaper_guitar_theory.lua
+    reaper_script_links.lua                  ← General > Other tools sub-tab
+    reaper_karplus_strong.lua
+    reaper_wav_writer.lua
 
   rock_band_vocal_helper_vkr.lua             ← entry point (only file users run)
   rock_band_vocal_helper_vkr/

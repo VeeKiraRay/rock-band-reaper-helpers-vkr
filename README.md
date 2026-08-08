@@ -46,12 +46,14 @@ Three smaller scripts round out the toolset, loaded the same way as the main scr
 - **[Standalone Pitch Tuner](rock_band_vocal_helper_vkr/README.md#standalone-pitch-tuner)** (`rock_band_pitch_tuner_vkr.lua`) — the Vocal Helper's Tuner tab in its own window, so the live readout stays visible while you work in another tab.
 - **[Quick actions](rock_band_vocal_helper_vkr/README.md#quick-actions)** (`quick_actions/`) — four no-UI hotkey scripts for fast vocal-note editing in the MIDI editor.
 
+You don't have to go back to the Actions list to switch between the windowed tools: the General Helper and the Vocal Helper each have a **General → Other tools** sub-tab with buttons that open any of the others. The tool you're already in isn't listed. Opening one from there also adds it to REAPER's Action list, so you can give it a shortcut afterwards.
+
 ---
 
 ## Installation
 
-1. Download and extract `rb_helper_scripts_vkr.zip` into your REAPER Scripts folder (or any folder you use for ReaScripts).
-2. In REAPER: **Actions → Show action list → Load ReaScript** and select the script(s) you want: `rock_band_vocal_helper_vkr.lua`, `rock_band_general_helper_vkr.lua`, or `rock_band_music_theory_helper_vkr.lua`.
+1. Download and extract `rb_helper_scripts_vkr.zip` into your REAPER Scripts folder (or any folder you use for ReaScripts). Keep all the `.lua` entry points together in that one folder — **General → Other tools** looks for its sibling tools beside the script that's running, and greys out any it can't find.
+2. In REAPER: **Actions → Show action list → Load ReaScript** and select the script(s) you want: `rock_band_vocal_helper_vkr.lua`, `rock_band_general_helper_vkr.lua`, or `rock_band_music_theory_helper_vkr.lua`. Loading just one is enough to reach the rest — open it, then use **General → Other tools**.
 3. Optionally assign either action to a toolbar button or keyboard shortcut.
 
 ---

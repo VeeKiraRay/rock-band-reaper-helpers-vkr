@@ -28,7 +28,7 @@ The script window has a persistent track-selector row at the top and a status/re
 | Area                   | Description                                                                                         |
 | ---------------------- | ----------------------------------------------------------------------------------------------------- |
 | Track selectors        | Above the tab bar — Audio source, MIDI destination; always visible                                  |
-| **General** tab        | Save / Load project settings; Refresh tracks; Show WIPs toggle                                      |
+| **General** tab        | Save / Load project settings; Refresh tracks; Show WIPs toggle; buttons that open the other tools   |
 | **Tuner** tab          | Live pitch detector — reads audio at the playhead and shows the current note, Hz, and history       |
 | **Pitch** tab          | Pitch source for Apply pitch changes: Built-in detection (YIN) or Reference MIDI; Snap to Key Scale |
 | **Lyrics** tab         | Select a lyrics file, assign or clear lyric events                                                  |
@@ -68,7 +68,7 @@ Without a time selection, the full audio item is analysed.
 
 ## General tab
 
-Contains two sub-tabs: **Actions** and **Settings**.
+Contains three sub-tabs: **Actions**, **Settings**, and **Other tools**.
 
 ### Actions sub-tab
 
@@ -89,6 +89,19 @@ Settings are loaded automatically when the script opens (if a save exists for th
 **What is saved:** all Detection sliders, Pitch source selection and all pitch settings (including YIN parameters), Velocity, Slide Scan settings, Harmonies destination enabled/copy style/lyric-suffix options, Harmonies key selection, Copy phrase markers, Snap to Key Scale settings (key, scale, avoid-collision), Phrase Similarity threshold and mode, and the Show WIPs toggle.
 
 **What is not saved:** track selections. If your project follows the naming convention (`VOCALS AUDIO`, `PART VOCALS`, `HARM1–3`) the script will re-select the right tracks automatically. The Harmonies key-detection results are session-only and reset on each open.
+
+### Other tools sub-tab
+
+Buttons that open the other tools in this set, so you don't have to go back to REAPER's Actions list to switch between them. Two groups:
+
+- **Main tools** — General Helper, Music Theory Helper.
+- **Standalone windows** — Venue Preview, [Pitch Tuner](#standalone-pitch-tuner).
+
+Each opens in its own window and runs independently of this one — closing the Vocal Helper doesn't close them, and they keep their own settings. The Vocal Helper itself isn't listed, since you're already in it.
+
+Opening a tool for the first time also **registers it in REAPER's Action list**, which is what lets you give it a keyboard shortcut or a toolbar button afterwards (**Actions → Show action list**, then search for its name). It's never removed again — un-registering would delete the entry along with any shortcut you'd bound to it, and re-adding it later produces a different internal ID, so the shortcut couldn't be restored. Clicking a tool that's already open just says so instead of opening a second copy.
+
+A tool that isn't installed next to this script is greyed out with a note saying which file is missing, rather than failing when you click it. Put the `.lua` files back in one folder and the button re-enables on its own within a couple of seconds — no need to restart the script.
 
 ---
 

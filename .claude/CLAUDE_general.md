@@ -12,7 +12,7 @@ Five stable tabs are always visible: **General | Difficulty | Tab Input | MIDI |
 
 Four WIP tabs appear only when **Show WIPs? = Yes** in the General tab (persisted setting, default No): **Tempo Map | Drums | Keys | Guitar**. These tabs function at a basic level but have known issues and are not ready for general users.
 
-**General tab** — audio alignment and settings persistence. Contains three sub-tabs:
+**General tab** — audio alignment and settings persistence. Contains four sub-tabs:
 
 *Actions sub-tab*
 - **Refresh tracks** — re-scans the project's track list.
@@ -33,6 +33,14 @@ Four WIP tabs appear only when **Show WIPs? = Yes** in the General tab (persiste
 - **Template switching prunes, not caps.** `SelectWorkflowFile(idx)` (the one place `S.workflow_file_idx`/`S.workflow_file_name` actually change) calls `PruneToWorkflowEntries(S.workflow_files[idx].entries)` — drops any `S.workflow_state` entry not matching that *one* file's items — then `SaveWorkflowState()` immediately. Replaced an earlier design that only pruned once total checked items exceeded a 100-item cap, compared against every loaded template rather than just the selected one; this is simpler and matches the actual use case (bouncing between a couple of templates doesn't need long-lived cross-template history).
 - Checked state is keyed by **(section, item label)**, not label alone — the same item text can appear under multiple different `[section]` headers (e.g. "Guitar" under both "Instruments Expert" and "Difficulty reductions" in the starter template) without sharing state.
 - Parse-time validation (shown as warnings above the checklist, non-blocking): duplicate `(section, label)` pairs within one file, and unbalanced `[`/`]` or `{`/`}` bracket counts in the file.
+
+*Other tools sub-tab* — buttons that open the suite's other entry points. Drawn by `DrawGeneralLinksTab` in **`lib/reaper_script_links.lua`**, not by a file in this module folder: the vocal helper's General tab has the identical sub-tab, so the registry and the launcher live in `lib/` to exist exactly once. See `CLAUDE.md` → "Shared lib".
+- Two sections from `SCRIPT_LINK_GROUPS`: *Main tools* (General Helper, Vocal Helper, Music Theory Helper) and *Standalone windows* (Venue Preview, Pitch Tuner). One `BtnGroupWidth` spans both sections so they read as a single column.
+- The running script's own entry is filtered out by `FilterScriptLinkGroups` (whole-basename, case-insensitive match against `get_action_context()`), so this tab shows four buttons, never five. A group emptied by that filter is dropped rather than left as a header over nothing.
+- `LaunchReaScript(path)` = `AddRemoveReaScript(true, 0, path, true)` → `Main_OnCommand`. Registration is idempotent (REAPER de-duplicates by path) and **permanent by design** — it is never removed, since that would delete the user's own registration and any key/toolbar binding with it, and a re-add returns a different command ID. `GetToggleCommandState(cmd) == 1` short-circuits a re-launch so REAPER's modal "ReaScript task control" dialog can't block the frame. Safe to call mid-frame: the launched script runs in its own Lua state and draws its first frame on the next defer tick.
+- Missing targets are `BeginDisabled`+`EndDisabled` with the reason drawn *inline* — a disabled widget reports no hover, so its `Tooltip` is unreachable in that state. `file_exists` is re-checked on a 2 s throttle (not per frame, not frozen once — `deploy_to_reaper.bat` gets run with REAPER open).
+- **`rock_band_music_theory_helper_vkr` is a link target only** — no reverse link back, because its `ui.lua` has no General tab to host this sub-tab. See `.claude/CLAUDE_music_theory.md`.
+- Tested by `dev/tests/script_links.lua` (pure; no project fixture) — the valuable case checks the registry against the entry points actually present at the install root, in both directions.
 
 **Tempo Map tab** — generate a REAPER tempo map from drum audio analysis.
 1. Set the four source track dropdowns (KICK, SNARE, KIT, Fallback). Any can be left as "(none)".
@@ -327,6 +335,9 @@ lib/reaper_guitar_theory.lua   → GuitarClassifyChordType, GuitarSuggestRBMappi
                                   actions_guitar.lua's BuildShapeGemMap, by pitch class, for
                                   chord-quality mapping); GUITAR_TAB_OPEN (tuning table, also used by
                                   actions_guitar_guide.lua's tab parsers)
+lib/reaper_script_links.lua    → SCRIPT_LINK_GROUPS, ScriptLinkBasename, IsRunningScriptLink,
+                                  FilterScriptLinkGroups, LaunchReaScript, DrawGeneralLinksTab
+                                  (General > Other tools sub-tab; shared with the vocal helper)
 defaults.lua                   → S, VENUE_VALID, TIPS, constants
 settings.lua                   → SaveSettings, LoadSettings
 helpers.lua                    → FindTrackByName, FindNamedTrackMIDI, GetTakePPQPerQN,

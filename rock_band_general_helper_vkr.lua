@@ -1,12 +1,13 @@
 -- @description Rock Band General Helper
 -- @author VeeKiraRay
--- @version 0.9.47
+-- @version 0.9.48
 -- @about
 --   Utility actions for Rock Band authoring in REAPER.
 --
 --   Tabs:
 --     General    - audio alignment, count-in positioning, song fade out, settings,
---                  per-project authoring workflow checklist
+--                  per-project authoring workflow checklist, buttons that open
+--                  the other tools in this set
 --     Tempo Map  - audio-driven tempo map generation from drum stems
 --     Drums      - convert GM MIDI to Rock Band 5-lane drum notation
 --     Keys       - hand split, Pro Keys conversion + animation, 5-Lane Keys conversion
@@ -21,6 +22,29 @@
 --   This @about block keeps only the 5 most recent versions.
 --   Full history: CHANGELOG.md in the repo.
 --
+--   v0.9.48
+--     - New General > Other tools sub-tab: buttons that open the other scripts
+--       in this set - Vocal Helper and Music Theory Helper, plus the standalone
+--       Venue Preview and Pitch Tuner windows. Each opens in its own window,
+--       independently of this one. The tool you are already in is never listed,
+--       so this tab shows four buttons rather than five. A tool that is not
+--       installed beside this script is greyed out with a note saying so,
+--       instead of failing on click; put the .lua entry points back in one
+--       folder and it re-enables on its own, no restart.
+--       Opening a tool for the first time also registers it in REAPER's Action
+--       list, which is what makes it bindable to a key or a toolbar button. It
+--       is never un-registered afterwards - removing the action would delete
+--       your own registration of that script along with any shortcut bound to
+--       it, and re-adding it later produces a different command ID, so the
+--       binding could not be restored. Clicking a tool that is already open
+--       says so rather than raising REAPER's "ReaScript task control" dialog.
+--       New shared lib/reaper_script_links.lua, so this tab and the Vocal
+--       Helper's copy of it (its v1.18) are drawn from one registry rather
+--       than two that could drift. Covered by a new Script Links test set,
+--       which checks the registry against the entry points actually present
+--       in the install folder - both directions, so a renamed script fails a
+--       test instead of shipping a dead button, and a newly added tool fails
+--       until it is listed.
 --   v0.9.47
 --     - Tab Input: horizontal tab now reads LOW to HIGH - the leftmost token
 --       is the low E string. This is standard chord notation, where
@@ -152,65 +176,6 @@
 --       generated results, saved section configs and the spritesheet
 --       tooling are all unaffected. New shared SortedByLabel /
 --       ComboGroupHeader (lib/reaper_imgui_helpers.lua).
---   v0.9.43
---     - Venue: corrected what lightpreset_blendin / postproc_blendin mean.
---       They were implemented as "place THIS section's lighting/postproc
---       event N beats before the section start", which blends nothing - it
---       just moves the hard cut earlier, and makes the new section's preset
---       run over the last N beats of the previous section. RB3 changes
---       preset when the section begins either way; the blendin value says
---       how many beats ahead of that boundary the PREVIOUSLY active preset
---       is re-stated, giving the game an anchor to interpolate from. A
---       section's own events now always sit on its section start, and the
---       outgoing preset is duplicated ahead of it instead:
---         m3     [lighting (stomp)]  [ProFilm_a.pp]
---         m9 b3  [ProFilm_a.pp]                     (postproc_blendin 2)
---         m9 b4  [lighting (stomp)]  [first]        (lightpreset_blendin 1)
---         m10    [lighting (verse)]  [ProFilm_b.pp]  [first]
---       This changes what every shipped theme produces - they all set
---       blendin. blendin 0 / absent still means a hard cut at the section
---       start, so the snap behaviour is unchanged and still reachable.
---       A duplicate is skipped when the preset is not actually changing
---       (lighting and postproc judged independently) or when it would land
---       at or before the event it copies. New BlendPpq /
---       EmitBlendDuplicates and a two-pass ResolveThemeSection /
---       EmitThemeSection split of the old ProcessThemeSection
---       (venue_lighting.lua) - emitting a section needs the previous
---       section's picks, which isn't visible one section at a time.
---       Section gen, which only ever sees one section, reads the outgoing
---       preset off the VENUE track (new FindActiveVenuePresetsBefore,
---       venue_generator.lua) and no longer clears back over those events.
---     - Venue > Manual gen: new "Blend" button beside "Add" on the Lighting
---       and Post proc rows. It copies the preset of that type currently
---       running to the playhead - the same blend anchor Themes gen and
---       Section gen place from lightpreset_blendin / postproc_blendin - so
---       a hand-authored transition fades instead of cutting. Park the
---       playhead a beat or two before the boundary, click Blend, then add
---       the new preset at the boundary itself. It reads the VENUE track
---       rather than the dropdown above, so it copies whatever is actually
---       playing, and reports the event it copied with the position it came
---       from. Refused, with a report naming what it found and where, when
---       the last two events of that type already match (a blend is already
---       in place), when one is already on the playhead, or when none
---       precedes it; a refusal creates no undo point. New
---       ResolveBlendSource (pure, so the rule is testable without a
---       playhead) and BlendVenuePresetAtPlayhead, actions_venue_manual.lua.
---     - Venue: [first] now marks a preset CHANGE. A lighting event that
---       restates the preset already running - a blend duplicate, or a
---       section that kept the previous section's preset - no longer
---       restarts the keyframe sequence; the train from the event that did
---       start it simply carries on through. This is what lets the
---       Keyframes tab agree with the generators: it can't see sections or
---       blendin values, only the events on the track, so "regenerate"
---       would otherwise put a [first] back on every blend duplicate.
---       Enforced in three places from the same rule - the section emitter
---       (venue_lighting.lua), RegenerateVenueKeyframes' span walk, which
---       now neither starts nor ends a span on an event repeating the one
---       immediately before it, and Manual gen's span-end clamp, which no
---       longer lets a duplicate of the preset being keyframed cut the
---       train short. Only ADJACENT events are compared, so two sections
---       sharing a preset with a different one between them are each still
---       a real change.
 r = reaper  -- global so all dofile'd modules can use it
 
 if not r.ImGui_CreateContext then
@@ -248,6 +213,7 @@ for _, _f in ipairs({
     _dir  .. 'lib/reaper_dsp.lua',
     _dir  .. 'lib/reaper_midi_helpers.lua',
     _dir  .. 'lib/reaper_guitar_theory.lua',
+    _dir  .. 'lib/reaper_script_links.lua',
     _mdir .. 'defaults.lua',
     _mdir .. 'settings.lua',
     _mdir .. 'helpers.lua',
@@ -311,6 +277,7 @@ dofile(_dir  .. 'lib/reaper_imgui_helpers.lua')
 dofile(_dir  .. 'lib/reaper_dsp.lua')
 dofile(_dir  .. 'lib/reaper_midi_helpers.lua')
 dofile(_dir  .. 'lib/reaper_guitar_theory.lua')
+dofile(_dir  .. 'lib/reaper_script_links.lua')
 dofile(_mdir .. 'defaults.lua')
 dofile(_mdir .. 'settings.lua')
 dofile(_mdir .. 'helpers.lua')

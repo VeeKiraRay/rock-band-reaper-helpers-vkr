@@ -1,7 +1,7 @@
 ﻿-- UI loop
 -- Requires: S, TIPS, r, ctx (globals)
 -- Requires: all action functions, GetTimeSelection, RefreshTrackLists, Tooltip,
---           SliderTooltip, SectionHeader (globals)
+--           SliderTooltip, SectionHeader, DrawGeneralLinksTab (globals)
 -- Note: r.defer(Loop) is called at the end of this file.
 
 -- Local variant of TrackCombo: matches by REAPER track index (t.idx), supports
@@ -225,6 +225,14 @@ local function Loop()
                     ------------------------------------------------
                     if r.ImGui_BeginTabItem(ctx, 'Workflow') then
                         DrawGeneralWorkflowTab()
+                        r.ImGui_EndTabItem(ctx)
+                    end
+
+                    ------------------------------------------------
+                    -- General > Other tools sub-tab
+                    ------------------------------------------------
+                    if r.ImGui_BeginTabItem(ctx, 'Other tools') then
+                        DrawGeneralLinksTab()
                         r.ImGui_EndTabItem(ctx)
                     end
 

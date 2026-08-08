@@ -1,6 +1,6 @@
 -- @description Rock Band Vocal Helper
 -- @author VeeKiraRay
--- @version 1.17
+-- @version 1.18
 -- @about
 --   Analyses a vocal audio track and appends MIDI notes to an existing MIDI
 --   item on a destination track, one note per detected syllable or phrase.
@@ -13,6 +13,29 @@
 --   This @about block keeps only the 5 most recent versions.
 --   Full history: CHANGELOG.md in the repo.
 --
+--   v1.18
+--     - New General > Other tools sub-tab: buttons that open the other scripts
+--       in this set - General Helper and Music Theory Helper, plus the
+--       standalone Venue Preview and Pitch Tuner windows. Each opens in its own
+--       window, independently of this one. The tool you are already in is never
+--       listed, so this tab shows four buttons rather than five. A tool that is
+--       not installed beside this script is greyed out with a note saying so,
+--       instead of failing on click; put the .lua entry points back in one
+--       folder and it re-enables on its own, no restart.
+--       Opening a tool for the first time also registers it in REAPER's Action
+--       list, which is what makes it bindable to a key or a toolbar button. It
+--       is never un-registered afterwards - removing the action would delete
+--       your own registration of that script along with any shortcut bound to
+--       it, and re-adding it later produces a different command ID, so the
+--       binding could not be restored. Clicking a tool that is already open
+--       says so rather than raising REAPER's "ReaScript task control" dialog.
+--       New shared lib/reaper_script_links.lua, so this tab and the General
+--       Helper's copy of it (its v0.9.48) are drawn from one registry rather
+--       than two that could drift. Covered by a new Script Links test set,
+--       which checks the registry against the entry points actually present in
+--       the install folder - both directions, so a renamed script fails a test
+--       instead of shipping a dead button, and a newly added tool fails until
+--       it is listed.
 --   v1.17
 --     - The Tuner tab is now also available as a standalone script,
 --       rock_band_pitch_tuner_vkr.lua, so the live readout can stay visible in
@@ -93,10 +116,6 @@
 --       positional indexing (whole take), and validates lyrics.txt against
 --       the take's existing lyric text before writing anything - aborts
 --       with no changes if they've drifted out of sync.
---   v1.13
---     - Result panel (bottom of every tab): long lines now wrap to the
---       window's current width (ImGui_PushTextWrapPos(ctx, 0)) instead of
---       overflowing and requiring the window to be stretched to read them.
 --
 --   Workflow:
 --     1. Pick the audio source track and the MIDI destination track.
@@ -142,6 +161,7 @@ for _, _f in ipairs({
     _dir  .. 'lib/reaper_imgui_helpers.lua',
     _dir  .. 'lib/reaper_dsp.lua',
     _dir  .. 'lib/reaper_midi_helpers.lua',
+    _dir  .. 'lib/reaper_script_links.lua',
     _mdir .. 'defaults.lua',
     _mdir .. 'tips.lua',
     _mdir .. 'settings.lua',
@@ -175,6 +195,7 @@ end
 dofile(_dir  .. 'lib/reaper_imgui_helpers.lua')
 dofile(_dir  .. 'lib/reaper_dsp.lua')
 dofile(_dir  .. 'lib/reaper_midi_helpers.lua')
+dofile(_dir  .. 'lib/reaper_script_links.lua')
 dofile(_mdir .. 'defaults.lua')
 dofile(_mdir .. 'tips.lua')
 dofile(_mdir .. 'settings.lua')
