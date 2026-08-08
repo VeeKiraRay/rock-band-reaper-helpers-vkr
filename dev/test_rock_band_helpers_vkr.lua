@@ -32,7 +32,8 @@ local results = { vocal = nil, general = nil, vocal_midi = nil, general_midi = n
                   quick_actions = nil, spritesheet = nil, venue_events = nil,
                   venue_subtracks = nil, venue_phrase_pacing = nil,
                   venue_labels = nil, workflow = nil,
-                  guitar_theory = nil, karplus_strong = nil, wav_writer = nil,
+                  guitar_theory = nil, music_notation = nil,
+                  karplus_strong = nil, wav_writer = nil,
                   script_links = nil }
 
 local COL_OK  = 0x55DD55FF
@@ -145,6 +146,14 @@ function Loop()
         end
         r.ImGui_SameLine(ctx)
         draw_status(results.guitar_theory)
+
+        r.ImGui_Spacing(ctx)
+
+        if r.ImGui_Button(ctx, 'Music Notation Tests', 155, 24) then
+            run('run_music_notation.lua', 'music_notation')
+        end
+        r.ImGui_SameLine(ctx)
+        draw_status(results.music_notation)
 
         r.ImGui_Spacing(ctx)
 

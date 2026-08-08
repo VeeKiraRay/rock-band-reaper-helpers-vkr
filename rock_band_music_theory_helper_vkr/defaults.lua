@@ -8,7 +8,29 @@ S = {
     burst_next_t        = 0.0,   -- r.time_precise() timestamp for next burst hit
     guitar_search_input  = '',   -- live text in the Guitar tab's shape search box
     guitar_chord_type_idx = 1,   -- selected index into GUITAR_CHORD_TYPES; 1 = Power chord (default)
+    -- Piano tab. Note heads are stored per staff, not once for the grand
+    -- staff, because a staff slot means a different sounding pitch on each
+    -- (different clef, and possibly a different octave transposition).
+    piano_clef_upper_idx = nil,  -- index into NOTATION_CLEFS; set below, needs the lib loaded
+    piano_clef_lower_idx = nil,
+    piano_show_lower     = true, -- false = single staff (upper only)
+    piano_rb_names       = true, -- true = REAPER piano-roll names, false = staff spelling
+    -- Preset NAME from SYNTH_TONES, not an index -- adding a preset can't
+    -- silently repoint it, and SynthToneOpts falls back to a working tone if
+    -- the name ever goes stale.
+    piano_tone           = 'piano_natural',
+    piano_key_sig_idx    = nil,  -- index into KEY_SIGNATURES; set below, needs the lib loaded
+    piano_notes_upper    = {},   -- set of placed written steps: [step] = true
+    piano_notes_lower    = {},
 }
+
+-- KEY_SIG_NATURAL_IDX and NOTATION_CLEF_IDX come from
+-- lib/reaper_music_notation.lua, which the entry point loads before this
+-- file. Looked up by name rather than hardcoded as row numbers, so inserting
+-- a clef or key signature row can't silently change what the tab opens on.
+S.piano_key_sig_idx    = KEY_SIG_NATURAL_IDX
+S.piano_clef_upper_idx = NOTATION_CLEF_IDX.treble
+S.piano_clef_lower_idx = NOTATION_CLEF_IDX.bass
 
 TIPS = {}
 
@@ -34,6 +56,61 @@ TIPS.guitar_search =
     'Helper, so a shape can be pasted between the two.\n\n' ..
     'The shape is also checked against Drop D tuning. If Drop D gives a different\n' ..
     'result than Standard, both are shown -- e.g. try "0 0 0" or "2 2 2".'
+
+TIPS.piano_clef =
+    'Which clef this staff is written in -- it sets which pitch each line and space\n' ..
+    'stands for.\n\n' ..
+    '"Treble (8vb)" is the treble clef with a small 8 hanging under it, common in\n' ..
+    'piano and vocal scores: it is read exactly like treble but sounds an octave\n' ..
+    'lower. "Bass (8va)" is the mirror image, sounding an octave higher.\n\n' ..
+    'Changing the clef re-reads the note heads already placed on this staff -- they\n' ..
+    'stay where they are on the page and their pitches change, which is what would\n' ..
+    'happen on real paper.'
+
+TIPS.piano_key_sig =
+    'The sharps or flats printed at the start of the line. Every note of an affected\n' ..
+    'letter is altered for the whole staff -- with 3 flats, a note head on the treble\n' ..
+    'bottom line is Eb, not E.\n\n' ..
+    'Major and relative-minor keys share a signature, so both names are listed; pick\n' ..
+    'by the accidental count, which is all that is printed on the page anyway.'
+
+TIPS.piano_show_lower =
+    'Uncheck to work on a single staff instead of a grand staff -- useful when the\n' ..
+    'source is a lead sheet or a one-hand part rather than a piano score.'
+
+TIPS.piano_rb_names =
+    'Name the notes the way REAPER\'s piano roll does, so they read straight across\n' ..
+    'into the MIDI editor. Two things change:\n\n' ..
+    'ACCIDENTALS. REAPER uses one fixed set of 12 names -- C C# D Eb E F F# G G# A\n' ..
+    'Bb B -- so a Db on the page reads as C#, and an A# reads as Bb. It has no key\n' ..
+    'signature to spell by, only the key you press.\n\n' ..
+    'OCTAVES. Rock Band numbering, where C1 = 36 (the kick drum) and middle C is C3.\n' ..
+    'That is one lower than the sheet-music numbering, where middle C is C4.\n\n' ..
+    'Uncheck to see the sheet-music spelling instead -- what is actually printed on\n' ..
+    'the page, spelled to match the key signature. The MIDI number is the same\n' ..
+    'either way; only the name changes.'
+
+-- No TIPS entry for the staff canvas itself: a hover tooltip covering the
+-- thing you are trying to click is worse than useless, so those instructions
+-- are printed above the staff instead (see DrawPianoTab in ui_piano.lua).
+
+TIPS.piano_tone =
+    'How the preview is synthesized. All three are the same string model with a\n' ..
+    'softer or harder hammer -- a real hammer puts most of its energy into the low\n' ..
+    'partials, which is what keeps a struck string from sounding plucked.\n\n' ..
+    'Soft     -- mellow and dark, the least "synthetic" of the three.\n' ..
+    'Natural  -- the default; a middle setting.\n' ..
+    'Bright   -- harder strike, closer to the plucked tone the Guitar tab uses.\n\n' ..
+    'This only affects what you hear. The notes, names and MIDI numbers are\n' ..
+    'identical whichever you pick.'
+
+TIPS.piano_play =
+    'Plays the notes currently on the staff as a block chord (synthesized tone via\n' ..
+    'the same SWS extension the Drums tab uses for its samples). Unlike the Guitar\n' ..
+    'tab the notes are not staggered -- a keyboard is struck, not strummed.'
+
+TIPS.piano_clear =
+    'Removes every note head from both staves. Clef and key signature are left alone.'
 
 -- ---------------------------------------------------------------------------
 -- Drums: standard notation → Rock Band Pro lane mapping

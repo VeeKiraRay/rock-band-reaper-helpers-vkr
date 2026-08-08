@@ -31,6 +31,11 @@ r.ShowConsoleMsg('======  Guitar Theory - algorithm unit tests  ======\n')
 
 dofile(_tdir .. 'framework.lua')
 dofile(_root .. 'lib/reaper_guitar_theory.lua')
+-- Not used by this suite, but defaults.lua below seeds S.piano_key_sig_idx
+-- from this file's KEY_SIG_NATURAL_IDX. Without it that field silently
+-- becomes nil -- harmless here, but the kind of thing that only shows up
+-- much later, so load the real dependency rather than relying on luck.
+dofile(_root .. 'lib/reaper_music_notation.lua')
 -- GUITAR_CHORDS / GUITAR_CHORD_TYPES, round-tripped by the chord section.
 -- Defines globals only (S, TIPS, the reference tables) and calls no REAPER
 -- API at load time, so it is safe to pull in here; nothing in this suite

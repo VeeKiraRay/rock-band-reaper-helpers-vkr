@@ -28,39 +28,8 @@ local NOTE_IMG_OFFSET_X  = 12    -- px from image left edge to first note column
 local NOTE_W_WIDE_FACTOR = 1.83  -- width multiplier for wide note columns; tune visually
 local NOTE_W_MED_FACTOR  = 1.40  -- width multiplier for medium note columns; tune visually
 
--- Stop and free the currently active preview (if any).
--- Tries the combined newer API first, falls back to the two-step older form.
-local function StopCurrentPreview()
-    if S.preview_src then
-        if r.CF_Preview_StopAndDestroyPreview then
-            r.CF_Preview_StopAndDestroyPreview(S.preview_src)
-        else
-            r.CF_Preview_Stop(S.preview_src)
-        end
-        S.preview_src = nil
-    end
-    if S.preview_pcm then
-        r.PCM_Source_Destroy(S.preview_pcm)
-        S.preview_pcm = nil
-    end
-end
-
--- Preview an audio file at an absolute path via SWS CF_CreatePreview.
--- Shared by drum sample playback and guitar synthesized-chord playback.
--- Returns false if SWS is unavailable, the file is missing, or creation fails.
-local function PlayPreviewPath(path)
-    StopCurrentPreview()
-    local pcm = r.PCM_Source_CreateFromFile(path)
-    if not pcm then return false end
-    local preview = r.CF_CreatePreview(pcm)
-    if not preview then r.PCM_Source_Destroy(pcm); return false end
-    r.CF_Preview_SetValue(preview, 'B_LOOP', 0)
-    r.CF_Preview_SetValue(preview, 'D_VOLUME', 1.0)
-    r.CF_Preview_Play(preview)
-    S.preview_src = preview
-    S.preview_pcm = pcm
-    return true
-end
+-- StopCurrentPreview and PlayPreviewPath live in audio_preview.lua -- the
+-- Piano tab (ui_piano.lua) needs them too, so they are globals now.
 
 -- Play a single file from the resources/audio/drums/ folder.
 local function PlayAudioFile(filename)
@@ -92,32 +61,11 @@ local function PlayDrumWAV(img_idx_or_row)
     end
 end
 
--- Guitar chord playback: synthesize a short Karplus-Strong plucked-string
--- WAV for the given pitches and preview it via the same PlayPreviewPath
--- used for drums, instead of routing MIDI to an external synth (see
--- .claude/CLAUDE_music_theory.md for why -- StuffMIDIMessage has no path to
--- a software synth without a track in the project). Needs SWS (same as
--- drum playback), gated the same way via AUDIO_CF_AVAILABLE. The pitches
--- come straight from lib/reaper_guitar_theory.lua's classifier, so this one
--- code path covers both the static reference table and arbitrary live
--- Shape Search results (any tuning).
-local GUITAR_SYNTH_SAMPLE_RATE = 44100
-local GUITAR_SYNTH_DURATION_S  = 1.0
-
--- Synthesize and preview a chord shape (pitches[], as produced by
--- GuitarAnalyzeShape/GuitarShapeToPitches). Returns false if SWS is
--- unavailable, the pitch list is empty, or the write/preview fails.
-local function PlayGuitarChord(pitches)
-    if not AUDIO_CF_AVAILABLE then return false end
-    if not pitches or #pitches == 0 then return false end
-    -- Stop any current preview BEFORE overwriting GUITAR_PREVIEW_WAV_PATH --
-    -- releases whatever hold the previous preview had on that same file,
-    -- avoiding a write/read race against REAPER's own file handle.
-    StopCurrentPreview()
-    local samples = SynthesizeChordSamples(pitches, GUITAR_SYNTH_SAMPLE_RATE, GUITAR_SYNTH_DURATION_S, {})
-    if not WriteMonoWAV16(samples, GUITAR_SYNTH_SAMPLE_RATE, GUITAR_PREVIEW_WAV_PATH) then return false end
-    return PlayPreviewPath(GUITAR_PREVIEW_WAV_PATH)
-end
+-- Guitar chord playback goes through PlaySynthChord (audio_preview.lua) with
+-- its default strum stagger. The pitches come straight from
+-- lib/reaper_guitar_theory.lua's classifier, so that one code path covers
+-- both the static reference table and arbitrary live Shape Search results
+-- (any tuning).
 
 local drum_notation_col_w  -- lazily computed once, first DrawDrumsTab() call
 local drum_patterns_col_w  -- lazily computed once, first DrawDrumsTab() call
@@ -280,7 +228,7 @@ local function DrawGuitarTab()
                 line = line .. '  ->  ' .. (result.width or 'no RB mapping suggestion') .. '  (' .. combo_text .. ')'
                 if show_tuning_labels then line = entry.tuning_name .. ': ' .. line end
                 if r.ImGui_SmallButton(ctx, 'Play##guitar_search_play_' .. entry.tuning_name) then
-                    PlayGuitarChord(result.pitches)
+                    PlaySynthChord(result.pitches)
                 end
                 Tooltip(TIPS.guitar_play)
                 r.ImGui_SameLine(ctx)
@@ -342,7 +290,7 @@ local function DrawGuitarTab()
                 -- label uses shape+name together to keep widget IDs distinct.
                 r.ImGui_Selectable(ctx, row.shape .. '##' .. row.name, false, r.ImGui_SelectableFlags_SpanAllColumns())
                 if r.ImGui_IsItemClicked(ctx) then
-                    PlayGuitarChord(GuitarParseFretInput(row.shape))
+                    PlaySynthChord(GuitarParseFretInput(row.shape))
                 end
                 Tooltip(TIPS.guitar_play)
                 r.ImGui_TableSetColumnIndex(ctx, 1)
@@ -416,6 +364,13 @@ local function Loop()
                 r.ImGui_Spacing(ctx)
                 r.ImGui_BeginChild(ctx, '##guitar_scroll', 0, 0, r.ImGui_ChildFlags_None(), r.ImGui_WindowFlags_None())
                 DrawGuitarTab()
+                r.ImGui_EndChild(ctx)
+                r.ImGui_EndTabItem(ctx)
+            end
+            if r.ImGui_BeginTabItem(ctx, 'Piano') then
+                r.ImGui_Spacing(ctx)
+                r.ImGui_BeginChild(ctx, '##piano_scroll', 0, 0, r.ImGui_ChildFlags_None(), r.ImGui_WindowFlags_None())
+                DrawPianoTab()
                 r.ImGui_EndChild(ctx)
                 r.ImGui_EndTabItem(ctx)
             end

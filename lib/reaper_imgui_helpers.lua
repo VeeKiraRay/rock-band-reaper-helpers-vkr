@@ -15,6 +15,9 @@ local RADIO_PAD_FALLBACK = 28   -- used only if ImGui_GetFrameHeight is unavaila
 local RADIO_CUSHION      = 16   -- extra just-in-case margin on top of the real style values
 local HAS_FRAME_HEIGHT   = type(r.ImGui_GetFrameHeight) == 'function'
 
+-- All-sharp spelling. For the mixed spelling REAPER's own piano roll prints
+-- (Eb and Bb instead of D# and A#, sharps elsewhere) see RBPitchName in
+-- lib/reaper_music_notation.lua -- same octave convention, different table.
 function PitchName(p)
     p = math.floor(p + 0.5)
     if p < 0 then p = 0 elseif p > 127 then p = 127 end

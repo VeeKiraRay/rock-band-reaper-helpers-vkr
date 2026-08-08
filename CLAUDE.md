@@ -76,8 +76,9 @@ dofile(_mdir .. 'defaults.lua')                   -- script-specific modules
 | `lib/reaper_dsp.lua` | `ComputeRMSContour`, `OpenYINContext`, `YINWindowSize`, `ReadMonoWindow`, `QuickRMS`, `ComputeCMND`, `SearchYINTau`, `MedianVote`, `DetectPitchYIN`, `SampleYINAt`, `GateAndSplit`, `ApplyMinOffset` |
 | `lib/reaper_midi_helpers.lua` | `FindMIDIItem`, `FindFirstMIDIItem`, `ReadAllMIDINotesOnTrack`, `ClearNotesAtPitchesInRange`, `InsertNotes`, … |
 | `lib/reaper_guitar_theory.lua` | `GuitarShapeToPitches`, `GuitarNormalizeIntervals`, `GuitarClassifyChordType`, `GuitarSuggestRBMapping`, `GuitarAnalyzeShape`, `GuitarParseFretInput`, `GuitarAnalyzeShapeAllTunings` — pure, no `r`/`ctx`/`S` |
+| `lib/reaper_music_notation.lua` | Staff notation model: `NOTATION_CLEFS`, `KEY_SIGNATURES`, `NotationStepToNatural`, `NotationStepToPitch`, `NotationNoteName`, `NotationKeySigAlteration(s)`, `NotationSoundingStep`, `NotationKeySigSlots`, `RBPitchName`, `PianoKeyLayout` — pure, no `r`/`ctx`/`S` |
 | `lib/reaper_script_links.lua` | `SCRIPT_LINK_GROUPS`, `ScriptLinkBasename`, `IsRunningScriptLink`, `FilterScriptLinkGroups`, `LaunchReaScript`, `DrawGeneralLinksTab` — the General > Other tools sub-tab, shared by both helpers |
-| `lib/reaper_karplus_strong.lua` | `KarplusStrongVoice`, `SynthesizeChordSamples` — plucked-string synthesis for chord audition |
+| `lib/reaper_karplus_strong.lua` | `KarplusStrongVoice`, `SynthesizeChordSamples`, `SYNTH_TONES`, `SYNTH_TONE_ORDER`, `SynthToneOpts`, `SynthTonesInFamily` — struck/plucked-string synthesis and its per-instrument tone presets, for chord audition |
 | `lib/reaper_wav_writer.lua` | `WriteMonoWAV16` |
 
 ### Global vs local function rules
@@ -362,6 +363,7 @@ that dofiles the code under test and the set.
     reaper_dsp.lua
     reaper_midi_helpers.lua
     reaper_guitar_theory.lua
+    reaper_music_notation.lua                ← staff/clef/key-signature model
     reaper_script_links.lua                  ← General > Other tools sub-tab
     reaper_karplus_strong.lua
     reaper_wav_writer.lua
@@ -375,6 +377,11 @@ that dofiles the code under test and the set.
   rock_band_general_helper_vkr/
     defaults.lua     helpers.lua     venue.lua
     settings.lua     tempomap.lua    actions.lua    ui.lua
+
+  rock_band_music_theory_helper_vkr.lua      ← entry point (only file users run)
+  rock_band_music_theory_helper_vkr/
+    defaults.lua     audio_preview.lua
+    ui_piano.lua     ui.lua                  ← ui.lua = tab bar + Drums + Guitar
 
   rock_band_preview_vkr.lua                  ← standalone Venue Preview window
                                                (no module folder of its own —
