@@ -316,3 +316,127 @@ CheckPoolParity('DIRECTED_POOL', LBL_MAIN.dir_pool,  LBL_DEMO.dir_pool)
 -- is a throwaway generator, not the authoring UI. Coverage is what matters here.
 CheckCovered('demo COOP_LABELS',     PoolNames(LBL_DEMO.coop_pool), LBL_DEMO.coop)
 CheckCovered('demo DIRECTED_LABELS', PoolNames(LBL_DEMO.dir_pool),  LBL_DEMO.dir)
+
+Test.section('Camera shot priority (venue_camera_priority.lua)')
+
+-- CAM_PRIORITY is the third table keyed by bare shot name, so it rots the same
+-- two ways the label tables do: a pool event with no rank (the preview would
+-- treat it as rank 0 and let MIDI order decide), or a typo'd key nothing looks
+-- up. It also carries ordering promises the documentation makes explicitly,
+-- which a careless re-transcription would silently break.
+local PRIO_NAMES = PoolNames(LBL_MAIN.coop_pool)
+for _, n in ipairs(PoolNames(LBL_MAIN.dir_pool, DIRECTED_EXTRA)) do
+    PRIO_NAMES[#PRIO_NAMES + 1] = n
+end
+
+-- Same two checks CheckCovered/CheckNoOrphans make of the label tables, worded
+-- for ranks: an unranked pool event is not a cosmetic fallback here, it drops to
+-- rank 0 and lets MIDI order decide which shot the preview shows.
+Test.it('CAM_PRIORITY: every pool event has a rank', function()
+    local missing = {}
+    for _, n in ipairs(PRIO_NAMES) do
+        if not LBL_MAIN.priority[n] then missing[#missing + 1] = n end
+    end
+    Test.expect(#missing == 0, 'no rank for: ' .. Join(missing))
+end)
+
+Test.it('CAM_PRIORITY: no orphan rank keys', function()
+    local known = {}
+    for _, n in ipairs(PRIO_NAMES) do known[n] = true end
+    local orphans = {}
+    for k in pairs(LBL_MAIN.priority) do
+        if not known[k] then orphans[#orphans + 1] = k end
+    end
+    Test.expect(#orphans == 0, 'ranked but in no pool: ' .. Join(orphans))
+end)
+
+Test.it('CAM_PRIORITY: ranks are unique', function()
+    local seen, dupes = {}, {}
+    for name, rank in pairs(LBL_MAIN.priority) do
+        if seen[rank] then dupes[#dupes + 1] = ('%d (%s, %s)'):format(rank, seen[rank], name) end
+        seen[rank] = name
+    end
+    Test.expect(#dupes == 0, 'duplicate ranks: ' .. Join(dupes))
+end)
+
+Test.it('CAM_PRIORITY_TIERS: documented tier sizes', function()
+    -- 3/2/10/9/15 = 39 coop (matches COOP_POOL) and 40 directed
+    -- (DIRECTED_POOL's 38 plus the two BRE cuts).
+    local want = { coop_generic=3, coop_front=2, coop_single=10,
+                   coop_closeup=9, coop_duo=15, directed=40 }
+    local bad = {}
+    local seen_keys = {}
+    for _, tier in ipairs(LBL_MAIN.priority_tiers) do
+        seen_keys[tier.key] = true
+        if #tier.events ~= want[tier.key] then
+            bad[#bad + 1] = ('%s has %d, want %s'):format(
+                tier.key, #tier.events, tostring(want[tier.key]))
+        end
+    end
+    for key in pairs(want) do
+        if not seen_keys[key] then bad[#bad + 1] = key .. ' tier missing' end
+    end
+    Test.expect(#bad == 0, Join(bad))
+end)
+
+Test.it('CAM_PRIORITY: every directed cut outranks every coop shot', function()
+    -- "Directed cuts are always more specific than normal cam shot categories."
+    local max_coop, min_directed
+    for name, rank in pairs(LBL_MAIN.priority) do
+        if name:find('^coop_') then
+            if not max_coop or rank > max_coop then max_coop = rank end
+        else
+            if not min_directed or rank < min_directed then min_directed = rank end
+        end
+    end
+    Test.expect(min_directed > max_coop,
+        ('lowest directed rank %s should beat highest coop rank %s')
+            :format(tostring(min_directed), tostring(max_coop)))
+end)
+
+Test.it('CAM_PRIORITY: single keys shots beat every two-character coop shot', function()
+    -- Documentation, "Two character shots", Note 1.
+    local duos = { 'coop_dv_near', 'coop_bd_near', 'coop_dg_near',
+                   'coop_bv_near', 'coop_gv_near', 'coop_kv_near',
+                   'coop_bg_near', 'coop_bk_near', 'coop_gk_near',
+                   'coop_bv_behind', 'coop_gv_behind', 'coop_kv_behind',
+                   'coop_bg_behind', 'coop_bk_behind', 'coop_gk_behind' }
+    local keys = { 'coop_k_behind', 'coop_k_near',
+                   'coop_k_closeup_hand', 'coop_k_closeup_head' }
+    local bad = {}
+    for _, k in ipairs(keys) do
+        for _, d in ipairs(duos) do
+            if not (LBL_MAIN.priority[k] > LBL_MAIN.priority[d]) then
+                bad[#bad + 1] = k .. ' <= ' .. d
+            end
+        end
+    end
+    Test.expect(#bad == 0, Join(bad))
+end)
+
+Test.it('CAM_PRIORITY: closeups beat standard single shots of the same member', function()
+    local pairs_to_check = {
+        { 'coop_b_closeup_hand', 'coop_b_near' },
+        { 'coop_g_closeup_head', 'coop_g_behind' },
+        { 'coop_v_closeup',      'coop_v_near' },
+    }
+    local bad = {}
+    for _, p in ipairs(pairs_to_check) do
+        if not (LBL_MAIN.priority[p[1]] > LBL_MAIN.priority[p[2]]) then
+            bad[#bad + 1] = p[1] .. ' <= ' .. p[2]
+        end
+    end
+    Test.expect(#bad == 0, Join(bad))
+end)
+
+Test.it('CAM_GENERIC_FALLBACK: the three documented generic shots', function()
+    Test.expect(#LBL_MAIN.generic_fallback == 3,
+        'expected 3 entries, got ' .. tostring(#LBL_MAIN.generic_fallback))
+    local in_pool = {}
+    for _, ev in ipairs(LBL_MAIN.coop_pool) do in_pool[ev] = true end
+    local bad = {}
+    for _, ev in ipairs(LBL_MAIN.generic_fallback) do
+        if not in_pool[ev] then bad[#bad + 1] = ev .. ' not in COOP_POOL' end
+    end
+    Test.expect(#bad == 0, Join(bad))
+end)

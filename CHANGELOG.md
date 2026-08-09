@@ -9,6 +9,38 @@ over 5. See `CLAUDE.md` → "Changelog / `@about` trimming" for the rule.
 
 `rock_band_general_helper_vkr.lua`
 
+**v0.9.46**
+- Tab Input > Guitar / Bass: the guide no longer truncates a chord
+  before classifying it, so it now agrees with the Music Theory
+  helper's Shape Search on every shape. Both tools answer the same
+  question - how a chord maps to RB - and Shape Search was the one
+  getting it right. The guide had been reducing each chord to 3
+  PHYSICAL notes by array position (lowest, middle, highest) before
+  any harmonic analysis, which could throw away the root and keep a
+  doubled note: an open D (- 0 0 2 3 2) lost every D and was reported
+  as a 1-3 chord instead of a 3-note major triad, and a C/G
+  (3 3 2 0 1 0) lost both C's the same way. Worse, "3 x 0 0 3 3"
+  became three octaves of G - one pitch class, no suggestable width -
+  and was charted as a 3-note chord, while the identical G5 voiced as
+  "3 x 0 0 - -" was correctly a 1-3 power chord. Nothing needed
+  reducing in the first place: the tab writes nothing to the project,
+  and the gem count already comes from distinct PITCH CLASSES across
+  the whole shape (2 for a dyad, 3 for a real triad).
+- Tab Input > Guitar / Bass: the guide no longer reads Max chord,
+  Allow 1-4, or Phrase gap. Those sliders belong to the Guitar tab's
+  converter and are only visible when WIP tabs are enabled, but they
+  were steering this tab's output even though it does not offer them.
+  An octave dyad now correctly reports 1-4, and phrase breaks come
+  from blank lines in the tab, as documented. The Guitar tab
+  converter is unaffected - it keeps its own settings and its gem
+  assignments are unchanged.
+- Chord names: a chord voiced with a doubled note now reports its
+  interval name instead of "Unrecognized chord shape". A power chord
+  was the only such shape that had a name, so an octave-doubled sixth
+  or third came back unnamed from the classifier while the RB mapping
+  happily called it a 1-3 dyad. Affects the chord name shown in both
+  the Tab Input report and Music Theory > Shape Search.
+
 **v0.9.45**
 - Venue > Actions: new "Validate" section with a "Validate
   lighting/blends" button - a read-only audit of the lighting and post

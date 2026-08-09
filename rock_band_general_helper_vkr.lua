@@ -1,6 +1,6 @@
 -- @description Rock Band General Helper
 -- @author VeeKiraRay
--- @version 0.9.50
+-- @version 0.9.51
 -- @about
 --   Utility actions for Rock Band authoring in REAPER.
 --
@@ -22,6 +22,27 @@
 --   This @about block keeps only the 5 most recent versions.
 --   Full history: CHANGELOG.md in the repo.
 --
+--   v0.9.51
+--     - Venue > Preview: when several camera shots are stacked on one tick, the
+--       preview now shows the one the GAME would play. Authors stack shots so
+--       at least one fits whatever band the song ends up with, and the game
+--       ranks them - most specific wins, and a directed cut always beats a
+--       normal shot. The preview used to just take the last one in MIDI order,
+--       and if that one needed a missing instrument it took the first stacked
+--       shot that fit, so a spot could show a shot the game would never pick.
+--       Priority order is transcribed from the RBN2 Camera And Lights
+--       documentation, including its exception that a single keys shot outranks
+--       any duo shot. The Previous and Next columns resolve their own stacks
+--       the same way - before, only Current considered alternatives at all.
+--     - Venue > Preview: when nothing stacked at a spot fits the selected
+--       Players combo, the red "No suitable event" card now comes with a note
+--       on what the game does instead: it falls back to a generic full band
+--       shot, and it converts a normal duo shot to a single shot of the
+--       remaining member when it can. The preview deliberately keeps showing
+--       the event you authored rather than drawing one of those substitutes -
+--       each has several possible outcomes, and a sprite that is not on your
+--       timeline would look like a preview bug.
+--     - Same in the standalone Venue Preview window (its v0.3).
 --   v0.9.50
 --     - Fix: switching projects left the MIDI tab's Length sub-tab pointing at
 --       the old project's tracks. Its Source track and Reference track fields
@@ -104,37 +125,6 @@
 --       two formats now run in opposite directions, because the two
 --       notations really do. The format tooltip says so, so it doesn't read
 --       as a bug.
---   v0.9.46
---     - Tab Input > Guitar / Bass: the guide no longer truncates a chord
---       before classifying it, so it now agrees with the Music Theory
---       helper's Shape Search on every shape. Both tools answer the same
---       question - how a chord maps to RB - and Shape Search was the one
---       getting it right. The guide had been reducing each chord to 3
---       PHYSICAL notes by array position (lowest, middle, highest) before
---       any harmonic analysis, which could throw away the root and keep a
---       doubled note: an open D (- 0 0 2 3 2) lost every D and was reported
---       as a 1-3 chord instead of a 3-note major triad, and a C/G
---       (3 3 2 0 1 0) lost both C's the same way. Worse, "3 x 0 0 3 3"
---       became three octaves of G - one pitch class, no suggestable width -
---       and was charted as a 3-note chord, while the identical G5 voiced as
---       "3 x 0 0 - -" was correctly a 1-3 power chord. Nothing needed
---       reducing in the first place: the tab writes nothing to the project,
---       and the gem count already comes from distinct PITCH CLASSES across
---       the whole shape (2 for a dyad, 3 for a real triad).
---     - Tab Input > Guitar / Bass: the guide no longer reads Max chord,
---       Allow 1-4, or Phrase gap. Those sliders belong to the Guitar tab's
---       converter and are only visible when WIP tabs are enabled, but they
---       were steering this tab's output even though it does not offer them.
---       An octave dyad now correctly reports 1-4, and phrase breaks come
---       from blank lines in the tab, as documented. The Guitar tab
---       converter is unaffected - it keeps its own settings and its gem
---       assignments are unchanged.
---     - Chord names: a chord voiced with a doubled note now reports its
---       interval name instead of "Unrecognized chord shape". A power chord
---       was the only such shape that had a name, so an octave-doubled sixth
---       or third came back unnamed from the classifier while the RB mapping
---       happily called it a 1-3 dyad. Affects the chord name shown in both
---       the Tab Input report and Music Theory > Shape Search.
 r = reaper  -- global so all dofile'd modules can use it
 
 if not r.ImGui_CreateContext then
@@ -178,6 +168,7 @@ for _, _f in ipairs({
     _mdir .. 'helpers.lua',
     _mdir .. 'venue.lua',
     _mdir .. 'venue_awareness.lua',
+    _mdir .. 'venue_camera_priority.lua',
     _mdir .. 'section_events.lua',
     _mdir .. 'venue_themes.lua',
     _mdir .. 'venue_camera.lua',
@@ -244,6 +235,7 @@ dofile(_mdir .. 'settings.lua')
 dofile(_mdir .. 'helpers.lua')
 dofile(_mdir .. 'venue.lua')
 dofile(_mdir .. 'venue_awareness.lua')
+dofile(_mdir .. 'venue_camera_priority.lua')
 dofile(_mdir .. 'section_events.lua')
 dofile(_mdir .. 'venue_themes.lua')
 dofile(_mdir .. 'venue_camera.lua')

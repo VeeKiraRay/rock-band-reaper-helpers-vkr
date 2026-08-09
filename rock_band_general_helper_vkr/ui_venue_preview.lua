@@ -2,7 +2,7 @@
 -- Shows previous / current / next venue events relative to the playhead
 -- for each category (Camera, Lighting, Post-Process) with sprite animations.
 -- Requires globals: r, ctx, S, GetVenueEventsForPreview, DrawVenueInlineSprite,
---                   VenueSpriteFoldersFound, SectionHeader
+--                   VenueSpriteFoldersFound, SectionHeader, PickPriorityCameraEvent
 
 local _preview_cache       = nil   -- { camera, lighting, postproc } or nil
 local _preview_error       = nil   -- error string or nil
@@ -28,6 +28,18 @@ local _INST_NAMES    = { b='PART BASS', g='PART GUITAR', k='PART KEYS' }
 
 local _SHOW_CURRENT_ONLY = 0
 local _SHOW_SURROUNDING  = 1
+
+-- Shown under the Camera row only while a column has no shot that fits the
+-- selected lineup. The preview deliberately keeps showing the authored event
+-- instead of substituting one of these, so the wording stays on what the
+-- GAME does - both fallbacks have more than one possible outcome, and a
+-- sprite that is not on the timeline would read as a preview bug.
+-- Body text rather than a tooltip, so it lives here and not in TIPS.
+local _FALLBACK_NOTE =
+    'No stacked camera shot matches the current band. In game, the camera system falls back '
+ .. 'to a generic full band camera shot - [coop_all_behind], [coop_all_far] or [coop_all_near]. '
+ .. 'A normal (coop) duo shot is converted to a single shot of the remaining band member when '
+ .. 'possible by the game. Directed cuts have no documented duo-to-single fallback.'
 
 local _muted_cache = nil  -- GetMutedInstruments() result; mute toggles bump
                           -- the project state count, so refreshes catch them
@@ -67,39 +79,36 @@ local function _get_bare_name(ev, category)
     end
 end
 
--- Events are stored in MIDI order (chronological). Return prev/current/next
--- relative to the given playhead time. Groups events at the same PPQ position
--- so that stacked events (same spot) never split across prev/current/next.
+-- Every event sharing the PPQ position of events[idx], in MIDI order.
+-- Authors stack several camera shots on one tick so at least one fits
+-- whatever lineup the song ends up with, so a "spot" is a group, not an
+-- event - which of them plays is PickPriorityCameraEvent's call.
+local function _group_at(events, idx)
+    local ppq = events[idx].ppq
+    local first, last = idx, idx
+    while first > 1 and events[first - 1].ppq == ppq do first = first - 1 end
+    while last < #events and events[last + 1].ppq == ppq do last = last + 1 end
+    local group = {}
+    for i = first, last do group[#group + 1] = events[i] end
+    return group, first, last
+end
+
+-- Events are stored in MIDI order (chronological). Return the prev/current/next
+-- PPQ groups relative to the given playhead time, so stacked events never split
+-- across the three columns.
 local function _find_prev_current_next(events, time)
     if not events or #events == 0 then return nil, nil, nil end
     local curr_idx = nil
     for i, ev in ipairs(events) do
         if ev.t <= time then curr_idx = i else break end
     end
-    if not curr_idx then return nil, nil, events[1] end
+    if not curr_idx then return nil, nil, (_group_at(events, 1)) end
 
-    local curr_ppq = events[curr_idx].ppq
+    local curr, first, last = _group_at(events, curr_idx)
+    local prev = first > 1      and (_group_at(events, first - 1)) or nil
+    local next_group = last < #events and (_group_at(events, last + 1)) or nil
 
-    -- Walk back to the start of this PPQ group
-    local group_start = curr_idx
-    while group_start > 1 and events[group_start - 1].ppq == curr_ppq do
-        group_start = group_start - 1
-    end
-
-    -- Previous: last event strictly before this group
-    local prev = group_start > 1 and events[group_start - 1] or nil
-
-    -- Current: last event in the group (alternatives searched by ppq in _resolve_cam_ev)
-    local curr = events[curr_idx]
-
-    -- Next: first event after this group
-    local after = curr_idx + 1
-    while after <= #events and events[after].ppq == curr_ppq do
-        after = after + 1
-    end
-    local next_ev = after <= #events and events[after] or nil
-
-    return prev, curr, next_ev
+    return prev, curr, next_group
 end
 
 -- Build the muted table for filtering from the current combo selection.
@@ -107,30 +116,19 @@ local function _combo_muted(combo)
     return { [_COMBO_ABSENT[combo]] = true }
 end
 
--- True if event_msg requires an instrument that is in the muted table.
--- Reuses GetCoopRequiredInstruments / GetDirectedRequiredInstruments from venue_awareness.lua.
-local function _is_cam_filtered(msg, muted)
-    local req
-    if msg:find('^%[coop_')         then req = GetCoopRequiredInstruments(msg)
-    elseif msg:find('^%[directed_') then req = GetDirectedRequiredInstruments(msg)
-    else return false end
-    for _, ltr in ipairs(req) do if muted[ltr] then return true end end
-    return false
-end
-
--- Given a camera event and the full camera list, find the best event to display.
+-- Pick the event to display for one PPQ group.
 -- Returns: display_ev, is_filtered
---   is_filtered=false → display_ev is suitable, show normally
---   is_filtered=true  → no suitable alternative found; display_ev is the original (show in red)
-local function _resolve_cam_ev(ev, all_cam, muted)
-    if not ev then return nil, false end
-    if not _is_cam_filtered(ev.msg, muted) then return ev, false end
-    for _, other in ipairs(all_cam) do
-        if other.ppq == ev.ppq and not _is_cam_filtered(other.msg, muted) then
-            return other, false
-        end
-    end
-    return ev, true
+--   is_filtered=false → display_ev is what the game would play here
+--   is_filtered=true  → nothing in the group fits the lineup; display_ev is the
+--                       group's last event, shown in red with _FALLBACK_NOTE
+-- Camera groups resolve by the documented shot priority (venue_camera_priority.lua);
+-- lighting and post-process have no priority order, so their last event wins.
+local function _resolve_group(group, muted)
+    if not group or #group == 0 then return nil, false end
+    if not muted then return group[#group], false end
+    local chosen = PickPriorityCameraEvent(group, muted)
+    if chosen then return chosen, false end
+    return group[#group], true
 end
 
 -- Draw one labeled column (header + event card or placeholder).
@@ -172,25 +170,28 @@ local function _draw_column(header, ev, category, scale, is_filtered, combo_name
     r.ImGui_EndGroup(ctx)
 end
 
-local function _draw_category_row(label, prev_ev, curr_ev, next_ev, category, scale, muted, combo_name)
+-- prev/curr/next are PPQ groups (arrays of events), not single events.
+local function _draw_category_row(label, prev_grp, curr_grp, next_grp, category, scale, muted, combo_name)
     SectionHeader(label)
     r.ImGui_Separator(ctx)  -- full-width separator drawn outside groups (safe here)
-    local function col(header, ev)
-        if muted then
-            local d, f = _resolve_cam_ev(ev, _preview_cache.camera, muted)
-            _draw_column(header, d, category, scale, f, combo_name)
-        else
-            _draw_column(header, ev, category, scale)
-        end
+    local any_filtered = false
+    local function col(header, group)
+        local ev, filtered = _resolve_group(group, muted)
+        if filtered then any_filtered = true end
+        _draw_column(header, ev, category, scale, filtered, combo_name)
     end
     if S.venue_preview_show_mode == _SHOW_CURRENT_ONLY then
-        col('Current', curr_ev)
+        col('Current', curr_grp)
     else
-        col('Previous', prev_ev)
+        col('Previous', prev_grp)
         r.ImGui_SameLine(ctx)
-        col('Current',  curr_ev)
+        col('Current',  curr_grp)
         r.ImGui_SameLine(ctx)
-        col('Next',     next_ev)
+        col('Next',     next_grp)
+    end
+    if any_filtered then
+        r.ImGui_Spacing(ctx)
+        r.ImGui_TextWrapped(ctx, _FALLBACK_NOTE)
     end
 end
 
@@ -305,6 +306,7 @@ function DrawVenuePreviewTab()
     local playhead = playing and r.GetPlayPosition() or r.GetCursorPosition()
     local scale    = S.venue_preview_tab_scale
 
+    -- Each of these is a PPQ group (array of stacked events), not one event.
     local cam_p, cam_c, cam_n = _find_prev_current_next(_preview_cache.camera,   playhead)
     local lt_p,  lt_c,  lt_n  = _find_prev_current_next(_preview_cache.lighting, playhead)
     local pp_p,  pp_c,  pp_n  = _find_prev_current_next(_preview_cache.postproc, playhead)

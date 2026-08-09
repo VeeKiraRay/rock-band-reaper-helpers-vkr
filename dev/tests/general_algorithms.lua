@@ -170,6 +170,94 @@ Test.it('all five instruments are always present in the result', function()
 end)
 
 ----------------------------------------------------------------------
+Test.section('PickPriorityCameraEvent')
+
+-- Groups mirror what ui_venue_preview.lua's _group_at builds: the camera events
+-- stacked on one tick, in MIDI order. muted[letter]=true means that instrument
+-- is muted or absent (GetMutedInstruments' convention).
+local function Grp(...)
+    local g = {}
+    for _, msg in ipairs({ ... }) do g[#g + 1] = { msg = msg, ppq = 960 } end
+    return g
+end
+
+Test.it('single event group returns that event', function()
+    local got = PickPriorityCameraEvent(Grp('[coop_g_near]'), {})
+    Test.expect(got and got.msg == '[coop_g_near]', 'got ' .. tostring(got and got.msg))
+end)
+
+Test.it('picks highest priority, not last in MIDI order', function()
+    -- coop_all_* is the most generic shot; a duo is far more specific. The old
+    -- preview took the last event in the group, which would answer coop_all_near.
+    local got = PickPriorityCameraEvent(Grp('[coop_gv_near]', '[coop_all_near]'), {})
+    Test.expect(got and got.msg == '[coop_gv_near]', 'got ' .. tostring(got and got.msg))
+end)
+
+Test.it('picks highest priority regardless of position in the group', function()
+    local got = PickPriorityCameraEvent(
+        Grp('[coop_all_far]', '[coop_bg_near]', '[coop_d_near]'), {})
+    Test.expect(got and got.msg == '[coop_bg_near]', 'got ' .. tostring(got and got.msg))
+end)
+
+Test.it('directed cut beats any coop shot in the group', function()
+    local got = PickPriorityCameraEvent(Grp('[directed_all]', '[coop_gk_near]'), {})
+    Test.expect(got and got.msg == '[directed_all]', 'got ' .. tostring(got and got.msg))
+end)
+
+Test.it('skips a shot needing a muted instrument for a lower-ranked fit', function()
+    -- Keys absent: the bass/keys duo cannot play, so the generic shot wins even
+    -- though it ranks far below it.
+    local got = PickPriorityCameraEvent(Grp('[coop_all_near]', '[coop_bk_near]'), { k = true })
+    Test.expect(got and got.msg == '[coop_all_near]', 'got ' .. tostring(got and got.msg))
+end)
+
+Test.it('companion stacking resolves to the shot that fits the lineup', function()
+    -- What the generator emits for a keys/guitar/bass swap band (FindCompanion).
+    local group = Grp('[coop_bg_near]', '[coop_k_near]')
+    local with_keys = PickPriorityCameraEvent(group, { g = true })
+    Test.expect(with_keys and with_keys.msg == '[coop_k_near]',
+        'guitar absent -> keys shot; got ' .. tostring(with_keys and with_keys.msg))
+    local with_guitar = PickPriorityCameraEvent(group, { k = true })
+    Test.expect(with_guitar and with_guitar.msg == '[coop_bg_near]',
+        'keys absent -> bass/guitar shot; got ' .. tostring(with_guitar and with_guitar.msg))
+end)
+
+Test.it('single keys shot wins over a valid duo shot (documented exception)', function()
+    local got = PickPriorityCameraEvent(Grp('[coop_bg_near]', '[coop_k_near]'), {})
+    Test.expect(got and got.msg == '[coop_k_near]', 'got ' .. tostring(got and got.msg))
+end)
+
+Test.it('returns nil when nothing in the group fits', function()
+    local got = PickPriorityCameraEvent(Grp('[coop_bk_near]', '[directed_keys]'), { k = true })
+    Test.expect(got == nil, 'expected nil; got ' .. tostring(got and got.msg))
+end)
+
+Test.it('shots needing nobody are never filtered out', function()
+    -- [coop_all_*] / [coop_front_*] / [directed_all*] require no instrument.
+    local got = PickPriorityCameraEvent(Grp('[coop_front_near]'),
+                                        { b = true, g = true, k = true })
+    Test.expect(got and got.msg == '[coop_front_near]', 'got ' .. tostring(got and got.msg))
+end)
+
+Test.it('unranked event loses to a ranked one but wins when it is the only fit', function()
+    local mixed = PickPriorityCameraEvent(Grp('[coop_made_up]', '[coop_d_near]'), {})
+    Test.expect(mixed and mixed.msg == '[coop_d_near]',
+        'ranked shot should win; got ' .. tostring(mixed and mixed.msg))
+    local alone = PickPriorityCameraEvent(Grp('[coop_made_up]'), {})
+    Test.expect(alone and alone.msg == '[coop_made_up]',
+        'lone unranked shot still shows; got ' .. tostring(alone and alone.msg))
+end)
+
+Test.it('nil muted table means every shot fits', function()
+    local got = PickPriorityCameraEvent(Grp('[coop_all_near]', '[coop_bk_near]'), nil)
+    Test.expect(got and got.msg == '[coop_bk_near]', 'got ' .. tostring(got and got.msg))
+end)
+
+Test.it('nil group returns nil', function()
+    Test.expect(PickPriorityCameraEvent(nil, {}) == nil, 'expected nil')
+end)
+
+----------------------------------------------------------------------
 Test.section('KeyframeSubdivQN')
 
 Test.it('mode 0 (every beat) -> 1.0 QN', function()

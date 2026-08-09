@@ -44,6 +44,9 @@ dofile(_root .. 'lib/reaper_imgui_helpers.lua')  -- SortedByLabel (display lists
 dofile(_gdir .. 'defaults.lua')        -- VENUE_VALID
 dofile(_gdir .. 'venue_themes.lua')    -- LIGHTING_NAMES, POSTPROC_NAMES, POSTPROC_DISPLAY
 dofile(_gdir .. 'venue_camera.lua')    -- COOP_/DIRECTED_ pools, labels, display lists
+-- Pure tables/functions; its GetCoopRequiredInstruments use is at call time only,
+-- so venue_awareness.lua is not needed for these table-coverage checks.
+dofile(_gdir .. 'venue_camera_priority.lua')  -- CAM_PRIORITY, CAM_PRIORITY_TIERS
 dofile(_gdir .. 'venue_sprites.lua')   -- RawVenueEventText
 dofile(_gdir .. 'venue_lighting.lua')  -- MANUAL_LIGHTING_SET, LIGHTING_DISPLAY_GROUPS
 -- The demo mirrors MANUAL_LIGHTING_SET too, keyed by BARE name where the helper keys
@@ -61,6 +64,9 @@ LBL_MAIN = {
     dir_bre         = DIRECTED_BRE_NAMES,
     lighting_groups = LIGHTING_DISPLAY_GROUPS,
     postproc_display = POSTPROC_DISPLAY,
+    priority         = CAM_PRIORITY,
+    priority_tiers   = CAM_PRIORITY_TIERS,
+    generic_fallback = CAM_GENERIC_FALLBACK,
 }
 
 dofile(_demo_dir .. 'defaults.lua')

@@ -400,6 +400,50 @@ be changed from `local` to a global function in `venue_camera.lua` so these othe
 call it (see `CLAUDE.md`'s global-vs-local function rule). Both bookend call sites now check
 `coop_opts.keys_failsafe` and call `FindCompanion` the same way the main loop does.
 
+### Camera shot priority (`venue_camera_priority.lua`)
+
+Stacking only works because the game **ranks** the shots it finds on one tick. Source:
+`_external_docs/RBN2 Camera And Lights - RBN_C3 Documentation.htm`, sections "Camera Shot
+Priority" and "Directed Cuts Priority". The engine evaluates every shot at that tick in a
+fixed order and plays the one that most closely matches the members actually on stage. The
+documented order runs most generic → most specific, and **more specific wins**.
+
+`CAM_PRIORITY_TIERS` keeps the documentation's own grouping and within-tier order:
+
+| Rank | Tier | Count | Notes |
+|---|---|---|---|
+| lowest | Generic four camera shots | 3 | `[coop_all_behind/far/near]` |
+| ↓ | Three character shots (no drum) | 2 | `[coop_front_behind/near]` |
+| ↓ | One character standard shots | 10 | drums and vocals rank below b/g/k — they are always present, so their shots are the more generic ones |
+| ↓ | One character closeups | 9 | |
+| ↓ | Two character shots | 15 | |
+| highest | Directed cuts | 40 | always more specific than any coop shot; 38 pool entries + `[directed_bre]` / `[directed_brej]` |
+
+`CAM_PRIORITY[bare_name]` is the flattened **effective** rank (higher wins). It diverges from
+the tier table in exactly one documented place: doc Note 1, "a single keys shot will prioritize
+over any combo shot", so `coop_k_behind/near/closeup_hand/closeup_head` are lifted to just
+above the two-character tier — still below every directed cut. The note does not settle whether
+the closeups count; the module includes them and says so.
+
+`PickPriorityCameraEvent(group, muted)` is the resolver: drop the shots needing an instrument in
+`muted`, return the highest-ranked survivor, return `nil` if none survives. `dev/tests/venue_labels.lua`
+guards the table (coverage, unique ranks, tier sizes, the two ordering promises) and
+`dev/tests/general_algorithms.lua` the resolver.
+
+**Two engine fallbacks nothing in this repo performs.** Both are game-side substitutions with
+more than one possible outcome, so the generator does not emit them and the Venue Preview does
+not draw them — it keeps showing the authored event and explains these in an alert instead:
+
+- **Generic shot fallback.** If no stacked shot can be matched, the game uses one of
+  `[coop_all_behind]`, `[coop_all_far]` or `[coop_all_near]` (`CAM_GENERIC_FALLBACK`). A
+  three-character `[coop_front_*]` shot may be selected in such cases as well.
+- **Duo to single fallback.** If a member is missing when a duo flag is called *and there are no
+  other stacked flags*, the duo cut becomes a single cut of the remaining member. This is the
+  direct reason companion stacking above is worth doing: without a companion you get the game's
+  guess, with one you get the shot you chose. The documentation states this only for normal
+  (coop) two-character shots — the directed cuts section makes no equivalent claim for
+  `[directed_duo_*]`.
+
 ### Song-start bookends and the music-start anchor
 
 Two events are inserted before the regular generation loop, anchored to the absolute start of

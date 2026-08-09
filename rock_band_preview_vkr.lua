@@ -1,6 +1,6 @@
 -- @description Rock Band Venue Preview
 -- @author VeeKiraRay
--- @version 0.2
+-- @version 0.3
 -- @about
 --   Standalone window for the Venue > Preview sub-tab of the Rock Band
 --   General Helper. Shows previous / current / next VENUE events (camera,
@@ -10,6 +10,15 @@
 --   this entry point offers the same UI in its own window so it can sit
 --   next to the generation tabs (e.g. Manual) without tab switching.
 --
+--   v0.3
+--     - Stacked camera shots at one tick now resolve by the game's own shot
+--       priority - most specific wins, directed cuts beat normal shots, and a
+--       single keys shot outranks any duo shot - instead of taking whichever
+--       came last in MIDI order. Applies to the Previous and Next columns too.
+--       When nothing stacked at a spot fits the selected Players combo, the
+--       "No suitable event" card now explains what the game falls back to.
+--       Same change as the general helper's Venue > Preview sub-tab (v0.9.51),
+--       which this window shares its implementation with.
 --   v0.2
 --     - Added the "Active players" row below the preview: a colored dot per
 --       instrument shows its state at the playhead - active (green), idle
@@ -61,6 +70,7 @@ local _files = {
     _mdir .. 'helpers.lua',
     _mdir .. 'venue.lua',
     _mdir .. 'venue_awareness.lua',
+    _mdir .. 'venue_camera_priority.lua',
     _mdir .. 'venue_sprites.lua',
     _mdir .. 'ui_venue_preview.lua',
     _mdir .. 'ui_venue_players.lua',

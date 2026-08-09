@@ -37,6 +37,9 @@ dofile(_mdir .. 'defaults.lua')        -- S and constants
 dofile(_mdir .. 'tempomap.lua')        -- EstimateBPM, GuessTimeSig, FitBeatGrid
 dofile(_mdir .. 'venue_awareness.lua') -- ComputePlayerStatesAt (pure; REAPER-facing
                                        -- functions in this file are not exercised)
+dofile(_mdir .. 'venue_camera_priority.lua')  -- PickPriorityCameraEvent (pure; needs
+                                       -- venue_awareness.lua above for the required-
+                                       -- instrument lookups it calls)
 dofile(_mdir .. 'venue_lighting.lua')  -- KeyframeSubdivQN (pure; other functions in
                                        -- this file are not exercised)
 dofile(_mdir .. 'actions_guitar.lua')  -- BuildShapeGemMap, SortedChordPitches (pure;
