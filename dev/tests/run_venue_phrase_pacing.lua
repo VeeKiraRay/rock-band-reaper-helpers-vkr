@@ -32,6 +32,7 @@ dofile(_tdir .. 'framework.lua')
 dofile(_tdir .. 'fixture_helpers.lua')
 dofile(_gdir .. 'defaults.lua')                   -- S
 dofile(_gdir .. 'helpers.lua')                    -- FindTrackByName
+dofile(_gdir .. 'venue.lua')                      -- IsBlendAnchor (actions_venue_manual reads it)
 dofile(_gdir .. 'venue_camera.lua')               -- GenerateCameraEvents, RB3_PHRASE_PITCH
 dofile(_gdir .. 'venue_lighting.lua')             -- CollectInstNotePositions, CollectVocalPhraseStarts
 dofile(_gdir .. 'actions_venue_manual.lua')       -- FindNextVocalPhraseStartPpq

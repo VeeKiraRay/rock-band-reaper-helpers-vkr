@@ -1,6 +1,6 @@
 -- @description Rock Band Venue Preview
 -- @author VeeKiraRay
--- @version 0.3
+-- @version 0.4
 -- @about
 --   Standalone window for the Venue > Preview sub-tab of the Rock Band
 --   General Helper. Shows previous / current / next VENUE events (camera,
@@ -10,6 +10,18 @@
 --   this entry point offers the same UI in its own window so it can sit
 --   next to the generation tabs (e.g. Manual) without tab switching.
 --
+--   v0.4
+--     - The preview now understands blends. A blend is authored by writing the
+--       running lighting or post proc preset a second time just before the
+--       change, so the game fades into it instead of cutting. That second copy
+--       is an anchor, not a preset of its own, so it is no longer shown as its
+--       own event - before, the same preset filled two columns and every fade
+--       looked like a hard cut.
+--     - Each lighting and post proc card now says how it hands over to the next
+--       one: "blends into next", "blending now" while the playhead is inside
+--       the fade, or "hard cut to next" - which is a valid authoring choice,
+--       not an error. Camera cards have no such line; a camera cut never fades.
+--       Same change as the general helper's Venue > Preview sub-tab (v0.9.53).
 --   v0.3
 --     - Stacked camera shots at one tick now resolve by the game's own shot
 --       priority - most specific wins, directed cuts beat normal shots, and a

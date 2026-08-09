@@ -381,6 +381,8 @@ Whole-song generation driven by a `.rbtheme` file.
 - **Keyframe align** — global alignment mode for `[first]`/`[next]` keyframe events. Options: Section start, Closest beat, Downbeat, and five instrument-aware modes (Guitar notes, Bass notes, Keys notes, Drum kicks, Drum snare) that place `[next]` only at beats where notes exist on the corresponding PART track.
 - **Generate venue events** — generates camera cuts, lighting changes, manual-lighting keyframes, and post-process effects on the VENUE track. Camera pools are filtered by which PART instrument tracks are present and unmuted. Respects time selection (partial regeneration). Fully undoable.
 
+A section never re-states the lighting or post proc preset already running. If a section's theme pool offers alternatives, it picks one of those instead; if the pool holds only the running preset, that section simply keeps it and writes no event at all (the report counts these as *Kept running preset*). This matters because two identical events back to back is exactly how a blend anchor is written — a repeat would read as a fade you never asked for. Its keyframes are still generated, so a manual preset keeps animating across the boundary. If you genuinely want a duplicate, add it with **Blend** on the [Manual gen sub-tab](#manual-gen-sub-tab).
+
 ### Section gen sub-tab
 
 ![Section gen sub-tab](../assets/g_venue_section_gen.jpg)
@@ -399,6 +401,8 @@ Per-section manual configuration. Sections are read from `[prc_*]` markers on th
   - **Bonus FX** — insert a `[bonusfx]` event at the section start.
 - **Camera pacing** — camera cut rate override for the generated section.
 - **Generate section** — generates events for the selected section only. Fully undoable.
+
+Like Themes gen, this never re-states a preset that's already running: in Template mode the roll avoids it, and if your chosen Lighting or Post-process is the one already playing the event is skipped and the report says which preset it kept. Keyframes are still generated either way.
 
 ### Manual gen sub-tab
 
@@ -437,6 +441,14 @@ Live readout of current, previous, and next venue events relative to the playhea
 - **Preview size** — inline sprite display scale: 1× (213×120 px) or 2× (426×240 px).
 - **Sprites** — Animated (plays through all frames) or Still (single middle frame).
 - **Show** — Current only (one column) or Surrounding events (Previous / Current / Next columns).
+
+**Blends.** A blend is authored by re-stating the running lighting or post proc preset a beat or two before the change, so the game fades between the two instead of cutting. That re-stated copy is not a preset of its own, so the preview never shows it as an event — you'd otherwise see the same preset twice across two columns. Instead each lighting and post proc card gets a line saying how it hands over:
+
+- **blends into next** — an anchor is present, the game will fade.
+- **blending now** — the playhead is inside that fade right now.
+- **hard cut to next** — no anchor, the game switches instantly. Perfectly valid, not an error.
+
+Camera cards never show this line; a camera cut never fades. To add an anchor by hand, use **Blend** on the [Manual gen sub-tab](#manual-gen-sub-tab); to find changes that don't have one, use **Validate lighting/blends** on the [Actions sub-tab](#actions-sub-tab).
 
 Sprite previews require JPEG spritesheets installed under `resources/img/spritesheets/`. If no spritesheets are found, event names are shown as text with no image.
 

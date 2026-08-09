@@ -29,6 +29,11 @@ local _INST_NAMES    = { b='PART BASS', g='PART GUITAR', k='PART KEYS' }
 local _SHOW_CURRENT_ONLY = 0
 local _SHOW_SURROUNDING  = 1
 
+-- Amber, for the one transition line that reports live state ("blending now").
+-- Deliberately not the 0xFF4444FF red the filtered camera card uses - that red
+-- means "nothing here can play", which a blend in progress is the opposite of.
+local _BLEND_ACTIVE_COL = 0xFFCC66FF
+
 -- Shown under the Camera row only while a column has no shot that fits the
 -- selected lineup. The preview deliberately keeps showing the authored event
 -- instead of substituting one of these, so the wording stays on what the
@@ -131,13 +136,35 @@ local function _resolve_group(group, muted)
     return group[#group], true
 end
 
+-- How the event in a column hands over to whatever follows it, as one line under
+-- the timestamp. Returns text, color (nil color = TextDisabled).
+--
+-- Lighting and post proc arrive from AnnotateVenueBlends (venue.lua) already
+-- collapsed - a blend anchor restates a preset that is already running, so it is
+-- never a card of its own - and carry the fields read here. Camera events have
+-- none of them and always get the blank line: a camera cut never fades.
+--
+-- The next_t upper bound is what keeps "blending now" out of the Previous column
+-- without that column having to know it is the Previous one: past the change, the
+-- playhead is no longer inside the fade window.
+local function _transition_line(ev, playhead)
+    if not ev or not ev.next_t then return ' ' end
+    if ev.blend_out_t then
+        if playhead >= ev.blend_out_t and playhead < ev.next_t then
+            return '-> blending now', _BLEND_ACTIVE_COL
+        end
+        return '-> blends into next'
+    end
+    return '-> hard cut to next'
+end
+
 -- Draw one labeled column (header + event card or placeholder).
 -- NOTE: r.ImGui_Separator inside a BeginGroup expands to full window width,
 -- breaking the side-by-side layout - use Spacing instead, and draw the
 -- separator once outside all groups (in _draw_category_row).
 -- Dummy reserves the sprite footprint so all columns stay the same width
 -- even when there is no event or no spritesheet installed.
-local function _draw_column(header, ev, category, scale, is_filtered, combo_name)
+local function _draw_column(header, ev, category, scale, is_filtered, combo_name, playhead)
     local sw = _SPRITE_W * scale
     local sh = _SPRITE_H * scale
     r.ImGui_BeginGroup(ctx)
@@ -153,6 +180,15 @@ local function _draw_column(header, ev, category, scale, is_filtered, combo_name
             r.ImGui_Text(ctx, ev.msg)
         end
         r.ImGui_TextDisabled(ctx, _fmt_event_time(ev.t))
+        -- Always drawn, blank when there is nothing to say: a column one text line
+        -- shorter than its neighbours would push its sprite out of alignment.
+        local tline, tcol = _transition_line(ev, playhead)
+        if tcol then
+            r.ImGui_TextColored(ctx, tcol, tline)
+        else
+            r.ImGui_TextDisabled(ctx, tline)
+        end
+        if tline ~= ' ' then Tooltip(TIPS.venue_preview_blend) end
         if is_filtered then
             local cx, cy = r.ImGui_GetCursorPos(ctx)
             r.ImGui_Dummy(ctx, sw, sh)           -- reserve space first (sets group height)
@@ -171,14 +207,15 @@ local function _draw_column(header, ev, category, scale, is_filtered, combo_name
 end
 
 -- prev/curr/next are PPQ groups (arrays of events), not single events.
-local function _draw_category_row(label, prev_grp, curr_grp, next_grp, category, scale, muted, combo_name)
+local function _draw_category_row(label, prev_grp, curr_grp, next_grp, category, scale,
+                                  muted, combo_name, playhead)
     SectionHeader(label)
     r.ImGui_Separator(ctx)  -- full-width separator drawn outside groups (safe here)
     local any_filtered = false
     local function col(header, group)
         local ev, filtered = _resolve_group(group, muted)
         if filtered then any_filtered = true end
-        _draw_column(header, ev, category, scale, filtered, combo_name)
+        _draw_column(header, ev, category, scale, filtered, combo_name, playhead)
     end
     if S.venue_preview_show_mode == _SHOW_CURRENT_ONLY then
         col('Current', curr_grp)
@@ -314,11 +351,14 @@ function DrawVenuePreviewTab()
     local muted      = _combo_muted(S.venue_preview_combo)
     local combo_name = _COMBO_NAMES[S.venue_preview_combo]
 
-    _draw_category_row('Camera',       cam_p, cam_c, cam_n, 'Camera',   scale, muted, combo_name)
+    _draw_category_row('Camera',       cam_p, cam_c, cam_n, 'Camera',   scale,
+                       muted, combo_name, playhead)
     r.ImGui_Spacing(ctx)
     r.ImGui_Spacing(ctx)
-    _draw_category_row('Lighting',     lt_p,  lt_c,  lt_n,  'Lighting', scale)
+    _draw_category_row('Lighting',     lt_p,  lt_c,  lt_n,  'Lighting', scale,
+                       nil, nil, playhead)
     r.ImGui_Spacing(ctx)
     r.ImGui_Spacing(ctx)
-    _draw_category_row('Post-Process', pp_p,  pp_c,  pp_n,  'PostProc', scale)
+    _draw_category_row('Post-Process', pp_p,  pp_c,  pp_n,  'PostProc', scale,
+                       nil, nil, playhead)
 end

@@ -36,6 +36,7 @@ dofile(_gdir .. 'defaults.lua')                   -- S
 dofile(_gdir .. 'helpers.lua')                    -- FindTrackByName
 dofile(_gdir .. 'venue_awareness.lua')            -- ReadEventSections (merge test)
 dofile(_gdir .. 'venue_themes.lua')               -- GetSectionPreset, BuildLightingPool
+dofile(_gdir .. 'venue_camera.lua')               -- PickRandom (ResolveThemeSection rolls with it)
 dofile(_gdir .. 'venue_lighting.lua')             -- FindNextMeasureStartPpq, keyframe generation
 dofile(_gdir .. 'venue_generator.lua')            -- ResolveSongEndAndAnchor
 dofile(_gdir .. 'section_events.lua')

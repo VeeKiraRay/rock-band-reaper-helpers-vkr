@@ -239,6 +239,14 @@ function Loop()
 
         r.ImGui_Spacing(ctx)
 
+        if r.ImGui_Button(ctx, 'Venue Blends Tests', 155, 24) then
+            run('run_venue_blends.lua', 'venue_blends')
+        end
+        r.ImGui_SameLine(ctx)
+        draw_status(results.venue_blends)
+
+        r.ImGui_Spacing(ctx)
+
         if r.ImGui_Button(ctx, 'Workflow Tests', 155, 24) then
             run('run_workflow.lua', 'workflow')
         end

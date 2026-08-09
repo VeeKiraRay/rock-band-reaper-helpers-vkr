@@ -1,6 +1,6 @@
 -- @description Rock Band General Helper
 -- @author VeeKiraRay
--- @version 0.9.52
+-- @version 0.9.53
 -- @about
 --   Utility actions for Rock Band authoring in REAPER.
 --
@@ -22,6 +22,26 @@
 --   This @about block keeps only the 5 most recent versions.
 --   Full history: CHANGELOG.md in the repo.
 --
+--   v0.9.53
+--     - Venue > Themes gen and Section gen no longer re-state a lighting or post
+--       proc preset that is already running. A blend is authored by writing the
+--       running preset a second time just before the change, so the game fades
+--       into it - which means a section that happened to pick the preset already
+--       playing was writing a blend nobody asked for, and the validator, the
+--       Keyframes tab and Manual gen's Blend button all read it as deliberate.
+--       If a section's theme pool offers alternatives it now picks one of those;
+--       if the pool holds only the running preset the section keeps it and writes
+--       nothing. Its keyframes are still generated either way, so a manual preset
+--       keeps animating across the boundary. The report counts what was kept.
+--       Manual gen is unchanged - ask it for a duplicate and you get one.
+--     - Venue > Preview now understands blends. The second copy of a preset is an
+--       anchor, not a preset of its own, so it is no longer shown as its own
+--       event - before, the same preset filled two columns and every fade looked
+--       like a hard cut. Each lighting and post proc card instead says how it
+--       hands over: "blends into next", "blending now" while the playhead is
+--       inside the fade, or "hard cut to next" (a valid choice, not an error).
+--       Camera cards have no such line - a camera cut never fades.
+--       Same change in the standalone Venue Preview window (its v0.4).
 --   v0.9.52
 --     - Venue > Actions > Validate: new "Validate camera stacks" button. Only
 --       two of bass/guitar/keys fit on stage at once, so a song charting all
@@ -107,29 +127,6 @@
 --       measure numbers of the project they came from, so a Replace All after
 --       a project switch could act on the wrong material. They are now cleared
 --       along with the source track, as every other track selector already was.
---   v0.9.48
---     - New General > Other tools sub-tab: buttons that open the other scripts
---       in this set - Vocal Helper and Music Theory Helper, plus the standalone
---       Venue Preview and Pitch Tuner windows. Each opens in its own window,
---       independently of this one. The tool you are already in is never listed,
---       so this tab shows four buttons rather than five. A tool that is not
---       installed beside this script is greyed out with a note saying so,
---       instead of failing on click; put the .lua entry points back in one
---       folder and it re-enables on its own, no restart.
---       Opening a tool for the first time also registers it in REAPER's Action
---       list, which is what makes it bindable to a key or a toolbar button. It
---       is never un-registered afterwards - removing the action would delete
---       your own registration of that script along with any shortcut bound to
---       it, and re-adding it later produces a different command ID, so the
---       binding could not be restored. Clicking a tool that is already open
---       says so rather than raising REAPER's "ReaScript task control" dialog.
---       New shared lib/reaper_script_links.lua, so this tab and the Vocal
---       Helper's copy of it (its v1.18) are drawn from one registry rather
---       than two that could drift. Covered by a new Script Links test set,
---       which checks the registry against the entry points actually present
---       in the install folder - both directions, so a renamed script fails a
---       test instead of shipping a dead button, and a newly added tool fails
---       until it is listed.
 r = reaper  -- global so all dofile'd modules can use it
 
 if not r.ImGui_CreateContext then

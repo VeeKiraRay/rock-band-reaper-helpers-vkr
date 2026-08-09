@@ -38,7 +38,8 @@ dofile(_tdir .. 'framework.lua')
 dofile(_root .. 'lib/reaper_imgui_helpers.lua')   -- SortedByLabel, FormatTime
 dofile(_gdir .. 'defaults.lua')                   -- S
 dofile(_gdir .. 'helpers.lua')                    -- FindNamedTrackMIDI, GetTakePPQPerQN
-dofile(_gdir .. 'venue_lighting.lua')             -- MANUAL_LIGHTING_SET, IsBlendAnchor
+dofile(_gdir .. 'venue.lua')                      -- IsBlendAnchor
+dofile(_gdir .. 'venue_lighting.lua')             -- MANUAL_LIGHTING_SET
 dofile(_gdir .. 'actions_venue_subtracks.lua')    -- CategorizeVenueEvent
 dofile(_gdir .. 'venue_awareness.lua')            -- GetCoopRequiredInstruments,
                                                   -- INST_LETTER_NAMES

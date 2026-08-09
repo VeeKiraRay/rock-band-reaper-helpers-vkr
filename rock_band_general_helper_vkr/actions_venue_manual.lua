@@ -103,8 +103,8 @@ function ResolveBlendSource(events, cur_ppq, tol)
 
     if not last then return nil, 'none' end
     -- Two identical adjacent events of a kind ARE a blend anchor (IsBlendAnchor,
-    -- venue_lighting.lua - the shared rule EmitBlendDuplicates writes and the
-    -- validator reads back), so a third copy would change nothing.
+    -- venue.lua - the shared rule EmitBlendDuplicates writes and the validator,
+    -- keyframes and Preview read back), so a third copy would change nothing.
     if IsBlendAnchor(second_last, last) then
         return nil, 'blended', last, second_last
     end

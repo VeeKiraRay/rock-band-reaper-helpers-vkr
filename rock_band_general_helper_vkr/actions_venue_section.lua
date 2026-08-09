@@ -125,29 +125,6 @@ function GenerateSectionEvent()
     end
 
     local sec = S.venue_sections[S.venue_sec_idx]
-    local cfg
-    if S.venue_sec_mode == 1 then
-        local _th    = S.venue_themes and S.venue_themes[S.venue_sec_tmpl_idx]
-        local _pr    = _th and _th.section_presets and
-            (_th.section_presets[sec.name] or _th.section_presets['default'])
-        if _pr then
-            local lp = _pr.allowed_lightpresets
-            local pp = _pr.allowed_postprocs
-            cfg = {
-                lighting      = lp and lp[math.random(#lp)] or '',
-                postproc      = pp and pp[math.random(#pp)] or '',
-                keyframe_rate = _pr.keyframe_rate       or 2,
-                light_blendin = _pr.lightpreset_blendin or 0,
-                pp_blendin    = _pr.postproc_blendin    or 0,
-                dircut        = _pr.dircut_at_start     or '',
-                bonusfx       = _pr.bonusfx_at_start    or false,
-            }
-        else
-            cfg = DefaultConfig()
-        end
-    else
-        cfg = S.venue_sec_configs[SectionKey(sec)] or DefaultConfig()
-    end
 
     local item_start_sec = r.GetMediaItemInfo_Value(item, 'D_POSITION')
 
@@ -160,11 +137,41 @@ function GenerateSectionEvent()
 
     -- Preset state going into this section, read BEFORE anything is cleared (the clear
     -- below reaches into the blend zone and would remove the very events being looked
-    -- up). Feeds GenerateThemedSectionEvents' `incoming` so the blend duplicates
-    -- re-state whatever was actually playing - Themes gen gets this from its own
+    -- up) and before the Template-mode roll below, which avoids re-picking whatever is
+    -- already running. Feeds GenerateThemedSectionEvents' `incoming` so the blend
+    -- duplicates re-state what was actually playing - Themes gen gets this from its own
     -- section walk, but Section gen only ever sees one section.
     local in_lt_text, in_lt_ppq, in_pp_text, in_pp_ppq =
         FindActiveVenuePresetsBefore(take, sec_start_ppq)
+
+    local cfg
+    if S.venue_sec_mode == 1 then
+        local _th    = S.venue_themes and S.venue_themes[S.venue_sec_tmpl_idx]
+        local _pr    = _th and _th.section_presets and
+            (_th.section_presets[sec.name] or _th.section_presets['default'])
+        if _pr then
+            local lp = _pr.allowed_lightpresets
+            local pp = _pr.allowed_postprocs
+            -- PickRandom avoids the running preset, same as ResolveThemeSection's own
+            -- roll: re-stating it writes a blend anchor nobody asked for. A one-entry
+            -- pool still returns its preset; GenerateThemedSectionEvents skips it.
+            cfg = {
+                lighting      = lp and PickRandom(lp, in_lt_text) or '',
+                postproc      = pp and PickRandom(pp, in_pp_text) or '',
+                keyframe_rate = _pr.keyframe_rate       or 2,
+                light_blendin = _pr.lightpreset_blendin or 0,
+                pp_blendin    = _pr.postproc_blendin    or 0,
+                dircut        = _pr.dircut_at_start     or '',
+                bonusfx       = _pr.bonusfx_at_start    or false,
+            }
+        else
+            cfg = DefaultConfig()
+        end
+    else
+        -- Custom mode keeps the user's fixed choice; if it matches what is running,
+        -- GenerateThemedSectionEvents skips the event and the report says so.
+        cfg = S.venue_sec_configs[SectionKey(sec)] or DefaultConfig()
+    end
 
     local max_blendin    = math.max(cfg.light_blendin, cfg.pp_blendin)
     local clear_start_ppq = math.max(item_start_ppq, sec_start_ppq - max_blendin * ppq)
@@ -414,8 +421,10 @@ function GenerateSectionEvent()
     local lt_count   = 0
     local ctrl_count = 0
     local pp_count   = 0
+    local preset_stats
     if syn_theme then
-        local lt_events, ctrl_events, pp_events = GenerateThemedSectionEvents(
+        local lt_events, ctrl_events, pp_events
+        lt_events, ctrl_events, pp_events, preset_stats = GenerateThemedSectionEvents(
             { sec }, syn_theme, take, clear_start_ppq, sec_end_ppq, ppq,
             (in_lt_text or in_pp_text) and {
                 lt_text  = in_lt_text, lt_ppq = in_lt_ppq,
@@ -487,6 +496,20 @@ function GenerateSectionEvent()
     end
     if last_bookend_16ths then
         lines[#lines + 1] = 'Song-start bookend: included'
+    end
+    -- Naming the kept preset matters more here than in Themes gen: the user picked it
+    -- (or the template rolled it) for THIS one section, so "nothing was written" needs
+    -- a reason. Re-stating a running preset would forge a blend anchor - use Manual
+    -- gen's Blend button if a duplicate is genuinely wanted.
+    if preset_stats then
+        if preset_stats.lt_skipped > 0 then
+            lines[#lines + 1] = ('Lighting:           %s was already running, no event added')
+                :format(cfg.lighting)
+        end
+        if preset_stats.pp_skipped > 0 then
+            lines[#lines + 1] = ('Post-process:       %s was already running, no event added')
+                :format(cfg.postproc)
+        end
     end
     lines[#lines + 1] = ''
 

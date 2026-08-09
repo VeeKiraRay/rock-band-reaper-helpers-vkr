@@ -411,9 +411,10 @@ do
                 starts[i] = r.MIDI_GetPPQPosFromProjTime(take, secs[i].t_start)
             end
             local range_e = r.MIDI_GetPPQPosFromProjTime(take, r.TimeMap_QNToTime(64))
-            local lt, ctrl, pp = GenerateThemedSectionEvents(
+            local lt, ctrl, pp, stats = GenerateThemedSectionEvents(
                 secs, theme, take, 0, range_e, ppq, incoming)
-            return { lt = lt, ctrl = ctrl, pp = pp, ppq = ppq, starts = starts }
+            return { lt = lt, ctrl = ctrl, pp = pp, stats = stats,
+                     ppq = ppq, starts = starts }
         end)
         S.venue_keyframe_align = saved
         CleanupFixture(idx)
@@ -491,8 +492,11 @@ do
             'the [next] on the blend point should no longer be clamped away')
     end)
 
-    Test.it('a section keeping the previous preset gets no [first]', function()
-        -- Lighting unchanged across the boundary: nothing changes, so nothing restarts.
+    Test.it('a section keeping the previous preset writes nothing, but keeps keyframing', function()
+        -- Lighting unchanged across the boundary. Both single-entry pools, so the
+        -- re-roll has nowhere to go and the emit gate is what handles it: the section
+        -- writes no lighting event at all, because re-stating the running preset is
+        -- exactly how a blend anchor is written and this one is not a blend.
         local g = RunThemed(0, TwoSectionTheme('stomp', 'ProFilm_a.pp',
                                                'stomp', 'ProFilm_b.pp', 1, 2, 2),
                             { 'versea', 'verseb' }, { 8, 24 })
@@ -501,9 +505,13 @@ do
         Test.expect(found[g.starts[1]], 'the first section still starts the sequence')
         Test.expect(not found[g.starts[2]],
             'a section restating the running preset must not restart the sequence')
-        -- Its own lighting event and [next] train are unaffected.
-        Test.expect(TicksOf(g.lt, '[lighting (stomp)]')[2] == g.starts[2],
-            'the section should still emit its own lighting event')
+        Test.expect(#TicksOf(g.lt, '[lighting (stomp)]') == 1,
+            'only section 1s event should exist, got '
+            .. #TicksOf(g.lt, '[lighting (stomp)]'))
+        Test.expect(g.stats.lt_skipped == 1,
+            'the skip should be counted, got ' .. g.stats.lt_skipped)
+        -- The keyframes are NOT skipped with it: section 1s train stopped at its own
+        -- end, so without one here the preset would run on with its lights frozen.
         local past = false
         for _, t in ipairs(TicksOf(g.ctrl, '[next]')) do
             if t > g.starts[2] then past = true end
@@ -511,15 +519,18 @@ do
         Test.expect(past, 'the [next] train should still run inside the second section')
     end)
 
-    Test.it('an unchanged preset gets no duplicate, judged per kind', function()
-        -- Lighting is the same across both sections, postproc changes.
+    Test.it('an unchanged preset is judged per kind', function()
+        -- Lighting is the same across both sections, postproc changes. The two are
+        -- decided independently, so the postproc still gets its blend duplicate.
         local g = RunThemed(0, TwoSectionTheme('stomp', 'ProFilm_a.pp',
                                                'stomp', 'ProFilm_b.pp', 1, 2, 2),
                             { 'versea', 'verseb' }, { 8, 24 })
-        Test.expect(#TicksOf(g.lt, '[lighting (stomp)]') == 2,
-            'unchanged lighting must not gain a duplicate (2 = one per section)')
+        Test.expect(#TicksOf(g.lt, '[lighting (stomp)]') == 1,
+            'unchanged lighting must not be re-stated (1 = section 1s own event)')
         Test.expect(#TicksOf(g.pp, '[ProFilm_a.pp]') == 2,
             'the changed postproc should still be duplicated once')
+        Test.expect(g.stats.pp_skipped == 0,
+            'postproc was a real change, nothing to skip')
     end)
 
     Test.it('a blendin longer than the previous section emits no duplicate', function()

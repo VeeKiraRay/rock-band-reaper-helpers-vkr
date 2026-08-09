@@ -1031,6 +1031,16 @@ TIPS = {
                            "Current only       -  one column showing the active event (started at or\n" ..
                            "                      before the playhead and not yet superseded).\n" ..
                            "Surrounding events -  three columns: the previous, current, and next event.",
+    venue_preview_blend  = "How this lighting / post proc preset hands over to the next one.\n\n" ..
+                           "A blend is authored by re-stating the running preset a beat or two\n" ..
+                           "before the change, so the game fades between them instead of cutting.\n" ..
+                           "That re-stated copy is not a preset of its own, so the preview never\n" ..
+                           "shows it as an event - it shows up here instead:\n\n" ..
+                           "blends into next  -  an anchor is present, the game will fade.\n" ..
+                           "blending now      -  the playhead is inside that fade right now.\n" ..
+                           "hard cut to next  -  no anchor, the game switches instantly. This is\n" ..
+                           "                     a valid authoring choice, not an error.\n\n" ..
+                           "Camera events never show a line here - a camera cut never fades.",
     venue_preview_refresh_resume = "Auto-refresh was paused because the last VENUE MIDI read\n" ..
                            "took 150 ms or longer.\n\n" ..
                            "Click to re-enable automatic updates. If it pauses again,\n" ..

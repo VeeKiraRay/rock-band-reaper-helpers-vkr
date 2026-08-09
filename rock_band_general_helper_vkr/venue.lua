@@ -1,6 +1,68 @@
 -- VENUE track parsing and validation
 -- Requires: VENUE_VALID, DIRECTED_GAP_MIN, MIDI_META_NAMES, S, FormatTime,
 --           FindNamedTrackMIDI, r (globals)
+-- Globals exported: ListVenueEvents, GetVenueEventsForPreview,
+--   IsBlendAnchor, AnnotateVenueBlends
+
+-- Two identical ADJACENT events of one kind are a blend anchor: the outgoing preset
+-- restated ahead of the change, so RB3 interpolates into the next one instead of
+-- cutting to it. `a` is the event immediately before `b`; either may be nil at the
+-- start of a track, which is simply "not an anchor".
+--
+-- The one home for the rule, since four places read it back off a track and must
+-- agree: ResolveBlendSource (Manual gen's Blend button refuses to add a third copy),
+-- ValidateVenueLightingBlends (reports changes with no anchor), the keyframe
+-- restatement test - a duplicate carries no [first] precisely because it is this -
+-- and AnnotateVenueBlends below (the Preview collapses anchors out of its timeline).
+-- EmitBlendDuplicates (venue_lighting.lua) is the write side of the same rule.
+--
+-- Lives here rather than beside the write side because venue.lua is one of the few
+-- modules the standalone Venue Preview window loads (rock_band_preview_vkr.lua) -
+-- venue_lighting.lua is deliberately outside that subset.
+function IsBlendAnchor(a, b)
+    return a ~= nil and b ~= nil and a.msg == b.msg
+end
+
+-- Collapses blend anchors out of one kind's chronological event list and annotates
+-- what survives, for readers that want preset STATE rather than raw events (the
+-- Preview). Pure over {msg, t, ppq, ...} records - no r/ctx/S - so it is testable
+-- without a project. Returns a new array; the inputs are never modified.
+--
+-- A dropped event restates the one before it, so it is not a state of its own. Every
+-- event dropped between two survivors is by construction a copy of the earlier
+-- survivor, which is what makes the annotation below a simple index comparison.
+--
+--   blend_out_t / blend_out_ppq - where the anchor for the NEXT change sits, so this
+--     event fades into it instead of cutting. nil = hard cut (or nothing follows).
+--     With three or more copies this is the LAST restatement, matching IsBlendAnchor's
+--     adjacency rule - that pair is the anchor the game reads.
+--   next_t - when the next change lands, or nil for the final survivor. Paired with
+--     blend_out_t it bounds the window in which a fade is actually in progress.
+function AnnotateVenueBlends(events)
+    if not events then return {} end
+
+    local out, raw_idx = {}, {}
+    for i, ev in ipairs(events) do
+        if not IsBlendAnchor(events[i - 1], ev) then
+            out[#out + 1] = { msg = ev.msg, t = ev.t, ppq = ev.ppq, evtype = ev.evtype }
+            raw_idx[#out] = i
+        end
+    end
+
+    for j, ev in ipairs(out) do
+        local i = raw_idx[j]
+        local k = raw_idx[j + 1]
+        if k then
+            ev.next_t = events[k].t
+            if k > i + 1 then
+                ev.blend_out_t   = events[k - 1].t
+                ev.blend_out_ppq = events[k - 1].ppq
+            end
+        end
+    end
+
+    return out
+end
 
 local function ReadVenueTextEvents(take)
     local events = {}
@@ -49,6 +111,12 @@ end
 
 -- Read and categorize all VENUE text events for the Preview sub-tab.
 -- Returns: { camera={}, lighting={}, postproc={} } or nil, err_string
+--
+-- Lighting and postproc go through AnnotateVenueBlends, so the preview sees preset
+-- STATE: a blend anchor restates the preset already running and is never a card of
+-- its own, and what survives knows whether it fades or cuts into the next change.
+-- Camera is left raw - it has no blend concept, and two adjacent identical camera
+-- events are a repeat that ListVenueEvents below already reports as a fault.
 function GetVenueEventsForPreview()
     local track, _, take = FindNamedTrackMIDI('VENUE')
     if not track then return nil, 'No VENUE track found.' end
@@ -67,7 +135,11 @@ function GetVenueEventsForPreview()
         end
     end
 
-    return { camera = cam, lighting = lt, postproc = pp }
+    return {
+        camera   = cam,
+        lighting = AnnotateVenueBlends(lt),
+        postproc = AnnotateVenueBlends(pp),
+    }
 end
 
 function ListVenueEvents()

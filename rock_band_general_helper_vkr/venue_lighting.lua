@@ -6,8 +6,10 @@
 --   LIGHTING_OFFSET_16THS, INST_KF_MODES,
 --   KF_ALIGN_LABELS, FindNextMeasureStartPpq, CollectInstNotePositions,
 --   CollectVocalPhraseStarts, GenerateKeyframesForSpan, GenerateLightingEvents,
---   GenerateThemedSectionEvents, KeyframeSubdivQN, SnapPpqToHalfBeat,
---   IsBlendAnchor
+--   GenerateThemedSectionEvents, KeyframeSubdivQN, SnapPpqToHalfBeat
+--
+-- EmitBlendDuplicates below is the WRITE side of the blend rule; its read side
+-- (IsBlendAnchor) lives in venue.lua, which the standalone Venue Preview loads.
 --
 -- Keyframe placement rule: [first] always lands on the SAME tick as the manual
 -- lighting event it drives - it is that event's own initial keyframe. The
@@ -94,20 +96,6 @@ end
 
 local function SnapPpqToNearestBeat(ppq_pos, ppq)
     return math.floor(ppq_pos / ppq + 0.5) * ppq
-end
-
--- Two identical ADJACENT events of one kind are a blend anchor: the outgoing preset
--- restated ahead of the change, so RB3 interpolates into the next one instead of
--- cutting to it. `a` is the event immediately before `b`; either may be nil at the
--- start of a track, which is simply "not an anchor".
---
--- The one home for the rule, since three places read it back off a track and must
--- agree: ResolveBlendSource (Manual gen's Blend button refuses to add a third copy),
--- ValidateVenueLightingBlends (reports changes with no anchor), and the keyframe
--- restatement test - a duplicate carries no [first] precisely because it is this.
--- EmitBlendDuplicates is the write side of the same rule.
-function IsBlendAnchor(a, b)
-    return a ~= nil and b ~= nil and a.msg == b.msg
 end
 
 -- Half-beat snap - the grid venue_generator.lua's insert_text and
@@ -314,7 +302,17 @@ end
 --
 -- blend_lt_ppq / blend_pp_ppq are where the PREVIOUS section's preset gets
 -- re-stated to blend into this one - see BlendPpq.
-local function ResolveThemeSection(sec, theme, take, range_start_ppq, range_end_ppq, ppq)
+--
+-- `prev` is the preset state going into this section (the previously resolved
+-- section, or the caller's `incoming` for the first one). Both picks avoid what is
+-- already running, via the same PickRandom the camera pools and the no-theme
+-- lighting walk use: re-stating a running preset writes two identical adjacent
+-- events, which IS the blend-anchor shape (IsBlendAnchor, venue.lua), so a section
+-- that happened to roll its predecessor's preset would forge an anchor the validator,
+-- the Keyframes tab and Manual gen's Blend button all then read as deliberate.
+-- A single-entry pool has nothing else to offer and still returns its one preset -
+-- EmitThemeSection is where that case is skipped instead.
+local function ResolveThemeSection(sec, theme, take, range_start_ppq, range_end_ppq, ppq, prev)
     local sec_start_ppq = r.MIDI_GetPPQPosFromProjTime(take, sec.t_start)
     local sec_end_ppq   = r.MIDI_GetPPQPosFromProjTime(take, sec.t_end)
     if sec_start_ppq >= range_end_ppq or sec_end_ppq <= range_start_ppq then return nil end
@@ -329,8 +327,10 @@ local function ResolveThemeSection(sec, theme, take, range_start_ppq, range_end_
     return {
         sec_ppq      = sec_ppq,
         sec_end_ppq  = sec_end_ppq,
-        lt_text      = (lt_pool and #lt_pool > 0) and lt_pool[math.random(#lt_pool)] or nil,
-        pp_text      = (pp_pool and #pp_pool > 0) and pp_pool[math.random(#pp_pool)] or nil,
+        lt_text      = (lt_pool and #lt_pool > 0)
+                       and PickRandom(lt_pool, prev and prev.lt_text) or nil,
+        pp_text      = (pp_pool and #pp_pool > 0)
+                       and PickRandom(pp_pool, prev and prev.pp_text) or nil,
         kf_beats     = preset.keyframe_rate
                        or math.random(KEYFRAME_MIN_BEATS, KEYFRAME_MAX_BEATS),
         blend_lt_ppq = sec_ppq - (preset.lightpreset_blendin or 0) * ppq,
@@ -402,19 +402,42 @@ end
 --
 -- `prev` is the preset state coming into this section - the previous resolved
 -- section, or the caller-supplied `incoming` for the first one.
+--
+-- Increments stats.lt_skipped / stats.pp_skipped when a section keeps the preset
+-- already running, so callers can report it (both do).
 local function EmitThemeSection(res, prev, take, range_start_ppq, range_end_ppq,
-                                ppq, lt_events, ctrl_events, pp_events, inst_note_positions)
+                                ppq, lt_events, ctrl_events, pp_events,
+                                inst_note_positions, stats)
     local sec_ppq = res.sec_ppq
 
     EmitBlendDuplicates(res, prev, range_start_ppq, lt_events, pp_events)
+
+    -- Whether this section actually CHANGES each preset. Judged independently for
+    -- lighting and post proc, exactly as EmitBlendDuplicates decides them.
+    local lt_changes = not (prev and prev.lt_text == res.lt_text)
+    local pp_changes = not (prev and prev.pp_text == res.pp_text)
 
     if res.lt_text then
         -- The section's own preset lands exactly ON the section start - a blendin
         -- never moves it, it only adds the duplicate above (RB3 cuts to the preset
         -- "when this section begins" either way).
-        lt_events[#lt_events + 1] = {
-            tick = math.floor(sec_ppq - range_start_ppq + 0.5), text = res.lt_text }
+        --
+        -- Unless it is not a change at all: re-stating the running preset would write
+        -- two identical adjacent events, and that shape IS a blend anchor to everything
+        -- that reads this track back (IsBlendAnchor, venue.lua). ResolveThemeSection
+        -- re-rolls to avoid getting here; a single-entry pool or a fixed Section gen
+        -- choice lands here anyway, and the section simply keeps what is playing.
+        if lt_changes then
+            lt_events[#lt_events + 1] = {
+                tick = math.floor(sec_ppq - range_start_ppq + 0.5), text = res.lt_text }
+        elseif stats then
+            stats.lt_skipped = stats.lt_skipped + 1
+        end
 
+        -- Keyframes are emitted either way. The previous section's [next] train was
+        -- bounded by ITS own sec_end_ppq, so a kept manual preset with no train of its
+        -- own here would run through this section with its lights frozen. Only [first]
+        -- is withheld, by the same lt_changes test - see below.
         if MANUAL_LIGHTING_SET[res.lt_text] then
             local kf_end = math.min(range_end_ppq, res.sec_end_ppq)
             local align  = S.venue_keyframe_align
@@ -431,8 +454,7 @@ local function EmitThemeSection(res, prev, take, range_start_ppq, range_end_ppq,
             -- callers will snap the lighting event onto (keyframes themselves go in
             -- unsnapped), so the two land on exactly the same tick.
             local first_kf_ppq = SnapPpqToHalfBeat(sec_ppq, ppq)
-            local changes      = not (prev and prev.lt_text == res.lt_text)
-            if changes and first_kf_ppq < kf_end then
+            if lt_changes and first_kf_ppq < kf_end then
                 ctrl_events[#ctrl_events + 1] = {
                     tick = math.floor(first_kf_ppq - range_start_ppq + 0.5),
                     text = '[first]',
@@ -518,9 +540,14 @@ local function EmitThemeSection(res, prev, take, range_start_ppq, range_end_ppq,
     end
 
     if res.pp_text then
-        -- Same rule as lighting: the section's own postproc lands on the section start.
-        pp_events[#pp_events + 1] = {
-            tick = math.floor(sec_ppq - range_start_ppq + 0.5), text = res.pp_text }
+        -- Same two rules as lighting: the section's own postproc lands on the section
+        -- start, and a section that keeps the running effect writes nothing at all.
+        if pp_changes then
+            pp_events[#pp_events + 1] = {
+                tick = math.floor(sec_ppq - range_start_ppq + 0.5), text = res.pp_text }
+        elseif stats then
+            stats.pp_skipped = stats.pp_skipped + 1
+        end
     end
 end
 
@@ -529,11 +556,16 @@ end
 -- forced song-start bookend, Section gen passes what it read off the VENUE track
 -- (FindActiveVenuePresetsBefore). Without it the first section gets no blend
 -- duplicates, since there is nothing known to blend out of.
+--
+-- Returns lt_events, ctrl_events, pp_events, stats - stats being
+-- { lt_skipped, pp_skipped }: sections that kept the preset already running and so
+-- wrote no event of their own (see EmitThemeSection).
 function GenerateThemedSectionEvents(sections, theme, take,
                                      range_start_ppq, range_end_ppq, ppq, incoming)
     local lt_events   = {}
     local ctrl_events = {}
     local pp_events   = {}
+    local stats       = { lt_skipped = 0, pp_skipped = 0 }
 
     -- Pre-compute instrument note positions once for instrument-aware modes (3-7)
     local inst_note_positions = nil
@@ -547,9 +579,13 @@ function GenerateThemedSectionEvents(sections, theme, take,
     -- Pass 1: resolve every section's picks up front - emitting a section needs the
     -- PREVIOUS one's preset, both to duplicate into the blend zone and to tell whether
     -- this section actually changes the preset (only a change starts a keyframe run).
+    -- Resolving runs in order too, so each pick can avoid the preset it would be
+    -- re-stating (ResolveThemeSection's `prev`).
     local resolved = {}
     for _, sec in ipairs(sections) do
-        local res = ResolveThemeSection(sec, theme, take, range_start_ppq, range_end_ppq, ppq)
+        local prev = resolved[#resolved] or (#resolved == 0 and incoming or nil)
+        local res  = ResolveThemeSection(sec, theme, take,
+                                         range_start_ppq, range_end_ppq, ppq, prev)
         if res then resolved[#resolved + 1] = res end
     end
 
@@ -557,7 +593,7 @@ function GenerateThemedSectionEvents(sections, theme, take,
     for i, res in ipairs(resolved) do
         EmitThemeSection(res, resolved[i - 1] or (i == 1 and incoming or nil),
                          take, range_start_ppq, range_end_ppq, ppq,
-                         lt_events, ctrl_events, pp_events, inst_note_positions)
+                         lt_events, ctrl_events, pp_events, inst_note_positions, stats)
     end
-    return lt_events, ctrl_events, pp_events
+    return lt_events, ctrl_events, pp_events, stats
 end

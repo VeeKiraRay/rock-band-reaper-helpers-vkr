@@ -456,10 +456,10 @@ function GenerateVenueEvents()
 
     local lt_offset_ticks = math.floor(LIGHTING_OFFSET_16THS * sixteenth_ticks + 0.5)
     local lt_range_16ths  = total_16ths - LIGHTING_OFFSET_16THS
-    local lt_events, ctrl_events, pp_events
+    local lt_events, ctrl_events, pp_events, preset_stats
 
     if theme and #sections > 0 then
-        lt_events, ctrl_events, pp_events = GenerateThemedSectionEvents(
+        lt_events, ctrl_events, pp_events, preset_stats = GenerateThemedSectionEvents(
             sections, theme, take, range_start_ppq, range_end_ppq, ppq, incoming_presets)
         for _, ev in ipairs(lt_events)   do insert_text(ev.tick, ev.text) end
         for _, ev in ipairs(ctrl_events) do insert_text(ev.tick, ev.text, true) end
@@ -521,6 +521,12 @@ function GenerateVenueEvents()
     lines[#lines + 1] = ('Control [first]/[next]: %d'):format(#ctrl_events)
     if #pp_events + forced_pp_count > 0 then
         lines[#lines + 1] = ('Post-process:       %d'):format(#pp_events + forced_pp_count)
+    end
+    -- Sections that resolved to the preset already running write nothing: re-stating it
+    -- would forge a blend anchor. Worth naming so the counts above don't read as short.
+    if preset_stats and (preset_stats.lt_skipped > 0 or preset_stats.pp_skipped > 0) then
+        lines[#lines + 1] = ('Kept running preset: %d lighting, %d post-process'):format(
+            preset_stats.lt_skipped, preset_stats.pp_skipped)
     end
     if bonusfx_count > 0 then
         lines[#lines + 1] = ('Bonus FX:           %d'):format(bonusfx_count)

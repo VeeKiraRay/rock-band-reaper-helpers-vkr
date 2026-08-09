@@ -9,6 +9,30 @@ over 5. See `CLAUDE.md` → "Changelog / `@about` trimming" for the rule.
 
 `rock_band_general_helper_vkr.lua`
 
+**v0.9.48**
+- New General > Other tools sub-tab: buttons that open the other scripts
+  in this set - Vocal Helper and Music Theory Helper, plus the standalone
+  Venue Preview and Pitch Tuner windows. Each opens in its own window,
+  independently of this one. The tool you are already in is never listed,
+  so this tab shows four buttons rather than five. A tool that is not
+  installed beside this script is greyed out with a note saying so,
+  instead of failing on click; put the .lua entry points back in one
+  folder and it re-enables on its own, no restart.
+  Opening a tool for the first time also registers it in REAPER's Action
+  list, which is what makes it bindable to a key or a toolbar button. It
+  is never un-registered afterwards - removing the action would delete
+  your own registration of that script along with any shortcut bound to
+  it, and re-adding it later produces a different command ID, so the
+  binding could not be restored. Clicking a tool that is already open
+  says so rather than raising REAPER's "ReaScript task control" dialog.
+  New shared lib/reaper_script_links.lua, so this tab and the Vocal
+  Helper's copy of it (its v1.18) are drawn from one registry rather
+  than two that could drift. Covered by a new Script Links test set,
+  which checks the registry against the entry points actually present
+  in the install folder - both directions, so a renamed script fails a
+  test instead of shipping a dead button, and a newly added tool fails
+  until it is listed.
+
 **v0.9.47**
 - Tab Input: horizontal tab now reads LOW to HIGH - the leftmost token
   is the low E string. This is standard chord notation, where

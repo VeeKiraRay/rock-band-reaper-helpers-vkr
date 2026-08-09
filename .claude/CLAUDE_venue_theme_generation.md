@@ -96,8 +96,8 @@ Sections without a number (e.g. `[prc_intro]`) match the bare key `intro`.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `allowed_lightpresets` | list of names | Lighting preset names (bare, without `[lighting (...)]` wrapper). One is picked at random per section instance. Valid names listed in `LIGHTING_VALID_SET` in `venue_themes.lua`. |
-| `allowed_postprocs` | list of `.pp` filenames | Post-process effect filenames. One picked at random. Valid set: 30 entries in `POSTPROC_VALID_SET`. Emitted as `[ProFilm_a.pp]` — filename wrapped in brackets. |
+| `allowed_lightpresets` | list of names | Lighting preset names (bare, without `[lighting (...)]` wrapper). One is picked per section instance, avoiding the preset already running (see "Never re-states a running preset" below). Valid names listed in `LIGHTING_VALID_SET` in `venue_themes.lua`. |
+| `allowed_postprocs` | list of `.pp` filenames | Post-process effect filenames. One picked per section instance, same avoidance. Valid set: 30 entries in `POSTPROC_VALID_SET`. Emitted as `[ProFilm_a.pp]` — filename wrapped in brackets. |
 | `keyframe_rate` | integer (beats) | `[first]`/`[next]` interval for manual lighting presets. Required if `allowed_lightpresets` includes any manual preset (`verse`, `chorus`, `manual_cool`, `manual_warm`, `dischord`, `stomp`). |
 | `lightpreset_blendin` | number (beats) | Blend into this section's lighting instead of cutting to it: re-state the **previously active** lighting preset this many beats before the section start. This section's own event never moves off the section start. Absent/0 = hard cut. See "Blend-in" below. |
 | `postproc_blendin` | number (beats) | Same for post-process, with its own independent offset. |
@@ -148,14 +148,28 @@ Details, all in `BlendPpq` / `EmitBlendDuplicates` (`venue_lighting.lua`):
 A blendin value exists only inside a theme; the VENUE track keeps no record of
 it. What survives is the shape: **two identical adjacent events of one kind
 are a blend anchor.** That is the whole rule, and `IsBlendAnchor(a, b)`
-(`venue_lighting.lua`) is the one place it lives, because three unrelated
-features have to agree on it:
+(`venue.lua`) is the one place it lives, because four unrelated features have
+to agree on it:
 
 | Reader | Uses it to decide |
 |---|---|
 | `ResolveBlendSource` (Manual gen's **Blend** button) | refuse to add a third copy — the pair already *is* an anchor |
 | `ValidateVenueLightingBlends` (Actions ▸ **Validate lighting/blends**) | which preset changes have no anchor before them |
 | keyframe restatement test | a duplicate gets no `[first]` — it starts no train |
+| `AnnotateVenueBlends` (Venue **Preview**) | which events are preset *state* and which are just anchors to collapse |
+
+It sits in `venue.lua` rather than beside the write side because the standalone
+Venue Preview window loads that module and deliberately does not load
+`venue_lighting.lua`.
+
+**`AnnotateVenueBlends(events)`** is the Preview's reader. Pure over one kind's
+`{msg, t, ppq}` list: it drops every anchor and annotates each survivor with
+`blend_out_t`/`blend_out_ppq` (where the anchor for the *next* change sits;
+`nil` = hard cut) and `next_t` (when that change lands). The pair bounds the
+window in which a fade is actually running, which is what the Preview's
+"blending now" line tests against the playhead. With three or more identical
+copies `blend_out_t` is the **last** restatement — the pair `IsBlendAnchor`
+would match. Camera is never annotated: a camera cut does not fade.
 
 Lighting and post proc are judged independently, exactly as
 `EmitBlendDuplicates` decides them. Only **adjacent** events are compared, so
@@ -169,6 +183,35 @@ before the boundary, click Blend, then add the new preset at the boundary
 itself. A change with no anchor is a **hard cut** — legitimate, and what
 blendin 0 / absent produces — so the validator lists them as "where a fade
 would need an anchor", never as errors.
+
+### Never re-states a running preset
+
+A section that resolved to the preset already playing would write two identical
+adjacent events at its boundary — which *is* the anchor shape above, so all four
+readers would take it as a deliberate blend. Both generating tabs prevent it, lighting
+and post proc judged independently:
+
+1. **Re-roll at pick time.** `ResolveThemeSection` takes the incoming preset state as
+   `prev` and picks with `PickRandom(pool, prev_text)` — the same helper the camera
+   pools and `GenerateLightingEvents`' `last_pick` use. `GenerateThemedSectionEvents`'
+   pass 1 already runs in section order, so each pick sees the one before it (`incoming`
+   seeds the first). Section gen's Template mode does the same against
+   `FindActiveVenuePresetsBefore`, which is why that lookup runs before its roll.
+2. **Skip at emit time.** `EmitThemeSection` drops the event when it still matches —
+   a one-entry pool, Section gen's Custom-mode fixed choice, or `PickRandom`'s
+   fallback after 10 tries. `GenerateThemedSectionEvents` returns a 4th value,
+   `stats = { lt_skipped, pp_skipped }`; `GenerateVenueEvents` reports the totals and
+   `GenerateSectionEvent` names the preset it kept.
+
+**Keyframes are emitted either way** — the skip covers only the `lt_events` append. The
+previous section's `[next]` train was bounded by *its own* `sec_end_ppq`, so a kept
+manual preset with no train of its own here would run through the section with its
+lights frozen. `[first]` is withheld by the same test, which is the existing
+"only a change starts a train" rule and is what keeps the Keyframes tab's round trip
+working (it already treats a duplicate as neither starting nor ending a span, so
+removing the duplicate leaves its span continuous).
+
+Manual gen is exempt by design: an author who wants a duplicate there gets one.
 
 ### Valid lighting preset names (bare)
 `verse`, `chorus`, `manual_cool`, `manual_warm`, `dischord`, `stomp` (manual — require `[first]`/`[next]`)
