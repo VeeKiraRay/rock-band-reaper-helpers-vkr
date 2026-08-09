@@ -35,11 +35,11 @@ Four WIP tabs appear only when **Show WIPs? = Yes** in the General tab (persiste
 - Parse-time validation (shown as warnings above the checklist, non-blocking): duplicate `(section, label)` pairs within one file, and unbalanced `[`/`]` or `{`/`}` bracket counts in the file.
 
 *Other tools sub-tab* — buttons that open the suite's other entry points. Drawn by `DrawGeneralLinksTab` in **`lib/reaper_script_links.lua`**, not by a file in this module folder: the vocal helper's General tab has the identical sub-tab, so the registry and the launcher live in `lib/` to exist exactly once. See `CLAUDE.md` → "Shared lib".
-- Two sections from `SCRIPT_LINK_GROUPS`: *Main tools* (General Helper, Vocal Helper, Music Theory Helper) and *Standalone windows* (Venue Preview, Pitch Tuner). One `BtnGroupWidth` spans both sections so they read as a single column.
-- The running script's own entry is filtered out by `FilterScriptLinkGroups` (whole-basename, case-insensitive match against `get_action_context()`), so this tab shows four buttons, never five. A group emptied by that filter is dropped rather than left as a header over nothing.
+- Two sections from `SCRIPT_LINK_GROUPS`: *Main tools* (General Helper, Vocal Helper, Music Theory Helper) and *Standalone windows* (Venue Preview, Pitch Tuner, MIDI Pattern). One `BtnGroupWidth` spans both sections so they read as a single column.
+- The running script's own entry is filtered out by `FilterScriptLinkGroups` (whole-basename, case-insensitive match against `get_action_context()`), so this tab shows five buttons, never six. A group emptied by that filter is dropped rather than left as a header over nothing.
 - `LaunchReaScript(path)` = `AddRemoveReaScript(true, 0, path, true)` → `Main_OnCommand`. Registration is idempotent (REAPER de-duplicates by path) and **permanent by design** — it is never removed, since that would delete the user's own registration and any key/toolbar binding with it, and a re-add returns a different command ID. `GetToggleCommandState(cmd) == 1` short-circuits a re-launch so REAPER's modal "ReaScript task control" dialog can't block the frame. Safe to call mid-frame: the launched script runs in its own Lua state and draws its first frame on the next defer tick.
 - Missing targets are `BeginDisabled`+`EndDisabled` with the reason drawn *inline* — a disabled widget reports no hover, so its `Tooltip` is unreachable in that state. `file_exists` is re-checked on a 2 s throttle (not per frame, not frozen once — `deploy_to_reaper.bat` gets run with REAPER open).
-- **`rock_band_music_theory_helper_vkr` is a link target only** — no reverse link back, because its `ui.lua` has no General tab to host this sub-tab. See `.claude/CLAUDE_music_theory.md`.
+- **`rock_band_music_theory_helper_vkr` is a link target only** — no reverse link back, because its `ui.lua` has no General tab to host this sub-tab. See `.claude/CLAUDE_music_theory.md`. The three standalone windows are link targets only too, having no tab bar at all by design.
 - Tested by `dev/tests/script_links.lua` (pure; no project fixture) — the valuable case checks the registry against the entry points actually present at the install root, in both directions.
 
 **Tempo Map tab** — generate a REAPER tempo map from drum audio analysis.
@@ -149,7 +149,7 @@ Every Validate action (all four sub-tabs, H/M/E only — never Expert) also runs
   - A chord (multiple notes sharing one start tick, e.g. a Green+Red+Blue chord) still gets every pitch individually adjusted, but is counted once toward the report/status (`counted_starts` in both `AdjustNonSustainLengths` and `AdjustSustainGaps`, `actions_midi_length.lua`), so the numbers read as "N notes"/"N sustains", not "N pitches".
 - **Midi track** — resize every MIDI item on every track to match a reference track's length. Reference track selector, **Resize all MIDI** button.
 
-*Pattern sub-tab* — find, replace, and navigate a note pattern across a MIDI track.
+*Pattern sub-tab* — find, replace, and navigate a note pattern across a MIDI track. Also available as its own window (`rock_band_midi_pattern_vkr.lua`, see "Third entry point" below); the body is `DrawMIDIPatternTab` in `ui_midi_pattern.lua`, drawn by both.
 - Source track selector; **Set Search** / **Set Replace** capture the currently-selected notes in the active MIDI editor as the search/replace patterns.
 - **Replace All** applies the replace pattern wherever the search pattern is found; **Fill Range** repeats the replace pattern across the time selection.
 - **Go Prev** / **Go Next** move the edit cursor to the nearest Search-pattern match before/after the current cursor position; **List Search** reports every match with its measure/time location (read-only, populates the shared result panel). All three share the same match-scanning walk as Replace All (`ScanPatternMatches`) and respect time selection the same way (falls back to the whole MIDI item).
@@ -267,7 +267,9 @@ Every Validate action (all four sub-tabs, H/M/E only — never Expert) also runs
 | `rock_band_general_helper_vkr/actions_difficulty_drums.lua` | `CopyDrumsDiff`, `ValidateDrumsDiff`, `ValidateAllDrums` (global) — Drums difficulty rules |
 | `rock_band_general_helper_vkr/ui_keys.lua` | `DrawKeysTab` (global) — Keys tab rendering |
 | `rock_band_general_helper_vkr/ui_difficulty.lua` | `DrawDifficultyTab` (global) — Difficulty tab rendering (Pro Keys, Keys, Guitar/Bass, Drums sub-tabs) |
-| `rock_band_general_helper_vkr/ui_midi.lua` | `DrawTabInputTab`, `DrawMIDITab` (global) — Tab Input and MIDI tab rendering |
+| `rock_band_general_helper_vkr/ui_common.lua` | `TrackCombo`, `MidiEditorTrackWarning`, `DrawStatusResultPanel(show_undo)` (global) — UI pieces shared with the standalone MIDI Pattern window. They live here rather than in `ui.lua` for the same reason the vocal helper's `ui_common.lua` exists: `ui.lua` ends in a bare `r.defer(Loop)` and cannot be dofile'd by a standalone |
+| `rock_band_general_helper_vkr/ui_midi_pattern.lua` | `DrawMIDIPatternTab` (body only — no `Begin`/`BeginTabItem`), `ResetMIDIPatternState` (global); `MR_DIFF_OPTIONS` (local) — MIDI > Pattern sub-tab, shared with the standalone window |
+| `rock_band_general_helper_vkr/ui_midi.lua` | `DrawTabInputTab`, `DrawMIDITab` (global) — Tab Input and MIDI tab rendering. The Pattern sub-tab's body is in `ui_midi_pattern.lua`; this file only wraps it in a tab item |
 | `rock_band_general_helper_vkr/actions_venue_manual.lua` | `InsertVenueEventAtPlayhead`, `AdvanceCameraPacing`, `GenerateManualKeyframes`, `RemoveVenueEventsByType`, `FindManualLightingAtPpq`, `FindNextVocalPhraseStartPpq`, `ResolveBlendSource`, `BlendVenuePresetAtPlayhead`, `NO_LIGHTING_AT_PLAYHEAD_MSG` (global); `_spot_tol` (local) — Manual gen actions |
 | `rock_band_general_helper_vkr/section_events.lua` | `SECTION_EVENT_GROUPS`, `SECTION_EVENT_BASE` — EVENTS-track event vocabulary (groups, per-base number/letter caps) for the Events sub-tab; data only, no S/REAPER deps |
 | `rock_band_general_helper_vkr/actions_venue_events.lua` | `FindEventsTake`, `ScanEventsTextEvents`, `NextSectionEvent` (pure), `ValidatePlainInsert` (pure), `InsertEventsEvent`, `AddSectionEvent`, `ClearAllEventsTexts`, `InsertEventsBookends` (global) — Events sub-tab actions + validation |
@@ -412,8 +414,11 @@ actions_venue_subtracks.lua    → VENUE_SUBTRACKS, CategorizeVenueEvent, FindOr
                                   EnsureMatchingItem, CopyVenueEvents, CopyVenueToSubtracks,
                                   CopyAllSubtracksToMain, CopySelectedSubtrackTo,
                                   CopySelectedSubtrackFrom
+ui_common.lua                  → TrackCombo, MidiEditorTrackWarning,
+                                 DrawStatusResultPanel
 ui_keys.lua                    → DrawKeysTab
 ui_difficulty.lua              → DrawDifficultyTab
+ui_midi_pattern.lua            → DrawMIDIPatternTab, ResetMIDIPatternState
 ui_midi.lua                    → DrawTabInputTab, DrawMIDITab
 ui_venue.lua                   → DrawVenueTab, RenderCamPacingRow, RenderKeyframeAlignCombo
 ui_venue_section_gen.lua       → DrawVenueSectionGenTab
@@ -437,7 +442,14 @@ ui.lua                         → Loop (also calls r.defer(Loop))
 - `venue_sprites.lua` reads `SCRIPT_DIR` at dofile time; both entry points set it before loading.
 - The standalone calls `LoadSettings()` at startup and on project switch, but never `SaveSettings()` (saving stays in the general helper's General tab).
 
-**`TrackCombo` override.** The general helper uses `sel_idx = -1` to mean "no track configured" for drum source dropdowns. The lib's `TrackCombo` always expects a non-negative index. `ui.lua` defines `TrackCombo` as a **global** — overriding the lib version for all modules — that adds a `(none)` selectable entry and handles -1. The extracted `ui_keys.lua`, `ui_midi.lua`, and `ui_venue.lua` all call `TrackCombo` and rely on this global override.
+**Third entry point: `rock_band_midi_pattern_vkr.lua` (repo root).** Standalone MIDI Pattern window. No module folder of its own either — it dofiles `lib/reaper_imgui_helpers.lua`, `lib/reaper_midi_helpers.lua`, then `defaults.lua`, `helpers.lua`, `actions_midi_replace.lua`, `ui_common.lua`, `ui_midi_pattern.lua`, and runs its own minimal `Loop`: a **Refresh tracks** button (the general helper keeps that button in General > Actions, which this window has no equivalent of), then `DrawMIDIPatternTab()` + `DrawStatusResultPanel(true)`. Consequences when editing those files:
+- The subset must keep working without the rest of the general helper loaded. In particular `ui_midi_pattern.lua` may not grow a dependency on `ui_midi.lua`, `settings.lua` or any venue/difficulty module.
+- **`ui.lua` is deliberately not in the list and must never be added**: its last line is a bare `r.defer(Loop)`, which would spawn the full helper window. That is the whole reason `TrackCombo` and the status/result panel were moved out into `ui_common.lua` — the same split the vocal helper made for its standalone tuner.
+- It sets neither `SCRIPT_DIR` nor `SCRIPT_MDIR` — nothing in this subset reads them (`venue_sprites.lua` is what forces the preview standalone to set them).
+- Unlike the other two standalones it calls **neither `LoadSettings()` nor `SaveSettings()`**: the Pattern sub-tab has never persisted anything (its `S.mr_*` fields are session-only and `settings.lua` has no key for them), and no `SetDefault*Tracks` function assigns `mr_midi_src_idx`. If a Pattern setting is ever made persistent, this window needs `settings.lua` added and `LoadSettings()` called at startup + on project switch.
+- Both entry points call `ResetMIDIPatternState()` on project switch. The captured Search/Replace patterns are take-relative PPQ offsets whose labels name the previous project's measures, so carrying them over would silently target the wrong material. (`ui.lua`'s reset block still omits the Length sub-tab's `mn_midi_idx` / `ms_ref_idx` — a separate pre-existing gap, not addressed here.)
+
+**`TrackCombo` override.** The general helper uses `sel_idx = -1` to mean "no track configured" for drum source dropdowns. The lib's `TrackCombo` always expects a non-negative index. **`ui_common.lua`** defines `TrackCombo` as a **global** — overriding the lib version for all modules — that adds a `(none)` selectable entry and handles -1. `ui_keys.lua`, `ui_midi.lua`, `ui_midi_pattern.lua` and `ui_venue.lua` all call `TrackCombo` and rely on this global override, so `ui_common.lua` must be dofile'd after `lib/reaper_imgui_helpers.lua` and before any of them. (It lived in `ui.lua` until v0.9.49; it moved because the standalone MIDI Pattern window needs it and cannot load `ui.lua`.)
 
 ### Save / Load
 

@@ -81,6 +81,11 @@ SCRIPT_LINK_GROUPS = {
               short = 'Live pitch readout in its own window',
               desc  = "The Vocal Helper's Tuner tab in its own window, so the live\n" ..
                       'readout stays visible while you work in another tab.' },
+            { file  = 'rock_band_midi_pattern_vkr.lua',
+              label = 'MIDI Pattern',
+              short = 'Find/replace note patterns',
+              desc  = "The General Helper's MIDI > Pattern sub-tab in its own\n" ..
+                      'window, so it stays beside the MIDI editor while you work.' },
         },
     },
 }

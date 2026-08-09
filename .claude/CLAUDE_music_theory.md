@@ -46,8 +46,8 @@ bar has only Drums, Guitar and Piano, so there is no General tab to host that
 sub-tab.
 Adding one means introducing a General tab here first; that is the open TODO,
 recorded per `CLAUDE.md` → "UI consistency across scripts". The same asymmetry
-applies to `rock_band_preview_vkr.lua` and `rock_band_pitch_tuner_vkr.lua`,
-which have no tab bar at all by design.
+applies to `rock_band_preview_vkr.lua`, `rock_band_pitch_tuner_vkr.lua` and
+`rock_band_midi_pattern_vkr.lua`, which have no tab bar at all by design.
 
 If a General tab is ever added here, wiring the sub-tab up is three lines:
 `lib/reaper_script_links.lua` in the entry point's pre-check + `dofile` lists,

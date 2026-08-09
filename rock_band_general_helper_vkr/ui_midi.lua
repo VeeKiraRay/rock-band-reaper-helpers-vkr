@@ -1,13 +1,9 @@
-﻿-- Tab Input and MIDI tab rendering
-
--- MIDI > Pattern: Difficulty filter dropdown options (S.mr_diff_idx).
-local MR_DIFF_OPTIONS = {
-    { idx = 0, label = 'All' },
-    { idx = 1, label = 'Expert' },
-    { idx = 2, label = 'Hard' },
-    { idx = 3, label = 'Medium' },
-    { idx = 4, label = 'Easy' },
-}
+﻿-- Tab Input and MIDI tab rendering.
+--
+-- The MIDI > Pattern sub-tab's body lives in ui_midi_pattern.lua, because the
+-- standalone rock_band_midi_pattern_vkr.lua window draws it too; this file only
+-- wraps it in a tab item. MidiEditorTrackWarning moved to ui_common.lua for the
+-- same reason (Pattern and Length both call it).
 
 -- MIDI > Length > Midi note: Difficulty dropdown options (S.mn_diff_idx).
 -- No "All" entry - sustain/gap rules differ per tier.
@@ -27,18 +23,6 @@ local MN_NOTE_SIZE_OPTIONS = {
     { idx = 64,  label = '1/64' },
     { idx = 128, label = '1/128' },
 }
-
--- Warn when the selected track isn't the one open in the MIDI editor.
--- Silent when no editor is open, or when track_idx is unset.
-local function MidiEditorTrackWarning(track_idx)
-    if track_idx < 0 then return end
-    local ed      = r.MIDIEditor_GetActive()
-    local ed_take = ed and r.MIDIEditor_GetTake(ed)
-    local ed_tr   = ed_take and r.GetMediaItemTake_Track(ed_take)
-    if ed_tr and ed_tr ~= r.GetTrack(0, track_idx) then
-        r.ImGui_TextColored(ctx, 0xFFAA00FF, '! Source track not open in the MIDI editor.')
-    end
-end
 
 -- Shared body for each Tab Input mode sub-tab: format selector, mode-specific
 -- option, textarea, and Add note / Run guide. mode: 0=Guitar/Bass, 1=Keys/Pro
@@ -140,7 +124,6 @@ end
 
 function DrawMIDITab(ctx)
     local midi_tracks = S.midi_track_list
-    local is_busy_mr    = S.busy
 
     if r.ImGui_BeginTabBar(ctx, '##midi_subtabs') then
 
@@ -255,96 +238,7 @@ function DrawMIDITab(ctx)
         -- MIDI > Pattern sub-tab
         ------------------------------------------------
         if r.ImGui_BeginTabItem(ctx, 'Pattern') then
-            local lbl_col_pat = LabelColWidth({ 'Source track', 'Difficulty' })
-
-            r.ImGui_Text(ctx, 'Source track')
-            r.ImGui_SameLine(ctx, lbl_col_pat)
-            r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
-            S.mr_midi_src_idx = TrackCombo('##mr_src', S.mr_midi_src_idx, midi_tracks)
-            Tooltip(TIPS.mr_midi_src)
-            MidiEditorTrackWarning(S.mr_midi_src_idx)
-
-            r.ImGui_Text(ctx, 'Difficulty')
-            r.ImGui_SameLine(ctx, lbl_col_pat)
-            r.ImGui_SetNextItemWidth(ctx, WIDTH_SHORT)
-            S.mr_diff_idx = TrackCombo('##mr_diff', S.mr_diff_idx, MR_DIFF_OPTIONS)
-            Tooltip(TIPS.mr_diff)
-            if S.mr_midi_src_idx >= 0 then
-                local _tr = r.GetTrack(0, S.mr_midi_src_idx)
-                if _tr then
-                    local _, _trname = r.GetTrackName(_tr)
-                    local _lo, _hi = GetPatternPitchRange(_trname, S.mr_diff_idx)
-                    r.ImGui_TextDisabled(ctx, ('Pitch range: %d-%d'):format(_lo, _hi))
-                end
-            end
-
-            r.ImGui_Spacing(ctx)
-            local bw_pat = BtnGroupWidth({
-                'Set Search', 'Set Replace', 'Replace All', 'Fill Range',
-                'Go Prev', 'Go Next', 'List Search',
-            })
-            if is_busy_mr then r.ImGui_BeginDisabled(ctx) end
-            if Btn('Set Search', BTN_H, bw_pat) then
-                RunAction(SetSearchPattern)
-            end
-            Tooltip(TIPS.mr_set_search)
-            r.ImGui_SameLine(ctx)
-            if Btn('Set Replace', BTN_H, bw_pat) then
-                RunAction(SetReplacePattern)
-            end
-            Tooltip(TIPS.mr_set_replace)
-            if is_busy_mr then r.ImGui_EndDisabled(ctx) end
-
-            local no_replace = not S.mr_replace_notes
-            local no_both    = not S.mr_search_notes or no_replace
-            if is_busy_mr or no_both then r.ImGui_BeginDisabled(ctx) end
-            if Btn('Replace All', BTN_H, bw_pat) then
-                RunAction(DoMIDIPatternReplace)
-            end
-            Tooltip(TIPS.mr_do_replace)
-            if is_busy_mr or no_both then r.ImGui_EndDisabled(ctx) end
-            r.ImGui_SameLine(ctx)
-            if is_busy_mr or no_replace then r.ImGui_BeginDisabled(ctx) end
-            if Btn('Fill Range', BTN_H, bw_pat) then
-                RunAction(FillRange)
-            end
-            Tooltip(TIPS.mr_fill_range)
-            if is_busy_mr or no_replace then r.ImGui_EndDisabled(ctx) end
-
-            local no_search = not S.mr_search_notes
-            if is_busy_mr or no_search then r.ImGui_BeginDisabled(ctx) end
-            if Btn('Go Prev', BTN_H, bw_pat) then
-                RunAction(GoPrevPatternMatch)
-            end
-            Tooltip(TIPS.mr_go_prev)
-            r.ImGui_SameLine(ctx)
-            if Btn('Go Next', BTN_H, bw_pat) then
-                RunAction(GoNextPatternMatch)
-            end
-            Tooltip(TIPS.mr_go_next)
-            r.ImGui_SameLine(ctx)
-            if Btn('List Search', BTN_H, bw_pat) then
-                RunAction(ListPatternMatches)
-            end
-            Tooltip(TIPS.mr_list_search)
-            if is_busy_mr or no_search then r.ImGui_EndDisabled(ctx) end
-
-            r.ImGui_Spacing(ctx)
-            r.ImGui_Text(ctx, 'Search: ')
-            r.ImGui_SameLine(ctx)
-            if S.mr_search_notes then
-                r.ImGui_Text(ctx, S.mr_search_label)
-            else
-                r.ImGui_TextDisabled(ctx, 'not set')
-            end
-            r.ImGui_Text(ctx, 'Replace:')
-            r.ImGui_SameLine(ctx)
-            if S.mr_replace_notes then
-                r.ImGui_Text(ctx, S.mr_replace_label)
-            else
-                r.ImGui_TextDisabled(ctx, 'not set')
-            end
-
+            DrawMIDIPatternTab()   -- ui_midi_pattern.lua (shared with the standalone)
             r.ImGui_EndTabItem(ctx)
         end
 

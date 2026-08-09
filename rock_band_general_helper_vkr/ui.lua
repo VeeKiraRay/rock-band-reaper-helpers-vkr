@@ -1,37 +1,11 @@
 ﻿-- UI loop
 -- Requires: S, TIPS, r, ctx (globals)
--- Requires: all action functions, GetTimeSelection, RefreshTrackLists, Tooltip,
---           SliderTooltip, SectionHeader, DrawGeneralLinksTab (globals)
+-- Requires: all action functions, RefreshTrackLists, Tooltip, SliderTooltip,
+--           SectionHeader, DrawGeneralLinksTab (globals)
+-- Requires: TrackCombo, DrawStatusResultPanel (ui_common.lua) - they live there
+--           because the standalone rock_band_midi_pattern_vkr.lua draws them too
+--           and cannot dofile this file (its last line is a bare r.defer(Loop)).
 -- Note: r.defer(Loop) is called at the end of this file.
-
--- Local variant of TrackCombo: matches by REAPER track index (t.idx), supports
--- reaper_idx = -1 as "(none)". Shadowing the lib's TrackCombo which uses array
--- indices and has no "(none)" entry.
-function TrackCombo(label, reaper_idx, tracks)
-    local preview = reaper_idx < 0 and '(none)' or '<no tracks>'
-    if reaper_idx >= 0 then
-        for _, t in ipairs(tracks) do
-            if t.idx == reaper_idx then preview = t.label; break end
-        end
-        if preview == '<no tracks>' and S.all_track_list then
-            for _, t in ipairs(S.all_track_list) do
-                if t.idx == reaper_idx then preview = t.label; break end
-            end
-        end
-    end
-    local new_idx = reaper_idx
-    if r.ImGui_BeginCombo(ctx, label, preview) then
-        if r.ImGui_Selectable(ctx, '(none)', reaper_idx < 0) then new_idx = -1 end
-        if reaper_idx < 0 then r.ImGui_SetItemDefaultFocus(ctx) end
-        for _, t in ipairs(tracks) do
-            local is_sel = (t.idx == reaper_idx)
-            if r.ImGui_Selectable(ctx, t.label, is_sel) then new_idx = t.idx end
-            if is_sel then r.ImGui_SetItemDefaultFocus(ctx) end
-        end
-        r.ImGui_EndCombo(ctx)
-    end
-    return new_idx
-end
 
 local _active_proj = r.EnumProjects(-1, '')
 local _active_tab  = ''
@@ -58,6 +32,10 @@ local function Loop()
         S.mc_gtr_src_idx      = -1
         S.mc_gtr_tgt_idx      = -1
         S.ma_midi_src_idx    = -1
+        -- Pattern sub-tab: the captured patterns are take-relative PPQ offsets
+        -- labelled with the old project's measure numbers, so they cannot carry
+        -- over. Shared with the standalone window, which resets the same way.
+        ResetMIDIPatternState()
         S.diff_pk_x_idx      = -1
         S.diff_pk_h_idx      = -1
         S.diff_pk_m_idx      = -1
@@ -89,7 +67,6 @@ local function Loop()
         SetDefaultDifficultyTracks()
     end
 
-    local sel_s, sel_e = GetTimeSelection()
     if not S.all_track_list then RefreshTrackLists() end
     local audio_tracks = S.audio_track_list
     local midi_tracks  = S.midi_track_list
@@ -97,7 +74,6 @@ local function Loop()
     r.ImGui_SetNextWindowSize(ctx, 560, 660, r.ImGui_Cond_FirstUseEver())
     local visible, open = r.ImGui_Begin(ctx, 'Rock Band General Helper', true)
     if visible then
-        local bw_und = BtnWidth('Undo')
         local _new_tab = ''
 
         if r.ImGui_BeginTabBar(ctx, '##tabs') then
@@ -558,44 +534,7 @@ local function Loop()
         ----------------------------------------------------------------
         -- Time selection info + status panel (always visible below tabs)
         ----------------------------------------------------------------
-        r.ImGui_Separator(ctx)
-        if sel_s then
-            r.ImGui_Text(ctx, ('Time selection: %s - %s'):format(FormatTime(sel_s), FormatTime(sel_e)))
-        else
-            r.ImGui_TextDisabled(ctx, 'No time selection')
-        end
-        r.ImGui_Spacing(ctx)
-        r.ImGui_Text(ctx, S.status)
-        r.ImGui_SameLine(ctx)
-        local undo_str = r.Undo_CanUndo2(0) or ''
-        local can_undo = undo_str ~= ''
-        local avail_x  = r.ImGui_GetContentRegionAvail(ctx)
-        if avail_x > bw_und + 4 then
-            r.ImGui_SetCursorPosX(ctx, r.ImGui_GetCursorPosX(ctx) + (avail_x - bw_und))
-        end
-        if not can_undo then r.ImGui_BeginDisabled(ctx) end
-        if Btn('Undo', BTN_H) then r.Undo_DoUndo2(0) end
-        if not can_undo then r.ImGui_EndDisabled(ctx) end
-        if can_undo then Tooltip('Undo: ' .. undo_str) end
-        if S.last_result then
-            r.ImGui_Separator(ctx)
-            r.ImGui_PushTextWrapPos(ctx, 0)
-            for line in (S.last_result .. '\n'):gmatch('([^\n]*)\n') do
-                if line ~= '' then
-                    local left, right = line:match('^([^\t]*)\t(.*)$')
-                    if left then
-                        r.ImGui_Text(ctx, left)
-                        r.ImGui_SameLine(ctx, 190)
-                        r.ImGui_Text(ctx, right)
-                    else
-                        r.ImGui_Text(ctx, line)
-                    end
-                else
-                    r.ImGui_Spacing(ctx)
-                end
-            end
-            r.ImGui_PopTextWrapPos(ctx)
-        end
+        DrawStatusResultPanel(true)   -- ui_common.lua (shared with the standalone)
 
         r.ImGui_End(ctx)
     end

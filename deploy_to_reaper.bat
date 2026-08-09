@@ -33,6 +33,7 @@ copy /Y  "%SRC%rock_band_vocal_helper_vkr.lua"          "%DST%\rock_band_vocal_h
 copy /Y  "%SRC%rock_band_general_helper_vkr.lua"        "%DST%\rock_band_general_helper_vkr.lua"      >nul
 copy /Y  "%SRC%rock_band_preview_vkr.lua"               "%DST%\rock_band_preview_vkr.lua"             >nul
 copy /Y  "%SRC%rock_band_pitch_tuner_vkr.lua"           "%DST%\rock_band_pitch_tuner_vkr.lua"         >nul
+copy /Y  "%SRC%rock_band_midi_pattern_vkr.lua"          "%DST%\rock_band_midi_pattern_vkr.lua"        >nul
 copy /Y  "%SRC%rock_band_music_theory_helper_vkr.lua"   "%DST%\rock_band_music_theory_helper_vkr.lua" >nul
 copy /Y  "%SRC%dev\rock_band_venue_demo_vkr.lua"        "%DST%\dev\rock_band_venue_demo_vkr.lua"      >nul
 copy /Y  "%SRC%dev\venue_sprite_tester_vkr.lua"         "%DST%\dev\venue_sprite_tester_vkr.lua"       >nul

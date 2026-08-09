@@ -646,7 +646,7 @@ Assign Lyrics only ever guarantees word *i* ↔ the *i*-th vocal-range note — 
 - [ ] Lyrics — Create phrases: in a tight spot, both phrases keep at least a 1/32-note sliver of individual lead-in/tail before the gap between them grows toward its own 1/8-note ideal (not maximized individual spacing at the gap's expense).
 - [ ] Lyrics — Create phrases: first/last phrase grows freely on its outer (no-neighbor) side.
 - [ ] Lyrics — Create phrases is greyed out when no lyrics file selected, same as Assign lyrics.
-- [ ] Tab bar: 8 tabs (General, Tuner, Note Placement, Pitch, Lyrics, Pitch slide, Harmonies, Validation); switching doesn't clear `S.status` / `S.last_result`. General has Actions/Settings/Other tools sub-tabs (Other tools shows four buttons — never the Vocal Helper itself); Pitch has Placement - Built-in/Placement - Reference/Snap sub-tabs; Note Placement (WIP) has Auto Detection/Draft Snap sub-tabs.
+- [ ] Tab bar: 8 tabs (General, Tuner, Note Placement, Pitch, Lyrics, Pitch slide, Harmonies, Validation); switching doesn't clear `S.status` / `S.last_result`. General has Actions/Settings/Other tools sub-tabs (Other tools shows five buttons — never the Vocal Helper itself); Pitch has Placement - Built-in/Placement - Reference/Snap sub-tabs; Note Placement (WIP) has Auto Detection/Draft Snap sub-tabs.
 - [ ] Generate (replace): clears all existing vocal-range notes in the range, then inserts fresh detections; result panel says "Replaced".
 - [ ] Draft Snap: rough hand-drawn notes snap to audio onsets; pitches assigned from configured pitch source.
 - [ ] Snap to Key Scale: notes shift to nearest scale degree; phrase markers preserved; avoid-collision pushes duplicates to next scale degree.

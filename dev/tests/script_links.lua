@@ -60,11 +60,11 @@ end)
 ------------------------------------------------------------------
 Test.section('Script Links: registry shape')
 
-Test.it('has the two expected groups, 3 + 2 entries', function()
+Test.it('has the two expected groups, 3 + 3 entries', function()
     Test.expect(#SCRIPT_LINK_GROUPS == 2, 'expected 2 groups, got ' .. #SCRIPT_LINK_GROUPS)
     Test.expect(#SCRIPT_LINK_GROUPS[1].entries == 3,
         'group 1 has ' .. #SCRIPT_LINK_GROUPS[1].entries .. ' entries')
-    Test.expect(#SCRIPT_LINK_GROUPS[2].entries == 2,
+    Test.expect(#SCRIPT_LINK_GROUPS[2].entries == 3,
         'group 2 has ' .. #SCRIPT_LINK_GROUPS[2].entries .. ' entries')
 end)
 
@@ -144,8 +144,8 @@ Test.it('every registry file exists at the install root', function()
     Test.expect(#missing == 0, 'not found in ' .. LINKS_ROOT .. ': ' .. Join(missing))
 end)
 
--- The reverse guard: a sixth entry point added at the root fails this until it
--- is listed, so a new tool cannot be invisible from the Other tools tab.
+-- The reverse guard: a seventh entry point added at the root fails this until
+-- it is listed, so a new tool cannot be invisible from the Other tools tab.
 Test.it('every rock_band_*_vkr.lua at the root is in the registry', function()
     -- r.EnumerateFiles requires a path without trailing separator
     local dir_no_slash = LINKS_ROOT:gsub('[/\\]$', '')
@@ -168,10 +168,10 @@ end)
 ------------------------------------------------------------------
 Test.section('Script Links: self-hide filter')
 
-Test.it('running script is dropped, the other four remain', function()
+Test.it('running script is dropped, the other five remain', function()
     for _, e in ipairs(AllEntries(SCRIPT_LINK_GROUPS)) do
         local kept = AllEntries(FilterScriptLinkGroups(SCRIPT_LINK_GROUPS, 'C:\\x\\' .. e.file))
-        Test.expect(#kept == 4, e.file .. ': expected 4 entries, got ' .. #kept)
+        Test.expect(#kept == 5, e.file .. ': expected 5 entries, got ' .. #kept)
         for _, k in ipairs(kept) do
             Test.expect(k.file ~= e.file, e.file .. ' was not dropped')
         end
@@ -181,13 +181,13 @@ end)
 Test.it('matches case-insensitively (Windows paths)', function()
     local path = 'C:\\X\\ROCK_BAND_GENERAL_HELPER_VKR.LUA'
     local kept = AllEntries(FilterScriptLinkGroups(SCRIPT_LINK_GROUPS, path))
-    Test.expect(#kept == 4, 'expected 4, got ' .. #kept)
+    Test.expect(#kept == 5, 'expected 5, got ' .. #kept)
 end)
 
 Test.it('matches a bare basename with no directory', function()
     local kept = AllEntries(FilterScriptLinkGroups(SCRIPT_LINK_GROUPS,
         'rock_band_pitch_tuner_vkr.lua'))
-    Test.expect(#kept == 4, 'expected 4, got ' .. #kept)
+    Test.expect(#kept == 5, 'expected 5, got ' .. #kept)
 end)
 
 -- Whole-basename equality, not a substring search: these three all contain a
@@ -200,19 +200,19 @@ Test.it('a neighbouring filename hides nothing', function()
     }
     for _, path in ipairs(cases) do
         local kept = AllEntries(FilterScriptLinkGroups(SCRIPT_LINK_GROUPS, path))
-        Test.expect(#kept == 5, path .. ': expected 5, got ' .. #kept)
+        Test.expect(#kept == 6, path .. ': expected 6, got ' .. #kept)
     end
 end)
 
 Test.it('nil and empty paths hide nothing', function()
-    Test.expect(#AllEntries(FilterScriptLinkGroups(SCRIPT_LINK_GROUPS, nil)) == 5, 'nil')
-    Test.expect(#AllEntries(FilterScriptLinkGroups(SCRIPT_LINK_GROUPS, '')) == 5, 'empty')
+    Test.expect(#AllEntries(FilterScriptLinkGroups(SCRIPT_LINK_GROUPS, nil)) == 6, 'nil')
+    Test.expect(#AllEntries(FilterScriptLinkGroups(SCRIPT_LINK_GROUPS, '')) == 6, 'empty')
 end)
 
 Test.it('leaves the source registry untouched', function()
     FilterScriptLinkGroups(SCRIPT_LINK_GROUPS, 'C:\\x\\rock_band_pitch_tuner_vkr.lua')
     Test.expect(#SCRIPT_LINK_GROUPS == 2, 'group count changed')
-    Test.expect(#AllEntries(SCRIPT_LINK_GROUPS) == 5, 'entry count changed')
+    Test.expect(#AllEntries(SCRIPT_LINK_GROUPS) == 6, 'entry count changed')
 end)
 
 ------------------------------------------------------------------

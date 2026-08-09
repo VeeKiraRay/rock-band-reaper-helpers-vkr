@@ -1,6 +1,6 @@
 -- @description Rock Band Vocal Helper
 -- @author VeeKiraRay
--- @version 1.18
+-- @version 1.19
 -- @about
 --   Analyses a vocal audio track and appends MIDI notes to an existing MIDI
 --   item on a destination track, one note per detected syllable or phrase.
@@ -13,6 +13,13 @@
 --   This @about block keeps only the 5 most recent versions.
 --   Full history: CHANGELOG.md in the repo.
 --
+--   v1.19
+--     - General > Other tools: new MIDI Pattern button, a standalone window
+--       carrying the General Helper's MIDI > Pattern sub-tab (capture a note
+--       pattern from a time selection, then find, replace, tile or step
+--       through every recurrence of it). Nothing in this script changed - the
+--       tool list is shared with the General Helper, so the button appears in
+--       both. The tab now lists five buttons rather than four.
 --   v1.18
 --     - New General > Other tools sub-tab: buttons that open the other scripts
 --       in this set - General Helper and Music Theory Helper, plus the
@@ -108,14 +115,6 @@
 --       identical pitches to full rate across the vocal range. A high Max
 --       frequency keeps the rate up, so the Piano/keys preset is unaffected.
 --     - Live tuner and pitch-slide detection share all of the above.
---   v1.14
---     - Lyrics tab: new "Create phrases" action writes phrase-marker
---       (pitch 105) notes, one per line in the lyrics file, bracketing that
---       line's sung notes with lead-in/tail spacing snapped to the grid and
---       to nearby beat/measure boundaries. Reuses Assign Lyrics' word<->note
---       positional indexing (whole take), and validates lyrics.txt against
---       the take's existing lyric text before writing anything - aborts
---       with no changes if they've drifted out of sync.
 --
 --   Workflow:
 --     1. Pick the audio source track and the MIDI destination track.

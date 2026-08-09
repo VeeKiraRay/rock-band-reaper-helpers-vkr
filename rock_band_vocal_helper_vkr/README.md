@@ -95,7 +95,7 @@ Settings are loaded automatically when the script opens (if a save exists for th
 Buttons that open the other tools in this set, so you don't have to go back to REAPER's Actions list to switch between them. Two groups:
 
 - **Main tools** — General Helper, Music Theory Helper.
-- **Standalone windows** — Venue Preview, [Pitch Tuner](#standalone-pitch-tuner).
+- **Standalone windows** — Venue Preview, [Pitch Tuner](#standalone-pitch-tuner), MIDI Pattern.
 
 Each opens in its own window and runs independently of this one — closing the Vocal Helper doesn't close them, and they keep their own settings. The Vocal Helper itself isn't listed, since you're already in it.
 

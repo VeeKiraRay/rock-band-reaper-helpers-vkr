@@ -148,7 +148,7 @@ Switching templates (via the combo) immediately drops checked history for any st
 Buttons that open the other tools in this set, so you don't have to go back to REAPER's Actions list to switch between them. Two groups:
 
 - **Main tools** — Vocal Helper, Music Theory Helper.
-- **Standalone windows** — Venue Preview, Pitch Tuner.
+- **Standalone windows** — Venue Preview, Pitch Tuner, MIDI Pattern.
 
 Each opens in its own window and runs independently of this one — closing the General Helper doesn't close them, and they keep their own settings. The General Helper itself isn't listed, since you're already in it.
 
@@ -288,6 +288,14 @@ Finds and replaces a recurring note pattern across a MIDI track, or tiles a patt
 5. Or click **Fill Range** to tile the Replace pattern repeatedly across the current time selection — no Search pattern needed.
 
 A live readout under the buttons shows what's currently captured (e.g. "M4–M6 (2 measures with 5 notes)" or "not set"). All actions are fully undoable.
+
+<a id="standalone-midi-pattern"></a>
+
+#### Standalone MIDI Pattern window
+
+`rock_band_midi_pattern_vkr.lua` (repo root) is a separate script that opens just this sub-tab in its own window — load it the same way as the main scripts (**Actions → Show action list → Load ReaScript**), or click **MIDI Pattern** in [General → Other tools](#other-tools-sub-tab). Handy for keeping it beside REAPER's MIDI editor without the helper's other tabs coming along. Same underlying behavior as above, plus its own **Refresh tracks** button (the main window keeps that in General → Actions) and its own status line with an Undo button.
+
+It has no settings of its own to save — this sub-tab has never had any — and switching REAPER projects clears the captured Search and Replace patterns rather than leaving them pointing at the previous project's MIDI item.
 
 ---
 

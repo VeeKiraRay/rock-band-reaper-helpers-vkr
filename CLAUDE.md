@@ -377,6 +377,8 @@ that dofiles the code under test and the set.
   rock_band_general_helper_vkr/
     defaults.lua     helpers.lua     venue.lua
     settings.lua     tempomap.lua    actions.lua    ui.lua
+    ui_common.lua                            ← pieces shared with the standalone
+    ui_midi_pattern.lua                        MIDI Pattern window (see below)
 
   rock_band_music_theory_helper_vkr.lua      ← entry point (only file users run)
   rock_band_music_theory_helper_vkr/
@@ -394,6 +396,12 @@ that dofiles the code under test and the set.
                                                rock_band_vocal_helper_vkr/
                                                ui_common.lua + ui_tuner.lua and
                                                their dependencies; never ui.lua)
+
+  rock_band_midi_pattern_vkr.lua             ← standalone MIDI Pattern window
+                                               (same exception — reuses
+                                               rock_band_general_helper_vkr/
+                                               ui_common.lua + ui_midi_pattern.lua
+                                               and their dependencies; never ui.lua)
 
   quick_actions/                             ← single-file, no-UI hotkey scripts
     lib/
