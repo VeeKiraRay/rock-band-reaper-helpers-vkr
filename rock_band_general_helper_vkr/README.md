@@ -283,7 +283,7 @@ Finds and replaces a recurring note pattern across a MIDI track, or tiles a patt
 
 1. Select the **Source track**.
 2. Make a time selection over an example of the pattern you want to search for, then click **Set Search** to capture it.
-3. Make a time selection over the pattern you want to replace it with, then click **Set Replace** to capture it. Both patterns must span the same duration — capturing a differently-sized Search clears any existing Replace.
+3. Make a time selection over the pattern you want to replace it with, then click **Set Replace** to capture it. Both patterns must span the same duration — if they don't, **Replace All** refuses to run and tells you so; re-capture whichever one is wrong. Capturing one never clears the other.
 4. Click **Replace All** to scan the track (within the time selection if one is active, otherwise the whole item) and swap in the Replace pattern wherever the Search pattern matches exactly (same pitches, same relative timing).
 5. Or click **Fill Range** to tile the Replace pattern repeatedly across the current time selection — no Search pattern needed.
 

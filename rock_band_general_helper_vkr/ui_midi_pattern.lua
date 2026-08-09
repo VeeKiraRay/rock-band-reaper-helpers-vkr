@@ -21,10 +21,6 @@ local MR_DIFF_OPTIONS = {
 
 function DrawMIDIPatternTab()
     local midi_tracks = S.midi_track_list
-    -- S.busy is never assigned anywhere in this script, so every guard below is
-    -- currently a no-op. Kept as-is: it is the existing behaviour, and the hook
-    -- is what a future long-running Pattern action would set.
-    local is_busy_mr = S.busy
 
     local lbl_col_pat = LabelColWidth({ 'Source track', 'Difficulty' })
 
@@ -54,7 +50,6 @@ function DrawMIDIPatternTab()
         'Set Search', 'Set Replace', 'Replace All', 'Fill Range',
         'Go Prev', 'Go Next', 'List Search',
     })
-    if is_busy_mr then r.ImGui_BeginDisabled(ctx) end
     if Btn('Set Search', BTN_H, bw_pat) then
         RunAction(SetSearchPattern)
     end
@@ -64,26 +59,25 @@ function DrawMIDIPatternTab()
         RunAction(SetReplacePattern)
     end
     Tooltip(TIPS.mr_set_replace)
-    if is_busy_mr then r.ImGui_EndDisabled(ctx) end
 
     local no_replace = not S.mr_replace_notes
     local no_both    = not S.mr_search_notes or no_replace
-    if is_busy_mr or no_both then r.ImGui_BeginDisabled(ctx) end
+    if no_both then r.ImGui_BeginDisabled(ctx) end
     if Btn('Replace All', BTN_H, bw_pat) then
         RunAction(DoMIDIPatternReplace)
     end
     Tooltip(TIPS.mr_do_replace)
-    if is_busy_mr or no_both then r.ImGui_EndDisabled(ctx) end
+    if no_both then r.ImGui_EndDisabled(ctx) end
     r.ImGui_SameLine(ctx)
-    if is_busy_mr or no_replace then r.ImGui_BeginDisabled(ctx) end
+    if no_replace then r.ImGui_BeginDisabled(ctx) end
     if Btn('Fill Range', BTN_H, bw_pat) then
         RunAction(FillRange)
     end
     Tooltip(TIPS.mr_fill_range)
-    if is_busy_mr or no_replace then r.ImGui_EndDisabled(ctx) end
+    if no_replace then r.ImGui_EndDisabled(ctx) end
 
     local no_search = not S.mr_search_notes
-    if is_busy_mr or no_search then r.ImGui_BeginDisabled(ctx) end
+    if no_search then r.ImGui_BeginDisabled(ctx) end
     if Btn('Go Prev', BTN_H, bw_pat) then
         RunAction(GoPrevPatternMatch)
     end
@@ -98,7 +92,7 @@ function DrawMIDIPatternTab()
         RunAction(ListPatternMatches)
     end
     Tooltip(TIPS.mr_list_search)
-    if is_busy_mr or no_search then r.ImGui_EndDisabled(ctx) end
+    if no_search then r.ImGui_EndDisabled(ctx) end
 
     r.ImGui_Spacing(ctx)
     r.ImGui_Text(ctx, 'Search: ')

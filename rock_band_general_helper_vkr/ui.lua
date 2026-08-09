@@ -32,6 +32,8 @@ local function Loop()
         S.mc_gtr_src_idx      = -1
         S.mc_gtr_tgt_idx      = -1
         S.ma_midi_src_idx    = -1
+        S.mn_midi_idx        = -1
+        S.ms_ref_idx         = -1
         -- Pattern sub-tab: the captured patterns are take-relative PPQ offsets
         -- labelled with the old project's measure numbers, so they cannot carry
         -- over. Shared with the standalone window, which resets the same way.

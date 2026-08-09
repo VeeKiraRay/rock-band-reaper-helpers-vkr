@@ -830,8 +830,9 @@ TIPS = {
                      "their own fixed range regardless of this selector.\n\n" ..
                      "Any other track: no filtering, full MIDI note range.",
     mr_set_search  = "Capture the current time selection as the pattern to search for.\n\n" ..
-                     "Both patterns must cover exactly the same duration.\n" ..
-                     "Setting a new Search pattern with a different length clears the Replace pattern.",
+                     "Both patterns must cover exactly the same duration. Neither button\n" ..
+                     "clears the other - if the two lengths disagree, Replace All refuses\n" ..
+                     "to run and says so, and you re-capture whichever one is wrong.",
     mr_set_replace = "Capture the current time selection as the replacement pattern.\n\n" ..
                      "Must cover the same duration as the Search pattern (if one is already set).\n" ..
                      "Also used as the source for Fill Range.",

@@ -9,6 +9,39 @@ over 5. See `CLAUDE.md` → "Changelog / `@about` trimming" for the rule.
 
 `rock_band_general_helper_vkr.lua`
 
+**v0.9.45**
+- Venue > Actions: new "Validate" section with a "Validate
+  lighting/blends" button - a read-only audit of the lighting and post
+  proc authoring on the VENUE track, checking the same two rules the
+  generators write from, read back off the track.
+  [first] keyframes: every manual lighting event that CHANGES the
+  running preset needs one on its exact tick. A [first] anywhere else
+  is reported with what to do about it - move it (it is within a beat
+  of a change that is missing one, so fixing the first list cannot
+  leave a duplicate behind), or delete it (on a blend anchor, on an
+  automatic preset that takes no keyframes, on a tick with no lighting
+  event, or a second copy). An event restating the preset already
+  running is correctly [first]-free and is never flagged for lacking
+  one, matching the v0.9.43 rule.
+  Blends: a preset change fades only when the OUTGOING preset is
+  restated shortly before it. Changes with no such anchor are listed
+  for lighting and post proc independently, each naming the outgoing
+  preset and where it started. A hard cut is valid, so the report says
+  so - the list is "where a fade would need an anchor", not "where the
+  track is wrong".
+  Always reads the whole track (judging a change, or an anchor, needs
+  the events before it); with a time selection active only issues
+  inside it are reported. New actions_venue_validate.lua, whose
+  ValidateVenueLightingBlends is pure over three sorted event arrays -
+  covered by a new Venue Validate test set with no project fixture.
+- Internal: the "two identical adjacent events are a blend anchor" test
+  is now one shared IsBlendAnchor (venue_lighting.lua). Three features
+  read it back off a track and have to agree - Manual gen's Blend
+  button refusing a third copy, the new validator, and the keyframe
+  restatement rule - and it had been an inline comparison in each.
+  Also added actions_venue_subtracks.lua to the entry point's
+  missing-file check, which had only ever listed it for loading.
+
 **v0.9.44**
 - Venue: expanded directed-camera dropdown labels whose abbreviation
   could be read as something else. "lt" is "long time", not "lighting":
