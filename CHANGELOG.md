@@ -9,6 +9,23 @@ over 5. See `CLAUDE.md` → "Changelog / `@about` trimming" for the rule.
 
 `rock_band_general_helper_vkr.lua`
 
+**v0.9.47**
+- Tab Input: horizontal tab now reads LOW to HIGH - the leftmost token
+  is the low E string. This is standard chord notation, where
+  "x 3 2 0 1 0" is C major and "3 2 0 0 0 3" is G major; the old
+  high-to-low order was backwards from how every chord chart, chord
+  dictionary, and Guitar Pro diagram writes a one-line fret shape.
+  Applies to all three Tab Input sub-tabs (Guitar/Bass, Keys/Pro Keys
+  and Vocal share one parser), and to the Music Theory helper's Shape
+  Search, whose 26 reference shapes were reversed to match (its v0.4).
+  Existing tab text you have written by hand needs reversing; nothing
+  stored in a project changes, since the tab boxes are never saved.
+- Tab Input: VERTICAL tab is deliberately unchanged - the high e stays
+  on the top row, which is how ASCII tab is printed everywhere. The
+  two formats now run in opposite directions, because the two
+  notations really do. The format tooltip says so, so it doesn't read
+  as a bug.
+
 **v0.9.46**
 - Tab Input > Guitar / Bass: the guide no longer truncates a chord
   before classifying it, so it now agrees with the Music Theory

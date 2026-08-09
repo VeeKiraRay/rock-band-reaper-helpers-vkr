@@ -430,6 +430,12 @@ the closeups count; the module includes them and says so.
 guards the table (coverage, unique ranks, tier sizes, the two ordering promises) and
 `dev/tests/general_algorithms.lua` the resolver.
 
+Two things read it. The **Venue Preview** resolves each PPQ group through it, so a stacked spot
+shows the shot the game would play. **Venue > Actions > Validate camera stacks**
+(`actions_venue_validate_camera.lua`) replays it once per possible lineup across the whole track
+and reports stacks that went wrong — shots that win under no lineup, and lineups left with no
+valid camera shot. See "Feature: VENUE validation" in `.claude/CLAUDE_general.md`.
+
 **Two engine fallbacks nothing in this repo performs.** Both are game-side substitutions with
 more than one possible outcome, so the generator does not emit them and the Venue Preview does
 not draw them — it keeps showing the authored event and explains these in an alert instead:

@@ -1,12 +1,17 @@
 -- @description Rock Band Venue Validate - Tests
 -- @author VeeKiraRay
 -- @about
---   Tests for the VENUE lighting/blend validator (actions_venue_validate.lua):
---   [first] keyframe placement against the preset-change rule, stray-[first]
---   classification, and blend-anchor detection for lighting and post proc.
---   All cases drive the pure ValidateVenueLightingBlends, so no project state is
---   touched and no fixture cleanup is needed. Run from the REAPER Actions list for a
---   fully isolated Lua context, or via the test_rock_band_helpers_vkr launcher.
+--   Tests for the two VENUE validators.
+--   actions_venue_validate.lua: [first] keyframe placement against the
+--   preset-change rule, stray-[first] classification, and blend-anchor detection
+--   for lighting and post proc.
+--   actions_venue_validate_camera.lua: band lineup enumeration, and which stacked
+--   camera shots can actually play - unreachable shots, lineups with nothing to
+--   play, duplicates and botched stacks.
+--   All cases drive the pure ValidateVenueLightingBlends / ValidateVenueCameraStacks,
+--   so no project state is touched and no fixture cleanup is needed. Run from the
+--   REAPER Actions list for a fully isolated Lua context, or via the
+--   test_rock_band_helpers_vkr launcher.
 --   Results appear in the REAPER console.
 
 r = reaper
@@ -35,7 +40,13 @@ dofile(_gdir .. 'defaults.lua')                   -- S
 dofile(_gdir .. 'helpers.lua')                    -- FindNamedTrackMIDI, GetTakePPQPerQN
 dofile(_gdir .. 'venue_lighting.lua')             -- MANUAL_LIGHTING_SET, IsBlendAnchor
 dofile(_gdir .. 'actions_venue_subtracks.lua')    -- CategorizeVenueEvent
-dofile(_gdir .. 'actions_venue_validate.lua')     -- code under test
+dofile(_gdir .. 'venue_awareness.lua')            -- GetCoopRequiredInstruments,
+                                                  -- INST_LETTER_NAMES
+dofile(_gdir .. 'venue_camera_priority.lua')      -- CAM_PRIORITY_TIERS (read at load
+                                                  -- time by the camera validator),
+                                                  -- PickPriorityCameraEvent
+dofile(_gdir .. 'actions_venue_validate.lua')        -- code under test
+dofile(_gdir .. 'actions_venue_validate_camera.lua') -- code under test
 
 dofile(_tdir .. 'venue_validate.lua')
 Test.report()

@@ -174,10 +174,15 @@ function DrawVenueTab(ctx)
 
             r.ImGui_Separator(ctx)
             SectionHeader('Validate')
-            if Btn('Validate lighting/blends', BTN_H) then
+            local bw_validate = BtnGroupWidth({ 'Validate lighting/blends', 'Validate camera stacks' })
+            if Btn('Validate lighting/blends', BTN_H, bw_validate) then
                 RunAction(ValidateVenueLighting)
             end
             Tooltip(TIPS.venue_validate_lighting)
+            if Btn('Validate camera stacks', BTN_H, bw_validate) then
+                RunAction(ValidateVenueCamera)
+            end
+            Tooltip(TIPS.venue_validate_camera)
 
             r.ImGui_Separator(ctx)
             SectionHeader('Quick actions')

@@ -277,6 +277,26 @@ TIPS = {
                       "    these are only issues where you wanted a fade.\n\n" ..
                       "Always reads the whole track (judging a change needs the events before\n" ..
                       "it); with a time selection active, only issues inside it are reported.",
+    venue_validate_camera =
+                      "Check which of your stacked camera shots can actually play.\n" ..
+                      "Read-only.\n\n" ..
+                      "Only 4 members fit on stage and keys replaces a guitarist or\n" ..
+                      "bassist, so a song charting guitar, bass AND keys has three\n" ..
+                      "possible lineups. This replays the game's shot pick for every\n" ..
+                      "lineup your project can produce, and reports:\n" ..
+                      "  - shots that win under no lineup: they need an instrument that\n" ..
+                      "    is never on stage, or a stacked sibling outranks them\n" ..
+                      "    everywhere they would fit\n" ..
+                      "  - spots where a lineup has no valid camera shot, so the game\n" ..
+                      "    picks for you (a generic full band shot, or a single shot of\n" ..
+                      "    the remaining member for a lone duo cut)\n" ..
+                      "  - the same shot written twice on one tick\n" ..
+                      "  - shots a few ticks apart that were meant to be stacked: the\n" ..
+                      "    game reads those as two cuts, so the second replaces the first\n\n" ..
+                      "Letting the game fall back is a valid choice, so those spots are\n" ..
+                      "only issues where you wanted to control the shot.\n\n" ..
+                      "Always reads the whole track; with a time selection active, only\n" ..
+                      "issues inside it are reported.",
     venue_sections  = "Read [prc_*] section markers from the EVENTS track and list the\n" ..
                       "detected song sections with their time ranges.\n\n" ..
                       "Letter-suffix events ([prc_verse_1a], [prc_verse_1b], ...) are grouped\n" ..

@@ -1,6 +1,6 @@
 -- @description Rock Band General Helper
 -- @author VeeKiraRay
--- @version 0.9.51
+-- @version 0.9.52
 -- @about
 --   Utility actions for Rock Band authoring in REAPER.
 --
@@ -22,6 +22,27 @@
 --   This @about block keeps only the 5 most recent versions.
 --   Full history: CHANGELOG.md in the repo.
 --
+--   v0.9.52
+--     - Venue > Actions > Validate: new "Validate camera stacks" button. Only
+--       two of bass/guitar/keys fit on stage at once, so a song charting all
+--       three can be played by three different bands, and stacked camera shots
+--       are how you cover each. This replays the game's shot pick for every
+--       lineup your project can produce and reports where that breaks down:
+--       shots that win under no lineup (they need an instrument never on
+--       stage, or a stacked sibling outranks them everywhere they fit), and
+--       spots where a lineup has no valid camera shot so the game picks for
+--       you.
+--       Read-only, like the lighting validator beside it.
+--     - It also catches two mistakes that break stacking outright: the same
+--       shot written twice on one tick, and two shots a few ticks apart that
+--       were meant to be stacked - the game reads those as two separate cuts,
+--       so the second replaces the first before you ever see it.
+--     - Letting the game fall back is a valid authoring choice, so those spots
+--       are listed as "where the game decides", not as errors - the same way
+--       the lighting validator treats a hard cut. Uncovered spots are reported
+--       one line per spot rather than per lineup, and the report names which
+--       lineups your project can actually produce, so a four-piece song does
+--       not read as the check having found nothing to do.
 --   v0.9.51
 --     - Venue > Preview: when several camera shots are stacked on one tick, the
 --       preview now shows the one the GAME would play. Authors stack shots so
@@ -109,22 +130,6 @@
 --       in the install folder - both directions, so a renamed script fails a
 --       test instead of shipping a dead button, and a newly added tool fails
 --       until it is listed.
---   v0.9.47
---     - Tab Input: horizontal tab now reads LOW to HIGH - the leftmost token
---       is the low E string. This is standard chord notation, where
---       "x 3 2 0 1 0" is C major and "3 2 0 0 0 3" is G major; the old
---       high-to-low order was backwards from how every chord chart, chord
---       dictionary, and Guitar Pro diagram writes a one-line fret shape.
---       Applies to all three Tab Input sub-tabs (Guitar/Bass, Keys/Pro Keys
---       and Vocal share one parser), and to the Music Theory helper's Shape
---       Search, whose 26 reference shapes were reversed to match (its v0.4).
---       Existing tab text you have written by hand needs reversing; nothing
---       stored in a project changes, since the tab boxes are never saved.
---     - Tab Input: VERTICAL tab is deliberately unchanged - the high e stays
---       on the top row, which is how ASCII tab is printed everywhere. The
---       two formats now run in opposite directions, because the two
---       notations really do. The format tooltip says so, so it doesn't read
---       as a bug.
 r = reaper  -- global so all dofile'd modules can use it
 
 if not r.ImGui_CreateContext then
@@ -182,6 +187,7 @@ for _, _f in ipairs({
     _mdir .. 'actions_venue_sing_along.lua',
     _mdir .. 'actions_venue_subtracks.lua',
     _mdir .. 'actions_venue_validate.lua',
+    _mdir .. 'actions_venue_validate_camera.lua',
     _mdir .. 'workflow.lua',
     _mdir .. 'actions_workflow.lua',
     _mdir .. 'tempomap.lua',
@@ -249,6 +255,7 @@ dofile(_mdir .. 'actions_venue_keyframes.lua')
 dofile(_mdir .. 'actions_venue_sing_along.lua')
 dofile(_mdir .. 'actions_venue_subtracks.lua')
 dofile(_mdir .. 'actions_venue_validate.lua')
+dofile(_mdir .. 'actions_venue_validate_camera.lua')
 dofile(_mdir .. 'workflow.lua')
 dofile(_mdir .. 'actions_workflow.lua')
 dofile(_mdir .. 'tempomap.lua')
