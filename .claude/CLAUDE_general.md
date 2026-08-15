@@ -264,6 +264,8 @@ The section's **keyframes are emitted either way** — only the lighting event i
 | `rock_band_general_helper_vkr/venue_generator.lua` | `GenerateVenueEvents`, `DeleteTextEventsInRange` (predicate-driven deleter backing all clear functions), `ClearVenueTextEventsInRange`, `ClearVenueNonCameraEventsInRange`, `ClearVenueExceptLPInRange`, `ClearVenueKeyframesInRange`, `FindActiveVenuePresetsBefore` (global) |
 | `rock_band_general_helper_vkr/workflow.lua` | `ParseWorkflowContent`, `ParseWorkflowFile`, `LoadWorkflowFiles`, `EscapeWF`, `UnescapeWF` (global); `FindBraceGroups`, `StripBraceGroups` (local) — Workflow sub-tab's `.txt` template parser (pure over string content) + `resources/workflow/` folder scanner |
 | `rock_band_general_helper_vkr/actions_workflow.lua` | `CompositeKey`, `PruneToWorkflowEntries`, `SaveWorkflowState`, `LoadWorkflowState`, `SelectWorkflowFile`, `ToggleWorkflowItem`, `ComputeWorkflowStats` (global) — Workflow checklist state, persistence (`workflow_v1` ExtState key), template-switch pruning, and the pure progress-count helper |
+| `rock_band_general_helper_vkr/difficulty_read.lua` | `FindTrackExact`, `ReadGemEvents`, `CountStrumOverrides`, `ReadMarkerSpans`, `ReadVocalNotes`, `ReadPhraseSpans`, `ReadPercussionSpans`, `ReadLaneShifts`, `ReadPlayingSpans`, `ANIM_PLAYING`, `ANIM_IDLE`, `VOCAL_LO`, `VOCAL_HI` (global); `TrackEndTime` (local) — reads a chart off REAPER tracks into the plain tables `lib/reaper_difficulty_score*.lua` consume. Uses `r.*` but no `S`/`ctx`, so `dev/calibration/corpus.lua` loads it too. **That sharing is the point:** every row of `dev/calibration/corpus_scores.csv`, and so every fitted coefficient, was produced by these exact readers — any divergence makes the shipped suggestion a different measurement from the one the model was fitted against. `FindTrackExact` is an exact case-insensitive name match, not `FindTrackByName` and not a substring search: these MIDIs carry `PART KEYS_ANIM_LH` beside `PART KEYS`, and `PART REAL_KEYS_E` before `PART REAL_KEYS_X`. |
+| `rock_band_general_helper_vkr/difficulty_suggester.lua` | `SuggestProjectDifficulties`, `CountVocalParts`, `HasAnyChartTrack` (global); `Unavailable`, `NoContent`, `SuggestOne` (local) — the read-only Metadata > Difficulty adapter. Returns one record per instrument (`rank`, `tier`, `tier_position`, `factors`, or `ok = false` with a `reason`); never touches `S`, never writes, never creates an undo point. Scores the **whole** chart — a time selection is deliberately not consulted, because the models were calibrated on whole songs. `CountVocalParts` derives `vocal_parts` from HARM2/HARM3 carrying notes, which reproduces the `songs.dta` field on all 203 corpus vocal songs. Reports "absent" and "muted" separately rather than calling `GetMutedInstruments`, which conflates them (see the comment there). |
 | `rock_band_general_helper_vkr/tempomap.lua` | `ComputeTempoRMSContour`, `DetectOnsets`, `EstimateBPM`, `GuessTimeSig`, `GetSourcesForRange`, `FitBeatGrid`, `RmsToOnsetFlux`, `FindLocalPeak` |
 | `rock_band_general_helper_vkr/actions.lua` | `AlignAudioTracks`, `AlignAllAudio`, `AlignCountIn`, `CreateSongFadeOut`; `CountInBeatSlots` (local) |
 | `rock_band_general_helper_vkr/actions_tempomap.lua` | `ShowTempoContext`, `EstimateInitialBPM`, `AutoTuneThreshold`, `ClearGeneratedTempoMarkers`, `GenerateTempoMap`; `BPM_MIN`, `BPM_MAX` (locals) |
@@ -497,6 +499,14 @@ See [`_future_ideas/`](_future_ideas/) for deferred work:
 - [Guitar Allow G+O Checkbox](_future_ideas/general_gtr_allow_go.md) — opt-in to preserve G+O chords without substitution
 - [Tempo Map Auto-Scan](_future_ideas/general_tempo_map_auto_scan.md) — auto-find usable analysis window when the first measure has no onsets
 - [Beat-Level Markers](_future_ideas/general_beat_level_markers.md) — sub-measure tempo resolution for rubato recordings
+
+**Difficulty suggester.** Its design notes live in `_future_ideas/` like the rest, but its
+calibration harness is real, tracked code in [`dev/calibration/`](../dev/calibration/) —
+fifteen rounds of model fitting against a corpus of officially-ranked songs, producing one
+selected model per instrument. [`dev/calibration/README.md`](../dev/calibration/README.md)
+is the version-controlled summary: results, file map, how to run it, the locked evaluation
+protocol, and the rules a new session must not break. Read it before touching anything in
+that folder — `_future_ideas/` is gitignored, so the README is the only tracked account.
 
 ---
 

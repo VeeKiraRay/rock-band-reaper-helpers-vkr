@@ -88,9 +88,9 @@ local TEXTISH = {
 local function ParseTrack(data, p, stop)
     local trk = { name = nil, notes = {}, texts = {}, tempos = {}, timesigs = {} }
 
-    local open   = {}   -- (chan*128 + pitch) -> array of note indices, innermost last
-    local status = nil  -- running status
-    local tick   = 0
+    local open    = {}   -- (chan*128 + pitch) -> array of note indices, innermost last
+    local running = nil  -- running status: CHANNEL messages only, see below
+    local tick    = 0
 
     while p < stop do
         local dt
@@ -100,10 +100,29 @@ local function ParseTrack(data, p, stop)
 
         local b = data:byte(p)
         if not b then return nil, 'truncated track' end
+
+        -- RUNNING STATUS IS SET BY CHANNEL MESSAGES ONLY (0x80-0xEF). A meta event
+        -- (0xFF) or sysex (0xF0/0xF7) is a status byte for its own event and nothing
+        -- more - it must not become the running status.
+        --
+        -- This was a real bug and it cost a lot to find. Storing 0xFF here means the
+        -- next running-status note event - a note whose 0x9n byte is omitted because
+        -- the previous channel message had the same status - gets read as a meta
+        -- event: its pitch becomes a meta type, its velocity becomes a length, and the
+        -- parser walks off into the middle of the note data and never recovers. The
+        -- track does not fail, it TRUNCATES, which is far worse: `lovehermadly` read
+        -- 28 notes on PART DRUMS instead of 5996, and 30 on PART REAL_KEYS_X instead
+        -- of 903, and reported them as if they were the whole chart. Rock Band MIDIs
+        -- interleave text events with notes constantly, so this fires on any file
+        -- whose writer relies on running status surviving a meta event.
+        local status
         if b >= 0x80 then
             status = b
             p = p + 1
-        elseif not status then
+            if b < 0xF0 then running = b end
+        elseif running then
+            status = running
+        else
             return nil, 'running status with no preceding status byte'
         end
 

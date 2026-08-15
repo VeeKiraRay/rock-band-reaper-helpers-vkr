@@ -49,101 +49,24 @@ dofile(_dir .. 'corpus.lua')
 -- What we score
 ----------------------------------------------------------------------
 
--- Guitar and bass share one factor set and one code path, so the second costs
--- almost nothing - and the pair is what turns a correlation number into a
--- diagnosis. Bass difficulty is far more purely density/speed driven, so if bass
--- correlates and guitar does not, the factors are fine and guitar needs
--- guitar-specific ones (chord shapes, HOPO chains). If neither correlates, the
--- factor set itself is wrong. One instrument cannot tell those apart.
--- `strum` and `tremolo` say whether the instrument HAS those systems at all, so the
--- difference between a structural zero and a measured zero stays visible. 5-lane keys
--- has no hammer-on/pull-off system (the guitar doc devotes a section to it, the keys
--- doc never mentions it) and the keys doc lists only trill markers, not tremolo.
-local INSTRUMENTS = {
-    { rank_key = 'guitar', track = 'PART GUITAR', strum = true,  tremolo = true  },
-    { rank_key = 'bass',   track = 'PART BASS',   strum = true,  tremolo = true  },
-    { rank_key = 'keys',   track = 'PART KEYS',   strum = false, tremolo = false },
-    -- Drums shares the 96-100 gem window but 96 is the kick PEDAL, and 126/127 are
-    -- ROLL lanes rather than tremolo and trill - same pitches, different meaning, so
-    -- `tremolo` stays false and they are read into roll_frac instead. `drums` switches
-    -- on the limb split and the tom markers.
-    { rank_key = 'drum',   track = 'PART DRUMS',  strum = false, tremolo = false,
-      drums = true },
-    -- PRO KEYS. The first instrument that does not read everything off one track with
-    -- the shared marker set, hence the three extra fields:
-    --
-    --   lo/hi        the gem window is 48-72 (C2-C4), not the 96-100 five-lane window.
-    --   span_track   PART REAL_KEYS_X carries NO animation states - measured, 0 of 123
-    --                charts have a play/idle/mellow/intense event - so playing spans
-    --                come off PART KEYS, the same performer's five-lane chart. (It does
-    --                carry [begin_key song_trainer_key_N] trainer sections, which look
-    --                like animation states to a loose census and are not.)
-    --   solo_pitch   115, not 103. Pro Keys is the ONLY instrument that differs, and
-    --                103 is entirely absent here - 0 notes across all 123 charts. Left
-    --                at the shared 103 this reads as an instrument with no solos.
-    --   gliss        126 is a GLISSANDO lane (leniency: scoring off under the marker),
-    --                not tremolo. Routed to gliss_frac so the sign stays honest.
-    --
-    -- No strum system and no tremolo lanes, same as five-lane keys.
-    { rank_key = 'real_keys', track = 'PART REAL_KEYS_X', strum = false, tremolo = false,
-      lo = 48, hi = 72, span_track = 'PART KEYS', solo_pitch = 115, gliss = true,
-      lane_shifts = true },
-    -- VOCALS. The only instrument that does not go through ScoreChart at all: its
-    -- difficulty lives in the lyric text attached to each note rather than in pitches,
-    -- and it scores pitch CLASS, so no gem factor transfers. `vocal` switches the whole
-    -- read-and-score path over to ReadVocalNotes / ScoreVocalChart.
-    --
-    -- Harmonies are deliberately out of scope: PART VOCALS only, no HARM1/2/3, and no
-    -- vocal_parts factor. The analysis reports residuals split by vocal_parts so the
-    -- cost of that choice stays visible.
-    { rank_key = 'vocals', track = 'PART VOCALS', strum = false, tremolo = false,
-      vocal = true },
-}
-
--- PRO KEYS lane-shift marker -> base pitch of the display window it selects. The six
--- white notes of the bottom octave, and the mapping is simply `pitch + 48`: 0 -> C2,
--- 2 -> D2, 4 -> E2, 5 -> F2, 7 -> G2, 9 -> A2. Black notes are never used for shifts.
+-- WHAT IS SCORED, AND WHERE THAT LIVES NOW.
 --
--- Written out rather than computed so an undocumented marker cannot be silently
--- accepted - see the whitelist note on ReadLaneShifts.
-local LANE_SHIFT_BASES = { [0] = 48, [2] = 50, [4] = 52, [5] = 53, [7] = 55, [9] = 57 }
-
--- Expert gem range for the tiered PART tracks - the same window
--- GetPatternPitchRange(track, 1) returns in actions_midi_replace.lua. Hardcoded
--- rather than loading that module, which would drag in S and the rest of the
--- helper's chain for two integers. It already excludes the force-HOPO markers at
--- 101/102 and overdrive at 116.
-local EXPERT_LO, EXPERT_HI = 96, 100
-
--- The two strum-override markers sit just above the gem window. Read as separate
--- counts (they push difficulty in opposite directions), never as gems.
-local FORCE_HOPO_PITCH  = EXPERT_LO + 5   -- 101: removes a strum, easier
-local FORCE_STRUM_PITCH = EXPERT_LO + 6   -- 102: adds a strum, harder
-
--- Section markers, read as spans by ReadMarkerSpans.
+-- The instrument table and every pitch constant this run used to declare here moved to
+-- rock_band_general_helper_vkr/difficulty_read.lua (RB_CHART_SPECS, EXPERT_LO, SOLO_PITCH,
+-- TOM_MARKERS, LANE_SHIFT_BASES, ...), which corpus.lua loads. They had to: the shipped
+-- Metadata > Difficulty suggestion reads charts too, and a second copy of "which pitches
+-- are gems" would eventually disagree with this one - at which point the suggestion would
+-- be a confident number measured against a different chart than the model was fitted on.
 --
--- ABSOLUTE, not difficulty-relative - do NOT write these as EXPERT_LO + n even
--- though 103 happens to equal EXPERT_LO + 7. A solo covers the same bars on every
--- difficulty and so is marked once for the whole track; the lo+7 slots for
--- Hard/Medium/Easy (91/79/67) are empty across the corpus. The two constants above
--- ARE relative, which is exactly what makes this easy to get wrong.
-local SOLO_PITCH    = 103   -- the authored solo section
-local TREMOLO_PITCH = 126   -- tremolo lane
-local TRILL_PITCH   = 127   -- trill lane
-
--- DRUMS. Also absolute, for the same reason, and 96 is NOT a gem colour here: it is
--- the kick pedal, the only lane played with a foot.
+-- Guitar and bass share one factor set and one code path, so the second costs almost
+-- nothing - and the pair is what turns a correlation number into a diagnosis. Bass
+-- difficulty is far more purely density/speed driven, so if bass correlates and guitar
+-- does not, the factors are fine and guitar needs guitar-specific ones. If neither
+-- correlates, the factor set itself is wrong. One instrument cannot tell those apart.
 --
--- The tom markers are lane-specific and the mapping is not guessable - 110 governs
--- yellow, 111 blue, 112 green - so it is written out as gem pitch -> marker pitch and a
--- gem is only ever counted under its OWN lane's marker.
---
--- Roll lanes reuse 126/127. On drums 126 is a standard roll and 127 the two-lane cymbal
--- swell; both are leniency devices, and 127 is 9 events in the whole corpus, so they are
--- read together into one roll_frac rather than split into columns that cannot be fitted.
-local KICK_PITCH   = 96
-local TOM_MARKERS  = { [98] = 110, [99] = 111, [100] = 112 }
-local ROLL_PITCHES = { 126, 127 }
+-- Harmonies remain out of scope for the vocal ROWS: PART VOCALS only, no HARM1/2/3 chart
+-- reading. `vocal_parts` is a label-context column and still comes from songs.dta here.
+local INSTRUMENTS = RB_CHART_SPECS
 
 -- One line naming the scorer behaviour this run used, recorded in the manifest.
 -- Not a version number: the factor SET is already recorded exactly by the CSV
@@ -251,168 +174,64 @@ end
 -- Scoring one instrument on one already-imported song
 ----------------------------------------------------------------------
 
-local function ScoreInstrument(song, inst, from_idx)
-    local rank = DtaRank(song, inst.rank_key)
+-- Reading and scoring now happens in ScoreChartForSpec (difficulty_read.lua), shared with
+-- the product. What stays here is everything the product has no equivalent of: the
+-- official rank, the corpus origin, and the CSV row layout.
+local function ScoreInstrument(song, spec, from_idx)
+    local rank = DtaRank(song, spec.key)
     if not rank then return nil end  -- no such part; verified equivalent to no track
 
-    local track = FindTrackExact(inst.track, from_idx)
-    if not track then
-        return nil, ('%s has rank %d but no %s track'):format(song.shortname, rank, inst.track)
+    local sc, info, err = ScoreChartForSpec(spec, from_idx, {
+        vocal_parts = song.vocal_parts or 1,
+    })
+    if not sc then
+        return nil, ('%s has rank %d but %s'):format(song.shortname, rank, err)
     end
 
-    -- VOCALS takes an entirely separate path: different reader, different scorer,
-    -- different factor set. It returns early rather than threading a `vocal` flag
-    -- through the twenty lines of gem-marker reading below, none of which applies.
-    if inst.vocal then
-        local notes  = ReadVocalNotes(track)
-        local phrase = ReadPhraseSpans(track)
-        local perc   = ReadPercussionSpans(track)
+    -- Recorded so a systematic tempo-import failure is visible in the output rather than
+    -- silently wrong: if REAPER is not importing the MIDI tempo map, every row reads 120
+    -- and every grid-relative factor is meaningless.
+    local bpm_at_first = 0
+    if info.first_onset then
+        bpm_at_first = select(1, r.TimeMap_GetDividedBpmAtTime(info.first_onset)) or 0
+    end
 
-        -- Same three-level fallback the gem path uses. Phrase markers are the authored
-        -- scoring unit and are present on 200 of 204 corpus tracks; animation states
-        -- cover most of the rest; DeriveSpansFromEvents is the last resort so a track
-        -- with a real rank and no structure still scores instead of yielding a NaN.
-        local spans, n_anim = phrase, 0
-        local span_source = 'phrase'
-        if #spans == 0 then
-            spans, n_anim = ReadPlayingSpans(track)
-            span_source = 'anim'
-        end
-        if #spans == 0 then
-            spans = DeriveSpansFromEvents(notes)
-            span_source = (n_anim > 0) and 'fallback_idle_only' or 'fallback_no_events'
-        end
-
-        local sc = ScoreVocalChart(notes, spans, {
-            perc_spans = perc, vocal_parts = song.vocal_parts or 1,
-        })
-
-        local bpm_at_first = 0
-        if #notes > 0 then
-            bpm_at_first = select(1, r.TimeMap_GetDividedBpmAtTime(notes[1].s)) or 0
-        end
-
-        local row = {
-            song.shortname, song.origin or '?', PackId(song.pack), inst.rank_key, rank,
-            sc.syllables_total, sc.tubes_total, span_source, n_anim,
+    local row
+    if spec.vocal then
+        row = {
+            song.shortname, song.origin or '?', PackId(song.pack), spec.key, rank,
+            sc.syllables_total, sc.tubes_total, info.span_source, info.n_anim,
             'n/a', 'n/a',
             'n/a', tostring(sc.tight_med > 0), 'n/a', sc.entropy_contexts,
             'n/a',
             bpm_at_first, r.CountTempoTimeSigMarkers(0),
         }
-        for _, k in ipairs(SCORE_FACTOR_KEYS) do row[#row + 1] = sc[k] or 0 end
-        return row
+    else
+        row = {
+            song.shortname, song.origin or '?', PackId(song.pack), spec.key, rank,
+            sc.notes, sc.events, info.span_source, info.n_anim,
+            -- 'n/a' rather than 0 where the instrument has no such system at all. These
+            -- are META columns, not factor columns, so a non-numeric cell is safe here -
+            -- the analysis parses only SCORE_FACTOR_KEYS as numbers and would reject the
+            -- whole row if a factor cell were 'n/a'. The matching factor cells
+            -- (force_hopo_rate, force_strum_rate, tremolo_frac) stay 0 to keep the CSV
+            -- rectangular, and the protocol's keys candidates exclude them so a constant
+            -- column is never fitted. This pair of columns is where the distinction lives.
+            info.n_fhopo or 'n/a', info.n_fstrum or 'n/a',
+            tostring(sc.sustain_measured), tostring(sc.tight_measured),
+            tostring(sc.solo_measured), sc.entropy_contexts,
+            info.n_tom or 'n/a',
+            bpm_at_first, r.CountTempoTimeSigMarkers(0),
+        }
     end
 
-    local events = ReadGemEvents(track, inst.lo or EXPERT_LO, inst.hi or EXPERT_HI)
-
-    -- Playing spans normally come off the instrument's own track. Pro Keys is the
-    -- exception: PART REAL_KEYS_X carries no animation states at all, so its spans are
-    -- read from PART KEYS - the same keyboardist, whose five-lane chart is animated.
-    -- Falling back to the gem track keeps a missing PART KEYS out of the fatal path; it
-    -- then hits the no-animation fallback below, which is the correct handling anyway.
-    local span_track = track
-    if inst.span_track then
-        span_track = FindTrackExact(inst.span_track, from_idx) or track
-    end
-    local spans, n_anim, solo_spans = ReadPlayingSpans(span_track)
-
-    -- Only read what the instrument actually has. Keys has no strum system and no
-    -- tremolo lanes, so reading them would produce zeros indistinguishable from "this
-    -- chart happens to use none" - and the protocol's keys candidates drop those
-    -- factors rather than fitting a constant.
-    local n_fhopo, n_fstrum = nil, nil
-    if inst.strum then
-        n_fhopo, n_fstrum = CountStrumOverrides(track, FORCE_HOPO_PITCH, FORCE_STRUM_PITCH)
-    end
-
-    -- The fallback the design insists on keeping. wewillrockyou1's PART BASS
-    -- carries only idle events despite a real rank of 96 - the lowest bass rank
-    -- in the corpus and one of the few Warmup examples, so it must not drop out.
-    local span_source = 'anim'
-    if #spans == 0 then
-        spans = DeriveSpansFromEvents(events)
-        span_source = (n_anim > 0) and 'fallback_idle_only' or 'fallback_no_events'
-    end
-
-    -- Drum-only reads. The tom markers are spans, not note-aligned modifiers: the doc
-    -- says a marker applies "for the duration of the note", and across the corpus the
-    -- median marker is a whole beat long with a p90 of 3000 ticks, so only a third are
-    -- note-length and the rest blanket a section. ReadMarkerSpans already returns
-    -- normalized spans, which is exactly that case.
-    local tom_spans, roll_spans, n_tom = nil, nil, nil
-    if inst.drums then
-        tom_spans, n_tom = {}, 0
-        for gem, marker in pairs(TOM_MARKERS) do
-            local sp = ReadMarkerSpans(track, marker)
-            if #sp > 0 then
-                tom_spans[gem] = sp
-                n_tom = n_tom + #sp
-            end
-        end
-        local rolls = {}
-        for _, pitch in ipairs(ROLL_PITCHES) do
-            for _, sp in ipairs(ReadMarkerSpans(track, pitch)) do rolls[#rolls + 1] = sp end
-        end
-        roll_spans = rolls
-    end
-
-    local sc = ScoreChart(events, spans, {
-        solo_spans        = solo_spans,   -- animation cue; on borrowed time
-        -- 115 on Pro Keys, 103 everywhere else. Not a relative offset on either.
-        marked_solo_spans = ReadMarkerSpans(track, inst.solo_pitch or SOLO_PITCH),
-        tremolo_spans     = inst.tremolo and ReadMarkerSpans(track, TREMOLO_PITCH) or nil,
-        -- 126 again, read as a glissando lane. Mutually exclusive with tremolo_spans:
-        -- the pitch means "harder than it looks" on guitar and "easier than it looks"
-        -- here, so passing both would fit one measurement under two opposite names.
-        gliss_spans       = inst.gliss and ReadMarkerSpans(track, TREMOLO_PITCH) or nil,
-        lane_shifts       = inst.lane_shifts and ReadLaneShifts(track, LANE_SHIFT_BASES) or nil,
-        pro_keys          = inst.rank_key == 'real_keys',
-        -- 127 is a trill lane on guitar and a two-lane cymbal roll on drums, so it must
-        -- not land in trill_frac for an instrument where that name would be false.
-        trill_spans       = (not inst.drums) and ReadMarkerSpans(track, TRILL_PITCH) or nil,
-        force_hopo_count  = n_fhopo,
-        force_strum_count = n_fstrum,
-        kick_pitch        = inst.drums and KICK_PITCH or nil,
-        tom_spans         = tom_spans,
-        roll_spans        = roll_spans,
-        -- Measured on every instrument: it is a property of the rhythm, not of the
-        -- controller. Only the drum candidates fit it this round.
-        offbeat           = true,
-    })
-
-    -- Recorded so a systematic tempo-import failure is visible in the output
-    -- rather than silently wrong: if REAPER is not importing the MIDI tempo map,
-    -- every row reads 120 and every grid-relative factor is meaningless.
-    local bpm_at_first = 0
-    if #events > 0 then
-        bpm_at_first = select(1, r.TimeMap_GetDividedBpmAtTime(events[1].s)) or 0
-    end
-
-    -- playing_s is not repeated here: it is now one of SCORE_FACTOR_KEYS and gets
-    -- appended below with the rest of the factors.
-    local row = {
-        song.shortname, song.origin or '?', PackId(song.pack), inst.rank_key, rank,
-        sc.notes, sc.events, span_source, n_anim,
-        -- 'n/a' rather than 0 where the instrument has no such system at all. These
-        -- are META columns, not factor columns, so a non-numeric cell is safe here -
-        -- the analysis parses only SCORE_FACTOR_KEYS as numbers and would reject the
-        -- whole row if a factor cell were 'n/a'. The matching factor cells
-        -- (force_hopo_rate, force_strum_rate, tremolo_frac) stay 0 to keep the CSV
-        -- rectangular, and the protocol's keys candidates exclude them so a constant
-        -- column is never fitted. This pair of columns is where the distinction lives.
-        n_fhopo or 'n/a', n_fstrum or 'n/a',
-        tostring(sc.sustain_measured), tostring(sc.tight_measured),
-        tostring(sc.solo_measured), sc.entropy_contexts,
-        n_tom or 'n/a',
-        bpm_at_first, r.CountTempoTimeSigMarkers(0),
-    }
-    -- `or 0` because SCORE_FACTOR_KEYS now spans both factor sets: the vocal columns are
+    -- `or 0` because SCORE_FACTOR_KEYS spans both factor sets: the vocal columns are
     -- structurally absent from a gem score, exactly as the gem columns are absent from a
     -- vocal one. A nil here would shift every later column left by one.
     for _, k in ipairs(SCORE_FACTOR_KEYS) do row[#row + 1] = sc[k] or 0 end
     return row
 end
+
 
 ----------------------------------------------------------------------
 -- Main
@@ -513,7 +332,7 @@ for si, song in ipairs(songs) do
     -- Which instruments still need a row for this song?
     local todo = {}
     for _, inst in ipairs(INSTRUMENTS) do
-        if DtaRank(song, inst.rank_key) and not done[song.shortname .. '\0' .. inst.rank_key] then
+        if DtaRank(song, inst.key) and not done[song.shortname .. '\0' .. inst.key] then
             todo[#todo + 1] = inst
         end
     end
@@ -605,7 +424,7 @@ local function WriteManifest()
     f:write(('warnings        : %d\n'):format(n_warn))
     f:write(('instruments     : '))
     local insts = {}
-    for _, inst in ipairs(INSTRUMENTS) do insts[#insts + 1] = inst.rank_key end
+    for _, inst in ipairs(INSTRUMENTS) do insts[#insts + 1] = inst.key end
     f:write(table.concat(insts, ', ') .. '\n')
     f:write(('factor columns  : %d\n'):format(#SCORE_FACTOR_KEYS))
     f:write('\nColumn order is the CSV header itself, which is the authoritative\n')

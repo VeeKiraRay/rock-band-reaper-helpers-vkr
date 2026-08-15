@@ -165,6 +165,13 @@ for _, _f in ipairs({
     _dir  .. 'lib/reaper_midi_helpers.lua',
     _dir  .. 'lib/reaper_guitar_theory.lua',
     _dir  .. 'lib/reaper_script_links.lua',
+    -- Difficulty suggester. reaper_difficulty_score.lua must precede its vocals
+    -- companion (which appends to SCORE_FACTOR_KEYS), and both precede the models.
+    _dir  .. 'lib/reaper_difficulty_score.lua',
+    _dir  .. 'lib/reaper_difficulty_score_vocals.lua',
+    _dir  .. 'lib/reaper_difficulty_tiers.lua',
+    _dir  .. 'lib/reaper_difficulty_predict.lua',
+    _dir  .. 'lib/reaper_difficulty_models.lua',
     _mdir .. 'defaults.lua',
     _mdir .. 'settings.lua',
     _mdir .. 'helpers.lua',
@@ -204,6 +211,8 @@ for _, _f in ipairs({
     _mdir .. 'actions_difficulty_5k.lua',
     _mdir .. 'actions_difficulty_gtrbass.lua',
     _mdir .. 'actions_difficulty_drums.lua',
+    _mdir .. 'difficulty_read.lua',
+    _mdir .. 'difficulty_suggester.lua',
     _mdir .. 'ui_common.lua',
     _mdir .. 'ui_keys.lua',
     _mdir .. 'ui_difficulty.lua',
@@ -233,6 +242,11 @@ dofile(_dir  .. 'lib/reaper_dsp.lua')
 dofile(_dir  .. 'lib/reaper_midi_helpers.lua')
 dofile(_dir  .. 'lib/reaper_guitar_theory.lua')
 dofile(_dir  .. 'lib/reaper_script_links.lua')
+dofile(_dir  .. 'lib/reaper_difficulty_score.lua')
+dofile(_dir  .. 'lib/reaper_difficulty_score_vocals.lua')
+dofile(_dir  .. 'lib/reaper_difficulty_tiers.lua')
+dofile(_dir  .. 'lib/reaper_difficulty_predict.lua')
+dofile(_dir  .. 'lib/reaper_difficulty_models.lua')
 dofile(_mdir .. 'defaults.lua')
 dofile(_mdir .. 'settings.lua')
 dofile(_mdir .. 'helpers.lua')
@@ -272,6 +286,8 @@ dofile(_mdir .. 'actions_difficulty.lua')
 dofile(_mdir .. 'actions_difficulty_5k.lua')
 dofile(_mdir .. 'actions_difficulty_gtrbass.lua')
 dofile(_mdir .. 'actions_difficulty_drums.lua')
+dofile(_mdir .. 'difficulty_read.lua')
+dofile(_mdir .. 'difficulty_suggester.lua')
 dofile(_mdir .. 'ui_common.lua')
 dofile(_mdir .. 'ui_keys.lua')
 dofile(_mdir .. 'ui_difficulty.lua')

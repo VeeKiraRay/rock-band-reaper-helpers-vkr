@@ -91,7 +91,15 @@ Order matters: everything downstream reads the CSV the first script writes.
    `corpus_scores.csv` to `corpus_scores_baseline.csv`, rescore, then run this.
 
 5. **`run_round14_offline.lua`** — scores without REAPER, reading `.mid` files directly
-   through `dev/tools/smf_reader.lua` under a plain Lua interpreter:
+   through `dev/tools/smf_reader.lua` under a plain Lua interpreter.
+
+   **Note if you rescore offline:** `smf_reader.lua` carried a running-status bug until
+   2026-08-15 — a meta event overwrote the channel running status, so the next
+   running-status note was read as a meta event and the rest of that track was silently
+   discarded. It truncated rather than failed, which is worse: `lovehermadly` read 28
+   notes on PART DRUMS instead of 5996. The current `corpus_scores.csv` is **not**
+   affected (its values match a corrected parse), but any offline rescore predating the
+   fix should be redone.
 
    ```
    lua dev/calibration/run_round14_offline.lua
@@ -100,37 +108,92 @@ Order matters: everything downstream reads the CSV the first script writes.
    Far faster than the REAPER import loop, and the path to use when only a subset of
    instruments needs rescoring.
 
-Unit tests for the pure modules: **`dev/tests/run_difficulty_score.lua`**, from the
-Actions list or the `dev/test_rock_band_helpers_vkr.lua` launcher.
+
+6. **`export_production_models.lua`** — freezes the six selected models into
+   `lib/reaper_difficulty_models.lua`, the coefficients the helper actually ships. Offline,
+   from the repo root:
+
+   ```
+   lua dev/calibration/export_production_models.lua
+   ```
+
+   Run it after any rescore or re-selection; nothing else regenerates that file, and a
+   stale one is not detectable by eye. It refits each candidate once on every row it is
+   allowed to train on, prints the pooled inner-fold error for every ridge value, and
+   refuses to write if a declared factor is missing, duplicated, or reordered.
+
+   Two deliberate differences from the protocol's ridge handling, both because a shipped
+   model must commit to one number where cross-validation never has to: it uses its own
+   arithmetic LCG rather than `math.random` (whose implementation changed between Lua 5.3
+   and 5.4, so REAPER and the offline runner disagree on what a seed means), and it picks
+   the ridge by **pooled** inner-fold error rather than a modal vote across folds. The
+   modal vote is knife-edge on guitar — 0.01 at 36% against 0.1 at 31% — whereas pooled
+   error separates them cleanly. Full reasoning in the file's header.
+
+7. **`dev/tools/verify_suggester_vs_csv.lua`** — checks that the shipped suggester
+   measures what the corpus was scored on. Loads real corpus MIDIs through a mock REAPER
+   API and compares every factor, and every predicted rank, against the CSV row:
+
+   ```
+   lua dev/tools/verify_suggester_vs_csv.lua 200
+   ```
+
+   Current result over all 877 rb3_dlc rows: worst rank difference **2.0**, one suggestion
+   changing tier (a chart predicting 332.6 against guitar's tier-5 threshold of exactly
+   333). The residual factor drift is confined to `short_frac`, `short_moving_frac` and
+   `sustain_frac`, whose thresholds sit exactly on common note lengths — see the file
+   header. It cannot prove REAPER's own MIDI APIs behave like the mock, so it complements
+   the in-REAPER fixture test rather than replacing it.
+
+Unit tests: **`dev/tests/run_difficulty_score.lua`** for the pure scorers, and
+**`dev/tests/run_difficulty_suggester.lua`** for the tiers, the predictor, and the frozen
+artifact — the latter refits every model from the CSV at its recorded ridge and compares
+coefficient by coefficient, which is what proves the shipped numbers are the model the
+protocol selected. Both run from the Actions list or the
+`dev/test_rock_band_helpers_vkr.lua` launcher.
 
 ---
 
 ## The files
 
-**Pure** — no `r.*`, no `S`, no `ctx`, so `dev/tests/` can drive them with synthetic input
-and no REAPER project.
+### Shared with the shipped helper
+
+The scoring code is **not** in this folder. It lives in `lib/` and in the general helper's
+module folder, because the Metadata > Difficulty suggestion and this harness must run the
+same measurement: a fitted coefficient only means anything paired with the exact factor
+implementation it was measured against, so a second copy would drift and silently
+invalidate every model here.
 
 | file | purpose |
 |---|---|
-| `difficulty_score.lua` | The gem scorer: `ScoreChart(events, spans, opts)` for guitar, bass, drums, 5-lane keys and Pro Keys. Owns `SCORE_FACTOR_KEYS`, the authoritative factor list and column order. |
-| `difficulty_score_vocals.lua` | The vocal scorer: `ScoreVocalChart(notes, phrase_spans, opts)`. **Appends** its columns to `SCORE_FACTOR_KEYS`, so it must load immediately after `difficulty_score.lua` and before anything that reads that list. |
-| `rank_tiers.lua` | Rank to displayed tier (0 Warmup … 6 Impossible), ported from `_external_docs/InstrumentDifficulty.ts`. |
-| `songs_dta.lua` | `songs.dta` parsing: ranks, origin, genre, `vocal_parts`. |
-| `stats.lua` | Spearman/Pearson, the weighted ridge fit (`MultiFit`/`ApplyFit`, standardizing internally), k-fold and seeded stratified shuffled folds, tier distance, Wilson bounds. |
-| `weirdly_scored.lua` | The disputed-label list. Deliberately empty — see the rules below. |
-| `protocol.lua` | **The locked protocol and every candidate declaration.** Read its comments before changing anything; they carry the reasoning and the pre-checks. |
+| `lib/reaper_difficulty_score.lua` | The gem scorer: `ScoreChart(events, spans, opts)` for guitar, bass, drums, 5-lane keys and Pro Keys. Owns `SCORE_FACTOR_KEYS`, the authoritative factor list and column order. Pure. |
+| `lib/reaper_difficulty_score_vocals.lua` | The vocal scorer: `ScoreVocalChart(notes, phrase_spans, opts)`. Pure. **Appends** its columns to `SCORE_FACTOR_KEYS`, so it must load immediately after the gem scorer and before anything that reads that list. |
+| `lib/reaper_difficulty_tiers.lua` | Rank to displayed tier (0 Warmup … 6 Impossible) plus `TierBand` / `TierPosition`, from `_external_docs/InstrumentDifficulty.ts`. Pure. |
+| `lib/reaper_difficulty_predict.lua` | `DifficultyPredictRank`, `DifficultyFactorZ`, `DifficultyOutOfRange` — how to apply a frozen model. Pure. Coefficients are in **standardized** units; nothing should ever apply them by hand. |
+| `lib/reaper_difficulty_models.lua` | **Generated.** The six frozen models: factor order, standardization statistics, coefficients, ridge, rank clamp, per-factor support bounds, concentration thresholds, maturity badge. Rewritten only by `export_production_models.lua`. |
+| `rock_band_general_helper_vkr/difficulty_read.lua` | The chart readers: track lookup, gems grouped into chord events, marker spans, animation states, vocal notes with tick-matched lyrics, phrase and percussion ranges, Pro Keys lane shifts. Touches `r.*`; no `S`, no `ctx`. Attaches the `qn` field, which is the one thing the pure scorer cannot compute for itself. |
 
-**REAPER-facing**
+`difficulty_score.lua`, `difficulty_score_vocals.lua` and `rank_tiers.lua` remain in this
+folder as **one-line loaders** pointing at the above, so every entry point and test runner
+here keeps its existing load list. Those scripts encode a locked experiment; a file move is
+not a reason to edit them.
+
+### Dev-only, and staying that way
 
 | file | purpose |
 |---|---|
-| `corpus.lua` | The only module here that touches `r.*`. Track lookup, chart/marker/animation-state readers, vocal note and lyric reading, MIDI import, tempo snapshot and restore, corpus walking. Attaches the `qn` field every event carries, which is the one thing the pure scorer cannot compute for itself. |
+| `songs_dta.lua` | `songs.dta` parsing: ranks, origin, genre, `vocal_parts`. Pure. |
+| `stats.lua` | Spearman/Pearson, the weighted ridge fit (`MultiFit`/`ApplyFit`, standardizing internally), k-fold and seeded stratified shuffled folds, tier distance, Wilson bounds. Pure. |
+| `weirdly_scored.lua` | The disputed-label list. Deliberately empty — see the rules below. Pure. |
+| `protocol.lua` | **The locked protocol and every candidate declaration.** Read its comments before changing anything; they carry the reasoning and the pre-checks. Pure. |
+| `corpus.lua` | Corpus discovery, MIDI import, tempo snapshot and restore, track cleanup, `songs.dta` walking — everything the product must never do. Loads `difficulty_read.lua` itself. |
 
-**Entry points** — the five `run_*.lua` scripts described under "How to run".
+**Entry points** — the five `run_*.lua` scripts plus `export_production_models.lua`,
+described under "How to run".
 
 ### The scoring input contract
 
-`corpus.lua` produces plain tables so the scorer stays pure:
+`difficulty_read.lua` produces plain tables so the scorer stays pure:
 
 - **events** — `{ s, e, qn, qn_e, pitches, held }`, chords grouped by shared onset within
   2 ms, sorted, muted notes skipped.

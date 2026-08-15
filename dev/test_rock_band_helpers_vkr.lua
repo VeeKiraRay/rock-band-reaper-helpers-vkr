@@ -35,7 +35,7 @@ local results = { vocal = nil, general = nil, vocal_midi = nil, general_midi = n
                   guitar_theory = nil, music_notation = nil,
                   karplus_strong = nil, wav_writer = nil,
                   script_links = nil, difficulty_score = nil,
-                  difficulty_bpm = nil }
+                  difficulty_bpm = nil, difficulty_suggester = nil }
 
 local COL_OK  = 0x55DD55FF
 local COL_ERR = 0xFF5555FF
@@ -155,6 +155,14 @@ function Loop()
         end
         r.ImGui_SameLine(ctx)
         draw_status(results.difficulty_bpm)
+
+        r.ImGui_Spacing(ctx)
+
+        if r.ImGui_Button(ctx, 'Difficulty Suggester Tests', 155, 24) then
+            run('run_difficulty_suggester.lua', 'difficulty_suggester')
+        end
+        r.ImGui_SameLine(ctx)
+        draw_status(results.difficulty_suggester)
 
         r.ImGui_Spacing(ctx)
 
