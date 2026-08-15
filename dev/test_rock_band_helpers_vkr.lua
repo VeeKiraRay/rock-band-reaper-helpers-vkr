@@ -34,7 +34,8 @@ local results = { vocal = nil, general = nil, vocal_midi = nil, general_midi = n
                   venue_labels = nil, workflow = nil,
                   guitar_theory = nil, music_notation = nil,
                   karplus_strong = nil, wav_writer = nil,
-                  script_links = nil }
+                  script_links = nil, difficulty_score = nil,
+                  difficulty_bpm = nil }
 
 local COL_OK  = 0x55DD55FF
 local COL_ERR = 0xFF5555FF
@@ -138,6 +139,22 @@ function Loop()
         end
         r.ImGui_SameLine(ctx)
         draw_status(results.general_algo)
+
+        r.ImGui_Spacing(ctx)
+
+        if r.ImGui_Button(ctx, 'Difficulty Score Tests', 155, 24) then
+            run('run_difficulty_score.lua', 'difficulty_score')
+        end
+        r.ImGui_SameLine(ctx)
+        draw_status(results.difficulty_score)
+
+        r.ImGui_Spacing(ctx)
+
+        if r.ImGui_Button(ctx, 'Difficulty Tempo Tests', 155, 24) then
+            run('run_difficulty_bpm.lua', 'difficulty_bpm')
+        end
+        r.ImGui_SameLine(ctx)
+        draw_status(results.difficulty_bpm)
 
         r.ImGui_Spacing(ctx)
 

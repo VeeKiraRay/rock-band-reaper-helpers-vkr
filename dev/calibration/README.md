@@ -1,0 +1,300 @@
+# Difficulty Calibration
+
+A dev-only harness that fits Rock Band's official **rank** from measured properties of an
+authored Expert chart, one model per instrument. It exists to answer a question the
+Difficulty Suggester feature could not answer by guessing: *what weights?* The weighting
+could not be settled by intuition, so it was calibrated against a corpus of real,
+officially-ranked songs.
+
+Nothing here ships. The pure scoring code and the fitted coefficients graduate into the
+helper; the corpus walking, CSV writing, regression fitting and evaluation protocol stay
+in `dev/`.
+
+**Run from the repository checkout, never from a `deploy_to_reaper.bat` copy.** These
+scripts locate the corpus relative to their own path, and `_external_docs/` is neither
+versioned nor deployed, so a deployed copy finds no songs. Register the repo copy via
+*Actions > Load ReaScript*.
+
+---
+
+## Where things stand
+
+Selected model per instrument, as of round 15 (2026-08-14). Reproduced from
+`calibration_protocol_report.txt`, which is regenerated on every protocol run and is the
+authority if these disagree.
+
+| instrument | selected candidate | scale | k | usable | usable lower bound | miss upper bound | rho | |
+|---|---|---|---:|---:|---:|---:|---:|---|
+| guitar | `full@attacks` | log(rank) | 21 | 95.70% | **92.18%** | 1.81% | +0.884 | **passes** |
+| bass | `baseline+ent_rel@attacks` | log(rank) | 3 | 95.28% | **91.68%** | 1.91% | +0.830 | **passes** |
+| drum | `full_drum` | rank | 26 | 95.28% | **91.68%** | 3.07% | +0.859 | **passes** |
+| keys | `primary+entropy_rel+complex_peak` | rank | 8 | 93.77% | 89.14% | 3.72% | +0.874 | fails narrowly |
+| real_keys | `primary+ent_rel@attacks` | rank | 7 | 86.89% | 81.05% | 4.47% | +0.833 | fails |
+| vocals | `primary+range+parts` | log(rank) | 10 | 90.83% | 86.32% | 5.04% | +0.626 | fails |
+
+"usable" is within-one-tier accuracy, averaged across repeats; the two bounds beside it are
+the pessimistic end of each interval, which is what the gate reads (floors: usable ≥ 90%,
+miss ≤ 5%, rho ≥ 0.70). Keys and Pro Keys fail on the usable lower bound alone; vocals
+fails all three criteria.
+
+Development rows per instrument: guitar 158, bass 159, drum 159, vocals 157, keys 122,
+real_keys 122 — all `rb3_dlc`, with 0 disputed rows held out.
+
+**Two things this table is not.**
+
+1. These are **development-set repeated-CV** figures. The reserved test partition is
+   defined and has deliberately **never been drawn** — it can be spent only once, and it
+   is worth more at a real release decision than as a progress check. Call these
+   "development-gate passes", not "validated".
+2. A failing instrument is not a broken one. Keys misses by 0.86 points at n=122, which
+   is a sample-size statement about certifying a 90% floor, not a claim that the model
+   got worse.
+
+The reserved partition should be drawn **by whole pack**, not by random rows: the corpus's
+multi-song packs are thematic, so related songs would otherwise leak across the split, and
+a pack-level split doubles as the domain-shift check.
+
+---
+
+## How to run
+
+Order matters: everything downstream reads the CSV the first script writes.
+
+1. **`run_calibration_vkr.lua`** — walks `_external_docs/reference_songs/`, imports each
+   song's MIDI, scores every instrument, appends a row per (song, instrument) to
+   `corpus_scores.csv`, and writes `corpus_scores.manifest.txt`.
+
+   **Run it in a scratch project.** It imports tracks, deletes them again, and snapshots
+   and restores the tempo map around each song. It is resumable — re-running skips
+   (song, instrument) pairs already in the CSV — and it refuses to resume when the column
+   set has changed, because appending new-order rows under an old header misaligns every
+   factor silently. Delete the CSV for a full rescore.
+
+2. **`run_calibration_protocol_vkr.lua`** — **the decision view.** Predeclared candidates,
+   paired repeated cross-validation, nested ridge, and the release gate read from interval
+   lower bounds. Writes `calibration_protocol_report.txt` as well as the console, because
+   REAPER's console truncates at about 16 KB and this report is longer.
+
+3. **`run_calibration_analysis_vkr.lua`** — **the diagnostic view.** Per-factor Spearman
+   correlations, a cross-validated all-factor fit, standardized coefficients, worst
+   residuals, and the RB3-vs-Lego origin check. Writes
+   `calibration_analysis_report.txt`.
+
+   Its coefficient table is **unstable by design** — an unridged fit over ~31 collinear
+   columns. It names the next factor to try; it does not decide anything. When the two
+   views disagree, the decision view is the answer. Measured worst case: the analysis put
+   `shadowsofthenight` four tiers out where every declared candidate got it within one.
+
+4. **`run_calibration_diff_vkr.lua`** — diffs `corpus_scores_baseline.csv` against
+   `corpus_scores.csv` per factor and per song. Run it after a scorer change to see *what
+   moved*, which is a separate question from *did the fit improve*. Usage: rename
+   `corpus_scores.csv` to `corpus_scores_baseline.csv`, rescore, then run this.
+
+5. **`run_round14_offline.lua`** — scores without REAPER, reading `.mid` files directly
+   through `dev/tools/smf_reader.lua` under a plain Lua interpreter:
+
+   ```
+   lua dev/calibration/run_round14_offline.lua
+   ```
+
+   Far faster than the REAPER import loop, and the path to use when only a subset of
+   instruments needs rescoring.
+
+Unit tests for the pure modules: **`dev/tests/run_difficulty_score.lua`**, from the
+Actions list or the `dev/test_rock_band_helpers_vkr.lua` launcher.
+
+---
+
+## The files
+
+**Pure** — no `r.*`, no `S`, no `ctx`, so `dev/tests/` can drive them with synthetic input
+and no REAPER project.
+
+| file | purpose |
+|---|---|
+| `difficulty_score.lua` | The gem scorer: `ScoreChart(events, spans, opts)` for guitar, bass, drums, 5-lane keys and Pro Keys. Owns `SCORE_FACTOR_KEYS`, the authoritative factor list and column order. |
+| `difficulty_score_vocals.lua` | The vocal scorer: `ScoreVocalChart(notes, phrase_spans, opts)`. **Appends** its columns to `SCORE_FACTOR_KEYS`, so it must load immediately after `difficulty_score.lua` and before anything that reads that list. |
+| `rank_tiers.lua` | Rank to displayed tier (0 Warmup … 6 Impossible), ported from `_external_docs/InstrumentDifficulty.ts`. |
+| `songs_dta.lua` | `songs.dta` parsing: ranks, origin, genre, `vocal_parts`. |
+| `stats.lua` | Spearman/Pearson, the weighted ridge fit (`MultiFit`/`ApplyFit`, standardizing internally), k-fold and seeded stratified shuffled folds, tier distance, Wilson bounds. |
+| `weirdly_scored.lua` | The disputed-label list. Deliberately empty — see the rules below. |
+| `protocol.lua` | **The locked protocol and every candidate declaration.** Read its comments before changing anything; they carry the reasoning and the pre-checks. |
+
+**REAPER-facing**
+
+| file | purpose |
+|---|---|
+| `corpus.lua` | The only module here that touches `r.*`. Track lookup, chart/marker/animation-state readers, vocal note and lyric reading, MIDI import, tempo snapshot and restore, corpus walking. Attaches the `qn` field every event carries, which is the one thing the pure scorer cannot compute for itself. |
+
+**Entry points** — the five `run_*.lua` scripts described under "How to run".
+
+### The scoring input contract
+
+`corpus.lua` produces plain tables so the scorer stays pure:
+
+- **events** — `{ s, e, qn, qn_e, pitches, held }`, chords grouped by shared onset within
+  2 ms, sorted, muted notes skipped.
+- **spans** — the stretches where the instrument is actually playing, from its animation
+  state text events. Each span is a separate **segment**, and no metric may pair the last
+  event of one segment with the first of the next: a chord change across a bar of rest is
+  not a change the player executes. That property is structural (`EventsInSegments`
+  returns an array of arrays) rather than a rule each metric has to remember.
+- Three-level fallback when authored playing states are absent: animation states, then
+  `DeriveSpansFromEvents`. A track can legitimately carry a real rank and a real chart
+  with no playing state at all.
+
+---
+
+## Data files, and what is versioned
+
+| file | what it is |
+|---|---|
+| `corpus_scores.csv` | The current run. 205 songs, 1061 rows, 96 factor columns. **Versioned.** |
+| `corpus_scores.manifest.txt` | Generated beside it: date, corpus counts by origin, row counts, instruments, factor-column count, and a one-line description of the scorer's measurement behaviour. |
+| `corpus_scores_baseline.csv` | The round-13 run, 84 factor columns. **Versioned**, and kept for one reason only: so `run_calibration_diff_vkr.lua` has something to compare a rescore against. |
+| `corpus_scores_baseline.manifest.txt` | Its manifest, plus a hand-written verdict block recording what that round selected and why. |
+| `corpus_scores_round14.csv` | The round-14 offline rescore output. |
+| `calibration_protocol_report.txt` | Generated by the decision view. Overwritten each run. |
+| `calibration_analysis_report.txt` | Generated by the diagnostic view. Overwritten each run. |
+
+The corpus itself lives in the untracked `_external_docs/reference_songs/` and exists on
+one machine. The CSVs are tracked deliberately: they hold only derived measurements —
+shortname, official rank, factor values — with no MIDI and no audio, the same class of
+metadata any `songs.dta` reader produces. Without them the repo would contain no data at
+all, and the coefficients that ship in the helper would have no derivation anywhere in it.
+They keep earning that place after the feature ships, because every remaining modelling
+question is answered from the CSV alone, with no REAPER and no corpus.
+
+What a CSV cannot survive is a change to the factor **set** — a new column means a full
+rescore — which is why exactly **two** are tracked (current, plus the baseline a change is
+being measured against) rather than an accumulating archive. Older factor sets can be
+neither refit nor row-compared against the current one; they are kept locally and ignored
+by `.gitignore`.
+
+The scoring run's console output also prints the corpus's current tier histogram from the
+`songs.dta` ranks, so the coverage picture stays current instead of going stale in a
+document. A thin tier means residuals there say little: two songs cannot establish whether
+the model handles that band.
+
+---
+
+## The locked protocol
+
+Across the first four rounds the factor set went 6 → 9 → 19 → 23 factors, with roughly
+forty model comparisons run against the same rows under the same fold assignment, keeping
+whatever looked best each time. That is selection inflation. `protocol.lua` exists to stop
+it, and its rules are fixed before a run rather than after seeing output.
+
+- **Candidates are predeclared.** Adding one to an instrument is a **declared
+  re-opening**, noted in the code beside the existing declarations, not an edit to a
+  sealed table.
+- **Comparisons are paired.** Every candidate is scored on the *same* fold assignments
+  within each repeat, and judged by the distribution of paired differences across repeats
+  — never by two marginal percentages. A round-3 result turned on a difference of about
+  one song.
+- **Ridge is tuned inside the training folds** (nested, `INNER_FOLD = 3`), never on rows
+  it will be evaluated on.
+- **The gate reads interval lower bounds**, not point estimates.
+
+Parameters (`PROTOCOL`):
+
+```
+N_REPEATS  10        NFOLD  5        SEED  20260812        INNER_FOLD  3
+RIDGE_GRID  1e-6, 1e-3, 1e-2, 1e-1, 1.0, 10.0
+LEGO_WEIGHT  0.3     Z  1.645  (one-sided 95%)
+USABLE_FLOOR  0.90   MISS_CEILING  0.05   RHO_FLOOR  0.70
+```
+
+Folds are stratified by **actual tier**, because whole tiers hold 2-3 songs and an
+unstratified shuffle can leave a fold with none of them.
+
+**Targets and weights.** RB3 DLC is the target throughout — 159 of the corpus's 205 songs.
+The 45 Lego-era songs sit on a rank scale about 45 points below it, so they are
+always-training at weight 0.3 and carry an `is_lego` column: they add information without
+steering the model. `PART KEYS` has no Lego rows at all — Lego Rock Band predates the
+keyboard part. The one `greenday` song is scored into the CSV but excluded from every fit,
+so it never appears in a development row count.
+
+**The selection rule.** Order candidates by simplicity (fewest features, then declaration
+order); take the best mean usable% as the leader; walk upward from the simplest and select
+the first candidate the leader does not *clearly* beat. "Clearly" means winning more than
+**70%** of paired repeats **and** by more than **1 percentage point** on average. A bigger
+model has to earn its place consistently, not post a higher average once.
+
+**Two reporting rules.**
+
+- **MAE is not comparable across target scales.** Fitting `log(rank)` buys proportional
+  accuracy at the cost of absolute accuracy, so its MAE can rise while its tier accuracy
+  improves. Grade on tier distance; the decision report omits MAE entirely.
+- Predictions are **clamped to the observed rank range** before display. A log-scale fit
+  exponentiates, so an extreme input produces a number that is not a rank at all — one
+  bass chart came back at 943 against a corpus spanning 135-488. This changes no headline
+  figure (tier 6 is tier 6 either way, and Spearman is order-preserving); it is about not
+  printing nonsense.
+
+---
+
+## Rules a new session must not break
+
+1. **The protocol is locked.** Candidates and thresholds are declared before a run.
+   Changing either is a new experiment, not a re-run — say so if you do.
+2. **Never loosen a selection threshold to make something pass.** Bass missed by 0.17
+   points in round 7 and the rule was left alone. In round 13 the best vocal candidate
+   ever measured missed the bar on both criteria by the smallest possible margin and the
+   simpler model was taken. That is the protocol working.
+3. **`weirdly_scored.lua` is the most dangerous file here**, and its list is deliberately
+   empty. Every entry raises reported accuracy. Read its four criteria before adding
+   anything: a label is disputed when the chart contradicts it mechanically, not when it
+   is inconvenient.
+4. **Reference songs and corpus MIDI are never shipped or committed.** They are commercial
+   content the author does not own. `_external_docs/` is gitignored and stays that way.
+5. **Standalone Spearman does not predict fitted gain**, in either direction. It is a
+   screen for whether a factor is worth declaring, never a size estimate. Getting this
+   wrong is the single most repeated error in this project's history — weak rho with a big
+   gain, unchanged rho with a big gain, and improved rho with a loss have all happened.
+6. **Judge a factor by the decision view, not the diagnostic view.** See
+   `run_calibration_analysis_vkr.lua` above.
+
+---
+
+## Findings worth keeping
+
+- **The finger-load rule.** Count **attacks** where one motion strikes many gems (guitar,
+  bass, Pro Keys); count **gems** where each one needs its own finger or limb (5-lane keys,
+  drums). This was derived on guitar and bass, then made a correct out-of-sample prediction
+  about drums before drums were in the corpus — the project's strongest methodological
+  result. Its one clean failure was Pro Keys, where the gem version lost, so the mechanism
+  is an open question rather than a settled rule.
+- **The kick is the third limb and outweighs the hands.** `kick_density_peak` carries the
+  largest coefficient in the drum model. `stick_size_mean` is *negative*: simple rock beats
+  land kick and snare together, while the hardest charts are fast single-limb streams.
+- **The vocal rank includes harmony burden.** Scoring `PART VOCALS` alone under-rates
+  3-part songs by ~34 rank points and over-rates 1- and 2-part songs by ~17. Adding
+  `vocal_parts` as a context term is worth +1.53 points and rho +0.579 → +0.626.
+- **The vocal rank means "sing it as written".** Register was initially refused as a factor
+  on the rule that difficulty follows what the game *requires* — pitch-class scoring
+  ignores the octave. Reversing that made the two register columns the strongest factors in
+  the whole vocal set (`notated_range` +0.485, `pitch_p90` +0.474). Low register is *not*
+  hard, measured rather than assumed: `low_time_50` is **-0.167**.
+- **The rank is not Pro-drums-aware.** Scoring drums under an eight-gem vocabulary, where a
+  tom and a cymbal on one colour are different gems, earns no fitted gain. Advising on the
+  Pro reading is a product choice with +0.273 as its measured cost.
+- **Single-note statistics are fragile.** `top_note` is the strongest vocal factor on
+  record (+0.594) and one exceptional note can set it: the corpus's highest top note
+  belongs to an ordinarily-ranked song, which the model using it puts three tiers out.
+  Prefer duration-weighted or time-above-threshold forms.
+
+---
+
+## The full history
+
+The round-by-round record — every hypothesis, every negative result, the reasoning behind
+each factor, and the residual investigations — lives in
+`_future_ideas/general_difficulty_suggester.md`, with per-round detail in the
+`_round14_results.md` and `_round15_results.md` files beside it.
+
+That folder is **gitignored**, so those documents exist only on the authoring machine.
+This README is the tracked summary. If you have the narrative file, read the
+**CURRENT STATUS** block at the top of it before anything else: the rest is chronological,
+and numbers quoted inside a round section are that round's numbers and are often
+superseded.
