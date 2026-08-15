@@ -414,7 +414,6 @@ RB_DIFFICULTY_MODELS = {
     },
     conc = {
         solo_change_ratio = 0,
-        density_ratio = 0,
     },
 },
 }

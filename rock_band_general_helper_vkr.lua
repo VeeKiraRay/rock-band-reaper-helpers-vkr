@@ -212,6 +212,7 @@ for _, _f in ipairs({
     _mdir .. 'actions_difficulty_gtrbass.lua',
     _mdir .. 'actions_difficulty_drums.lua',
     _mdir .. 'difficulty_read.lua',
+    _mdir .. 'difficulty_explain.lua',
     _mdir .. 'difficulty_suggester.lua',
     _mdir .. 'ui_common.lua',
     _mdir .. 'ui_keys.lua',
@@ -287,6 +288,7 @@ dofile(_mdir .. 'actions_difficulty_5k.lua')
 dofile(_mdir .. 'actions_difficulty_gtrbass.lua')
 dofile(_mdir .. 'actions_difficulty_drums.lua')
 dofile(_mdir .. 'difficulty_read.lua')
+dofile(_mdir .. 'difficulty_explain.lua')
 dofile(_mdir .. 'difficulty_suggester.lua')
 dofile(_mdir .. 'ui_common.lua')
 dofile(_mdir .. 'ui_keys.lua')

@@ -499,6 +499,238 @@ Test.it('support bounds actually contain the development rows they describe', fu
     end
 end)
 
+----------------------------------------------------------------------
+-- Explanations and warnings
+----------------------------------------------------------------------
+
+Test.section('difficulty explanations')
+
+-- A record shaped like the adapter's, so the explain layer can be driven without REAPER.
+local function FakeRec(inst, over)
+    local m = RB_DIFFICULTY_MODELS[inst]
+    -- Start every factor at its training mean, i.e. a perfectly ordinary chart.
+    local factors = {}
+    for j, k in ipairs(m.keys) do
+        if k ~= 'is_lego' then factors[k] = m.mean[j] end
+    end
+    local rec = {
+        instrument = inst, label = inst, ok = true, status = m.status,
+        model = m, factors = factors,
+        rank = 250, tier = 3, tier_name = 'Moderate', tier_position = 0.5,
+        clamped = false, raw_rank = 250, span_source = 'anim',
+    }
+    for k, v in pairs(over or {}) do
+        if k == 'factors' then
+            for fk, fv in pairs(v) do factors[fk] = fv end
+        else
+            rec[k] = v
+        end
+    end
+    return rec
+end
+
+-- Nudge one factor by n training standard deviations.
+local function AtZ(inst, key, n)
+    local m = RB_DIFFICULTY_MODELS[inst]
+    for j, k in ipairs(m.keys) do
+        if k == key then return m.mean[j] + n * m.sd[j] end
+    end
+    error('no factor ' .. key .. ' on ' .. inst)
+end
+
+Test.it('every factor of every shipped model has explanation wording', function()
+    -- The product plan's acceptance criterion: every explanation maps to an existing
+    -- measured factor. Checked in the strong direction - a model factor with no entry
+    -- would silently drop out of the panel instead of being explained.
+    local missing = {}
+    for _, inst in ipairs(RB_DIFFICULTY_MODEL_ORDER) do
+        for _, k in ipairs(RB_DIFFICULTY_MODELS[inst].keys) do
+            if k ~= 'is_lego' then
+                local info = DIFFICULTY_FACTOR_INFO[k]
+                if not (info and info.label and info.high and info.low) then
+                    missing[#missing + 1] = inst .. '.' .. k
+                end
+            end
+        end
+    end
+    Test.expect(#missing == 0, 'factors with no wording: ' .. table.concat(missing, ', '))
+end)
+
+Test.it('an ordinary chart gets no explanations and no noisy warnings', function()
+    -- Every factor sits exactly at its training mean, so there is nothing notable to say.
+    -- Manufacturing three observations here is what trains authors to ignore the panel.
+    local rec = FakeRec('guitar')
+    DifficultyAnnotate(rec)
+    Test.expect(#rec.explanations == 0,
+        'expected no explanations, got: ' .. table.concat(rec.explanations, ' | '))
+    Test.expect(#rec.warnings == 0,
+        'expected no warnings on a mid-tier average guitar chart, got ' .. #rec.warnings)
+end)
+
+Test.it('reports at most three properties, most unusual first', function()
+    local rec = FakeRec('drum', { factors = {
+        kick_density_peak = AtZ('drum', 'kick_density_peak', 3.0),
+        density_peak      = AtZ('drum', 'density_peak', 2.0),
+        offbeat_frac      = AtZ('drum', 'offbeat_frac', 1.5),
+        tom_frac          = AtZ('drum', 'tom_frac', 1.2),
+    } })
+    DifficultyAnnotate(rec)
+    Test.expect(#rec.explanations == 3, 'expected 3 explanations, got ' .. #rec.explanations)
+    Test.expect(rec.explanations[1] == DIFFICULTY_FACTOR_INFO.kick_density_peak.high,
+        'the most unusual factor should come first, got: ' .. rec.explanations[1])
+    -- The full table is still available behind the expander, ordered the same way.
+    Test.expect(#rec.factor_rows == #RB_DIFFICULTY_MODELS.drum.keys - 1,
+        'factor rows should cover every model factor except is_lego')
+    Test.expect(rec.factor_rows[1].key == 'kick_density_peak', 'rows are not sorted by |z|')
+end)
+
+Test.it('interval factors read the inverted way round', function()
+    -- tight_p10 is a SPACING in quarter notes, so a low value is the hard direction. A
+    -- naive high/low mapping would tell the author the chart is roomy when it is dense.
+    local rec = FakeRec('guitar', { factors = { tight_p10 = AtZ('guitar', 'tight_p10', -2.5) } })
+    DifficultyAnnotate(rec)
+    Test.expect(rec.explanations[1] == 'Long stretches of closely spaced changes',
+        'low tight_p10 should read as closely spaced, got: ' .. tostring(rec.explanations[1]))
+end)
+
+Test.section('difficulty warnings')
+
+Test.it('flags both tier boundaries, and neither past the ends of the ladder', function()
+    local near_low = FakeRec('guitar', { tier = 3, tier_position = 0.10 })
+    DifficultyAnnotate(near_low)
+    local kinds = {}
+    for _, w in ipairs(near_low.warnings) do kinds[w.kind] = w.text end
+    Test.expect(kinds.boundary and kinds.boundary:find('lower'), 'expected a lower-boundary warning')
+
+    local near_high = FakeRec('guitar', { tier = 3, tier_position = 0.92 })
+    DifficultyAnnotate(near_high)
+    kinds = {}
+    for _, w in ipairs(near_high.warnings) do kinds[w.kind] = w.text end
+    Test.expect(kinds.boundary and kinds.boundary:find('upper'), 'expected an upper-boundary warning')
+
+    -- Nothing below Warmup and nothing above Impossible, so those edges are not "close
+    -- calls" - there is no tier on the other side of them.
+    local floor_rec = FakeRec('guitar', { tier = 0, tier_position = 0.02 })
+    DifficultyAnnotate(floor_rec)
+    for _, w in ipairs(floor_rec.warnings) do
+        Test.expect(w.kind ~= 'boundary', 'tier 0 should not warn about the tier below')
+    end
+    local ceil_rec = FakeRec('guitar', { tier = 6, tier_position = 0.98 })
+    DifficultyAnnotate(ceil_rec)
+    for _, w in ipairs(ceil_rec.warnings) do
+        Test.expect(w.kind ~= 'boundary', 'tier 6 should not warn about the tier above')
+    end
+end)
+
+Test.it('concentration fires above the instrument threshold, not below', function()
+    local thr = RB_DIFFICULTY_MODELS.guitar.conc.solo_change_ratio
+    Test.expect(thr and thr > 1, 'guitar should carry a marked-solo threshold')
+
+    local quiet = FakeRec('guitar', { factors = { solo_change_ratio = thr * 0.9 } })
+    DifficultyAnnotate(quiet)
+    for _, w in ipairs(quiet.warnings) do
+        Test.expect(w.kind ~= 'concentration', 'should not warn below the threshold')
+    end
+
+    local loud = FakeRec('guitar', { factors = { solo_change_ratio = thr * 1.5 } })
+    DifficultyAnnotate(loud)
+    local found = false
+    for _, w in ipairs(loud.warnings) do
+        if w.kind == 'concentration' then found = true end
+    end
+    Test.expect(found, 'should warn above the threshold')
+end)
+
+Test.it('vocals never gets a concentration note', function()
+    -- It has neither a marked solo nor a gem density, so there is no passage to point at.
+    -- The exporter must not have left a zero threshold behind that every chart exceeds.
+    local c = RB_DIFFICULTY_MODELS.vocals.conc
+    Test.expect(not c.density_ratio, 'vocals should carry no density-ratio threshold')
+    Test.expect(not c.solo_change_ratio or c.solo_change_ratio <= 1.0,
+        'vocals should carry no usable marked-solo threshold')
+    local rec = FakeRec('vocals', { factors = { solo_change_ratio = 99, density_peak = 99 } })
+    DifficultyAnnotate(rec)
+    for _, w in ipairs(rec.warnings) do
+        Test.expect(w.kind ~= 'concentration', 'vocals should never warn about concentration')
+    end
+end)
+
+Test.it('out-of-range is reported and does not move the rank', function()
+    local m = RB_DIFFICULTY_MODELS.keys
+    local key, bound
+    for _, k in ipairs(m.keys) do
+        if m.bounds[k] then key, bound = k, m.bounds[k] break end
+    end
+    local rec = FakeRec('keys', { factors = { [key] = bound.max * 2 + 1 } })
+    DifficultyAnnotate(rec)
+    local found
+    for _, w in ipairs(rec.warnings) do
+        if w.kind == 'range' then found = w.text end
+    end
+    Test.expect(found, 'expected an out-of-range warning for ' .. key)
+    Test.expect(found:find('extrapolation'), 'should say the suggestion is an extrapolation')
+    -- Advisory only: the same factors must predict the same rank with or without the note.
+    local a = DifficultyPredictRank(m, rec.factors)
+    local b = DifficultyPredictRank(m, rec.factors)
+    Test.expect(a == b, 'the warning must not change the prediction')
+end)
+
+Test.it('says when playing time was inferred rather than authored', function()
+    local rec = FakeRec('bass', { span_source = 'fallback_no_events' })
+    DifficultyAnnotate(rec)
+    local found
+    for _, w in ipairs(rec.warnings) do if w.kind == 'spans' then found = true end end
+    Test.expect(found, 'a fallback span source should be reported')
+
+    local authored = FakeRec('bass', { span_source = 'anim' })
+    DifficultyAnnotate(authored)
+    for _, w in ipairs(authored.warnings) do
+        Test.expect(w.kind ~= 'spans', 'authored playing states should produce no note')
+    end
+end)
+
+Test.it('carries model maturity as both a badge and a sentence', function()
+    local validated = FakeRec('guitar')
+    DifficultyAnnotate(validated)
+    Test.expect(validated.badge == nil, 'a validated model needs no badge')
+    for _, w in ipairs(validated.warnings) do
+        Test.expect(w.kind ~= 'maturity', 'a validated model needs no maturity note')
+    end
+
+    for inst, badge in pairs({ keys = 'Beta', real_keys = 'Experimental', vocals = 'Experimental' }) do
+        local rec = FakeRec(inst)
+        DifficultyAnnotate(rec)
+        Test.expect(rec.badge == badge,
+            ('%s badge is %s, expected %s'):format(inst, tostring(rec.badge), badge))
+        local found
+        for _, w in ipairs(rec.warnings) do if w.kind == 'maturity' then found = true end end
+        Test.expect(found, inst .. ' should carry a maturity sentence')
+    end
+end)
+
+Test.it('never shows a confidence percentage', function()
+    -- The fitted regressions produce no calibrated per-song probability, and tier-band
+    -- position is a different quantity that would be read as one.
+    for _, inst in ipairs(RB_DIFFICULTY_MODEL_ORDER) do
+        local rec = FakeRec(inst, { tier_position = 0.05, span_source = 'fallback_no_events' })
+        DifficultyAnnotate(rec)
+        for _, w in ipairs(rec.warnings) do
+            Test.expect(not w.text:lower():find('confiden'),
+                inst .. ' warning mentions confidence: ' .. w.text)
+            Test.expect(not w.text:find('%d%d%% likely'), inst .. ' warning implies a probability')
+        end
+    end
+end)
+
+Test.it('describes where in the tier band the suggestion sits', function()
+    Test.expect(DifficultyPositionText(0.05):find('bottom'), '0.05 should read as near the bottom')
+    Test.expect(DifficultyPositionText(0.50):find('middle'), '0.50 should read as the middle')
+    Test.expect(DifficultyPositionText(0.95):find('top'),    '0.95 should read as near the top')
+    Test.expect(DifficultyPositionText(nil) == nil, 'no position means no text')
+end)
+
+Test.section('model artifact - concentration thresholds')
+
 Test.it('concentration thresholds exist where the chart can express concentration', function()
     -- Measured per instrument on purpose. Bass and drums never mark a solo (pitch 103),
     -- so only the density-ratio branch can fire there; vocals has neither column and gets

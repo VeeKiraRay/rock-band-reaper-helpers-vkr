@@ -135,6 +135,7 @@ dofile(_root .. 'lib/reaper_difficulty_tiers.lua')
 dofile(_root .. 'lib/reaper_difficulty_predict.lua')
 dofile(_root .. 'lib/reaper_difficulty_models.lua')
 dofile(_root .. 'rock_band_general_helper_vkr/difficulty_read.lua')
+dofile(_root .. 'rock_band_general_helper_vkr/difficulty_explain.lua')
 dofile(_root .. 'rock_band_general_helper_vkr/difficulty_suggester.lua')
 dofile(_root .. 'dev/calibration/songs_dta.lua')
 
@@ -225,6 +226,7 @@ local tier_hits, tier_total = 0, 0
 local other_bad_keys = {}
 local worst_rank_delta, worst_rank_where, n_tier_flip = 0, '', 0
 local tier_flips = {}
+local warn_counts, n_quiet, n_expl, n_no_expl = {}, 0, 0, 0
 
 for i = 1, math.min(N_SONGS, #songs) do
     local song = songs[i]
@@ -239,6 +241,17 @@ for i = 1, math.min(N_SONGS, #songs) do
         elseif not row then
             n_missing_row = n_missing_row + 1
             parts[#parts + 1] = ('%s: scored but no CSV row'):format(rec.instrument)
+        elseif os.getenv('CARDS') then
+            -- Renders each suggestion the way the Metadata > Difficulty card will, so the
+            -- wording can be read against real charts rather than synthetic factor tables.
+            n_rows = n_rows + 1
+            local head = ('%s%s'):format(rec.label, rec.badge and ('  [' .. rec.badge .. ']') or '')
+            print(('  %s'):format(head))
+            print(('    Suggested: %s (rank %d)%s'):format(
+                rec.tier_name, math.floor(rec.rank + 0.5),
+                rec.position_text and (' - ' .. rec.position_text) or ''))
+            for _, e in ipairs(rec.explanations) do print('    . ' .. e) end
+            for _, w in ipairs(rec.warnings) do print('    ! ' .. w.text) end
         else
             n_rows = n_rows + 1
             local in_model = {}
@@ -291,6 +304,16 @@ for i = 1, math.min(N_SONGS, #songs) do
                 end
             end
 
+            -- Warning noise. "Ordinary charts do not receive noisy warnings on every row"
+            -- is an acceptance criterion the unit tests cannot check: it is a property of
+            -- the thresholds against the real distribution, not of the code.
+            for _, w in ipairs(rec.warnings or {}) do
+                warn_counts[w.kind] = (warn_counts[w.kind] or 0) + 1
+            end
+            if #(rec.warnings or {}) == 0 then n_quiet = n_quiet + 1 end
+            n_expl = n_expl + #(rec.explanations or {})
+            if #(rec.explanations or {}) == 0 then n_no_expl = n_no_expl + 1 end
+
             local actual = tonumber(row[header.rank])
             local at     = TierForRank(rec.instrument, actual)
             tier_total   = tier_total + 1
@@ -321,6 +344,20 @@ print(('worst rank difference  : %.3f rank (%s)'):format(worst_rank_delta, worst
 print(('suggestions changing tier: %d of %d'):format(n_tier_flip, n_rows))
 for _, s in ipairs(tier_flips) do print('  ' .. s) end
 print(('within-one of official : %d/%d'):format(tier_hits, tier_total))
+print('')
+print('-- how noisy the panel is across the corpus --')
+print(('rows with no warning   : %d of %d (%.0f%%)')
+    :format(n_quiet, n_rows, n_quiet / math.max(n_rows, 1) * 100))
+print(('explanations per row   : %.2f  (%d rows had nothing notable)')
+    :format(n_expl / math.max(n_rows, 1), n_no_expl))
+do
+    local kinds = {}
+    for k, n in pairs(warn_counts) do kinds[#kinds + 1] = { k = k, n = n } end
+    table.sort(kinds, function(a, b) return a.n > b.n end)
+    for _, e in ipairs(kinds) do
+        print(('  %-14s %4d  (%.0f%% of rows)'):format(e.k, e.n, e.n / math.max(n_rows, 1) * 100))
+    end
+end
 print('')
 -- The pass condition is the SUGGESTION, not the intermediate. A threshold factor that
 -- flips a note either way is only a defect to the extent it moves the number shown.

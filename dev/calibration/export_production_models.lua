@@ -374,7 +374,13 @@ local function ConcentrationThresholds(d, target, pos)
         if not col then return nil end
         local vals = {}
         for _, i in ipairs(target) do
-            local v = transform and transform(i) or d.feats[i][col]
+            -- NOT `transform and transform(i) or d.feats[i][col]`. A transform returning
+            -- nil - which is how it says "this row cannot express a ratio" - would fall
+            -- through to the raw column and contribute a value it deliberately declined
+            -- to produce. On vocals, where density_avg is structurally 0, that silently
+            -- turned "no threshold" into a threshold of 0, which every chart exceeds.
+            local v
+            if transform then v = transform(i) else v = d.feats[i][col] end
             if v then vals[#vals + 1] = v end
         end
         if #vals == 0 then return nil end

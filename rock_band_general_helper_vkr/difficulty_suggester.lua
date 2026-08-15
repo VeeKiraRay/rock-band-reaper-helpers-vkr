@@ -15,7 +15,8 @@
 --                     RB_DIFFICULTY_MODELS, RB_DIFFICULTY_MODEL_ORDER
 --                     (lib/reaper_difficulty_models.lua),
 --                     DifficultyPredictRank (lib/reaper_difficulty_predict.lua),
---                     TierForRank, TierName, TierPosition (lib/reaper_difficulty_tiers.lua)
+--                     TierForRank, TierName, TierPosition (lib/reaper_difficulty_tiers.lua),
+--                     DifficultyAnnotate (difficulty_explain.lua - load before this file)
 --
 -- Deliberately NOT required: S. The suggestion is a pure function of the project, so it
 -- can be driven by a test with no UI state, and the UI owns where the result is stored.
@@ -148,6 +149,10 @@ local function SuggestOne(spec, vocal_parts)
     rec.tier_name     = TierName(rec.tier)
     rec.tier_position = TierPosition(spec.key, rank, model.rank_hi)
     rec.vocal_parts   = spec.vocal and vocal_parts or nil
+
+    -- Wording is difficulty_explain.lua's job, but it is attached here so every consumer
+    -- gets the same annotations rather than each remembering to ask for them.
+    DifficultyAnnotate(rec)
     return rec
 end
 
