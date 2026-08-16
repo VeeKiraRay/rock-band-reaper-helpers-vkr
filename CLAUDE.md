@@ -81,9 +81,9 @@ dofile(_mdir .. 'defaults.lua')                   -- script-specific modules
 | `lib/reaper_karplus_strong.lua` | `KarplusStrongVoice`, `SynthesizeChordSamples`, `SYNTH_TONES`, `SYNTH_TONE_ORDER`, `SynthToneOpts`, `SynthTonesInFamily` — struck/plucked-string synthesis and its per-instrument tone presets, for chord audition |
 | `lib/reaper_difficulty_score.lua` | `ScoreChart`, `SCORE_FACTOR_KEYS`, `NormalizeSpans`, `EventsInSegments`, `DeriveSpansFromEvents`, `ProRemapEvents`, `Percentile`, `TotalSpanSeconds`, `SpanOverlapSeconds` — chart difficulty factors for guitar/bass/drums/keys/Pro Keys. Pure, no `r`/`ctx`/`S` |
 | `lib/reaper_difficulty_score_vocals.lua` | `ScoreVocalChart`, `NormalizeVocalPhrases`, `VocalClassifyLyric`, `VocalPitchClassDistance`, `VocalNoteIsPitched`, `VocalSubtractPercussion` — the vocal factor set. Pure. **Load after `reaper_difficulty_score.lua`**: it uses that file's span helpers and appends its columns to `SCORE_FACTOR_KEYS` |
-| `lib/reaper_difficulty_tiers.lua` | `RANK_TIER_THRESHOLDS`, `TIER_NAMES`, `TierForRank`, `TierName`, `TierBand`, `TierPosition` — rank to displayed tier (0 Warmup … 6 Impossible), from `_external_docs/InstrumentDifficulty.ts`. Pure |
+| `lib/reaper_difficulty_tiers.lua` | `RANK_TIER_THRESHOLDS`, `TIER_NAMES`, `TierForRank`, `TierName`, `TierBand`, `TierPosition` — rank to displayed tier (0 Warmup … 6 Impossible), from `_external_docs/InstrumentDifficulty.ts`. Pure. **Both open-ended bands are closed by the model, not the tier table**: tier 6 by `rank_hi`, tier 0 by `rank_lo`. Measured from rank 1 instead, every floor-clamped Warmup chart computed 0.85–0.97 and read as almost-Apprentice while having fallen off the *bottom* of the scale (drums: 97% of a 1–124 band whose model floor is 120). Both args are optional and omitting them keeps the tier table's own 1-and-infinity |
 | `lib/reaper_difficulty_predict.lua` | `DIFFICULTY_SCALE_INV`, `DifficultyModelInputs`, `DifficultyPredictRank`, `DifficultyFactorZ`, `DifficultyOutOfRange` — how to apply a frozen model. Pure. Coefficients are in **standardized** units, so nothing may apply them by hand |
-| `lib/reaper_difficulty_models.lua` | **Generated** — `RB_DIFFICULTY_MODELS`, `RB_DIFFICULTY_MODEL_ORDER`, `RB_DIFFICULTY_MODELS_SCHEMA`. The six frozen fitted models. Rewritten only by `dev/calibration/export_production_models.lua`; never hand-edit |
+| `lib/reaper_difficulty_models.lua` | **Generated** — `RB_DIFFICULTY_MODELS`, `RB_DIFFICULTY_MODEL_ORDER`, `RB_DIFFICULTY_MODELS_SCHEMA`. The six frozen fitted models, at schema 2. Carries coefficients, standardization stats, rank clamp, per-factor `bounds`, concentration thresholds, and `corr` (pairwise factor correlations at \|r\| ≥ 0.70, used to stop the explanation panel restating one observation twice). Rewritten only by `dev/calibration/export_production_models.lua`; never hand-edit |
 | `lib/reaper_wav_writer.lua` | `WriteMonoWAV16` |
 
 The three `reaper_difficulty_*` modules are shared with the calibration harness in
@@ -207,6 +207,21 @@ r.ImGui_SameLine(ctx, lbl_col)
 Shared row-drawing functions used by more than one tab (`RenderCamPacingRow`,
 `RenderKeyframeAlignCombo`) take an optional `col_offset` param for this —
 pass the caller's `lbl_col` through so the row joins that tab's alignment.
+
+**Inside an `Indent`, add the row's own start.** `SameLine(ctx, x)` is measured
+from the window's content edge and does **not** include `ImGui_Indent`, so a
+bare `SameLine(ctx, lbl_col)` in an indented block leaves the label only
+`lbl_col - indent` of room and the next widget overlaps the longest one. Read
+the cursor before drawing the label and offset from there, which also survives
+the block gaining or losing an indent level:
+```lua
+local row_x = r.ImGui_GetCursorPosX(ctx)   -- includes the current indent
+r.ImGui_TextDisabled(ctx, label)
+r.ImGui_SameLine(ctx, row_x + lbl_col)
+```
+`rock_band_general_helper_vkr/ui_metadata.lua` is currently the only file that
+combines `Indent` with a label column — every other tab draws unindented, where
+the two forms are identical.
 
 ### Radio button columns
 `RadioButton` has no width parameter, so when a tab has multiple rows of
@@ -397,6 +412,11 @@ that dofiles the code under test and the set.
     settings.lua     tempomap.lua    actions.lua    ui.lua
     ui_common.lua                            ← pieces shared with the standalone
     ui_midi_pattern.lua                        MIDI Pattern window (see below)
+    difficulty_read.lua                      ← Metadata > Difficulty: chart readers
+    difficulty_explain.lua                     (shared with dev/calibration/), wording,
+    difficulty_report.lua                      the pasteable text report, the read-only
+    difficulty_suggester.lua                   adapter, and the tab body
+    ui_metadata.lua
 
   rock_band_music_theory_helper_vkr.lua      ← entry point (only file users run)
   rock_band_music_theory_helper_vkr/

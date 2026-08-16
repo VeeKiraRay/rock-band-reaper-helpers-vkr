@@ -179,6 +179,23 @@ S = {
     -- on_confirm = function() ... end } - set by a Copy*Diff call when the
     -- target already has notes; consumed by the confirm popup in ui_difficulty.lua.
     diff_copy_pending     = nil,
+    -- Metadata > Difficulty: the last set of suggestion records from
+    -- SuggestProjectDifficulties(). SESSION-ONLY and deliberately never persisted - a
+    -- prediction is derived from the charts as they are right now, and a saved one would
+    -- go stale the moment the author edits a note while still looking authoritative.
+    -- Cleared on project switch alongside the track indices; nil = not scanned yet.
+    diff_suggestions      = nil,
+    -- Show the raw factor measurements behind each suggestion. "peak attack rate 4.51,
+    -- +1.8 sd" is a debugging view, meaningful to someone comparing against the
+    -- calibration corpus and noise to everyone else; the plain-language bullets above it
+    -- say the same thing in words.
+    --
+    -- SESSION ONLY, DELIBERATELY NOT PERSISTED. Its control lives behind
+    -- S.show_wip_tabs, so a saved value could come back in a project where the checkbox
+    -- is not on screen - leaving a Details panel open with nothing visible to close it,
+    -- and no way to tell which of the two flags put it there. Starting from off every
+    -- session means the panel's visibility always has exactly one explanation.
+    diff_show_factors     = false,
     -- Cached filtered track lists (not persisted - rebuilt by RefreshTrackLists)
     all_track_list        = nil,
     audio_track_list      = nil,
@@ -242,6 +259,44 @@ TIPS = {
     save          = "Save current settings to this project.",
     load          = "Load previously saved settings from this project.",
     track_refresh = "Refresh the track lists to include any newly added or renamed tracks.",
+
+    -- Metadata > Difficulty
+    diff_suggest_refresh =
+        "Score every Expert chart in this project and suggest a rank and tier for each.\n\n" ..
+        "Read-only: nothing is written to the project, and no undo point is created.\n" ..
+        "Results are not saved - re-run after editing a chart.\n\n" ..
+        "The whole chart is scored. A time selection does not change the result.",
+    diff_dots =
+        "Rock Band shows an instrument's difficulty as five dots.\n\n" ..
+        "Filled dots are how far up the scale the part sits: none for Warmup, two for " ..
+        "Solid, five for Nightmare. Impossible fills all five in red.\n\n" ..
+        "Two tiers share five filled dots because that is how the game displays them.",
+    diff_copy =
+        "Copy every scored part to the clipboard as plain text, ready to paste into a " ..
+        "post or a message.\n\n" ..
+        "The full measured values are always included, whether or not they are shown " ..
+        "on screen.\n\n" ..
+        "Which model produced each number is included too, so a copy stays readable " ..
+        "after the models are updated.",
+    diff_ruler =
+        "Where this chart landed between the tier it earned and the next one up.\n\n" ..
+        "A tier is a threshold, so a chart sitting near either end could reasonably be " ..
+        "called either tier - the marker shows how much room there was.\n\n" ..
+        "An amber marker pinned to one end means the score ran past the end of the " ..
+        "scale, so its real position is further out than the ruler can show.",
+    diff_show_factors =
+        "Show the raw measurements behind each suggestion.\n\n" ..
+        "This is a development view - useful for comparing a chart against the reference " ..
+        "songs, and not needed to read the result. The bullet points above each card say " ..
+        "the same thing in words.\n\n" ..
+        "Not saved: it starts off again next time the script is opened.",
+    diff_suggest_why =
+        "The chart properties on which this part is unusual, compared with the songs the " ..
+        "model was fitted on.\n\n" ..
+        "These are measurements, not causes: they describe what is distinctive about the " ..
+        "chart rather than claiming which property produced the rank.\n\n" ..
+        "The value column is the measurement; the last column is how many standard " ..
+        "deviations it sits from the average charted song.",
 
     -- General tab
     align_all_audio = "Align every single-item audio track in the project to the SONG AUDIO start position.\n\n" ..

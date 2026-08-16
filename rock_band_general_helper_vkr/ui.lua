@@ -46,6 +46,9 @@ local function Loop()
         S.diff_gtr_idx       = -1
         S.diff_bass_idx      = -1
         S.diff_drums_idx     = -1
+        -- Metadata > Difficulty results describe the PREVIOUS project's charts. Leaving
+        -- them on screen after a switch would attribute one song's ranks to another.
+        S.diff_suggestions   = nil
         local loaded = LoadSettings()
         S.status = loaded and 'Project switched: loaded saved settings.'
                            or 'Project switched.'
@@ -254,6 +257,18 @@ local function Loop()
             if r.ImGui_BeginTabItem(ctx, 'Venue') then
                 _new_tab = 'Venue'
                 DrawVenueTab(ctx)
+                r.ImGui_EndTabItem(ctx)
+            end
+
+            ------------------------------------------------------------
+            -- Metadata tab
+            --
+            -- Last of the stable tabs, immediately before the WIP ones, so the
+            -- stable/WIP split stays visually intact.
+            ------------------------------------------------------------
+            if r.ImGui_BeginTabItem(ctx, 'Metadata') then
+                _new_tab = 'Metadata'
+                DrawMetadataTab(ctx)
                 r.ImGui_EndTabItem(ctx)
             end
 

@@ -19,7 +19,7 @@ versioned nor deployed, so a deployed copy finds no songs. Register the repo cop
 
 ## Where things stand
 
-Selected model per instrument, as of round 15 (2026-08-14). Reproduced from
+Selected model per instrument, as of round 17 (2026-08-16). Reproduced from
 `calibration_protocol_report.txt`, which is regenerated on every protocol run and is the
 authority if these disagree.
 
@@ -28,7 +28,7 @@ authority if these disagree.
 | guitar | `full@attacks` | log(rank) | 21 | 95.70% | **92.18%** | 1.81% | +0.884 | **passes** |
 | bass | `baseline+ent_rel@attacks` | log(rank) | 3 | 95.28% | **91.68%** | 1.91% | +0.830 | **passes** |
 | drum | `full_drum` | rank | 26 | 95.28% | **91.68%** | 3.07% | +0.859 | **passes** |
-| keys | `primary+entropy_rel+complex_peak` | rank | 8 | 93.77% | 89.14% | 3.72% | +0.874 | fails narrowly |
+| keys | `primary+ent_rel+complex@attacks-chord` | log(rank) | 7 | 94.02% | 89.44% | 0.82% | +0.880 | fails narrowly |
 | real_keys | `primary+ent_rel@attacks` | rank | 7 | 86.89% | 81.05% | 4.47% | +0.833 | fails |
 | vocals | `primary+range+parts` | log(rank) | 10 | 90.83% | 86.32% | 5.04% | +0.626 | fails |
 
@@ -329,8 +329,11 @@ model has to earn its place consistently, not post a higher average once.
   result. Its one clean failure was Pro Keys, where the gem version lost, so the mechanism
   is an open question rather than a settled rule.
 - **The kick is the third limb and outweighs the hands.** `kick_density_peak` carries the
-  largest coefficient in the drum model. `stick_size_mean` is *negative*: simple rock beats
-  land kick and snare together, while the hardest charts are fast single-limb streams.
+  largest coefficient in the drum model. (An earlier version of this finding added that
+  `stick_size_mean` is *negative*, i.e. that simultaneous limbs read easier. **That is not
+  true of the shipped model** — its coefficient is **+4.72**, and holding attack rate fixed
+  the correlation with rank is **+0.01**, no effect in either direction. It reads negative
+  only when GEM density is held fixed, which is the units artifact described below.)
 - **The vocal rank includes harmony burden.** Scoring `PART VOCALS` alone under-rates
   3-part songs by ~34 rank points and over-rates 1- and 2-part songs by ~17. Adding
   `vocal_parts` as a context term is worth +1.53 points and rho +0.579 → +0.626.
@@ -346,6 +349,136 @@ model has to earn its place consistently, not post a higher average once.
   record (+0.594) and one exceptional note can set it: the corpus's highest top note
   belongs to an ordinarily-ranked song, which the model using it puts three tiers out.
   Prefer duration-weighted or time-above-threshold forms.
+- **The sparse end of drums is noisy in the LABELS. Do not "fix" it in the model.** An
+  author reported a slow rock-beat chart scoring 113 (pinned to the 120 floor) against their
+  own judgement of Apprentice. Investigated and closed with no change:
+
+  - The penalties are all one fact — the chart is slow. Average attack rate **-34.8**, peak
+    kick rate **-29.5**, peak and average gem density **-26.0** each, total gems **-16.0**.
+    It is **11 rank short** of Apprentice, much closer than the pinned display suggests.
+  - Its 407 total gems is below the corpus minimum of **502**, so it is an extrapolation.
+  - **There is no systematic bias at the sparse end**: mean signed error over the 12
+    sparsest corpus drum charts is **+1.4 rank**, and **-0.1** over all 159.
+  - What there is, is scatter of **±50 rank** — where the whole Warmup→Solid span is
+    124→178 — because the official labels disagree with each other down there. Harmonix
+    rated `wanteddeadoralive2` **120** and `livelyupyourself2` **229** at nearly identical
+    densities, and `dreamonlive` (density 3.66) got **129**.
+
+  So an author's Apprentice call on such a chart is well inside the model's error band and
+  is not evidence of a defect. The model is unreliable at the sparse end because its
+  training labels are, and no reparameterisation fixes that — only labels would.
+
+- **A coefficient's sign is only interpretable relative to the units of the factors beside
+  it.** The cleanest case in the project: `chord_size_mean` is **-12.86 on keys** and
+  **+12.22 on Pro Keys** — the same music, scored from the same notes, sign reversed. The
+  models differ in one relevant way. Keys measures density in **gems** (`density_peak`), so
+  a three-note chord triples it and `chord_size_mean` is free to divide that back out,
+  landing negative. Pro Keys measures **attacks** (`attack_density_peak`), where nothing
+  needs dividing out, and it lands positive. Guitar also measures attacks and its chord
+  coefficient is ~0.00; bass omits the factor entirely.
+
+  The negative sign is a **decomposition artifact, not a statement that chords are easy**.
+  Holding attack rate fixed, chord size against official rank is **+0.24 on keys and +0.22
+  on Pro Keys** — larger chords go with *higher* ranks. Unconditionally it is only +0.08,
+  because chordal parts are struck more slowly; speed was the confound and chord size was
+  standing in for it.
+
+  This reaches authors: a slow 80bpm keys chart of sustained three-note chords scored **84**
+  uncapped, of which **-50 was chord size alone**, and the identical chart written as single
+  notes scores **152**. Authors dispute that on sight and they are right to. Note separately
+  that `chord_size_mean`'s corpus maximum is **2.80**, so an all-triads chart is an
+  extrapolation as well as a low scorer.
+
+  **ROUND 16 settled it.** A 2x2 over the selected keys candidate, holding the other six
+  factors fixed — gems/attacks × with/without `chord_size_mean`:
+
+  | cell | k | best usable | lower bound | rho |
+  |---|---:|---:|---:|---:|
+  | gems + chord (round 15 incumbent) | 8 | 93.77% | 89.14% | +0.874 |
+  | gems − chord | 7 | 92.21% | 87.24% | +0.860 |
+  | attacks + chord | 8 | **94.02%** | 89.44% | +0.875 |
+  | attacks − chord | 7 | **94.02%** | 89.44% | **+0.880** |
+
+  The two attacks cells are **identical to two decimal places**, and the fitted chord
+  coefficient collapses from **−12.86** (with gems) to **+0.02** (with attacks). Dropping
+  chord size costs 1.56 points under gems and *nothing* under attacks. The factor was doing
+  the gems-to-attacks conversion and nothing else — as predicted before the run. Selection
+  went to the simpler 7-feature `@attacks-chord` on the ties-to-simpler rule.
+
+  Two things the round did **not** establish. It did not show that chords are hard: the
+  factor is simply redundant once density counts attacks. And it did not fix the gate —
+  89.44% against the 90% floor, still a sample-size problem at n=122.
+
+  **This was adopted.** `lib/reaper_difficulty_models.lua` ships the round 16 model, so
+  voicing is no longer an input to a keys suggestion at all. What it fixed, measured on a
+  real chart: a slow keys part at a fixed strike rate scored 140 / 112 / 84 voiced one,
+  two and three notes wide under round 15 — roughly **-28 rank per added note**, two tiers
+  between the extremes, with the triad version pinned to the clamp floor. Under round 16
+  it scores **147 at every voicing**. The author who reported it converted their chart to
+  single notes and measured 144 against 84, independently confirming the slope.
+
+- **Chord voicing earns nothing on keys once speed is counted honestly (round 17).** Having
+  removed the artifact, the obvious next question is whether chords add difficulty for real.
+  Three candidates on the round 16 base:
+
+  | candidate | k | best usable | lower bound | coefficient on the added factor |
+  |---|---:|---:|---:|---:|
+  | base (round 16) | 7 | 94.02% | 89.44% | — |
+  | + `chord_change_frac` | 8 | 94.02% | 89.44% | +0.008 |
+  | + `chord_span_mean` | 8 | 94.18% | 89.64% | **-0.010** |
+  | + both | 9 | 93.61% | 88.93% | — |
+  | (+ `chord_size_mean`, from round 16) | 8 | 94.02% | 89.44% | +0.020 |
+
+  Nothing came near the 1-point bar — the best is +0.16 — so the base was retained. Every
+  coefficient is negligible, and the one belonging to the *best-performing* candidate is
+  **negative**, which under round 17's own pre-registered rule would have been grounds to
+  refuse it had it been selected.
+
+  The honest reading: **the official keys rank does not measurably reward chord voicing once
+  strike speed is accounted for.** That is a result, not a failure, and it is why shipping a
+  voicing-neutral model is right rather than merely convenient.
+
+  **"Not measurable" is not "not there", and the difference decides this.** The fitted
+  coefficient on `chord_size_mean` is small in standardized units but *not* small in effect:
+  at +0.0203 on log(rank) with sd 0.379, including it would move a chart **+11.3%** between
+  single notes and triads — +17 rank at 150, +28 at 250, about half a tier. What is small is
+  the evidence. The partial correlation with rank falls from **+0.24 holding attack rate
+  alone to +0.10 holding the full base**: `complex_peak`, `entropy_h2_rel` and
+  `total_changes` already absorb most of what chord size was tracking. At n=122 with 8
+  factors the standard error on a correlation is ≈0.09, so +0.10 is **one standard error
+  from zero**.
+
+  So the factor is excluded because it would do a lot on evidence that cannot support it —
+  not because it would do little. Anyone revisiting this should not read the round 17 table
+  as "chords do not matter". The right sentence is "the corpus cannot tell whether they do".
+  Keys needs ~50 more songs to clear the gate regardless (n=122 → 172); at that size a +0.10
+  residual becomes testable, and this question gets a real answer for free.
+
+  A methodological note worth the embarrassment: round 17 predicted `chord_change_frac`
+  would be the strongest of the three, because its partial correlation was +0.22 against
+  `chord_span_mean`'s +0.05. It was the weaker of the two. That is this README's own rule
+  about standalone correlation not predicting fitted gain, walked into by the person who
+  wrote it down.
+
+  Regardless of any of this, **no shipped wording may state a difficulty direction for this
+  factor** — see the header of `rock_band_general_helper_vkr/difficulty_explain.lua`.
+- **Playing time barely matters, and "sparse charts are penalised" is measured and false.**
+  A recurring hypothesis, worth recording so it is not re-proposed: `playing_s` carries
+  **-0.81** rank per sd on keys and **-0.34** on drums, against +32 for the largest lever
+  in the same model. Across its entire observed range it moves a suggestion by ~1 rank
+  point, and the *sign is negative*, so a short chart already gets a tiny bonus. The corpus
+  covers the sparse end well — keys `playing_s` spans **29-474 s**, and Harmonix rated
+  `californication` (29 s of keys) Warmup 130 while `turningjapanese` (98 s) got
+  Apprentice 178. A chart that scores low while playing little is being scored low for
+  density, repetition and complexity, which happen to co-occur with playing little.
+- **The selected factors are collinear enough to matter downstream.** Not a modelling
+  result — the ridge handles it — but the explanation UI shows the three *most unusual*
+  measurements, and on 20% of corpus rows two of those were a correlated pair restating one
+  observation. Worst offenders are per-instrument: `entropy_h2`/`entropy_h2_rel` **+0.96 on
+  drums**, `notes_total`/`total_changes` **+0.94 drums but +0.80 guitar**,
+  `complex_peak`/`density_peak` **+0.88 keys only**, `tight_p10`/`tight_med` **+0.45 drums
+  to +0.75 vocals**. The exporter therefore ships a `corr` table per model. Any future
+  consumer that ranks or groups factors needs the same treatment.
 
 ---
 

@@ -9,6 +9,32 @@ over 5. See `CLAUDE.md` → "Changelog / `@about` trimming" for the rule.
 
 `rock_band_general_helper_vkr.lua`
 
+**v0.9.49**
+- New standalone window: MIDI Pattern (rock_band_midi_pattern_vkr.lua),
+  the MIDI > Pattern sub-tab in a window of its own, so it can sit beside
+  the MIDI editor without the other eight tabs coming with it. Same Set
+  Search / Set Replace / Replace All / Fill Range / Go Prev / Go Next /
+  List Search, the same difficulty pitch-range filter, and the same
+  status and result panel including an Undo button - Replace All and
+  Fill Range write MIDI, so undo matters here. It carries no settings of
+  its own because the Pattern tab has never had any to save; a project
+  switch clears the captured patterns rather than leaving them pointing
+  at the previous project's take. It appears in the General > Other
+  tools sub-tab of both this script and the Vocal Helper, which now list
+  five buttons.
+- The sub-tab itself is unchanged and still lives in the MIDI tab. Its
+  drawing code moved to a new ui_midi_pattern.lua so both windows draw
+  one implementation rather than two that could drift, and the pieces
+  both entry points need - the track dropdown and the bottom status /
+  result panel - moved to a new ui_common.lua, since ui.lua cannot be
+  loaded by a standalone (its last line opens the full helper window).
+  Same split the Vocal Helper made for its standalone Pitch Tuner.
+- Fix: switching projects left the captured Search and Replace patterns
+  in place. They are tick offsets into a specific take, labelled with the
+  measure numbers of the project they came from, so a Replace All after
+  a project switch could act on the wrong material. They are now cleared
+  along with the source track, as every other track selector already was.
+
 **v0.9.48**
 - New General > Other tools sub-tab: buttons that open the other scripts
   in this set - Vocal Helper and Music Theory Helper, plus the standalone

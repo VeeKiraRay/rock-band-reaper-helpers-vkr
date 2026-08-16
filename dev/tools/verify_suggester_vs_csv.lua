@@ -247,10 +247,27 @@ for i = 1, math.min(N_SONGS, #songs) do
             n_rows = n_rows + 1
             local head = ('%s%s'):format(rec.label, rec.badge and ('  [' .. rec.badge .. ']') or '')
             print(('  %s'):format(head))
-            print(('    Suggested: %s (rank %d)%s'):format(
-                rec.tier_name, math.floor(rec.rank + 0.5),
-                rec.position_text and (' - ' .. rec.position_text) or ''))
-            for _, e in ipairs(rec.explanations) do print('    . ' .. e) end
+            print(('    Suggested: %s (rank %d)'):format(
+                rec.tier_name, math.floor(rec.rank + 0.5)))
+            -- The tier ruler, spelled out. The card DRAWS this - a proportional font
+            -- cannot keep dash columns aligned - but a console is monospace, so here the
+            -- dashed form is exactly right, and it is the fastest way to scan the band
+            -- ends and the clamp behaviour down a few hundred rows at once.
+            if rec.ruler then
+                local N   = 24
+                local pos = math.max(0, math.min(1, rec.ruler.pos or 0))
+                if rec.ruler.pinned == 'lo' then pos = 0
+                elseif rec.ruler.pinned == 'hi' then pos = 1 end
+                local at    = math.floor(pos * N + 0.5)
+                local track = {}
+                for tick = 0, N do
+                    track[#track + 1] = (tick == at) and (rec.ruler.pinned and '#' or '|')
+                                     or ((tick % 4 == 0) and '.' or '-')
+                end
+                print(('    %22s %s %s'):format(
+                    rec.ruler.lo_label, table.concat(track), rec.ruler.hi_label))
+            end
+            for _, e in ipairs(rec.explanations) do print('    . ' .. e.text) end
             for _, w in ipairs(rec.warnings) do print('    ! ' .. w.text) end
         else
             n_rows = n_rows + 1

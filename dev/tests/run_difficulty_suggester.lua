@@ -47,8 +47,9 @@ dofile(_root .. 'lib/reaper_difficulty_score_vocals.lua')   -- appends the vocal
 dofile(_root .. 'lib/reaper_difficulty_tiers.lua')
 dofile(_root .. 'lib/reaper_difficulty_predict.lua')
 dofile(_root .. 'lib/reaper_difficulty_models.lua')
--- Pure (no r/S/ctx), so it loads here without the rest of the helper's chain.
+-- Pure (no r/S/ctx), so they load here without the rest of the helper's chain.
 dofile(_root .. 'rock_band_general_helper_vkr/difficulty_explain.lua')
+dofile(_root .. 'rock_band_general_helper_vkr/difficulty_report.lua')
 
 -- Calibration-side pieces the parity section needs: the ridge fit it refits with, the
 -- disputed-label rule that defines the training partition, and PROTOCOL.LEGO_WEIGHT.

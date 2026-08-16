@@ -23,10 +23,16 @@
 --   conc        concentration thresholds (p90) for the "difficulty is concentrated in a
 --               short passage" note. Measured per instrument because a single cutoff is
 --               wrong - bass and drums never mark a solo at all.
+--   corr        pairwise correlation between this model's own factors, over the same
+--               rb3_dlc rows as bounds, emitted only for pairs at |r| >= 0.70. Lets the
+--               explanation panel drop a "notable property" that merely restates one it
+--               has already shown - which factors duplicate is per-instrument, so it is
+--               measured rather than hand-grouped. Key is the two factor names joined by
+--               '|'; readers must try both orderings.
 --   status      model maturity for the UI badge. Describes validation against noisy
 --               official ranks, NOT the probability that a prediction is correct.
 
-RB_DIFFICULTY_MODELS_SCHEMA = 1
+RB_DIFFICULTY_MODELS_SCHEMA = 2
 RB_DIFFICULTY_MODELS_CSV_FINGERPRINT = 4207280094
 
 RB_DIFFICULTY_MODEL_ORDER = {
@@ -127,6 +133,19 @@ RB_DIFFICULTY_MODELS = {
         solo_change_ratio = 2.6720064000000003,
         density_ratio = 2.251158391639551,
     },
+    corr = {
+        ["attack_density_avg|attack_density_peak"] = 0.774515021623305,
+        ["attack_density_avg|notes_total"] = 0.7338264116902228,
+        ["change_rate|total_changes"] = 0.7635877853713624,
+        ["chord_change_frac|anchor_frac"] = 0.7671402173566748,
+        ["chord_size_mean|anchor_frac"] = 0.70449261659585,
+        ["chord_size_mean|chord_change_frac"] = 0.8364011123981437,
+        ["move_mean|anchor_frac"] = -0.8686845935549218,
+        ["move_mean|move_p90"] = 0.8175165823927381,
+        ["notes_total|total_changes"] = 0.8003145017987306,
+        ["playing_s|notes_total"] = 0.7197445721521418,
+        ["playing_s|total_changes"] = 0.7494854887249607,
+    },
 },
 
 ["bass"] = {
@@ -162,6 +181,8 @@ RB_DIFFICULTY_MODELS = {
     conc = {
         solo_change_ratio = 1,
         density_ratio = 2.090430748669315,
+    },
+    corr = {
     },
 },
 
@@ -263,47 +284,68 @@ RB_DIFFICULTY_MODELS = {
         solo_change_ratio = 1,
         density_ratio = 1.5750853454436098,
     },
+    corr = {
+        ["attack_density_peak|hand_density_peak"] = 0.9402313999484767,
+        ["change_rate|attack_density_avg"] = 0.8355918257305597,
+        ["chord_size_mean|chord_change_frac"] = 0.8426654084628382,
+        ["chord_size_mean|stick_size_mean"] = 0.7261341361291734,
+        ["density_avg|attack_density_avg"] = 0.899722810699235,
+        ["density_avg|change_rate"] = 0.8124607884995176,
+        ["density_avg|density_peak"] = 0.7924671314509768,
+        ["density_avg|kick_density"] = 0.7647040499856461,
+        ["density_peak|attack_density_avg"] = 0.7189614328713074,
+        ["density_peak|attack_density_peak"] = 0.8688634862398642,
+        ["density_peak|hand_density_peak"] = 0.9270559558969452,
+        ["density_peak|kick_density"] = 0.7250876387451295,
+        ["density_peak|kick_density_peak"] = 0.7472147731434347,
+        ["entropy_h2|entropy_h2_rel"] = 0.9618238689443517,
+        ["kick_density|kick_density_peak"] = 0.8464451872312739,
+        ["move_mean|move_p90"] = 0.8143842794154478,
+        ["notes_total|total_changes"] = 0.9373929179086646,
+        ["playing_s|notes_total"] = 0.8245227838408662,
+        ["playing_s|total_changes"] = 0.7822778196101237,
+        ["tight_med|offbeat_frac"] = -0.8090136630206841,
+    },
 },
 
 ["keys"] = {
-    candidate = "primary+entropy_rel+complex_peak",
-    scale     = "rank",
+    candidate = "primary+ent_rel+complex@attacks-chord",
+    scale     = "log(rank)",
     status    = "beta",
     ridge     = 0.1,
     rank_lo   = 130,
     rank_hi   = 488,
-    intercept = 281.03278688524586,
+    intercept = 5.577659999335492,
     n_target  = 122,
     n_lego    = 0,
     keys = {
         "total_changes",
-        "density_peak",
+        "attack_density_peak",
         "tight_p10",
         "tight_med",
-        "chord_size_mean",
         "playing_s",
         "entropy_h2_rel",
         "complex_peak",
         "is_lego",
     },
     mean = {
-        384.94262295081967, 5.954866803278688, 0.47209698360655744, 0.8867486229508196, 
-        1.512424254098362, 221.02123569672116, 1.040071401639344, 7.952419844262292, 0
+        384.94262295081967, 4.1629610655737705, 0.47209698360655744, 0.8867486229508196, 
+        221.02123569672116, 1.040071401639344, 7.952419844262292, 0
     },
     sd = {
-        280.9968000278775, 2.9659787013650742, 0.7430030188807889, 1.13029443574164, 
-        0.37886280287615093, 91.60026022740786, 0.36665155686065015, 4.600545585838883, 1
+        280.9968000278775, 2.051725016432217, 0.7430030188807889, 1.13029443574164, 
+        91.60026022740786, 0.36665155686065015, 4.600545585838883, 1
     },
     coefs = {
-        19.719507806472762, 30.03854611070344, -1.0329860685425027, 0.7160912123114952, 
-        -12.858664002343508, -0.8115701244579301, 18.64759668436102, 32.17234845893156, 0
+        0.05275821442175253, 0.1050779144174923, -0.013434515366388395, 
+        -0.008448769363741282, -0.00048027219318340977, 0.07476495677862334, 
+        0.11947111657442214, 0
     },
     bounds = {
         ["total_changes"] = { min = 14, max = 1670, p90 = 740.7000000000002 },
-        ["density_peak"] = { min = 1.09375, max = 13.375, p90 = 10.125 },
+        ["attack_density_peak"] = { min = 0.375, max = 12.5, p90 = 6.573125 },
         ["tight_p10"] = { min = 0.083333, max = 8, p90 = 0.5 },
         ["tight_med"] = { min = 0.125, max = 8, p90 = 1.5 },
-        ["chord_size_mean"] = { min = 1, max = 2.797203, p90 = 2.0108243 },
         ["playing_s"] = { min = 29.179926, max = 473.514269, p90 = 349.94541730000003 },
         ["entropy_h2_rel"] = { min = 0.047445, max = 1.762838, p90 = 1.5630469000000002 },
         ["complex_peak"] = { min = 0, max = 22.013519, p90 = 13.896128800000001 },
@@ -311,6 +353,9 @@ RB_DIFFICULTY_MODELS = {
     conc = {
         solo_change_ratio = 1.2364010000000005,
         density_ratio = 2.743397310334657,
+    },
+    corr = {
+        ["attack_density_peak|complex_peak"] = 0.7538117356635748,
     },
 },
 
@@ -358,6 +403,8 @@ RB_DIFFICULTY_MODELS = {
     conc = {
         solo_change_ratio = 1.2691227000000014,
         density_ratio = 2.737163048653761,
+    },
+    corr = {
     },
 },
 
@@ -414,6 +461,9 @@ RB_DIFFICULTY_MODELS = {
     },
     conc = {
         solo_change_ratio = 0,
+    },
+    corr = {
+        ["tight_p10|tight_med"] = 0.7487316655315743,
     },
 },
 }

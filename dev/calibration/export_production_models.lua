@@ -52,7 +52,8 @@ local _out = _root .. 'lib/reaper_difficulty_models.lua'
 -- (a new field, a renamed one), not when the numbers move - the consumer checks this and
 -- refuses a table it does not understand, which is what stops a stale artifact from being
 -- read as a plausible but wrong model.
-local SCHEMA = 1
+-- 2: added `corr`, per-model factor correlations for explanation deduplication.
+local SCHEMA = 2
 
 dofile(_dir .. 'difficulty_score.lua')          -- SCORE_FACTOR_KEYS
 dofile(_dir .. 'difficulty_score_vocals.lua')   -- appends the vocal columns to it
@@ -74,7 +75,16 @@ local SELECTIONS = {
     { inst = 'guitar',    candidate = 'full@attacks',                     scale = 'log(rank)' },
     { inst = 'bass',      candidate = 'baseline+ent_rel@attacks',         scale = 'log(rank)' },
     { inst = 'drum',      candidate = 'full_drum',                        scale = 'rank'      },
-    { inst = 'keys',      candidate = 'primary+entropy_rel+complex_peak', scale = 'rank'      },
+    -- ROUND 16. Replaced 'primary+entropy_rel+complex_peak' / rank. That model measured
+    -- density in GEMS and carried chord_size_mean at -12.86 to divide chords back out of
+    -- the count - which charged a real chart ~28 rank per extra note in its voicing, so
+    -- the same music voiced as triads scored two tiers below the single-note version.
+    -- This one counts ATTACKS and drops the chord factor entirely, so voicing is not an
+    -- input at all. Equal accuracy (94.02% vs 93.77% cross-validated) and one factor
+    -- fewer. See dev/calibration/README.md, "a coefficient's sign is only interpretable
+    -- relative to the units of the factors beside it".
+    { inst = 'keys',      candidate = 'primary+ent_rel+complex@attacks-chord',
+                                                                     scale = 'log(rank)' },
     { inst = 'real_keys', candidate = 'primary+ent_rel@attacks',          scale = 'rank'      },
     { inst = 'vocals',    candidate = 'primary+range+parts',              scale = 'log(rank)' },
 }
@@ -357,6 +367,78 @@ local function FactorBounds(d, target, keys, pos)
     return bounds
 end
 
+----------------------------------------------------------------------
+-- Pairwise correlation between a model's own factors
+--
+-- Consumed by DifficultyExplanations, which shows at most three "notable properties" and
+-- picks them by how far each measurement sits from the corpus mean. That rule has no idea
+-- whether a factor says anything NEW: on 20% of corpus rows two of the three slots went to
+-- a correlated pair, i.e. one observation stated twice, while a genuinely different
+-- property waited behind it.
+--
+-- MEASURED AND SHIPPED RATHER THAN HAND-GROUPED, because which factors duplicate is a
+-- property of the instrument, not of the vocabulary. entropy_h2 and entropy_h2_rel
+-- correlate +0.96 on drums; notes_total and total_changes +0.94 on drums but +0.80 on
+-- guitar; complex_peak and density_peak +0.88 on keys alone; tight_p10 and tight_med range
+-- from +0.45 on drums to +0.75 on vocals. A single hand-written grouping would either miss
+-- the drum pairs or suppress the spacing pair where it genuinely carries two facts.
+--
+-- Target rows only, matching FactorBounds and for the same reason: every prediction is
+-- made on the RB3 scale, so the correlations the product reasons about are RB3's.
+--
+-- Only pairs at or above the threshold are emitted - the artifact carries what it needs to
+-- suppress a restatement, not a full matrix. is_lego is excluded: it is a training-time
+-- origin flag and can never be a bullet.
+----------------------------------------------------------------------
+
+-- Below this two factors are treated as saying different things. Must not be raised above
+-- the consumer's own COLLINEAR_R in difficulty_explain.lua, or a pair that file wants to
+-- suppress would simply be missing from the artifact.
+local CORR_EMIT_MIN = 0.70
+
+local function Correlation(xs, ys)
+    local n = #xs
+    if n < 2 then return 0 end
+    local mx, my = 0, 0
+    for i = 1, n do mx, my = mx + xs[i], my + ys[i] end
+    mx, my = mx / n, my / n
+    local sxy, sxx, syy = 0, 0, 0
+    for i = 1, n do
+        local a, b = xs[i] - mx, ys[i] - my
+        sxy, sxx, syy = sxy + a * b, sxx + a * a, syy + b * b
+    end
+    -- A constant column correlates with nothing; report 0 rather than dividing by zero.
+    if sxx <= 0 or syy <= 0 then return 0 end
+    return sxy / math.sqrt(sxx * syy)
+end
+
+local function FactorCorrelations(d, target, keys, pos)
+    local cols = {}
+    for _, k in ipairs(keys) do
+        if k ~= 'is_lego' then
+            local vals = {}
+            for _, i in ipairs(target) do vals[#vals + 1] = d.feats[i][pos[k]] end
+            cols[k] = vals
+        end
+    end
+    local out, n = {}, 0
+    for a = 1, #keys do
+        for b = a + 1, #keys do
+            local ka, kb = keys[a], keys[b]
+            if cols[ka] and cols[kb] then
+                local rr = Correlation(cols[ka], cols[kb])
+                if math.abs(rr) >= CORR_EMIT_MIN then
+                    -- Joined in the model's own key order. The reader tries both
+                    -- orderings, so this needs no sorting convention.
+                    out[ka .. '|' .. kb] = rr
+                    n = n + 1
+                end
+            end
+        end
+    end
+    return out, n
+end
+
 -- The concentration warning's threshold, per instrument, from the same target rows.
 --
 -- Measured rather than assumed, because a single cutoff is provably wrong here: guitar's
@@ -545,6 +627,7 @@ for _, sel in ipairs(SELECTIONS) do
                     rank_hi   = rank_hi,
                     bounds    = FactorBounds(d, target, cand.keys, pos),
                     conc      = ConcentrationThresholds(d, target, pos),
+                    corr      = FactorCorrelations(d, target, cand.keys, pos),
                     n_target  = #target,
                     n_lego    = #extra,
                 }
@@ -616,6 +699,12 @@ W([[
 --   conc        concentration thresholds (p90) for the "difficulty is concentrated in a
 --               short passage" note. Measured per instrument because a single cutoff is
 --               wrong - bass and drums never mark a solo at all.
+--   corr        pairwise correlation between this model's own factors, over the same
+--               rb3_dlc rows as bounds, emitted only for pairs at |r| >= 0.70. Lets the
+--               explanation panel drop a "notable property" that merely restates one it
+--               has already shown - which factors duplicate is per-instrument, so it is
+--               measured rather than hand-grouped. Key is the two factor names joined by
+--               '|'; readers must try both orderings.
 --   status      model maturity for the UI badge. Describes validation against noisy
 --               official ranks, NOT the probability that a prediction is correct.
 ]])
@@ -659,6 +748,18 @@ for _, m in ipairs(models) do
     W('    conc = {\n')
     for _, k in ipairs({ 'solo_change_ratio', 'density_ratio' }) do
         if m.conc[k] then W(('        %s = %s,\n'):format(k, Num(m.conc[k]))) end
+    end
+    W('    },\n')
+
+    -- SORTED, because pairs() order is not deterministic in Lua and this file has to be
+    -- byte-identical across runs - that reproducibility is what makes a regenerated
+    -- artifact reviewable as a diff.
+    local pair_keys = {}
+    for k in pairs(m.corr) do pair_keys[#pair_keys + 1] = k end
+    table.sort(pair_keys)
+    W('    corr = {\n')
+    for _, k in ipairs(pair_keys) do
+        W(('        [%s] = %s,\n'):format(Quote(k), Num(m.corr[k])))
     end
     W('    },\n')
 

@@ -990,6 +990,129 @@ CANDIDATES_REAL_KEYS[#CANDIDATES_REAL_KEYS + 1] = {
              'chord_size_mean', 'playing_s', 'entropy_h2_rel', 'complex_peak' },
 }
 
+----------------------------------------------------------------------
+-- ROUND 16: KEYS - IS THE CHORD COEFFICIENT MEASURING CHORDS, OR THE UNITS NEXT TO IT?
+--
+-- Declared before anything was run. Prior candidates remain byte-for-byte intact above.
+--
+-- THE OBSERVATION. chord_size_mean is -12.86 on keys and +12.22 on Pro Keys. Those two
+-- models describe the SAME MUSIC, scored from the same notes, and nothing about chords
+-- differs between them. What differs is the density factor beside it: keys uses
+-- density_peak, which counts GEMS, so a three-note chord triples it; Pro Keys uses
+-- attack_density_peak, which counts ATTACKS. The suspicion is therefore that keys'
+-- chord_size_mean is not measuring chord difficulty at all - it is dividing chords back
+-- out of a gem count, and the negative sign is that division.
+--
+-- Supporting evidence, not fitted: holding attack rate fixed, the partial correlation of
+-- chord_size_mean with the official rank is +0.24 on keys and +0.22 on Pro Keys. It is
+-- only +0.08 unconditionally, because chordal parts are struck more slowly - speed is the
+-- confound. Guitar, which measures attacks, gives the factor ~0.00; bass omits it.
+--
+-- THE DESIGN. A 2x2 over the SELECTED keys candidate, whose other six factors are held
+-- fixed. The incumbent is one cell, so three are added:
+--
+--                     with chord_size_mean          without
+--   gems              primary+entropy_rel+          +complex_peak-chord
+--                     complex_peak (INCUMBENT)
+--   attacks           +complex_peak@attacks         +complex_peak@attacks-chord
+--
+-- Keys only. Pro Keys, guitar and bass already measure attacks and are the CONTROL for
+-- this question; re-opening them would widen the experiment without adding evidence. The
+-- selection bar is unchanged (1 point AND 70% of paired repeats, ties to the simpler
+-- model) and the challengers are appended last, so the incumbent holds unless beaten.
+--
+-- PRE-REGISTERED PREDICTIONS:
+--   1. In BOTH attacks variants, chord_size_mean's fitted coefficient is positive. This
+--      is the direct test: if the sign follows the units, the artifact is confirmed.
+--   2. The incumbent probably HOLDS on accuracy. primary+ent_rel@attacks scored 91.23%
+--      against its 93.77% - a comparison confounded by complex_peak's absence, but the
+--      gem reading is also what this project's own finger-load rule predicts for a
+--      five-lane keyboard, where each gem needs its own finger. A model can predict
+--      better while describing the mechanism worse; that is the expected outcome.
+--   3. @attacks-chord loses to @attacks if chord size carries signal beyond the
+--      gems-to-attacks conversion. If they tie, conversion is all it was ever doing.
+--   4. No cell changes the usable lower bound enough to matter either way - keys' gate
+--      failure is a sample-size problem (122 rows), not a specification problem.
+--
+-- WHATEVER THIS RETURNS, no shipped wording states a difficulty direction for this
+-- factor. The UI fix is independent and already made; see difficulty_explain.lua.
+for _, c in ipairs({
+    { name = 'primary+ent_rel+complex@attacks',
+      keys = { 'total_changes', 'attack_density_peak', 'tight_p10', 'tight_med',
+               'chord_size_mean', 'playing_s', 'entropy_h2_rel', 'complex_peak' } },
+
+    { name = 'primary+ent_rel+complex-chord',
+      keys = { 'total_changes', 'density_peak', 'tight_p10', 'tight_med',
+               'playing_s', 'entropy_h2_rel', 'complex_peak' } },
+
+    { name = 'primary+ent_rel+complex@attacks-chord',
+      keys = { 'total_changes', 'attack_density_peak', 'tight_p10', 'tight_med',
+               'playing_s', 'entropy_h2_rel', 'complex_peak' } },
+}) do
+    CANDIDATES_KEYS[#CANDIDATES_KEYS + 1] = c
+end
+
+----------------------------------------------------------------------
+-- ROUND 17: KEYS - DO CHORDS ADD DIFFICULTY ONCE THE UNITS ARE HONEST?
+--
+-- Declared before anything was run. Prior candidates remain byte-for-byte intact above.
+--
+-- THE QUESTION ROUND 16 COULD NOT ANSWER. Round 16 established that keys' chord factor
+-- was an artifact of counting density in gems, and the selected model now counts attacks
+-- and carries no chord term at all. That makes voicing invisible to the score - the same
+-- music written as triads and as single notes now scores identically, which is a defensible
+-- default and fixes a real complaint (the gems model charged ~28 rank per added note).
+--
+-- But "invisible" is not the same as "measured to be irrelevant". Holding attack rate
+-- fixed, chord_size_mean still correlates +0.24 with the official rank on keys, and
+-- chord_change_frac +0.22. Something may be there that the previous parameterisation could
+-- never show, because its coefficient was busy doing arithmetic.
+--
+-- WHAT IS ALREADY KNOWN AND IS NOT REDECLARED. primary+ent_rel+complex@attacks is exactly
+-- "the new base plus chord_size_mean" and was fitted in round 16: coefficient +0.020, and
+-- usable identical to the base to two decimal places. Chord COUNT, on an attacks base,
+-- adds nothing. Round 17 therefore tests different chord measurements, not that one again.
+--
+-- THE CANDIDATES, all on the round 16 selected base:
+--   chord_change_frac  - how often a change re-forms a whole shape rather than moving one
+--                        finger. This is the one an author means by "chords are harder":
+--                        the cost is re-placing the hand, not the number of keys under it.
+--   chord_span_mean    - how far apart the outer notes sit. A stretched shape is harder
+--                        than a compact one of the same size.
+--   both               - they measure different things and may not substitute.
+--
+-- PRE-REGISTERED PREDICTIONS:
+--   1. chord_change_frac is the strongest of the three (partial +0.22 against
+--      chord_span_mean's +0.05) and is the only one with a chance of selection.
+--   2. NONE clears the 1-point / 70%-of-repeats bar. The base already carries
+--      complex_peak and entropy_h2_rel, which absorb "the shapes keep changing"; the
+--      partial correlation is probably measuring that rather than something new.
+--   3. If a chord factor is selected, its coefficient is POSITIVE. On an attacks base
+--      there is no gem count left to divide out, so a negative sign would mean the
+--      artifact has reappeared through some other route and the result must be refused.
+--   4. The usable lower bound stays under the 90% floor either way: keys' gate failure is
+--      a sample-size problem at n=122, and no single factor closes it.
+--
+-- IF PREDICTION 2 HOLDS, THAT IS THE ANSWER, NOT A DISAPPOINTMENT: the honest reading
+-- becomes "the official keys rank does not measurably reward chord voicing once speed is
+-- accounted for", and the voicing-neutral round 16 model is the right thing to ship.
+for _, c in ipairs({
+    { name = 'r16+chord_change',
+      keys = { 'total_changes', 'attack_density_peak', 'tight_p10', 'tight_med',
+               'playing_s', 'entropy_h2_rel', 'complex_peak', 'chord_change_frac' } },
+
+    { name = 'r16+chord_span',
+      keys = { 'total_changes', 'attack_density_peak', 'tight_p10', 'tight_med',
+               'playing_s', 'entropy_h2_rel', 'complex_peak', 'chord_span_mean' } },
+
+    { name = 'r16+chord_change+span',
+      keys = { 'total_changes', 'attack_density_peak', 'tight_p10', 'tight_med',
+               'playing_s', 'entropy_h2_rel', 'complex_peak',
+               'chord_change_frac', 'chord_span_mean' } },
+}) do
+    CANDIDATES_KEYS[#CANDIDATES_KEYS + 1] = c
+end
+
 -- Which declaration governs an instrument. Anything without its own entry uses the
 -- guitar/bass set, so adding an instrument without declaring candidates for it fails
 -- visibly (unavailable factors are reported, not silently dropped) rather than quietly

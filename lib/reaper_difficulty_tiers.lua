@@ -80,8 +80,19 @@ end
 --
 -- BOTH END BANDS ARE OPEN and have to be closed by hand, in different ways:
 --
---   Tier 0 runs from 1, not from 0. Rank 0 means the song has no such part,
---   which TierForRank already reports as nil rather than as the lowest tier.
+--   Tier 0 runs from `rank_lo` - the lowest rank the model can produce - for
+--   exactly the reason tier 6 stops at the observed maximum. A position inside
+--   an open band is only meaningful relative to what the tool can actually
+--   say. Measured from 1 instead, every floor-clamped Warmup chart computes
+--   0.85-0.97 and reads as almost-Apprentice when it in fact fell off the
+--   BOTTOM of the scale: the drum floor is 120 against a tier-1 threshold of
+--   124, so 97% of a band the model can only reach the last 4% of. That was
+--   also the true cause of a false "near the upper tier boundary" on clamped
+--   drum charts, which DifficultyWarnings had to suppress by hand.
+--
+--   With no rank_lo the band still starts at 1, which is the honest answer
+--   when the caller has no model to ask. Rank 0 is never the bottom of tier 0:
+--   it means the song has no such part, which TierForRank reports as nil.
 --
 --   Tier 6 has no upper threshold at all. `rank_hi` closes it, and the honest
 --   value is the highest rank the model was fitted against - the exported
@@ -96,10 +107,15 @@ end
 -- Returns lo, hi for a tier's rank band: lo inclusive, hi exclusive except on
 -- tier 6, where it is inclusive because nothing lies above it. nil for an
 -- unknown instrument or a tier outside 0-6.
-function TierBand(inst, tier, rank_hi)
+function TierBand(inst, tier, rank_hi, rank_lo)
     local t = RANK_TIER_THRESHOLDS[inst]
     if not t or not tier or tier < 0 or tier > 6 then return nil end
-    local lo = (tier == 0) and 1 or t[tier]
+    -- Never return a band the rank cannot reach: a rank_lo at or above the tier-1
+    -- threshold would invert the band, so fall back to 1 rather than trust it.
+    local lo = t[tier]
+    if tier == 0 then
+        lo = (rank_lo and rank_lo > 0 and rank_lo < t[1]) and rank_lo or 1
+    end
     if tier < 6 then return lo, t[tier + 1] end
     -- Never return a band the rank itself falls outside: an observed maximum
     -- from a corpus that happens to exclude this chart would otherwise produce
@@ -111,10 +127,13 @@ end
 
 -- Position of a rank inside its own tier, 0 at the bottom edge and 1 at the
 -- top. nil whenever TierForRank is nil, so callers test one thing.
-function TierPosition(inst, rank, rank_hi)
+function TierPosition(inst, rank, rank_hi, rank_lo)
     local tier = TierForRank(inst, rank)
     if not tier then return nil end
-    local lo, hi = TierBand(inst, tier, math.max(rank_hi or 0, rank))
+    -- math.min on the floor for the same reason math.max guards the ceiling: a
+    -- chart below the model's own observed minimum must read 0, not below it.
+    local lo, hi = TierBand(inst, tier, math.max(rank_hi or 0, rank),
+                            rank_lo and math.min(rank_lo, rank) or nil)
     if not lo or hi <= lo then return 0 end
     local p = (rank - lo) / (hi - lo)
     if p < 0 then return 0 end

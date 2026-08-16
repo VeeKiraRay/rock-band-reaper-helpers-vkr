@@ -1,6 +1,6 @@
 -- @description Rock Band General Helper
 -- @author VeeKiraRay
--- @version 0.9.53
+-- @version 0.9.54
 -- @about
 --   Utility actions for Rock Band authoring in REAPER.
 --
@@ -16,12 +16,38 @@
 --     Tab Input  - guitar/keys/vocal tab entry guide
 --     MIDI       - MIDI alignment, length sync, pattern replace
 --     Venue      - list, validate, and generate VENUE and EVENTS track events
+--     Metadata   - suggested difficulty rank and tier per instrument (Beta), from
+--                  measurements of the finished Expert charts. Read-only.
 --
 --   Built with Claude (Anthropic) - https://claude.ai
 --
 --   This @about block keeps only the 5 most recent versions.
 --   Full history: CHANGELOG.md in the repo.
 --
+--   v0.9.54
+--     - New Metadata tab, with a Difficulty sub-tab: suggested difficulty (Beta).
+--       Press Refresh suggestions and it scores every finished Expert chart in
+--       the project - Guitar, Bass, Drums, Keys, Pro Keys and Vocals - and
+--       suggests a rank and tier for each, from measurements of the charts
+--       themselves. Five difficulty dots as the game shows them, the rank, and
+--       a ruler showing where the score landed between the tier it earned and
+--       the next one up, so a close call is visible as a close call. Under that,
+--       up to three plain-language notes on what makes the chart unusual
+--       compared with the reference songs, each explaining its own terminology
+--       on hover.
+--       Read-only: it never writes a rank, a MIDI event or a project setting,
+--       and creates no undo point. The whole chart is scored - a time selection
+--       does not change the result.
+--     - Advisory, and it says so. The suggestion is an estimate from a model
+--       fitted to official Rock Band 3 ranks, not the official rank, and
+--       official and player judgments differ from each other too. Where a
+--       chart scores past the end of what the tool can measure, it says that
+--       rather than showing a number it cannot stand behind. Keys, Pro Keys
+--       and Vocals are less certain than Guitar, Bass and Drums.
+--     - No confidence percentage anywhere, and no list of which measurement
+--       "caused" a rank. The measurements are heavily interrelated, so naming
+--       one as the reason would be inventing an explanation; what is shown is
+--       what was measured.
 --   v0.9.53
 --     - Venue > Themes gen and Section gen no longer re-state a lighting or post
 --       proc preset that is already running. A blend is authored by writing the
@@ -102,31 +128,6 @@
 --       All and Fill Range without a pattern captured, the three navigation
 --       buttons without a Search) are driven by their own conditions and are
 --       untouched.
---   v0.9.49
---     - New standalone window: MIDI Pattern (rock_band_midi_pattern_vkr.lua),
---       the MIDI > Pattern sub-tab in a window of its own, so it can sit beside
---       the MIDI editor without the other eight tabs coming with it. Same Set
---       Search / Set Replace / Replace All / Fill Range / Go Prev / Go Next /
---       List Search, the same difficulty pitch-range filter, and the same
---       status and result panel including an Undo button - Replace All and
---       Fill Range write MIDI, so undo matters here. It carries no settings of
---       its own because the Pattern tab has never had any to save; a project
---       switch clears the captured patterns rather than leaving them pointing
---       at the previous project's take. It appears in the General > Other
---       tools sub-tab of both this script and the Vocal Helper, which now list
---       five buttons.
---     - The sub-tab itself is unchanged and still lives in the MIDI tab. Its
---       drawing code moved to a new ui_midi_pattern.lua so both windows draw
---       one implementation rather than two that could drift, and the pieces
---       both entry points need - the track dropdown and the bottom status /
---       result panel - moved to a new ui_common.lua, since ui.lua cannot be
---       loaded by a standalone (its last line opens the full helper window).
---       Same split the Vocal Helper made for its standalone Pitch Tuner.
---     - Fix: switching projects left the captured Search and Replace patterns
---       in place. They are tick offsets into a specific take, labelled with the
---       measure numbers of the project they came from, so a Replace All after
---       a project switch could act on the wrong material. They are now cleared
---       along with the source track, as every other track selector already was.
 r = reaper  -- global so all dofile'd modules can use it
 
 if not r.ImGui_CreateContext then
@@ -213,6 +214,7 @@ for _, _f in ipairs({
     _mdir .. 'actions_difficulty_drums.lua',
     _mdir .. 'difficulty_read.lua',
     _mdir .. 'difficulty_explain.lua',
+    _mdir .. 'difficulty_report.lua',
     _mdir .. 'difficulty_suggester.lua',
     _mdir .. 'ui_common.lua',
     _mdir .. 'ui_keys.lua',
@@ -227,6 +229,7 @@ for _, _f in ipairs({
     _mdir .. 'ui_venue_keyframes.lua',
     _mdir .. 'ui_venue_players.lua',
     _mdir .. 'ui_workflow.lua',
+    _mdir .. 'ui_metadata.lua',
     _mdir .. 'ui.lua',
 }) do
     if not r.file_exists(_f) then
@@ -289,6 +292,7 @@ dofile(_mdir .. 'actions_difficulty_gtrbass.lua')
 dofile(_mdir .. 'actions_difficulty_drums.lua')
 dofile(_mdir .. 'difficulty_read.lua')
 dofile(_mdir .. 'difficulty_explain.lua')
+dofile(_mdir .. 'difficulty_report.lua')   -- consumes DifficultyAnnotate's output
 dofile(_mdir .. 'difficulty_suggester.lua')
 dofile(_mdir .. 'ui_common.lua')
 dofile(_mdir .. 'ui_keys.lua')
@@ -303,6 +307,7 @@ dofile(_mdir .. 'ui_venue_preview.lua')
 dofile(_mdir .. 'ui_venue_keyframes.lua')
 dofile(_mdir .. 'ui_venue_players.lua')
 dofile(_mdir .. 'ui_workflow.lua')
+dofile(_mdir .. 'ui_metadata.lua')
 dofile(_mdir .. 'ui.lua')  -- also calls r.defer(Loop) at end
 
 -- Startup initialisation (runs after all modules are loaded)

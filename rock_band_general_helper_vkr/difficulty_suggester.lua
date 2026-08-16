@@ -147,7 +147,9 @@ local function SuggestOne(spec, vocal_parts)
     rec.clamped       = clamped
     rec.tier          = TierForRank(spec.key, rank)
     rec.tier_name     = TierName(rec.tier)
-    rec.tier_position = TierPosition(spec.key, rank, model.rank_hi)
+    -- Both model bounds, so the two open-ended bands are measured against what this model
+    -- can actually produce rather than against the tier table's 1-and-infinity.
+    rec.tier_position = TierPosition(spec.key, rank, model.rank_hi, model.rank_lo)
     rec.vocal_parts   = spec.vocal and vocal_parts or nil
 
     -- Wording is difficulty_explain.lua's job, but it is attached here so every consumer
