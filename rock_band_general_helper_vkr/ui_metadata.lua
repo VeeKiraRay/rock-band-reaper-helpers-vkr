@@ -1,12 +1,11 @@
 -- Metadata tab rendering.
 --
 -- Song-level properties, as opposed to every other tab in this script, which operates on
--- tracks, notes or events. Currently one sub-tab: Difficulty.
+-- tracks, notes or events. Two sub-tabs: Genre and Difficulty.
 --
--- (The genre mapper is the other feature planned for this tab. It is blocked on a
--- canonical RB3 genre/subgenre vocabulary that is not in the repo yet - see
--- _future_ideas/general_metadata_tab.md - and an empty sub-tab reads as a broken feature,
--- so it appears when it has data behind it.)
+-- Genre is drawn by ui_metadata_genre.lua; this file only wraps it in a tab item. It is
+-- first because it is a pure lookup that needs no project at all, so it works in an
+-- empty session, while Difficulty needs finished charts to say anything.
 --
 -- READ-ONLY. Nothing in this file writes to the project. There is deliberately no
 -- "apply this rank" control: the suggestion is advisory, the author's judgment is final,
@@ -297,6 +296,14 @@ end
 
 function DrawMetadataTab(ctx)
     if r.ImGui_BeginTabBar(ctx, '##metadata_subtabs') then
+
+        ------------------------------------------------
+        -- Metadata > Genre sub-tab
+        ------------------------------------------------
+        if r.ImGui_BeginTabItem(ctx, 'Genre') then
+            DrawMetadataGenreTab(ctx)
+            r.ImGui_EndTabItem(ctx)
+        end
 
         ------------------------------------------------
         -- Metadata > Difficulty sub-tab

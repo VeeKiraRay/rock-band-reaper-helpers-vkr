@@ -196,6 +196,14 @@ S = {
     -- and no way to tell which of the two flags put it there. Starting from off every
     -- session means the panel's visibility always has exactly one explanation.
     diff_show_factors     = false,
+    -- Metadata > Genre: the two combo positions. SESSION ONLY, DELIBERATELY NOT
+    -- PERSISTED - this sub-tab is a lookup over two static tables and says nothing about
+    -- the project, so a saved position would restore one project's answer into another
+    -- and mean nothing in either.
+    -- genre_ext_idx addresses the CURRENT family's list, so changing genre_family_idx
+    -- must reset it (see DrawForward in ui_metadata_genre.lua).
+    genre_family_idx      = 1,
+    genre_ext_idx         = 1,
     -- Cached filtered track lists (not persisted - rebuilt by RefreshTrackLists)
     all_track_list        = nil,
     audio_track_list      = nil,
@@ -259,6 +267,34 @@ TIPS = {
     save          = "Save current settings to this project.",
     load          = "Load previously saved settings from this project.",
     track_refresh = "Refresh the track lists to include any newly added or renamed tracks.",
+
+    -- Metadata > Genre
+    genre_family =
+        "Narrows the genre list below.\n\n" ..
+        "The full list runs past 200 entries, which is more than a single dropdown can " ..
+        "be read from. Pick the broad family first and the second list holds only that " ..
+        "family's genres.\n\n" ..
+        "Changing the family resets the genre below it.",
+    genre_pick =
+        "The genre you would actually call this song.\n\n" ..
+        "This list is deliberately wider than what Rock Band supports - it holds styles " ..
+        "like Djent, Easycore and Synthwave that have no supported category of their " ..
+        "own, which is the whole reason the conversion is needed.\n\n" ..
+        "If your genre is missing, pick the nearest one in the same family, or use the " ..
+        "other direction to browse what the supported list actually offers.",
+    genre_candidates =
+        "Some genres have more than one defensible home in the supported list.\n\n" ..
+        "The reference catalogue of released songs mostly agrees with itself, so a " ..
+        "single suggestion means the call is settled. Where two or three are shown, " ..
+        "real songs in that style were genuinely filed both ways.\n\n" ..
+        "The first is the usual pick. Each one says what would tip the choice toward it.",
+    genre_see_also =
+        "A pointer to a different genre in this list, not another Rock Band category.\n\n" ..
+        "Some styles are named for what came after something else, so the genre you " ..
+        "picked may not be the one you want. Post-Grunge suggests Grunge for a song " ..
+        "that really belongs to the early 90s wave.\n\n" ..
+        "Shown separately from the numbered suggestions because it answers a different " ..
+        "question: those are where your genre goes, this is whether you picked it.",
 
     -- Metadata > Difficulty
     diff_suggest_refresh =

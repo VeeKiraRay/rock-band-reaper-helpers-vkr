@@ -1,6 +1,6 @@
 -- @description Rock Band General Helper
 -- @author VeeKiraRay
--- @version 0.9.54
+-- @version 0.9.56
 -- @about
 --   Utility actions for Rock Band authoring in REAPER.
 --
@@ -16,14 +16,65 @@
 --     Tab Input  - guitar/keys/vocal tab entry guide
 --     MIDI       - MIDI alignment, length sync, pattern replace
 --     Venue      - list, validate, and generate VENUE and EVENTS track events
---     Metadata   - suggested difficulty rank and tier per instrument (Beta), from
---                  measurements of the finished Expert charts. Read-only.
+--     Metadata   - genre converter (real-world genre to the supported major genre
+--                  and subgenre), and suggested difficulty rank and tier per
+--                  instrument (Beta) from measurements of the finished Expert
+--                  charts. Read-only.
 --
 --   Built with Claude (Anthropic) - https://claude.ai
 --
 --   This @about block keeps only the 5 most recent versions.
 --   Full history: CHANGELOG.md in the repo.
 --
+--   v0.9.56
+--     - Metadata > Genre: an editorial pass over the mapping after a peer review.
+--       Four calls were checked against outside sources rather than settled by taste.
+--       Screamo now leads with Emo, since it is an offshoot of emo rather than of
+--       metal - the old answer leaned on "screamed vocals", which describes half the
+--       list. Viking Metal keeps Black, which is where the style actually came from,
+--       and both it and Folk Metal now offer melodic death metal, the branch that was
+--       missing and the one Amon Amarth-shaped songs need.
+--     - Big Band, Swing and Bebop no longer file as Jazz / Contemporary. Contemporary
+--       means modern jazz, so sending historic jazz there quietly misdated it;
+--       Jazz / Other is the honest answer and the entries say why.
+--     - Suggestions that really meant "you may have picked the wrong genre" are no
+--       longer mixed in with the genuine alternatives. Post-Grunge suggested Grunge as
+--       though it were another home for post-grunge, when it was telling you to pick a
+--       different genre entirely. Those now appear separately, unnumbered, below the
+--       suggestions.
+--     - Reasons that claimed "Exact match" where the two names do not actually match
+--       now say "closest supported category" instead. Teen Pop is not Teen Rock, and
+--       Hardcore Techno is not Hardcore Dance.
+--     - 19 more genres, covering the ones that previously returned nothing at all:
+--       Trap, Drill, Boom Bap, Jazz Rap, Lo-fi Hip-Hop, Electropop, Dance-Pop, Art
+--       Pop, Alternative R&B, Post-Metal, Industrial Rock, Melodic Metalcore, Jungle,
+--       UK Garage, Glitch, Cumbia, Bachata, Merengue and Mariachi. 227 genres in all.
+--     - The tab now says it is advisory, the way Metadata > Difficulty does. Where a
+--       style belongs is a judgment call rather than a measurement, so if a suggestion
+--       looks plainly wrong it is worth saying so - the mappings are meant to be
+--       corrected.
+--     - The file now states which dimension wins when a genre could be filed by sound,
+--       era, origin or subject matter, so entries like J-Rock and K-Pop stop looking
+--       inconsistent, and no longer claims the reference catalogue proves more than it
+--       does.
+--   v0.9.55
+--     - New Metadata > Genre sub-tab: a genre converter. Rock Band accepts 29 major
+--       genres and 126 subgenres, and finding the right one is a chore when your song
+--       is something the list has no name for. Pick the genre you would actually call
+--       the song from a family-narrowed dropdown and it reports the closest supported
+--       pair, with a plain-language reason for each.
+--       Over 200 genres are offered, deliberately wider than the supported list, so
+--       styles with no category of their own - Djent, Easycore, Synthwave, Deathcore,
+--       Post-Hardcore, Blackgaze - resolve to something real instead of leaving you
+--       guessing.
+--     - Some genres map more than one way, and the tab says so rather than pretending
+--       otherwise. Where the released-song catalogue genuinely filed a style two ways,
+--       both are offered, best first, and each says what would tip the choice. Where
+--       the catalogue is consistent, one answer is given.
+--     - Names only, never internal metadata strings. Those spellings drift between
+--       game eras, and the tool that writes your song metadata has its own picker.
+--       Read-only, like Metadata > Difficulty: it never reads or writes the project
+--       and creates no undo point.
 --   v0.9.54
 --     - New Metadata tab, with a Difficulty sub-tab: suggested difficulty (Beta).
 --       Press Refresh suggestions and it scores every finished Expert chart in
@@ -89,45 +140,6 @@
 --       one line per spot rather than per lineup, and the report names which
 --       lineups your project can actually produce, so a four-piece song does
 --       not read as the check having found nothing to do.
---   v0.9.51
---     - Venue > Preview: when several camera shots are stacked on one tick, the
---       preview now shows the one the GAME would play. Authors stack shots so
---       at least one fits whatever band the song ends up with, and the game
---       ranks them - most specific wins, and a directed cut always beats a
---       normal shot. The preview used to just take the last one in MIDI order,
---       and if that one needed a missing instrument it took the first stacked
---       shot that fit, so a spot could show a shot the game would never pick.
---       Priority order is transcribed from the RBN2 Camera And Lights
---       documentation, including its exception that a single keys shot outranks
---       any duo shot. The Previous and Next columns resolve their own stacks
---       the same way - before, only Current considered alternatives at all.
---     - Venue > Preview: when nothing stacked at a spot fits the selected
---       Players combo, the red "No suitable event" card now comes with a note
---       on what the game does instead: it falls back to a generic full band
---       shot, and it converts a normal duo shot to a single shot of the
---       remaining member when it can. The preview deliberately keeps showing
---       the event you authored rather than drawing one of those substitutes -
---       each has several possible outcomes, and a sprite that is not on your
---       timeline would look like a preview bug.
---     - Same in the standalone Venue Preview window (its v0.3).
---   v0.9.50
---     - Fix: switching projects left the MIDI tab's Length sub-tab pointing at
---       the old project's tracks. Its Source track and Reference track fields
---       kept their positions, so the first Adjust notes or Resize all MIDI
---       after a switch could act on whatever track happened to sit at that
---       index in the new project. They now reset like every other track
---       selector already did. The Pattern sub-tab got the same fix in v0.9.49.
---     - MIDI > Pattern: the Set Search tooltip described something the button
---       has never done - that capturing a Search of a different length clears
---       the Replace pattern. Nothing is ever cleared; the two lengths are
---       checked when Replace All runs, which refuses and says so. The tooltip
---       now says that, so a Replace pattern that looks intact really is.
---     - Internal: removed a disabled-state flag from the Pattern sub-tab that
---       nothing has ever set, so eight of its greyed-out guards could never
---       fire. No visible change - the buttons that genuinely grey out (Replace
---       All and Fill Range without a pattern captured, the three navigation
---       buttons without a Search) are driven by their own conditions and are
---       untouched.
 r = reaper  -- global so all dofile'd modules can use it
 
 if not r.ImGui_CreateContext then
@@ -216,6 +228,9 @@ for _, _f in ipairs({
     _mdir .. 'difficulty_explain.lua',
     _mdir .. 'difficulty_report.lua',
     _mdir .. 'difficulty_suggester.lua',
+    _mdir .. 'metadata_genres.lua',
+    _mdir .. 'metadata_genres_ext.lua',
+    _mdir .. 'metadata_genres_lookup.lua',
     _mdir .. 'ui_common.lua',
     _mdir .. 'ui_keys.lua',
     _mdir .. 'ui_difficulty.lua',
@@ -229,6 +244,7 @@ for _, _f in ipairs({
     _mdir .. 'ui_venue_keyframes.lua',
     _mdir .. 'ui_venue_players.lua',
     _mdir .. 'ui_workflow.lua',
+    _mdir .. 'ui_metadata_genre.lua',
     _mdir .. 'ui_metadata.lua',
     _mdir .. 'ui.lua',
 }) do
@@ -294,6 +310,12 @@ dofile(_mdir .. 'difficulty_read.lua')
 dofile(_mdir .. 'difficulty_explain.lua')
 dofile(_mdir .. 'difficulty_report.lua')   -- consumes DifficultyAnnotate's output
 dofile(_mdir .. 'difficulty_suggester.lua')
+-- Genre converter: vocabulary, then the authored mapping, then the lookup that
+-- reads both. metadata_genres_lookup.lua touches them only at call time, but the
+-- load order still states the dependency.
+dofile(_mdir .. 'metadata_genres.lua')
+dofile(_mdir .. 'metadata_genres_ext.lua')
+dofile(_mdir .. 'metadata_genres_lookup.lua')
 dofile(_mdir .. 'ui_common.lua')
 dofile(_mdir .. 'ui_keys.lua')
 dofile(_mdir .. 'ui_difficulty.lua')
@@ -307,6 +329,7 @@ dofile(_mdir .. 'ui_venue_preview.lua')
 dofile(_mdir .. 'ui_venue_keyframes.lua')
 dofile(_mdir .. 'ui_venue_players.lua')
 dofile(_mdir .. 'ui_workflow.lua')
+dofile(_mdir .. 'ui_metadata_genre.lua')
 dofile(_mdir .. 'ui_metadata.lua')
 dofile(_mdir .. 'ui.lua')  -- also calls r.defer(Loop) at end
 

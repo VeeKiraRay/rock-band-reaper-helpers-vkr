@@ -416,7 +416,11 @@ that dofiles the code under test and the set.
     difficulty_explain.lua                     (shared with dev/calibration/), wording,
     difficulty_report.lua                      the pasteable text report, the read-only
     difficulty_suggester.lua                   adapter, and the tab body
-    ui_metadata.lua
+    metadata_genres.lua                      ← Metadata > Genre: supported vocabulary
+    metadata_genres_ext.lua                    (transcribed), the authored extended
+    metadata_genres_lookup.lua                 vocabulary + mapping, and the lookup
+    ui_metadata_genre.lua                    ← Metadata > Genre tab body
+    ui_metadata.lua                          ← Metadata tab shell (Genre + Difficulty)
 
   rock_band_music_theory_helper_vkr.lua      ← entry point (only file users run)
   rock_band_music_theory_helper_vkr/

@@ -79,9 +79,16 @@ function ParseSongsDta(text)
             else
                 local origin = line:match('%(game_origin%s+([%w_]+)%)')
                 if origin then cur.origin = origin end
-                local genre = line:match('%(genre%s+([%w_]+)%)')
+                -- Skip commented-out lines before reading genre/sub_genre. Every Magma
+                -- template pack carries 26 copies of ";;(sub_genre ^^^garage^^^)", and
+                -- one pack has a real ";;(sub_genre psychedelicrock)" - read literally,
+                -- those placeholders would make `garage` the corpus's commonest
+                -- subgenre. Only these two fields need the guard: they are the only ones
+                -- that appear commented out anywhere in the corpus.
+                local uncommented = line:match('^%s*;;') and '' or line
+                local genre = uncommented:match('%(genre%s+([%w_]+)%)')
                 if genre then cur.genre = genre end
-                local sub = line:match('%(sub_genre%s+([%w_]+)%)')
+                local sub = uncommented:match('%(sub_genre%s+([%w_]+)%)')
                 if sub then cur.sub_genre = sub end
                 local vp = line:match('%(vocal_parts%s+(%d+)%)')
                 if vp then cur.vocal_parts = tonumber(vp) end

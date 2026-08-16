@@ -9,6 +9,47 @@ over 5. See `CLAUDE.md` → "Changelog / `@about` trimming" for the rule.
 
 `rock_band_general_helper_vkr.lua`
 
+**v0.9.51**
+  - Venue > Preview: when several camera shots are stacked on one tick, the
+    preview now shows the one the GAME would play. Authors stack shots so
+    at least one fits whatever band the song ends up with, and the game
+    ranks them - most specific wins, and a directed cut always beats a
+    normal shot. The preview used to just take the last one in MIDI order,
+    and if that one needed a missing instrument it took the first stacked
+    shot that fit, so a spot could show a shot the game would never pick.
+    Priority order is transcribed from the RBN2 Camera And Lights
+    documentation, including its exception that a single keys shot outranks
+    any duo shot. The Previous and Next columns resolve their own stacks
+    the same way - before, only Current considered alternatives at all.
+  - Venue > Preview: when nothing stacked at a spot fits the selected
+    Players combo, the red "No suitable event" card now comes with a note
+    on what the game does instead: it falls back to a generic full band
+    shot, and it converts a normal duo shot to a single shot of the
+    remaining member when it can. The preview deliberately keeps showing
+    the event you authored rather than drawing one of those substitutes -
+    each has several possible outcomes, and a sprite that is not on your
+    timeline would look like a preview bug.
+  - Same in the standalone Venue Preview window (its v0.3).
+
+**v0.9.50**
+  - Fix: switching projects left the MIDI tab's Length sub-tab pointing at
+    the old project's tracks. Its Source track and Reference track fields
+    kept their positions, so the first Adjust notes or Resize all MIDI
+    after a switch could act on whatever track happened to sit at that
+    index in the new project. They now reset like every other track
+    selector already did. The Pattern sub-tab got the same fix in v0.9.49.
+  - MIDI > Pattern: the Set Search tooltip described something the button
+    has never done - that capturing a Search of a different length clears
+    the Replace pattern. Nothing is ever cleared; the two lengths are
+    checked when Replace All runs, which refuses and says so. The tooltip
+    now says that, so a Replace pattern that looks intact really is.
+  - Internal: removed a disabled-state flag from the Pattern sub-tab that
+    nothing has ever set, so eight of its greyed-out guards could never
+    fire. No visible change - the buttons that genuinely grey out (Replace
+    All and Fill Range without a pattern captured, the three navigation
+    buttons without a Search) are driven by their own conditions and are
+    untouched.
+
 **v0.9.49**
 - New standalone window: MIDI Pattern (rock_band_midi_pattern_vkr.lua),
   the MIDI > Pattern sub-tab in a window of its own, so it can sit beside

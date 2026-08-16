@@ -156,6 +156,19 @@ Test.it('no sub_genre field is present anywhere in the corpus, and nil is fine',
     Test.expect(e[1].sub_genre == nil, 'sub_genre nil')
 end)
 
+-- Every Magma template pack ships 26 copies of ";;(sub_genre ^^^garage^^^)", so a
+-- comment-blind parser would report `garage` as the corpus's commonest subgenre.
+Test.it('a commented-out genre or sub_genre is not read as a value', function()
+    local e = ParseSongsDta(
+        '(song\n   (genre metal)\n   ;;(sub_genre ^^^garage^^^)  ; OPTIONAL\n)')
+    Test.expect(e[1].genre == 'metal', 'real genre still read')
+    Test.expect(e[1].sub_genre == nil, 'commented sub_genre must stay nil')
+
+    local e2 = ParseSongsDta('(song\n   ;;(genre rock)\n   (sub_genre psychedelicrock)\n)')
+    Test.expect(e2[1].genre == nil, 'commented genre must stay nil')
+    Test.expect(e2[1].sub_genre == 'psychedelicrock', 'an uncommented sub_genre is read')
+end)
+
 ----------------------------------------------------------------------
 Test.section('DtaRank - zero means no part')
 
