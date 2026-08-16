@@ -104,7 +104,8 @@ DIFFICULTY_FACTOR_INFO = {
     playing_s = { label = 'playing time', fmt = 'sec',
         high = 'Long playing time - the demand is sustained',
         low  = 'Short playing time',
-        tip = 'Time with this instrument actually playing, not the length of the song. Rests and intros are removed, and every rate below is measured against it.' },
+        tip = 'Time with this instrument actually playing, not the length of the song.\n' ..
+              'Rests and intros are removed, and every rate below is measured against it.' },
     notes_total = { label = 'total gems', fmt = 'int',
         high = 'A very high total gem count',
         low  = 'Few gems overall',
@@ -118,14 +119,16 @@ DIFFICULTY_FACTOR_INFO = {
     density_avg = { label = 'average gem density', fmt = 'num',
         high = 'High average gem density',
         low  = 'Low average gem density',
-        tip = 'Gems per second of playing time, so this rises with chord size as well as with speed.' },
+        tip = 'Gems per second of playing time, so this rises\n' ..
+              'with chord size as well as with speed.' },
     density_peak = { label = 'peak gem density', fmt = 'num',
         high = 'Very high peak gem density',
         low  = 'No especially dense passages' },
     attack_density_avg = { label = 'average attack rate', fmt = 'num',
         high = 'A high average attack rate',
         low  = 'A low average attack rate',
-        tip = 'Strikes per second, counting a whole chord as one. Hand speed with chord size taken out.' },
+        tip = 'Strikes per second, counting a whole chord as\n' ..
+              'one. Hand speed with chord size taken out.' },
     attack_density_peak = { label = 'peak attack rate', fmt = 'num',
         high = 'Very high peak attack density',
         low  = 'No especially fast passages',
@@ -148,7 +151,8 @@ DIFFICULTY_FACTOR_INFO = {
     chord_size_mean = { label = 'average chord size', fmt = 'num',
         high = 'Mostly chords',
         low  = 'Mostly single notes',
-        tip = 'Gems struck at the same instant. On drums this counts limbs, so kick and snare together is a chord.' },
+        tip = 'Gems struck at the same instant. On drums this\n' ..
+              'counts limbs, so kick and snare together is a chord.' },
     chord_span_mean = { label = 'average chord width', fmt = 'num',
         high = 'Wide chord shapes',
         low  = 'Narrow chord shapes' },
@@ -166,7 +170,8 @@ DIFFICULTY_FACTOR_INFO = {
     anchor_frac = { label = 'anchored changes', fmt = 'frac',
         high = 'The hand can stay anchored through most changes',
         low  = 'Almost every change moves the hand',
-        tip = 'Anchored means at least one lane carries over, so the hand does not have to reposition.' },
+        tip = 'Anchored means at least one lane carries over, so\n' ..
+              'the hand does not have to reposition.' },
 
     -- the authored solo (pitch 103, or 115 on Pro Keys)
     solo_frac_marked = { label = 'authored solo coverage', fmt = 'frac',
@@ -210,11 +215,13 @@ DIFFICULTY_FACTOR_INFO = {
     entropy_h2_rel = { label = 'motion unpredictability', fmt = 'num',
         high = 'The next hand motion is hard to predict',
         low  = 'One figure repeated, moved around the lanes',
-        tip = 'The same, but over hand motion instead of exact gems, so one riff moved up the lanes reads as a single figure.' },
+        tip = 'The same, but over hand motion instead of exact gems, so\n' ..
+              'one riff moved up the lanes reads as a single figure.' },
     complex_peak = { label = 'dense and unpredictable together', fmt = 'num',
         high = 'Dense and unpredictable at the same time',
         low  = 'Where it is dense, it is predictable',
-        tip = 'Separates a fast passage you can learn by rote from a fast passage that keeps changing.' },
+        tip = 'Separates a fast passage you can learn by rote\n' ..
+              'from a fast passage that keeps changing.' },
 
     -- drums: the kick is a third limb and is measured apart from the hands
     kick_density = { label = 'kick rate', fmt = 'num',
@@ -230,7 +237,8 @@ DIFFICULTY_FACTOR_INFO = {
     stick_size_mean = { label = 'limbs landing together', fmt = 'num',
         high = 'Many hits land on several limbs at once',
         low  = 'Mostly single-limb streams',
-        tip = 'Average number of limbs landing together, counting the kick as one of them. A hit of kick plus snare is 2, and a single stroke anywhere is 1.' },
+        tip = 'Average number of limbs landing together, counting the kick as one of\n' ..
+              'them. A hit of kick plus snare is 2, and a single stroke anywhere is 1.' },
     tom_frac = { label = 'tom coverage', fmt = 'frac',
         high = 'A lot of toms',
         low  = 'Little to no toms' },
@@ -252,18 +260,21 @@ DIFFICULTY_FACTOR_INFO = {
     syl_density_avg = { label = 'syllable rate', fmt = 'num',
         high = 'A high syllable rate',
         low  = 'A slow syllable rate',
-        tip = 'Syllables per second of singing time. Rests between phrases are excluded, so this is how fast the words come when they do.' },
+        tip = 'Syllables per second of singing time. Rests between phrases\n' ..
+              'are excluded, so this is how fast the words come when they do.' },
     syl_density_peak = { label = 'peak syllable rate', fmt = 'num',
         high = 'Very fast syllable passages',
         low  = 'No especially fast passages' },
     pc_interval_mean = { label = 'average interval', fmt = 'num',
         high = 'Large average intervals between notes',
         low  = 'Mostly stepwise motion',
-        tip = 'Rock Band scores the note name, not the octave, so an octave leap counts as no distance at all here.' },
+        tip = 'Rock Band scores the note name, not the octave, so\n' ..
+              'an octave leap counts as no distance at all here.' },
     notated_range = { label = 'notated range', fmt = 'num',
         high = 'A wide vocal register',
         low  = 'A narrow vocal register',
-        tip = 'Lowest to highest written note, in semitones. Unlike the interval measures, this one does read the octave.' },
+        tip = 'Lowest to highest written note, in semitones. Unlike\n' ..
+              'the interval measures, this one does read the octave.' },
     pitch_p90 = { label = 'upper register', fmt = 'num',
         high = 'Sits high in the vocal register',
         low  = 'Sits low in the vocal register' },
@@ -338,13 +349,14 @@ DIFFICULTY_STATUS_BADGE = {
 DIFFICULTY_STATUS_NOTE = {
     validated = nil,
     beta =
-        'Beta: this model came close to the accuracy bar set for the project but did not ' ..
-        'clear it.\n\nIts suggestions are usually sound; weigh them a little more lightly ' ..
-        'than guitar, bass or drums.',
+        'Beta: this model came close to the accuracy bar\n' ..
+        'set for the project but did not clear it.\n\n' ..
+        'Its suggestions are usually sound; weigh them a\n' ..
+        'little more lightly than guitar, bass or drums.',
     experimental =
         'Experimental: this model did not reach the accuracy bar set for the project.\n\n' ..
-        'It still measures the chart and the ordering is meaningful, but expect it to be ' ..
-        'a tier out more often. Use your own judgment first.',
+        'It still measures the chart and the ordering is meaningful, but\n' ..
+        'expect it to be a tier out more often. Use your own judgment first.',
 }
 
 ----------------------------------------------------------------------

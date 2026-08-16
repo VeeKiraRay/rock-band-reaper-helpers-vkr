@@ -271,68 +271,69 @@ TIPS = {
     -- Metadata > Genre
     genre_family =
         "Narrows the genre list below.\n\n" ..
-        "The full list runs past 200 entries, which is more than a single dropdown can " ..
-        "be read from. Pick the broad family first and the second list holds only that " ..
-        "family's genres.\n\n" ..
+        "The full list runs past 200 entries, which is more than a\n" ..
+        "single dropdown can be read from. Pick the broad family\n" ..
+        "first and the second list holds only that family's genres.\n\n" ..
         "Changing the family resets the genre below it.",
     genre_pick =
         "The genre you would actually call this song.\n\n" ..
-        "This list is deliberately wider than what Rock Band supports - it holds styles " ..
-        "like Djent, Easycore and Synthwave that have no supported category of their " ..
-        "own, which is the whole reason the conversion is needed.\n\n" ..
-        "If your genre is missing, pick the nearest one in the same family, or use the " ..
-        "other direction to browse what the supported list actually offers.",
+        "This list is deliberately wider than what Rock Band supports - it holds\n" ..
+        "styles like Djent, Easycore and Synthwave that have no supported category\n" ..
+        "of their own, which is the whole reason the conversion is needed.\n\n" ..
+        "If your genre is missing, pick the nearest one in the same family, or use\n" ..
+        "the other direction to browse what the supported list actually offers.",
     genre_candidates =
         "Some genres have more than one defensible home in the supported list.\n\n" ..
-        "The reference catalogue of released songs mostly agrees with itself, so a " ..
-        "single suggestion means the call is settled. Where two or three are shown, " ..
-        "real songs in that style were genuinely filed both ways.\n\n" ..
-        "The first is the usual pick. Each one says what would tip the choice toward it.",
+        "The reference catalogue of released songs mostly agrees with itself,\n" ..
+        "so a single suggestion means the call is settled. Where two or three\n" ..
+        "are shown, real songs in that style were genuinely filed both ways.\n\n" ..
+        "The first is the usual pick. Each one says what\n" ..
+        "would tip the choice toward it.",
     genre_see_also =
         "A pointer to a different genre in this list, not another Rock Band category.\n\n" ..
-        "Some styles are named for what came after something else, so the genre you " ..
-        "picked may not be the one you want. Post-Grunge suggests Grunge for a song " ..
-        "that really belongs to the early 90s wave.\n\n" ..
-        "Shown separately from the numbered suggestions because it answers a different " ..
+        "Some styles are named for what came after something else, so the\n" ..
+        "genre you picked may not be the one you want. Post-Grunge suggests\n" ..
+        "Grunge for a song that really belongs to the early 90s wave.\n\n" ..
+        "Shown separately from the numbered suggestions because it answers a different\n" ..
         "question: those are where your genre goes, this is whether you picked it.",
 
     -- Metadata > Difficulty
     diff_suggest_refresh =
         "Score every Expert chart in this project and suggest a rank and tier for each.\n\n" ..
-        "Read-only: nothing is written to the project, and no undo point is created.\n" ..
-        "Results are not saved - re-run after editing a chart.\n\n" ..
+        "Read-only: nothing is written to the project, and no undo point\n" ..
+        "is created. Results are not saved - re-run after editing a chart.\n\n" ..
         "The whole chart is scored. A time selection does not change the result.",
     diff_dots =
         "Rock Band shows an instrument's difficulty as five dots.\n\n" ..
-        "Filled dots are how far up the scale the part sits: none for Warmup, two for " ..
-        "Solid, five for Nightmare. Impossible fills all five in red.\n\n" ..
+        "Filled dots are how far up the scale the part sits: none for Warmup,\n" ..
+        "two for Solid, five for Nightmare. Impossible fills all five in red.\n\n" ..
         "Two tiers share five filled dots because that is how the game displays them.",
     diff_copy =
-        "Copy every scored part to the clipboard as plain text, ready to paste into a " ..
-        "post or a message.\n\n" ..
-        "The full measured values are always included, whether or not they are shown " ..
-        "on screen.\n\n" ..
-        "Which model produced each number is included too, so a copy stays readable " ..
-        "after the models are updated.",
+        "Copy every scored part to the clipboard as plain\n" ..
+        "text, ready to paste into a post or a message.\n\n" ..
+        "The full measured values are always included,\n" ..
+        "whether or not they are shown on screen.\n\n" ..
+        "Which model produced each number is included too, so\n" ..
+        "a copy stays readable after the models are updated.",
     diff_ruler =
         "Where this chart landed between the tier it earned and the next one up.\n\n" ..
-        "A tier is a threshold, so a chart sitting near either end could reasonably be " ..
-        "called either tier - the marker shows how much room there was.\n\n" ..
-        "An amber marker pinned to one end means the score ran past the end of the " ..
-        "scale, so its real position is further out than the ruler can show.",
+        "A tier is a threshold, so a chart sitting near either end could reasonably\n" ..
+        "be called either tier - the marker shows how much room there was.\n\n" ..
+        "An amber marker pinned to one end means the score ran past the end of\n" ..
+        "the scale, so its real position is further out than the ruler can show.",
     diff_show_factors =
         "Show the raw measurements behind each suggestion.\n\n" ..
-        "This is a development view - useful for comparing a chart against the reference " ..
-        "songs, and not needed to read the result. The bullet points above each card say " ..
-        "the same thing in words.\n\n" ..
+        "This is a development view - useful for comparing a chart\n" ..
+        "against the reference songs, and not needed to read the result.\n" ..
+        "The bullet points above each card say the same thing in words.\n\n" ..
         "Not saved: it starts off again next time the script is opened.",
     diff_suggest_why =
-        "The chart properties on which this part is unusual, compared with the songs the " ..
-        "model was fitted on.\n\n" ..
-        "These are measurements, not causes: they describe what is distinctive about the " ..
-        "chart rather than claiming which property produced the rank.\n\n" ..
-        "The value column is the measurement; the last column is how many standard " ..
-        "deviations it sits from the average charted song.",
+        "The chart properties on which this part is unusual,\n" ..
+        "compared with the songs the model was fitted on.\n\n" ..
+        "These are measurements, not causes: they describe what is distinctive\n" ..
+        "about the chart rather than claiming which property produced the rank.\n\n" ..
+        "The value column is the measurement; the last column is how\n" ..
+        "many standard deviations it sits from the average charted song.",
 
     -- General tab
     align_all_audio = "Align every single-item audio track in the project to the SONG AUDIO start position.\n\n" ..
