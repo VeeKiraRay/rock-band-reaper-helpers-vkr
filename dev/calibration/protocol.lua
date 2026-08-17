@@ -1130,6 +1130,92 @@ for _, c in ipairs({
     CANDIDATES_KEYS[#CANDIDATES_KEYS + 1] = c
 end
 
+----------------------------------------------------------------------
+-- ROUND 18: VOCALS - TESSITURA ALONGSIDE HARMONY COUNT, NOT INSTEAD OF IT
+--
+-- Declared before running. Prior candidates remain byte-for-byte intact above.
+--
+-- WHY THIS ROUND EXISTS. Vocals fails both gate floors (usable lower bound 83.34% against
+-- 90%, rho +0.624 against +0.70) and its failure has a shape: it under-predicts the
+-- hardest charts by about 117 rank, three times worse than any other instrument's top-end
+-- shrinkage (guitar -37, bass -45, keys -40). Two things were ruled out first:
+--
+--   * NOT a song-level label. Predicting a vocals rank from the OTHER instruments' ranks
+--     of the same song reaches only rho +0.219 - the lowest of the six, against guitar's
+--     +0.623. Whatever the vocal rank encodes is specific to the vocal chart, so it is
+--     reachable in principle. (Guitar, bass and drums lock to a shared groove and predict
+--     each other; a singer does not have to.)
+--   * NOT the "high AND held" interaction, which round 14 already declared as
+--     primary+range+highhold. Re-tested here as super-linear derived terms - sustained
+--     high time weighted by the square, and by 2^(excess/6), of the register above G4 -
+--     every variant moved the top-end bias by under 1 rank, and two of them made it worse.
+--     The two CONTROLS (convexity in time alone, ceiling height alone) beat all of them,
+--     which is the reverse of that hypothesis.
+--
+-- WHAT WAS NEVER TESTED. The tessitura family and vocal_parts have only ever appeared in
+-- SEPARATE candidates: primary+range+tess carries top_note and high_time_67 but drops
+-- vocal_parts, while the selected primary+range+parts keeps vocal_parts and carries no
+-- tessitura at all. Both together was never declared, so "does time spent high help once
+-- harmony count is already in" has no answer. It should: high_time_70 is the single
+-- largest discriminator of the charts ranked 400+, sitting +1.28 sd above the rest of the
+-- corpus, and it is absent from the shipped model. The model currently knows how HIGH a
+-- singer goes (pitch_p90, notated_range) and not how LONG they stay up there.
+--
+-- pc_change_rate joins because the exploratory pass suggested the demand is high AND
+-- MOVING rather than high and sustained - which fits the residual list, where the worst
+-- misses are melismatic wide-ranging singing (four Queen charts and two Iron Maiden) and
+-- not held-note ballads.
+--
+-- PRE-REGISTERED PREDICTIONS:
+--   1. parts+tess beats the incumbent on rho by at least +0.03. The exploratory pass put
+--      it at +0.684 against +0.624, and rho is the floor vocals misses by the wider
+--      margin.
+--   2. parts+tess+move is the strongest of the four and the only one with a chance of
+--      selection.
+--   3. NONE passes the gate. The exploratory usable mean was 88.47%, whose Wilson lower
+--      bound at n=313 is near 85% - still short of 90%, and rho +0.684 is still short of
+--      +0.70. This round narrows the gap; it does not close it.
+--   4. The top-end bias improves by at least 10 rank but stays worse than -80, i.e. the
+--      hardest charts remain materially under-rated even when the round succeeds.
+--
+-- The exploratory numbers above are NOT evidence. They came from searching ~10 variants
+-- against the same rows, which is exactly what inflates a selection estimate; they are
+-- recorded only to make these predictions falsifiable. The protocol's numbers are the
+-- ones that count, and prediction 1 is the one that is genuinely at risk.
+for _, c in ipairs({
+    -- The incumbent plus time-spent-high. The minimal test of the round's question.
+    { name = 'parts+tess',
+      keys = { 'syl_density_avg', 'syl_density_peak', 'tight_p10', 'tight_med',
+               'pc_interval_mean', 'playing_s',
+               'notated_range', 'pitch_p90', 'octave_jump_rate', 'vocal_parts',
+               'high_time_70' } },
+
+    -- With the ceiling as well as the time, since one onset at the top and a sustained
+    -- tessitura are different demands and top_note alone was round 11's weaker answer.
+    { name = 'parts+tess+ceiling',
+      keys = { 'syl_density_avg', 'syl_density_peak', 'tight_p10', 'tight_med',
+               'pc_interval_mean', 'playing_s',
+               'notated_range', 'pitch_p90', 'octave_jump_rate', 'vocal_parts',
+               'high_time_70', 'top_note' } },
+
+    -- High AND MOVING. pc_change_rate is how often the melody changes pitch class.
+    { name = 'parts+tess+move',
+      keys = { 'syl_density_avg', 'syl_density_peak', 'tight_p10', 'tight_med',
+               'pc_interval_mean', 'playing_s',
+               'notated_range', 'pitch_p90', 'octave_jump_rate', 'vocal_parts',
+               'high_time_70', 'pc_change_rate' } },
+
+    -- The discrimination check: does re-entering the high register cost something beyond
+    -- total time spent there? If this ties parts+tess, the answer is no.
+    { name = 'parts+tess+reentry',
+      keys = { 'syl_density_avg', 'syl_density_peak', 'tight_p10', 'tight_med',
+               'pc_interval_mean', 'playing_s',
+               'notated_range', 'pitch_p90', 'octave_jump_rate', 'vocal_parts',
+               'high_time_70', 'high_reentry_rate_70' } },
+}) do
+    CANDIDATES_VOCALS[#CANDIDATES_VOCALS + 1] = c
+end
+
 -- Which declaration governs an instrument. Anything without its own entry uses the
 -- guitar/bass set, so adding an instrument without declaring candidates for it fails
 -- visibly (unavailable factors are reported, not silently dropped) rather than quietly

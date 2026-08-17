@@ -281,6 +281,17 @@ DIFFICULTY_FACTOR_INFO = {
     octave_jump_rate = { label = 'octave leaps', fmt = 'num',
         high = 'Frequent octave leaps',
         low  = 'Few octave leaps' },
+    high_time_70 = { label = 'time sung high', fmt = 'pct',
+        high = 'Much of the singing sits above the top of a comfortable range',
+        low  = 'Little time spent high in the register',
+        tip = 'Share of singing time above G4. This reads the written\n' ..
+              'octave, and measures how LONG the part stays up there\n' ..
+              'rather than how high it reaches once.' },
+    pc_change_rate = { label = 'note change rate', fmt = 'num',
+        high = 'The melody changes note constantly',
+        low  = 'The melody holds or repeats notes',
+        tip = 'Changes of note name per second of singing time.\n' ..
+              'Repeating the same note costs nothing here.' },
     vocal_parts = { label = 'vocal parts', fmt = 'int',
         high = 'Multiple vocal parts are associated with the official vocal scale',
         low  = 'A single vocal part',
@@ -327,8 +338,8 @@ DIFFICULTY_FACTOR_ORDER = {
     'kick_density', 'kick_density_peak', 'hand_density_peak', 'stick_size_mean',
     'tom_frac', 'roll_frac', 'offbeat_frac', 'pro_stations_peak',
     -- vocals
-    'syl_density_avg', 'syl_density_peak', 'pc_interval_mean', 'notated_range',
-    'pitch_p90', 'octave_jump_rate', 'vocal_parts',
+    'syl_density_avg', 'syl_density_peak', 'pc_change_rate', 'pc_interval_mean',
+    'notated_range', 'pitch_p90', 'high_time_70', 'octave_jump_rate', 'vocal_parts',
 }
 
 local ORDER_INDEX = {}

@@ -44,6 +44,12 @@ local function NewEntry(shortname)
         genre       = nil,
         sub_genre   = nil,
         vocal_parts = nil,   -- missing on 2 corpus songs that do have a vocals rank
+        -- Harmonix's catalogue id. Roughly release order within a catalogue block
+        -- (RB3 DLC spans 1010058..1010639), which is the only handle the corpus offers
+        -- on WHEN a chart was authored. Blocks are not comparable to each other - a few
+        -- older-catalogue re-releases carry three-digit ids - so callers must group by
+        -- block rather than treat the number as a global timeline.
+        song_id     = nil,
         ranks       = {},    -- only keys actually present, values > 0 kept as-is
     }
 end
@@ -92,6 +98,11 @@ function ParseSongsDta(text)
                 if sub then cur.sub_genre = sub end
                 local vp = line:match('%(vocal_parts%s+(%d+)%)')
                 if vp then cur.vocal_parts = tonumber(vp) end
+                -- Digits only: the quoted RBN dialect writes ('song_id' 5008694), which
+                -- this pattern deliberately does not match - those files are not parsed
+                -- at all (their ranks are tier floors, not ranks).
+                local sid = line:match('%(song_id%s+(%d+)%)')
+                if sid then cur.song_id = tonumber(sid) end
             end
         end
     end

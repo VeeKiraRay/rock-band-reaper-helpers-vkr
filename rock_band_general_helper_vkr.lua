@@ -1,6 +1,6 @@
 -- @description Rock Band General Helper
 -- @author VeeKiraRay
--- @version 0.9.56
+-- @version 0.9.57
 -- @about
 --   Utility actions for Rock Band authoring in REAPER.
 --
@@ -25,6 +25,29 @@
 --
 --   This @about block keeps only the 5 most recent versions.
 --   Full history: CHANGELOG.md in the repo.
+--
+--   v0.9.57
+--     - Metadata > Difficulty: new suggestion models for drums, keys and vocals,
+--       refitted against a reference corpus that grew from 205 songs to 394. The
+--       earlier corpus was thin at both ends of the scale, which flattered every
+--       figure: a model that hedges toward the middle looks good when most of the
+--       songs measured against it sit there. Easy and hard songs were added at
+--       both ends, so the accuracy numbers went DOWN while becoming honest.
+--       Guitar, bass and Pro Keys suggestions are unchanged.
+--     - Vocals: the model now measures how long a part stays high, not only how
+--       high it reaches. A chart that sits above G4 for much of its singing time
+--       reads harder than one that touches the same note once, which is what the
+--       official ranks reward. It also counts how often the melody changes note.
+--       Vocals remains the weakest instrument and keeps its Experimental badge -
+--       it still under-rates the hardest charts, the operatic and wide-ranging
+--       ones most of all.
+--     - Drums: back to the fuller model, which now wins clearly rather than by a
+--       hair. It is the most reliable of the six.
+--     - Keys: unchanged factors, fitted on a straight rank scale rather than a
+--       log one. Keys sits fractionally under the accuracy bar the other three
+--       cleared, so it keeps its Beta badge; adding easy and hard keys charts
+--       twice failed to close that gap, which suggests the limit is the model
+--       rather than the number of songs behind it.
 --
 --   v0.9.56
 --     - Metadata > Genre: an editorial pass over the mapping after a peer review.
@@ -119,27 +142,6 @@
 --       inside the fade, or "hard cut to next" (a valid choice, not an error).
 --       Camera cards have no such line - a camera cut never fades.
 --       Same change in the standalone Venue Preview window (its v0.4).
---   v0.9.52
---     - Venue > Actions > Validate: new "Validate camera stacks" button. Only
---       two of bass/guitar/keys fit on stage at once, so a song charting all
---       three can be played by three different bands, and stacked camera shots
---       are how you cover each. This replays the game's shot pick for every
---       lineup your project can produce and reports where that breaks down:
---       shots that win under no lineup (they need an instrument never on
---       stage, or a stacked sibling outranks them everywhere they fit), and
---       spots where a lineup has no valid camera shot so the game picks for
---       you.
---       Read-only, like the lighting validator beside it.
---     - It also catches two mistakes that break stacking outright: the same
---       shot written twice on one tick, and two shots a few ticks apart that
---       were meant to be stacked - the game reads those as two separate cuts,
---       so the second replaces the first before you ever see it.
---     - Letting the game fall back is a valid authoring choice, so those spots
---       are listed as "where the game decides", not as errors - the same way
---       the lighting validator treats a hard cut. Uncovered spots are reported
---       one line per spot rather than per lineup, and the report names which
---       lineups your project can actually produce, so a four-piece song does
---       not read as the check having found nothing to do.
 r = reaper  -- global so all dofile'd modules can use it
 
 if not r.ImGui_CreateContext then

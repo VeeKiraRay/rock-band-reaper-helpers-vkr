@@ -1,684 +1,686 @@
 ======  Difficulty calibration - LOCKED PROTOCOL  ======
 
-rows 2011   repeats 10   folds 5   seed 20260812
+rows 2101   repeats 10   folds 5   seed 20260812
 candidates and thresholds are fixed in protocol.lua and were set before this ran.
 Changing any of them is a new experiment, not a re-run - say so if you do.
 
 ==================  GUITAR  ==================
-  development rows : 312 rb3_dlc
+  development rows : 327 rb3_dlc
   always-training   : 45 lego at weight 0.30, 15 rb2 at weight 0.30
   disputed held out : 0
   reserved test set : NOT DRAWN - this phase validates the approach, not a release
 
   candidate                  scale        k  usable (mean)    gate lower bound miss    rho
-  baseline                   rank         2   86.99% [86.9-87.2]   83.53%           0.99%  +0.794
-  baseline                   log(rank)    2   86.28% [85.9-86.9]   82.76%           1.28%  +0.789
-  primary                    rank         6   88.81% [88.1-89.5]   85.54%           0.87%  +0.816
-  primary                    log(rank)    6   88.43% [87.5-89.1]   85.11%           1.31%  +0.813
-  primary+solo               rank         7   90.80% [90.4-91.1]   87.75%           0.32%  +0.842
-  primary+solo               log(rank)    7   90.90% [90.4-91.4]   87.86%           0.83%  +0.838
-  primary+movement           rank         9   88.33% [87.5-89.1]   85.01%           0.93%  +0.810
-  primary+movement           log(rank)    9   88.04% [87.5-88.5]   84.69%           1.38%  +0.807
-  primary+solo+movement      rank        10   90.32% [89.7-90.8]   87.21%           0.38%  +0.839
-  primary+solo+movement      log(rank)   10   90.42% [89.7-91.1]   87.32%           0.77%  +0.833
-  full                       rank        21   92.12% [91.3-92.9]   89.23%           0.03%  +0.853
-  full                       log(rank)   21   92.56% [92.2-93.0]   89.74%           0.32%  +0.856
-  baseline@attacks           rank         2   90.83% [90.4-91.3]   87.78%           0.93%  +0.830
-  baseline@attacks           log(rank)    2   90.54% [90.0-91.1]   87.46%           1.06%  +0.828
-  primary@attacks            rank         6   91.67% [91.3-92.3]   88.72%           0.74%  +0.841
-  primary@attacks            log(rank)    6   90.64% [90.1-91.1]   87.57%           0.90%  +0.837
-  primary+solo@attacks       rank         7   92.69% [92.3-93.0]   89.88%           0.19%  +0.857
-  primary+solo@attacks       log(rank)    7   92.47% [91.6-93.0]   89.63%           0.74%  +0.852
-  primary+both_density       rank         7   91.57% [91.3-92.0]   88.61%           0.54%  +0.842
-  primary+both_density       log(rank)    7   90.19% [89.4-90.7]   87.07%           0.90%  +0.837
-  full@attacks               rank        21   93.37% [92.9-93.9]   90.65%           0.00%  +0.864
-  full@attacks               log(rank)   21   93.81% [92.9-94.9]   91.17%           0.32%  +0.864
+  baseline                   rank         2   86.94% [86.5-87.2]   83.57%           0.89%  +0.791
+  baseline                   log(rank)    2   86.36% [85.6-86.9]   82.94%           1.19%  +0.785
+  primary                    rank         6   88.56% [88.3-89.0]   85.35%           0.55%  +0.814
+  primary                    log(rank)    6   88.07% [87.5-88.4]   84.81%           1.04%  +0.809
+  primary+solo               rank         7   90.92% [90.5-91.4]   87.96%           0.15%  +0.840
+  primary+solo               log(rank)    7   90.89% [90.2-91.8]   87.92%           0.73%  +0.835
+  primary+movement           rank         9   88.23% [87.7-89.0]   84.98%           0.98%  +0.807
+  primary+movement           log(rank)    9   88.38% [88.0-89.0]   85.14%           1.25%  +0.804
+  primary+solo+movement      rank        10   90.00% [89.5-90.5]   86.93%           0.31%  +0.837
+  primary+solo+movement      log(rank)   10   90.55% [89.6-91.8]   87.55%           0.64%  +0.830
+  full                       rank        21   91.96% [91.1-93.0]   89.13%           0.00%  +0.852
+  full                       log(rank)   21   93.15% [92.3-94.2]   90.48%           0.31%  +0.854
+  baseline@attacks           rank         2   90.61% [90.2-90.9]   87.62%           0.83%  +0.827
+  baseline@attacks           log(rank)    2   90.98% [90.5-91.4]   88.03%           0.80%  +0.825
+  primary@attacks            rank         6   91.77% [91.4-92.0]   88.92%           0.52%  +0.838
+  primary@attacks            log(rank)    6   91.04% [90.5-91.5]   88.09%           0.73%  +0.833
+  primary+solo@attacks       rank         7   92.91% [92.7-93.3]   90.20%           0.00%  +0.854
+  primary+solo@attacks       log(rank)    7   92.51% [91.9-93.3]   89.75%           0.52%  +0.849
+  primary+both_density       rank         7   91.77% [91.1-92.4]   88.92%           0.43%  +0.840
+  primary+both_density       log(rank)    7   90.64% [89.9-91.1]   87.65%           0.80%  +0.834
+  full@attacks               rank        21   93.79% [93.2-94.5]   91.22%           0.00%  +0.862
+  full@attacks               log(rank)   21   94.16% [93.5-94.8]   91.64%           0.31%  +0.862
 
   usable (mean) is the average across repeats; [lo-hi] beside it is the 10th-90th
   percentile ACROSS REPEATS, i.e. split noise only. The gate lower bound is the
   one-sided 95% Wilson bound on the row count, which is the dominant uncertainty
   at this sample size and is what the gate actually reads.
 
-  ridge chosen inside training folds: 1e-006 x609 (55%), 0.001 x81 (7%), 0.01 x303 (28%), 0.1 x107 (10%)
+  ridge chosen inside training folds: 1e-006 x574 (52%), 0.001 x104 (9%), 0.01 x314 (29%), 0.1 x108 (10%)
 
   -- selection --
-    best mean usable  : full@attacks / log(rank) at 93.81%
+    best mean usable  : full@attacks / log(rank) at 94.16%
     SELECTED          : full@attacks / log(rank)  (21 features)
     no simpler candidate came within the predeclared margin.
 
   -- paired differences against the selected candidate --
     candidate                  scale       mean diff       wins
-    baseline                   rank           -6.83%         0%
-    baseline                   log(rank)      -7.53%         0%
-    primary                    rank           -5.00%         0%
-    primary                    log(rank)      -5.38%         0%
-    primary+solo               rank           -3.01%         0%
-    primary+solo               log(rank)      -2.92%         0%
-    primary+movement           rank           -5.48%         0%
-    primary+movement           log(rank)      -5.77%         0%
-    primary+solo+movement      rank           -3.49%         0%
-    primary+solo+movement      log(rank)      -3.40%         0%
-    full                       rank           -1.70%         0%
-    full                       log(rank)      -1.25%         0%
-    baseline@attacks           rank           -2.98%         0%
-    baseline@attacks           log(rank)      -3.27%         0%
-    primary@attacks            rank           -2.15%         0%
-    primary@attacks            log(rank)      -3.17%         0%
-    primary+solo@attacks       rank           -1.12%        10%
-    primary+solo@attacks       log(rank)      -1.35%         0%
-    primary+both_density       rank           -2.24%         0%
-    primary+both_density       log(rank)      -3.62%         0%
-    full@attacks               rank           -0.45%        20%
+    baseline                   rank           -7.22%         0%
+    baseline                   log(rank)      -7.80%         0%
+    primary                    rank           -5.60%         0%
+    primary                    log(rank)      -6.09%         0%
+    primary+solo               rank           -3.24%         0%
+    primary+solo               log(rank)      -3.27%         0%
+    primary+movement           rank           -5.93%         0%
+    primary+movement           log(rank)      -5.78%         0%
+    primary+solo+movement      rank           -4.16%         0%
+    primary+solo+movement      log(rank)      -3.61%         0%
+    full                       rank           -2.20%         0%
+    full                       log(rank)      -1.01%         0%
+    baseline@attacks           rank           -3.55%         0%
+    baseline@attacks           log(rank)      -3.18%         0%
+    primary@attacks            rank           -2.39%         0%
+    primary@attacks            log(rank)      -3.12%         0%
+    primary+solo@attacks       rank           -1.25%         0%
+    primary+solo@attacks       log(rank)      -1.65%         0%
+    primary+both_density       rank           -2.39%         0%
+    primary+both_density       log(rank)      -3.52%         0%
+    full@attacks               rank           -0.37%        20%
 
   -- worst 10 by tier distance, SELECTED model, averaged over repeats --
-    webuiltthiscity          rank 418  predicted  260  said tier 3, actual 6  (3 off)
-    shepherdoffire           rank 460  predicted  299  said tier 4, actual 6  (2 off)
-    theentertainer           rank 400  predicted  256  said tier 3, actual 5  (2 off)
-    saturdaynightspecial     rank 353  predicted  228  said tier 3, actual 5  (2 off)
-    rainingblood             rank 430  predicted  321  said tier 4, actual 6  (2 off)
-    fantasma2                rank 320  predicted  217  said tier 2, actual 4  (2 off)
+    webuiltthiscity          rank 418  predicted  259  said tier 3, actual 6  (3 off)
+    shepherdoffire           rank 460  predicted  301  said tier 4, actual 6  (2 off)
+    theentertainer           rank 400  predicted  255  said tier 3, actual 5  (2 off)
+    saturdaynightspecial     rank 353  predicted  231  said tier 3, actual 5  (2 off)
+    theprisoner              rank 445  predicted  333  said tier 4, actual 6  (2 off)
+    rainingblood             rank 430  predicted  323  said tier 4, actual 6  (2 off)
+    fantasma2                rank 320  predicted  218  said tier 2, actual 4  (2 off)
     wewillrockyou2           rank  95  predicted  189  said tier 2, actual 0  (2 off)
-    livelyupyourself2        rank 304  predicted  218  said tier 2, actual 4  (2 off)
-    iwantitall2              rank 351  predicted  266  said tier 3, actual 5  (2 off)
-    maybeimamazed            rank 194  predicted  279  said tier 4, actual 2  (2 off)
+    iwantitall2              rank 351  predicted  263  said tier 3, actual 5  (2 off)
+    happyxmas                rank 150  predicted  228  said tier 3, actual 1  (2 off)
 
   -- release gate, read from the pessimistic end of each interval --
-    usable lower bound :  91.17%   (floor 90%)
-    miss upper bound   :   1.42%   (ceiling 5%)
-    rho (mean)         : +0.864   (floor 0.70)
+    usable lower bound :  91.64%   (floor 90%)
+    miss upper bound   :   1.36%   (ceiling 5%)
+    rho (mean)         : +0.862   (floor 0.70)
     -> PASSES the gate on the development set.
 
 ==================  BASS  ==================
-  development rows : 315 rb3_dlc
+  development rows : 330 rb3_dlc
   always-training   : 45 lego at weight 0.30, 15 rb2 at weight 0.30
   disputed held out : 0
   reserved test set : NOT DRAWN - this phase validates the approach, not a release
 
   candidate                  scale        k  usable (mean)    gate lower bound miss    rho
-  baseline                   rank         2   92.38% [91.7-93.0]   89.55%           1.27%  +0.777
-  baseline                   log(rank)    2   91.49% [91.1-91.7]   88.54%           1.08%  +0.773
-  primary                    rank         6   92.10% [91.7-92.7]   89.22%           1.21%  +0.771
-  primary                    log(rank)    6   91.43% [90.8-91.8]   88.47%           0.86%  +0.772
-  primary+solo               rank         7   92.16% [91.7-92.7]   89.29%           1.27%  +0.770
-  primary+solo               log(rank)    7   91.17% [90.4-91.8]   88.18%           0.86%  +0.771
-  primary+movement           rank         9   91.56% [90.8-92.4]   88.61%           0.89%  +0.784
-  primary+movement           log(rank)    9   91.62% [91.1-92.4]   88.68%           0.60%  +0.785
-  primary+solo+movement      rank        10   91.43% [91.0-92.1]   88.47%           0.92%  +0.783
-  primary+solo+movement      log(rank)   10   91.37% [90.8-92.1]   88.40%           0.63%  +0.785
-  full                       rank        21   92.06% [91.4-92.4]   89.18%           0.63%  +0.778
-  full                       log(rank)   21   91.78% [91.1-92.4]   88.86%           0.44%  +0.781
-  baseline+entropy           rank         3   92.92% [92.3-93.7]   90.16%           0.51%  +0.810
-  baseline+entropy           log(rank)    3   94.51% [94.3-94.9]   91.99%           0.32%  +0.809
-  baseline+entropy_rel       rank         3   92.67% [92.3-93.1]   89.87%           0.38%  +0.808
-  baseline+entropy_rel       log(rank)    3   93.37% [93.0-93.7]   90.67%           0.13%  +0.806
-  primary+entropy            rank         7   92.35% [91.7-92.7]   89.51%           0.44%  +0.804
-  primary+entropy            log(rank)    7   93.27% [92.9-93.7]   90.56%           0.19%  +0.805
-  primary+entropy_rel        rank         7   92.00% [91.7-92.4]   89.11%           0.48%  +0.801
-  primary+entropy_rel        log(rank)    7   92.60% [92.4-92.7]   89.80%           0.10%  +0.802
-  baseline+ent_rel@attacks   rank         3   93.21% [93.0-93.4]   90.49%           0.32%  +0.813
-  baseline+ent_rel@attacks   log(rank)    3   93.87% [93.3-94.6]   91.25%           0.32%  +0.812
-  primary+entropy@attacks    rank         7   93.14% [92.6-93.7]   90.41%           0.32%  +0.814
-  primary+entropy@attacks    log(rank)    7   94.63% [94.6-94.9]   92.14%           0.32%  +0.815
+  baseline                   rank         2   92.70% [92.1-93.4]   89.98%           1.18%  +0.771
+  baseline                   log(rank)    2   91.52% [91.2-91.8]   88.64%           1.24%  +0.768
+  primary                    rank         6   92.30% [92.0-92.8]   89.53%           1.12%  +0.766
+  primary                    log(rank)    6   91.70% [91.2-92.1]   88.85%           0.82%  +0.767
+  primary+solo               rank         7   92.36% [91.8-92.8]   89.60%           1.09%  +0.766
+  primary+solo               log(rank)    7   91.61% [90.9-92.4]   88.74%           0.70%  +0.767
+  primary+movement           rank         9   91.55% [90.9-92.5]   88.68%           0.76%  +0.779
+  primary+movement           log(rank)    9   91.94% [91.5-92.4]   89.12%           0.61%  +0.782
+  primary+solo+movement      rank        10   91.64% [90.9-92.2]   88.78%           0.76%  +0.778
+  primary+solo+movement      log(rank)   10   91.91% [91.2-92.4]   89.09%           0.61%  +0.781
+  full                       rank        21   91.88% [91.2-92.5]   89.05%           0.67%  +0.772
+  full                       log(rank)   21   91.67% [90.9-92.8]   88.81%           0.48%  +0.773
+  baseline+entropy           rank         3   93.12% [93.0-93.3]   90.46%           0.30%  +0.802
+  baseline+entropy           log(rank)    3   94.18% [93.9-94.3]   91.68%           0.30%  +0.802
+  baseline+entropy_rel       rank         3   92.73% [92.4-93.1]   90.01%           0.27%  +0.801
+  baseline+entropy_rel       log(rank)    3   93.55% [93.3-93.7]   90.95%           0.06%  +0.800
+  primary+entropy            rank         7   92.79% [92.1-93.9]   90.08%           0.33%  +0.797
+  primary+entropy            log(rank)    7   93.48% [93.0-93.9]   90.88%           0.18%  +0.800
+  primary+entropy_rel        rank         7   92.18% [91.5-92.8]   89.39%           0.27%  +0.796
+  primary+entropy_rel        log(rank)    7   92.79% [92.4-93.1]   90.08%           0.09%  +0.797
+  baseline+ent_rel@attacks   rank         3   93.27% [93.0-93.6]   90.63%           0.33%  +0.807
+  baseline+ent_rel@attacks   log(rank)    3   93.73% [93.3-94.2]   91.16%           0.30%  +0.806
+  primary+entropy@attacks    rank         7   93.42% [93.0-93.7]   90.81%           0.33%  +0.806
+  primary+entropy@attacks    log(rank)    7   94.48% [94.2-94.8]   92.03%           0.18%  +0.809
 
   usable (mean) is the average across repeats; [lo-hi] beside it is the 10th-90th
   percentile ACROSS REPEATS, i.e. split noise only. The gate lower bound is the
   one-sided 95% Wilson bound on the row count, which is the dominant uncertainty
   at this sample size and is what the gate actually reads.
 
-  ridge chosen inside training folds: 1e-006 x464 (39%), 0.001 x57 (5%), 0.01 x469 (39%), 0.1 x210 (18%)
+  ridge chosen inside training folds: 1e-006 x492 (41%), 0.001 x61 (5%), 0.01 x433 (36%), 0.1 x214 (18%)
 
   -- selection --
-    best mean usable  : primary+entropy@attacks / log(rank) at 94.63%
+    best mean usable  : primary+entropy@attacks / log(rank) at 94.48%
     SELECTED          : baseline+entropy / log(rank)  (3 features)
-    the leader beats it by +0.13 points and wins 40% of paired repeats,
+    the leader beats it by +0.30 points and wins 60% of paired repeats,
     which does not clear the predeclared bar (>1 points AND >70% of repeats),
     so the simpler candidate is selected.
 
   -- paired differences against the selected candidate --
     candidate                  scale       mean diff       wins
-    baseline                   rank           -2.13%         0%
-    baseline                   log(rank)      -3.02%         0%
-    primary                    rank           -2.41%         0%
-    primary                    log(rank)      -3.08%         0%
-    primary+solo               rank           -2.35%         0%
-    primary+solo               log(rank)      -3.33%         0%
-    primary+movement           rank           -2.95%         0%
-    primary+movement           log(rank)      -2.89%         0%
-    primary+solo+movement      rank           -3.08%         0%
-    primary+solo+movement      log(rank)      -3.14%         0%
-    full                       rank           -2.44%         0%
-    full                       log(rank)      -2.73%         0%
-    baseline+entropy           rank           -1.59%         0%
-    baseline+entropy_rel       rank           -1.84%         0%
-    baseline+entropy_rel       log(rank)      -1.14%         0%
-    primary+entropy            rank           -2.16%         0%
-    primary+entropy            log(rank)      -1.24%         0%
-    primary+entropy_rel        rank           -2.51%         0%
-    primary+entropy_rel        log(rank)      -1.90%         0%
-    baseline+ent_rel@attacks   rank           -1.30%         0%
-    baseline+ent_rel@attacks   log(rank)      -0.63%        10%
-    primary+entropy@attacks    rank           -1.37%         0%
-    primary+entropy@attacks    log(rank)      +0.13%        40%
+    baseline                   rank           -1.48%         0%
+    baseline                   log(rank)      -2.67%         0%
+    primary                    rank           -1.88%         0%
+    primary                    log(rank)      -2.48%         0%
+    primary+solo               rank           -1.82%         0%
+    primary+solo               log(rank)      -2.58%         0%
+    primary+movement           rank           -2.64%         0%
+    primary+movement           log(rank)      -2.24%         0%
+    primary+solo+movement      rank           -2.55%         0%
+    primary+solo+movement      log(rank)      -2.27%         0%
+    full                       rank           -2.30%         0%
+    full                       log(rank)      -2.52%         0%
+    baseline+entropy           rank           -1.06%         0%
+    baseline+entropy_rel       rank           -1.45%         0%
+    baseline+entropy_rel       log(rank)      -0.64%         0%
+    primary+entropy            rank           -1.39%         0%
+    primary+entropy            log(rank)      -0.70%         0%
+    primary+entropy_rel        rank           -2.00%         0%
+    primary+entropy_rel        log(rank)      -1.39%         0%
+    baseline+ent_rel@attacks   rank           -0.91%         0%
+    baseline+ent_rel@attacks   log(rank)      -0.45%         0%
+    primary+entropy@attacks    rank           -0.76%         0%
+    primary+entropy@attacks    log(rank)      +0.30%        60%
 
   -- worst 10 by tier distance, SELECTED model, averaged over repeats --
-    wanteddeadoralive2       rank 315  predicted  178  said tier 1, actual 4  (3 off)
+    wanteddeadoralive2       rank 315  predicted  179  said tier 1, actual 4  (3 off)
     dreampolice              rank 299  predicted  480  said tier 6, actual 4  (2 off)
-    bluemonday               rank 230  predicted  387  said tier 5, actual 3  (2 off)
-    dameaire2                rank 333  predicted  194  said tier 2, actual 4  (2 off)
-    welcometothefamily       rank 379  predicted  250  said tier 3, actual 5  (2 off)
+    bluemonday               rank 230  predicted  397  said tier 5, actual 3  (2 off)
+    dameaire2                rank 333  predicted  195  said tier 2, actual 4  (2 off)
+    welcometothefamily       rank 379  predicted  251  said tier 3, actual 5  (2 off)
     spoonman2                rank 400  predicted  274  said tier 3, actual 5  (2 off)
-    pulseofthemaggots        rank 340  predicted  462  said tier 6, actual 4  (2 off)
-    theprisoner              rank 380  predicted  269  said tier 3, actual 5  (2 off)
+    pulseofthemaggots        rank 340  predicted  460  said tier 6, actual 4  (2 off)
+    theprisoner              rank 380  predicted  271  said tier 3, actual 5  (2 off)
     5minutesalone            rank 439  predicted  330  said tier 4, actual 6  (2 off)
     iveseenallgoodpeople     rank 365  predicted  258  said tier 3, actual 5  (2 off)
 
   -- worst 10 by tier distance, MEAN LEADER, averaged over repeats --
-    wanteddeadoralive2       rank 315  predicted  178  said tier 1, actual 4  (3 off)
-    bluemonday               rank 230  predicted  374  said tier 5, actual 3  (2 off)
-    pulseofthemaggots        rank 340  predicted  480  said tier 6, actual 4  (2 off)
-    dameaire2                rank 333  predicted  206  said tier 2, actual 4  (2 off)
+    wanteddeadoralive2       rank 315  predicted  179  said tier 1, actual 4  (3 off)
+    bluemonday               rank 230  predicted  382  said tier 5, actual 3  (2 off)
+    pulseofthemaggots        rank 340  predicted  479  said tier 6, actual 4  (2 off)
+    dameaire2                rank 333  predicted  205  said tier 2, actual 4  (2 off)
     spoonman2                rank 400  predicted  273  said tier 3, actual 5  (2 off)
     welcometothefamily       rank 379  predicted  255  said tier 3, actual 5  (2 off)
     5minutesalone            rank 439  predicted  329  said tier 4, actual 6  (2 off)
-    iveseenallgoodpeople     rank 365  predicted  257  said tier 3, actual 5  (2 off)
-    theprisoner              rank 380  predicted  275  said tier 3, actual 5  (2 off)
+    iveseenallgoodpeople     rank 365  predicted  256  said tier 3, actual 5  (2 off)
+    theprisoner              rank 380  predicted  277  said tier 3, actual 5  (2 off)
     somuchtosay              rank 300  predicted  201  said tier 2, actual 4  (2 off)
 
   -- release gate, read from the pessimistic end of each interval --
-    usable lower bound :  91.99%   (floor 90%)
-    miss upper bound   :   1.41%   (ceiling 5%)
-    rho (mean)         : +0.809   (floor 0.70)
+    usable lower bound :  91.68%   (floor 90%)
+    miss upper bound   :   1.35%   (ceiling 5%)
+    rho (mean)         : +0.802   (floor 0.70)
     -> PASSES the gate on the development set.
 
 ==================  DRUM  ==================
-  development rows : 313 rb3_dlc
+  development rows : 328 rb3_dlc
   always-training   : 45 lego at weight 0.30, 15 rb2 at weight 0.30
   disputed held out : 0
   reserved test set : NOT DRAWN - this phase validates the approach, not a release
 
   candidate                  scale        k  usable (mean)    gate lower bound miss    rho
-  baseline                   rank         2   92.14% [91.3-92.7]   89.26%           1.28%  +0.829
-  baseline                   log(rank)    2   92.72% [92.3-93.3]   89.92%           1.50%  +0.831
-  primary                    rank         6   93.39% [92.9-93.9]   90.68%           0.96%  +0.859
-  primary                    log(rank)    6   93.48% [93.0-94.0]   90.79%           0.73%  +0.858
-  baseline@attacks           rank         2   90.61% [90.1-91.4]   87.54%           1.28%  +0.803
-  baseline@attacks           log(rank)    2   90.00% [89.5-90.5]   86.86%           1.25%  +0.808
-  primary@attacks            rank         6   90.32% [89.7-91.4]   87.21%           1.76%  +0.815
-  primary@attacks            log(rank)    6   90.77% [90.0-91.1]   87.71%           1.37%  +0.810
-  primary+kick               rank         7   93.35% [92.9-93.6]   90.65%           0.86%  +0.861
-  primary+kick               log(rank)    7   93.61% [92.9-94.0]   90.94%           0.42%  +0.861
-  primary+limbs              rank         7   92.78% [92.3-93.3]   89.99%           0.77%  +0.846
-  primary+limbs              log(rank)    7   93.00% [92.6-93.6]   90.24%           0.51%  +0.844
-  primary+offbeat            rank         7   93.16% [92.7-93.6]   90.43%           1.05%  +0.857
-  primary+offbeat            log(rank)    7   93.35% [92.9-93.9]   90.65%           0.73%  +0.857
-  primary+entropy            rank         7   94.19% [93.6-94.9]   91.61%           0.51%  +0.884
-  primary+entropy            log(rank)    7   93.51% [93.0-94.0]   90.83%           0.32%  +0.885
-  primary+entropy_rel        rank         7   93.71% [93.3-94.2]   91.05%           0.64%  +0.882
-  primary+entropy_rel        log(rank)    7   93.67% [93.3-94.2]   91.02%           0.32%  +0.882
-  primary+limbs+ent+offbeat  rank         9   93.90% [93.3-94.6]   91.27%           0.80%  +0.865
-  primary+limbs+ent+offbeat  log(rank)    9   94.57% [94.2-94.9]   92.05%           0.67%  +0.869
-  primary+stations@pro       rank         7   93.58% [92.9-94.3]   90.90%           0.96%  +0.863
-  primary+stations@pro       log(rank)    7   93.67% [93.2-94.0]   91.02%           0.67%  +0.862
-  primary+limbs+stations     rank         8   92.62% [92.0-93.0]   89.81%           0.86%  +0.847
-  primary+limbs+stations     log(rank)    8   93.67% [93.3-94.0]   91.02%           0.73%  +0.846
-  primary@pro                rank         6   93.39% [92.9-93.9]   90.68%           0.96%  +0.859
-  primary@pro                log(rank)    6   93.48% [93.0-94.0]   90.79%           0.73%  +0.859
-  full_drum                  rank        26   95.21% [94.5-95.9]   92.80%           0.70%  +0.880
-  full_drum                  log(rank)   26   95.18% [94.5-96.2]   92.77%           0.35%  +0.883
+  baseline                   rank         2   92.13% [91.8-92.4]   89.33%           1.22%  +0.830
+  baseline                   log(rank)    2   92.62% [92.3-93.3]   89.88%           1.49%  +0.831
+  primary                    rank         6   93.81% [93.3-94.3]   91.24%           0.95%  +0.859
+  primary                    log(rank)    6   93.38% [93.0-93.9]   90.75%           0.67%  +0.859
+  baseline@attacks           rank         2   90.79% [90.2-91.5]   87.82%           1.28%  +0.805
+  baseline@attacks           log(rank)    2   90.24% [89.6-90.9]   87.21%           1.19%  +0.809
+  primary@attacks            rank         6   90.49% [89.9-91.5]   87.48%           1.71%  +0.818
+  primary@attacks            log(rank)    6   90.88% [90.2-91.5]   87.92%           1.34%  +0.813
+  primary+kick               rank         7   93.75% [93.3-94.2]   91.17%           0.70%  +0.863
+  primary+kick               log(rank)    7   93.87% [93.3-94.2]   91.31%           0.34%  +0.864
+  primary+limbs              rank         7   93.23% [92.7-93.9]   90.58%           0.70%  +0.851
+  primary+limbs              log(rank)    7   93.60% [93.3-93.9]   91.00%           0.30%  +0.849
+  primary+offbeat            rank         7   93.60% [93.3-94.2]   91.00%           0.98%  +0.858
+  primary+offbeat            log(rank)    7   93.26% [92.7-93.9]   90.61%           0.67%  +0.857
+  primary+entropy            rank         7   94.30% [93.6-94.8]   91.81%           0.40%  +0.882
+  primary+entropy            log(rank)    7   93.57% [93.0-93.9]   90.96%           0.30%  +0.883
+  primary+entropy_rel        rank         7   93.93% [93.6-94.2]   91.38%           0.58%  +0.881
+  primary+entropy_rel        log(rank)    7   93.57% [93.0-94.3]   90.96%           0.30%  +0.881
+  primary+limbs+ent+offbeat  rank         9   93.90% [93.0-94.5]   91.35%           0.49%  +0.868
+  primary+limbs+ent+offbeat  log(rank)    9   94.48% [94.2-94.8]   92.02%           0.52%  +0.872
+  primary+stations@pro       rank         7   93.81% [92.9-94.6]   91.24%           0.91%  +0.864
+  primary+stations@pro       log(rank)    7   93.75% [93.3-94.5]   91.17%           0.64%  +0.863
+  primary+limbs+stations     rank         8   93.20% [92.9-93.6]   90.54%           0.64%  +0.852
+  primary+limbs+stations     log(rank)    8   94.12% [93.9-94.5]   91.60%           0.52%  +0.851
+  primary@pro                rank         6   93.81% [93.3-94.3]   91.24%           0.95%  +0.859
+  primary@pro                log(rank)    6   93.38% [93.0-93.9]   90.75%           0.67%  +0.859
+  full_drum                  rank        26   95.61% [95.4-96.0]   93.35%           0.49%  +0.885
+  full_drum                  log(rank)   26   95.64% [94.8-96.6]   93.38%           0.34%  +0.888
 
   usable (mean) is the average across repeats; [lo-hi] beside it is the 10th-90th
   percentile ACROSS REPEATS, i.e. split noise only. The gate lower bound is the
   one-sided 95% Wilson bound on the row count, which is the dominant uncertainty
   at this sample size and is what the gate actually reads.
 
-  ridge chosen inside training folds: 1e-006 x414 (30%), 0.001 x111 (8%), 0.01 x696 (50%), 0.1 x179 (13%)
+  ridge chosen inside training folds: 1e-006 x532 (38%), 0.001 x115 (8%), 0.01 x562 (40%), 0.1 x191 (14%)
 
   -- selection --
-    best mean usable  : full_drum / rank at 95.21%
-    SELECTED          : primary+limbs+ent+offbeat / log(rank)  (9 features)
-    the leader beats it by +0.64 points and wins 80% of paired repeats,
-    which does not clear the predeclared bar (>1 points AND >70% of repeats),
-    so the simpler candidate is selected.
-
-  -- paired differences against the selected candidate --
-    candidate                  scale       mean diff       wins
-    baseline                   rank           -2.43%         0%
-    baseline                   log(rank)      -1.85%         0%
-    primary                    rank           -1.18%         0%
-    primary                    log(rank)      -1.09%         0%
-    baseline@attacks           rank           -3.96%         0%
-    baseline@attacks           log(rank)      -4.57%         0%
-    primary@attacks            rank           -4.25%         0%
-    primary@attacks            log(rank)      -3.80%         0%
-    primary+kick               rank           -1.21%         0%
-    primary+kick               log(rank)      -0.96%         0%
-    primary+limbs              rank           -1.79%         0%
-    primary+limbs              log(rank)      -1.57%         0%
-    primary+offbeat            rank           -1.41%         0%
-    primary+offbeat            log(rank)      -1.21%         0%
-    primary+entropy            rank           -0.38%        10%
-    primary+entropy            log(rank)      -1.05%        10%
-    primary+entropy_rel        rank           -0.86%         0%
-    primary+entropy_rel        log(rank)      -0.89%         0%
-    primary+limbs+ent+offbeat  rank           -0.67%        10%
-    primary+stations@pro       rank           -0.99%        10%
-    primary+stations@pro       log(rank)      -0.89%        10%
-    primary+limbs+stations     rank           -1.95%         0%
-    primary+limbs+stations     log(rank)      -0.89%         0%
-    primary@pro                rank           -1.18%         0%
-    primary@pro                log(rank)      -1.09%         0%
-    full_drum                  rank           +0.64%        80%
-    full_drum                  log(rank)      +0.61%        60%
-
-  -- worst 10 by tier distance, SELECTED model, averaged over repeats --
-    tennesseeflattopbox      rank 279  predicted  141  said tier 1, actual 4  (3 off)
-    wanteddeadoralive2       rank 120  predicted  206  said tier 3, actual 0  (3 off)
-    makemesmile2             rank 292  predicted  550  said tier 6, actual 4  (2 off)
-    rizeofthefenix           rank 448  predicted  271  said tier 4, actual 6  (2 off)
-    2112pt3                  rank 465  predicted  324  said tier 4, actual 6  (2 off)
-    stillofthenight          rank 176  predicted  306  said tier 4, actual 2  (2 off)
-    breakingthehabit         rank 350  predicted  237  said tier 3, actual 5  (2 off)
-    wedidntstartthefire      rank 150  predicted  221  said tier 3, actual 1  (2 off)
-    ifyouleavemenow          rank 146  predicted  216  said tier 3, actual 1  (2 off)
-    howdoyousleep            rank 198  predicted  145  said tier 1, actual 3  (2 off)
-
-  -- worst 10 by tier distance, MEAN LEADER, averaged over repeats --
-    wedidntstartthefire      rank 150  predicted  242  said tier 4, actual 1  (3 off)
-    wanteddeadoralive2       rank 120  predicted  204  said tier 3, actual 0  (3 off)
-    makemesmile2             rank 292  predicted  550  said tier 6, actual 4  (2 off)
-    rizeofthefenix           rank 448  predicted  275  said tier 4, actual 6  (2 off)
-    2112pt3                  rank 465  predicted  328  said tier 4, actual 6  (2 off)
-    stillofthenight          rank 176  predicted  294  said tier 4, actual 2  (2 off)
-    ifyouleavemenow          rank 146  predicted  234  said tier 3, actual 1  (2 off)
-    hammertofall             rank 173  predicted  251  said tier 4, actual 2  (2 off)
-    howdoyousleep            rank 198  predicted  130  said tier 1, actual 3  (2 off)
-    shootingthemoon          rank 183  predicted  125  said tier 1, actual 3  (2 off)
-
-  -- release gate, read from the pessimistic end of each interval --
-    usable lower bound :  92.05%   (floor 90%)
-    miss upper bound   :   1.96%   (ceiling 5%)
-    rho (mean)         : +0.869   (floor 0.70)
-    -> PASSES the gate on the development set.
-
-==================  VOCALS  ==================
-  development rows : 313 rb3_dlc
-  always-training   : 45 lego at weight 0.30, 15 rb2 at weight 0.30
-  disputed held out : 0
-  reserved test set : NOT DRAWN - this phase validates the approach, not a release
-
-  candidate                  scale        k  usable (mean)    gate lower bound miss    rho
-  baseline                   rank         2   76.65% [76.0-77.3]   72.49%           6.58%  +0.269
-  baseline                   log(rank)    2   77.48% [76.7-78.0]   73.37%           6.74%  +0.270
-  primary_vocal              rank         6   79.46% [79.1-79.9]   75.46%           3.29%  +0.439
-  primary_vocal              log(rank)    6   79.20% [78.8-79.9]   75.19%           3.61%  +0.441
-  primary+phrase             rank         8   79.52% [78.8-80.5]   75.52%           3.29%  +0.435
-  primary+phrase             log(rank)    8   78.72% [78.0-79.6]   74.68%           3.58%  +0.437
-  primary+entropy_rel        rank         7   81.88% [81.4-82.5]   78.04%           2.91%  +0.550
-  primary+entropy_rel        log(rank)    7   83.96% [83.4-84.4]   80.26%           2.97%  +0.552
-  primary+markers            rank         8   81.15% [80.2-81.7]   77.25%           2.68%  +0.488
-  primary+markers            log(rank)    8   83.35% [82.7-83.8]   79.61%           3.29%  +0.491
-  primary+length_joint       rank         7   80.38% [79.6-81.2]   76.44%           3.23%  +0.462
-  primary+length_joint       log(rank)    7   81.66% [81.1-82.1]   77.80%           3.39%  +0.462
-  primary+length_separate    rank         8   78.27% [77.6-78.9]   74.21%           3.00%  +0.429
-  primary+length_separate    log(rank)    8   79.27% [78.6-79.9]   75.25%           3.80%  +0.435
-  primary_vocal@semitone     rank         6   79.30% [78.9-79.6]   75.29%           2.56%  +0.455
-  primary_vocal@semitone     log(rank)    6   78.91% [78.6-79.3]   74.88%           3.23%  +0.457
-  primary_vocal@tubes        rank         6   80.29% [79.8-80.6]   76.34%           3.19%  +0.469
-  primary_vocal@tubes        log(rank)    6   82.30% [81.8-82.8]   78.48%           3.48%  +0.471
-  full_vocal                 rank        18   84.38% [84.0-84.7]   80.71%           2.17%  +0.569
-  full_vocal                 log(rank)   18   84.25% [83.7-84.7]   80.57%           2.52%  +0.575
-  full_vocal@tubes           rank        18   84.60% [84.3-85.0]   80.95%           2.20%  +0.568
-  full_vocal@tubes           log(rank)   18   84.22% [83.4-84.7]   80.54%           2.56%  +0.574
-  primary_vocal@pitched      rank         6   76.26% [75.7-76.8]   72.09%           3.99%  +0.367
-  primary_vocal@pitched      log(rank)    6   76.90% [76.3-77.6]   72.76%           4.63%  +0.365
-  primary+range              rank         9   83.64% [83.0-84.3]   79.92%           1.15%  +0.562
-  primary+range              log(rank)    9   84.09% [83.7-84.4]   80.40%           2.24%  +0.573
-  primary@pitched+range      rank         9   82.11% [81.7-82.7]   78.27%           1.44%  +0.537
-  primary@pitched+range      log(rank)    9   82.49% [81.8-83.1]   78.68%           2.81%  +0.548
-  primary@pitched+entropy_p  rank         7   81.85% [81.2-82.4]   78.00%           2.81%  +0.533
-  primary@pitched+entropy_p  log(rank)    7   82.91% [82.7-83.1]   79.13%           3.16%  +0.535
-  full_vocal@pitched         rank        22   86.20% [85.3-86.9]   82.68%           1.76%  +0.611
-  full_vocal@pitched         log(rank)   22   86.77% [86.2-87.3]   83.31%           2.01%  +0.623
-  primary+range+breath       rank        12   83.42% [82.7-84.1]   79.68%           1.41%  +0.565
-  primary+range+breath       log(rank)   12   83.32% [82.4-84.1]   79.57%           2.30%  +0.578
-  primary+range+tess         rank        11   85.18% [84.6-85.8]   81.57%           1.21%  +0.607
-  primary+range+tess         log(rank)   11   87.00% [86.5-87.5]   83.55%           1.63%  +0.612
-  primary+range+tess@70      rank        11   85.11% [84.3-86.0]   81.50%           1.95%  +0.614
-  primary+range+tess@70      log(rank)   11   85.43% [85.0-85.7]   81.85%           3.13%  +0.619
-  primary+range+breath+tess  rank        14   84.70% [83.7-85.6]   81.05%           0.93%  +0.607
-  primary+range+breath+tess  log(rank)   14   86.49% [85.9-86.9]   82.99%           1.53%  +0.612
-  primary+range+breath+tess@70 rank        14   85.21% [84.3-86.0]   81.61%           1.82%  +0.615
-  primary+range+breath+tess@70 log(rank)   14   85.37% [85.0-85.7]   81.78%           2.56%  +0.622
-  full_vocal+all             rank        27   86.49% [85.8-87.3]   82.99%           1.82%  +0.661
-  full_vocal+all             log(rank)   27   86.87% [85.9-87.9]   83.41%           1.69%  +0.667
-  primary+range+parts        rank        10   84.06% [83.1-85.0]   80.36%           1.73%  +0.613
-  primary+range+parts        log(rank)   10   86.81% [86.2-87.3]   83.34%           1.92%  +0.624
-  primary+range+highhold     rank        13   84.54% [83.7-85.3]   80.88%           1.79%  +0.591
-  primary+range+highhold     log(rank)   13   84.92% [84.3-85.7]   81.29%           2.97%  +0.599
-  primary+range+parts+highhold rank        14   85.72% [84.9-86.6]   82.16%           1.73%  +0.641
-  primary+range+parts+highhold log(rank)   14   86.52% [85.9-87.2]   83.03%           2.36%  +0.649
-  primary+range+phrase_tail  rank        11   83.04% [82.4-83.7]   79.27%           1.92%  +0.562
-  primary+range+phrase_tail  log(rank)   11   83.77% [83.0-84.3]   80.05%           2.30%  +0.573
-
-  usable (mean) is the average across repeats; [lo-hi] beside it is the 10th-90th
-  percentile ACROSS REPEATS, i.e. split noise only. The gate lower bound is the
-  one-sided 95% Wilson bound on the row count, which is the dominant uncertainty
-  at this sample size and is what the gate actually reads.
-
-  ridge chosen inside training folds: 1e-006 x100 (4%), 0.001 x23 (1%), 0.01 x248 (10%), 0.1 x2228 (86%), 1 x1 (0%)
-
-  -- selection --
-    best mean usable  : primary+range+tess / log(rank) at 87.00%
-    SELECTED          : primary+range+parts / log(rank)  (10 features)
-    the leader beats it by +0.19 points and wins 60% of paired repeats,
-    which does not clear the predeclared bar (>1 points AND >70% of repeats),
-    so the simpler candidate is selected.
-
-  -- paired differences against the selected candidate --
-    candidate                  scale       mean diff       wins
-    baseline                   rank          -10.16%         0%
-    baseline                   log(rank)      -9.33%         0%
-    primary_vocal              rank           -7.35%         0%
-    primary_vocal              log(rank)      -7.60%         0%
-    primary+phrase             rank           -7.28%         0%
-    primary+phrase             log(rank)      -8.08%         0%
-    primary+entropy_rel        rank           -4.92%         0%
-    primary+entropy_rel        log(rank)      -2.84%         0%
-    primary+markers            rank           -5.65%         0%
-    primary+markers            log(rank)      -3.45%         0%
-    primary+length_joint       rank           -6.42%         0%
-    primary+length_joint       log(rank)      -5.14%         0%
-    primary+length_separate    rank           -8.53%         0%
-    primary+length_separate    log(rank)      -7.54%         0%
-    primary_vocal@semitone     rank           -7.51%         0%
-    primary_vocal@semitone     log(rank)      -7.89%         0%
-    primary_vocal@tubes        rank           -6.52%         0%
-    primary_vocal@tubes        log(rank)      -4.50%         0%
-    full_vocal                 rank           -2.43%         0%
-    full_vocal                 log(rank)      -2.56%         0%
-    full_vocal@tubes           rank           -2.20%         0%
-    full_vocal@tubes           log(rank)      -2.59%         0%
-    primary_vocal@pitched      rank          -10.54%         0%
-    primary_vocal@pitched      log(rank)      -9.90%         0%
-    primary+range              rank           -3.16%         0%
-    primary+range              log(rank)      -2.72%         0%
-    primary@pitched+range      rank           -4.70%         0%
-    primary@pitched+range      log(rank)      -4.31%         0%
-    primary@pitched+entropy_p  rank           -4.95%         0%
-    primary@pitched+entropy_p  log(rank)      -3.90%         0%
-    full_vocal@pitched         rank           -0.61%        10%
-    full_vocal@pitched         log(rank)      -0.03%        50%
-    primary+range+breath       rank           -3.39%         0%
-    primary+range+breath       log(rank)      -3.48%         0%
-    primary+range+tess         rank           -1.63%         0%
-    primary+range+tess         log(rank)      +0.19%        60%
-    primary+range+tess@70      rank           -1.69%         0%
-    primary+range+tess@70      log(rank)      -1.37%         0%
-    primary+range+breath+tess  rank           -2.11%         0%
-    primary+range+breath+tess  log(rank)      -0.32%        20%
-    primary+range+breath+tess@70 rank           -1.60%         0%
-    primary+range+breath+tess@70 log(rank)      -1.44%         0%
-    full_vocal+all             rank           -0.32%        30%
-    full_vocal+all             log(rank)      +0.06%        50%
-    primary+range+parts        rank           -2.75%         0%
-    primary+range+highhold     rank           -2.27%         0%
-    primary+range+highhold     log(rank)      -1.88%         0%
-    primary+range+parts+highhold rank           -1.09%         0%
-    primary+range+parts+highhold log(rank)      -0.29%        30%
-    primary+range+phrase_tail  rank           -3.77%         0%
-    primary+range+phrase_tail  log(rank)      -3.04%         0%
-
-  -- worst 10 by tier distance, SELECTED model, averaged over repeats --
-    antsmarching             rank 441  predicted  196  said tier 2, actual 6  (4 off)
-    sometimessalvation       rank 460  predicted  236  said tier 3, actual 6  (3 off)
-    phantomoftheopera        rank 468  predicted  258  said tier 3, actual 6  (3 off)
-    seventhson               rank 395  predicted  196  said tier 2, actual 5  (3 off)
-    flightoficarus           rank 442  predicted  249  said tier 3, actual 6  (3 off)
-    alliwannado              rank 438  predicted  268  said tier 3, actual 6  (3 off)
-    nightsonbroadway         rank 470  predicted  284  said tier 4, actual 6  (2 off)
-    somebodytolove2          rank 495  predicted  314  said tier 4, actual 6  (2 off)
-    2112pt3                  rank 405  predicted  230  said tier 3, actual 5  (2 off)
-    whatdoesntkillyou2       rank 471  predicted  296  said tier 4, actual 6  (2 off)
-
-  -- worst 10 by tier distance, MEAN LEADER, averaged over repeats --
-    phantomoftheopera        rank 468  predicted  234  said tier 3, actual 6  (3 off)
-    antsmarching             rank 441  predicted  218  said tier 3, actual 6  (3 off)
-    nightsonbroadway         rank 470  predicted  279  said tier 3, actual 6  (3 off)
-    flightoficarus           rank 442  predicted  254  said tier 3, actual 6  (3 off)
-    dontstopmenow            rank 457  predicted  272  said tier 3, actual 6  (3 off)
-    sometimessalvation       rank 460  predicted  282  said tier 4, actual 6  (2 off)
-    rumine                   rank 399  predicted  238  said tier 3, actual 5  (2 off)
-    somebodytolove2          rank 495  predicted  335  said tier 4, actual 6  (2 off)
-    deathontwolegs           rank 451  predicted  293  said tier 4, actual 6  (2 off)
-    alliwannado              rank 438  predicted  283  said tier 4, actual 6  (2 off)
-
-  -- release gate, read from the pessimistic end of each interval --
-    usable lower bound :  83.34%   (floor 90%)
-    miss upper bound   :   3.66%   (ceiling 5%)
-    rho (mean)         : +0.624   (floor 0.70)
-    -> DOES NOT PASS:
-       - usable lower bound 83.3% is below the 90% floor
-       - rho 0.624 is below the 0.70 floor
-
-==================  KEYS  ==================
-  development rows : 251 rb3_dlc
-  always-training   : none - no auxiliary-origin rows for this instrument
-  disputed held out : 0
-  reserved test set : NOT DRAWN - this phase validates the approach, not a release
-
-  candidate                  scale        k  usable (mean)    gate lower bound miss    rho
-  baseline                   rank         2   88.92% [88.8-89.2]   85.24%           1.59%  +0.832
-  baseline                   log(rank)    2   89.36% [88.8-90.0]   85.73%           2.35%  +0.828
-  primary                    rank         6   88.96% [88.0-90.0]   85.29%           1.59%  +0.833
-  primary                    log(rank)    6   89.40% [89.2-90.0]   85.78%           2.35%  +0.834
-  primary+solo               rank         7   89.72% [89.2-90.5]   86.13%           1.91%  +0.837
-  primary+solo               log(rank)    7   89.96% [89.6-90.5]   86.40%           2.47%  +0.836
-  primary+movement           rank         9   88.41% [87.6-89.2]   84.67%           1.55%  +0.827
-  primary+movement           log(rank)    9   88.80% [88.0-89.7]   85.11%           2.47%  +0.827
-  primary+entropy            rank         7   90.48% [89.6-90.9]   86.98%           1.31%  +0.845
-  primary+entropy            log(rank)    7   90.68% [90.4-91.2]   87.21%           1.35%  +0.845
-  primary+entropy_rel        rank         7   89.52% [88.8-90.1]   85.91%           1.71%  +0.841
-  primary+entropy_rel        log(rank)    7   90.28% [89.2-90.9]   86.76%           1.55%  +0.842
-  primary+solo+entropy_rel   rank         8   90.08% [89.2-90.9]   86.54%           1.75%  +0.845
-  primary+solo+entropy_rel   log(rank)    8   90.52% [90.0-90.9]   87.03%           1.79%  +0.841
-  primary+ent_rel@attacks    rank         7   92.55% [91.6-93.6]   89.35%           0.80%  +0.866
-  primary+ent_rel@attacks    log(rank)    7   92.31% [91.6-92.8]   89.07%           1.12%  +0.867
-  full_keys                  rank        20   89.80% [89.2-90.2]   86.22%           2.19%  +0.827
-  full_keys                  log(rank)   20   90.28% [90.0-90.8]   86.76%           2.71%  +0.824
-  primary+entropy_rel+complex_peak rank         8   91.95% [91.6-92.5]   88.66%           0.52%  +0.856
-  primary+entropy_rel+complex_peak log(rank)    8   91.71% [90.8-92.5]   88.39%           0.96%  +0.857
-  primary+ent_rel+complex@attacks rank         8   92.39% [92.0-92.8]   89.16%           0.04%  +0.874
-  primary+ent_rel+complex@attacks log(rank)    8   92.95% [92.4-93.6]   89.81%           1.08%  +0.875
-  primary+ent_rel+complex-chord rank         7   92.51% [92.0-93.2]   89.30%           0.68%  +0.856
-  primary+ent_rel+complex-chord log(rank)    7   91.47% [90.4-92.1]   88.11%           0.76%  +0.857
-  primary+ent_rel+complex@attacks-chord rank         7   92.71% [92.0-93.2]   89.53%           0.04%  +0.872
-  primary+ent_rel+complex@attacks-chord log(rank)    7   93.07% [92.4-93.7]   89.95%           0.84%  +0.873
-  r16+chord_change           rank         8   92.55% [92.0-93.2]   89.35%           0.00%  +0.873
-  r16+chord_change           log(rank)    8   92.99% [92.4-93.6]   89.85%           1.04%  +0.875
-  r16+chord_span             rank         8   92.47% [92.0-92.9]   89.25%           0.32%  +0.869
-  r16+chord_span             log(rank)    8   92.95% [92.4-93.6]   89.81%           1.00%  +0.869
-  r16+chord_change+span      rank         9   92.47% [92.0-92.8]   89.25%           0.16%  +0.870
-  r16+chord_change+span      log(rank)    9   92.75% [92.0-93.2]   89.58%           1.00%  +0.871
-
-  usable (mean) is the average across repeats; [lo-hi] beside it is the 10th-90th
-  percentile ACROSS REPEATS, i.e. split noise only. The gate lower bound is the
-  one-sided 95% Wilson bound on the row count, which is the dominant uncertainty
-  at this sample size and is what the gate actually reads.
-
-  ridge chosen inside training folds: 1e-006 x302 (19%), 0.001 x27 (2%), 0.01 x315 (20%), 0.1 x935 (58%), 1 x21 (1%)
-
-  -- selection --
-    best mean usable  : primary+ent_rel+complex@attacks-chord / log(rank) at 93.07%
-    SELECTED          : primary+ent_rel+complex@attacks-chord / log(rank)  (7 features)
+    best mean usable  : full_drum / log(rank) at 95.64%
+    SELECTED          : full_drum / log(rank)  (26 features)
     no simpler candidate came within the predeclared margin.
 
   -- paired differences against the selected candidate --
     candidate                  scale       mean diff       wins
-    baseline                   rank           -4.14%         0%
-    baseline                   log(rank)      -3.71%         0%
-    primary                    rank           -4.10%         0%
-    primary                    log(rank)      -3.67%         0%
-    primary+solo               rank           -3.35%         0%
-    primary+solo               log(rank)      -3.11%         0%
-    primary+movement           rank           -4.66%         0%
-    primary+movement           log(rank)      -4.26%         0%
-    primary+entropy            rank           -2.59%         0%
-    primary+entropy            log(rank)      -2.39%         0%
-    primary+entropy_rel        rank           -3.55%         0%
-    primary+entropy_rel        log(rank)      -2.79%         0%
-    primary+solo+entropy_rel   rank           -2.99%         0%
-    primary+solo+entropy_rel   log(rank)      -2.55%         0%
-    primary+ent_rel@attacks    rank           -0.52%        20%
-    primary+ent_rel@attacks    log(rank)      -0.76%        10%
-    full_keys                  rank           -3.27%         0%
-    full_keys                  log(rank)      -2.79%         0%
-    primary+entropy_rel+complex_peak rank           -1.12%         0%
-    primary+entropy_rel+complex_peak log(rank)      -1.35%         0%
-    primary+ent_rel+complex@attacks rank           -0.68%         0%
-    primary+ent_rel+complex@attacks log(rank)      -0.12%        10%
-    primary+ent_rel+complex-chord rank           -0.56%        10%
-    primary+ent_rel+complex-chord log(rank)      -1.59%         0%
-    primary+ent_rel+complex@attacks-chord rank           -0.36%        30%
-    r16+chord_change           rank           -0.52%         0%
-    r16+chord_change           log(rank)      -0.08%        20%
-    r16+chord_span             rank           -0.60%        20%
-    r16+chord_span             log(rank)      -0.12%        10%
-    r16+chord_change+span      rank           -0.60%         0%
-    r16+chord_change+span      log(rank)      -0.32%        10%
+    baseline                   rank           -3.51%         0%
+    baseline                   log(rank)      -3.02%         0%
+    primary                    rank           -1.83%         0%
+    primary                    log(rank)      -2.26%         0%
+    baseline@attacks           rank           -4.85%         0%
+    baseline@attacks           log(rank)      -5.40%         0%
+    primary@attacks            rank           -5.15%         0%
+    primary@attacks            log(rank)      -4.76%         0%
+    primary+kick               rank           -1.89%         0%
+    primary+kick               log(rank)      -1.77%         0%
+    primary+limbs              rank           -2.41%         0%
+    primary+limbs              log(rank)      -2.04%         0%
+    primary+offbeat            rank           -2.04%         0%
+    primary+offbeat            log(rank)      -2.38%         0%
+    primary+entropy            rank           -1.34%         0%
+    primary+entropy            log(rank)      -2.07%         0%
+    primary+entropy_rel        rank           -1.71%         0%
+    primary+entropy_rel        log(rank)      -2.07%         0%
+    primary+limbs+ent+offbeat  rank           -1.74%         0%
+    primary+limbs+ent+offbeat  log(rank)      -1.16%         0%
+    primary+stations@pro       rank           -1.83%        10%
+    primary+stations@pro       log(rank)      -1.89%         0%
+    primary+limbs+stations     rank           -2.44%         0%
+    primary+limbs+stations     log(rank)      -1.52%         0%
+    primary@pro                rank           -1.83%         0%
+    primary@pro                log(rank)      -2.26%         0%
+    full_drum                  rank           -0.03%        40%
 
   -- worst 10 by tier distance, SELECTED model, averaged over repeats --
-    iveseenallgoodpeople     rank 460  predicted  316  said tier 3, actual 6  (3 off)
-    weirdscience             rank 445  predicted  318  said tier 3, actual 6  (3 off)
-    starshiptrooper          rank 476  predicted  336  said tier 4, actual 6  (2 off)
-    headlikeahole            rank 472  predicted  334  said tier 4, actual 6  (2 off)
-    whatdoesntkillyou2       rank 378  predicted  253  said tier 2, actual 4  (2 off)
-    tenementfunster          rank 181  predicted  305  said tier 3, actual 1  (2 off)
-    shadowsofthenight        rank 366  predicted  251  said tier 2, actual 4  (2 off)
-    surrender                rank 158  predicted  270  said tier 3, actual 1  (2 off)
-    crippledinside           rank 470  predicted  361  said tier 4, actual 6  (2 off)
-    downunder                rank 358  predicted  257  said tier 2, actual 4  (2 off)
+    wanteddeadoralive2       rank 120  predicted  195  said tier 3, actual 0  (3 off)
+    makemesmile2             rank 292  predicted  550  said tier 6, actual 4  (2 off)
+    rizeofthefenix           rank 448  predicted  250  said tier 4, actual 6  (2 off)
+    2112pt3                  rank 465  predicted  327  said tier 4, actual 6  (2 off)
+    tearsdontfall            rank 454  predicted  336  said tier 4, actual 6  (2 off)
+    stillofthenight          rank 176  predicted  275  said tier 4, actual 2  (2 off)
+    wedidntstartthefire      rank 150  predicted  221  said tier 3, actual 1  (2 off)
+    ifyouleavemenow          rank 146  predicted  211  said tier 3, actual 1  (2 off)
+    wewerentborn             rank 133  predicted  183  said tier 3, actual 1  (2 off)
+    howdoyousleep            rank 198  predicted  150  said tier 1, actual 3  (2 off)
 
   -- release gate, read from the pessimistic end of each interval --
-    usable lower bound :  89.95%   (floor 90%)
-    miss upper bound   :   2.44%   (ceiling 5%)
-    rho (mean)         : +0.873   (floor 0.70)
-    -> DOES NOT PASS:
-       - usable lower bound 89.9% is below the 90% floor
+    usable lower bound :  93.38%   (floor 90%)
+    miss upper bound   :   1.40%   (ceiling 5%)
+    rho (mean)         : +0.888   (floor 0.70)
+    -> PASSES the gate on the development set.
 
-==================  REAL_KEYS  ==================
-  development rows : 251 rb3_dlc
-  always-training   : none - no auxiliary-origin rows for this instrument
+==================  VOCALS  ==================
+  development rows : 328 rb3_dlc
+  always-training   : 45 lego at weight 0.30, 15 rb2 at weight 0.30
   disputed held out : 0
   reserved test set : NOT DRAWN - this phase validates the approach, not a release
 
   candidate                  scale        k  usable (mean)    gate lower bound miss    rho
-  baseline                   rank         2   85.62% [85.2-86.1]   81.59%           2.19%  +0.818
-  baseline                   log(rank)    2   82.67% [82.5-82.9]   78.40%           2.83%  +0.814
-  primary                    rank         6   86.02% [85.3-86.5]   82.03%           1.99%  +0.819
-  primary                    log(rank)    6   82.95% [82.5-83.3]   78.70%           2.51%  +0.819
-  primary+solo               rank         7   85.66% [84.9-86.5]   81.64%           2.35%  +0.808
-  primary+solo               log(rank)    7   82.79% [82.1-83.7]   78.53%           2.99%  +0.807
-  primary+movement           rank         9   84.62% [83.3-85.7]   80.51%           2.11%  +0.816
-  primary+movement           log(rank)    9   82.91% [81.7-84.1]   78.65%           2.63%  +0.817
-  primary+entropy            rank         7   85.42% [84.8-86.5]   81.38%           2.11%  +0.829
-  primary+entropy            log(rank)    7   86.25% [85.7-86.9]   82.29%           2.67%  +0.832
-  primary+entropy_rel        rank         7   85.70% [85.2-86.1]   81.68%           1.63%  +0.833
-  primary+entropy_rel        log(rank)    7   85.02% [84.5-85.7]   80.94%           2.23%  +0.832
-  primary+solo+entropy_rel   rank         8   86.02% [85.2-86.9]   82.03%           2.15%  +0.820
-  primary+solo+entropy_rel   log(rank)    8   84.66% [83.7-85.3]   80.55%           2.63%  +0.819
-  primary+ent_rel@attacks    rank         7   89.20% [88.8-89.3]   85.55%           0.52%  +0.854
-  primary+ent_rel@attacks    log(rank)    7   88.25% [87.6-88.5]   84.49%           1.31%  +0.854
-  full_keys                  rank        20   84.94% [84.1-85.7]   80.86%           2.51%  +0.802
-  full_keys                  log(rank)   20   85.74% [85.3-86.1]   81.72%           3.19%  +0.802
-  primary+shift              rank         9   86.65% [86.0-87.6]   82.73%           2.03%  +0.832
-  primary+shift              log(rank)    9   85.90% [85.2-86.5]   81.90%           1.95%  +0.831
-  primary+shift_rate         rank         8   86.49% [85.7-87.3]   82.55%           1.95%  +0.832
-  primary+shift_rate         log(rank)    8   85.94% [85.6-86.5]   81.94%           1.95%  +0.832
-  full_real_keys             rank        23   85.42% [84.7-86.9]   81.38%           2.55%  +0.802
-  full_real_keys             log(rank)   23   86.06% [85.6-86.5]   82.07%           3.23%  +0.804
-  primary+ent_rel+fingers    rank        10   88.80% [88.4-89.3]   85.11%           0.60%  +0.851
-  primary+ent_rel+fingers    log(rank)   10   87.93% [87.2-88.5]   84.13%           1.87%  +0.848
-  primary+ent_rel+fingers+held rank        11   88.84% [88.4-89.3]   85.15%           0.64%  +0.849
-  primary+ent_rel+fingers+held log(rank)   11   87.69% [87.3-88.1]   83.87%           1.95%  +0.847
-  primary+ent_rel@attacks+complex_peak rank         8   89.20% [88.8-89.7]   85.55%           1.04%  +0.861
-  primary+ent_rel@attacks+complex_peak log(rank)    8   89.64% [89.2-90.1]   86.04%           1.31%  +0.862
+  baseline                   rank         2   76.77% [76.5-77.2]   72.72%           6.52%  +0.287
+  baseline                   log(rank)    2   77.44% [76.8-78.1]   73.43%           6.86%  +0.286
+  primary_vocal              rank         6   79.48% [78.8-80.2]   75.58%           3.14%  +0.437
+  primary_vocal              log(rank)    6   79.54% [78.9-80.2]   75.64%           3.54%  +0.436
+  primary+phrase             rank         8   79.63% [78.9-80.2]   75.74%           3.20%  +0.434
+  primary+phrase             log(rank)    8   79.36% [78.9-79.9]   75.45%           3.54%  +0.432
+  primary+entropy_rel        rank         7   82.20% [81.3-83.2]   78.46%           2.77%  +0.549
+  primary+entropy_rel        log(rank)    7   83.51% [82.9-84.2]   79.86%           3.23%  +0.550
+  primary+markers            rank         8   81.49% [80.7-82.3]   77.71%           2.74%  +0.481
+  primary+markers            log(rank)    8   83.78% [82.9-84.8]   80.16%           3.11%  +0.483
+  primary+length_joint       rank         7   80.79% [79.8-81.8]   76.97%           3.20%  +0.463
+  primary+length_joint       log(rank)    7   81.46% [80.8-82.0]   77.68%           3.26%  +0.462
+  primary+length_separate    rank         8   78.23% [77.1-79.0]   74.26%           2.90%  +0.425
+  primary+length_separate    log(rank)    8   79.66% [78.9-80.5]   75.77%           3.63%  +0.429
+  primary_vocal@semitone     rank         6   79.12% [78.6-79.4]   75.19%           2.59%  +0.452
+  primary_vocal@semitone     log(rank)    6   79.27% [78.7-80.2]   75.35%           3.11%  +0.451
+  primary_vocal@tubes        rank         6   80.18% [79.5-80.6]   76.32%           3.05%  +0.467
+  primary_vocal@tubes        log(rank)    6   82.50% [82.3-82.9]   78.79%           3.29%  +0.467
+  full_vocal                 rank        18   84.24% [83.5-84.8]   80.65%           2.04%  +0.563
+  full_vocal                 log(rank)   18   84.30% [83.5-84.8]   80.72%           2.32%  +0.567
+  full_vocal@tubes           rank        18   83.96% [83.4-84.8]   80.35%           2.07%  +0.561
+  full_vocal@tubes           log(rank)   18   84.30% [83.5-85.1]   80.72%           2.38%  +0.566
+  primary_vocal@pitched      rank         6   76.92% [76.5-77.7]   72.88%           3.72%  +0.368
+  primary_vocal@pitched      log(rank)    6   77.38% [76.8-78.1]   73.36%           4.54%  +0.364
+  primary+range              rank         9   83.23% [82.5-83.9]   79.57%           1.07%  +0.559
+  primary+range              log(rank)    9   83.66% [82.9-84.5]   80.03%           2.13%  +0.568
+  primary@pitched+range      rank         9   82.10% [81.6-82.6]   78.36%           1.25%  +0.534
+  primary@pitched+range      log(rank)    9   82.07% [81.7-82.4]   78.33%           2.68%  +0.545
+  primary@pitched+entropy_p  rank         7   82.41% [81.7-83.2]   78.69%           2.93%  +0.529
+  primary@pitched+entropy_p  log(rank)    7   82.77% [82.0-83.2]   79.08%           3.23%  +0.530
+  full_vocal@pitched         rank        22   85.61% [85.0-86.3]   82.13%           1.77%  +0.599
+  full_vocal@pitched         log(rank)   22   86.16% [85.3-86.9]   82.72%           1.95%  +0.612
+  primary+range+breath       rank        12   83.02% [82.0-84.1]   79.34%           1.28%  +0.558
+  primary+range+breath       log(rank)   12   83.38% [82.9-84.1]   79.73%           2.23%  +0.571
+  primary+range+tess         rank        11   85.27% [85.0-85.7]   81.77%           1.10%  +0.607
+  primary+range+tess         log(rank)   11   87.23% [86.8-87.8]   83.89%           1.49%  +0.609
+  primary+range+tess@70      rank        11   84.94% [84.1-85.4]   81.41%           1.86%  +0.609
+  primary+range+tess@70      log(rank)   11   85.27% [84.5-86.3]   81.77%           2.47%  +0.612
+  primary+range+breath+tess  rank        14   85.03% [84.5-85.4]   81.50%           1.01%  +0.604
+  primary+range+breath+tess  log(rank)   14   86.46% [85.9-86.9]   83.06%           1.62%  +0.609
+  primary+range+breath+tess@70 rank        14   85.21% [84.6-86.0]   81.70%           1.62%  +0.612
+  primary+range+breath+tess@70 log(rank)   14   84.73% [84.4-85.1]   81.17%           2.32%  +0.618
+  full_vocal+all             rank        27   86.25% [85.6-86.9]   82.82%           1.62%  +0.653
+  full_vocal+all             log(rank)   27   86.59% [85.9-87.2]   83.19%           1.71%  +0.659
+  primary+range+parts        rank        10   83.81% [83.5-84.5]   80.19%           1.74%  +0.608
+  primary+range+parts        log(rank)   10   86.22% [85.3-87.2]   82.79%           1.83%  +0.617
+  primary+range+highhold     rank        13   84.79% [84.1-85.4]   81.24%           1.59%  +0.585
+  primary+range+highhold     log(rank)   13   85.24% [84.7-85.7]   81.73%           2.93%  +0.594
+  primary+range+parts+highhold rank        14   85.49% [84.7-86.3]   82.00%           1.62%  +0.630
+  primary+range+parts+highhold log(rank)   14   86.59% [86.0-86.9]   83.19%           2.35%  +0.638
+  primary+range+phrase_tail  rank        11   83.29% [82.6-83.9]   79.63%           1.86%  +0.560
+  primary+range+phrase_tail  log(rank)   11   83.87% [83.5-84.2]   80.26%           2.35%  +0.567
+  parts+tess                 rank        11   85.58% [85.3-86.0]   82.10%           1.77%  +0.644
+  parts+tess                 log(rank)   11   86.49% [85.9-86.9]   83.09%           2.20%  +0.647
+  parts+tess+ceiling         rank        12   85.40% [84.8-85.7]   81.90%           1.83%  +0.648
+  parts+tess+ceiling         log(rank)   12   86.25% [85.9-86.6]   82.82%           2.62%  +0.652
+  parts+tess+move            rank        12   87.07% [86.6-87.5]   83.72%           1.92%  +0.665
+  parts+tess+move            log(rank)   12   88.35% [87.4-89.0]   85.12%           2.29%  +0.668
+  parts+tess+reentry         rank        12   85.88% [85.1-86.6]   82.43%           1.77%  +0.642
+  parts+tess+reentry         log(rank)   12   86.92% [86.3-87.5]   83.55%           2.20%  +0.646
 
   usable (mean) is the average across repeats; [lo-hi] beside it is the 10th-90th
   percentile ACROSS REPEATS, i.e. split noise only. The gate lower bound is the
   one-sided 95% Wilson bound on the row count, which is the dominant uncertainty
   at this sample size and is what the gate actually reads.
 
-  ridge chosen inside training folds: 1e-006 x408 (27%), 0.001 x53 (4%), 0.01 x366 (24%), 0.1 x602 (40%), 1 x71 (5%)
+  ridge chosen inside training folds: 1e-006 x156 (5%), 0.001 x31 (1%), 0.01 x397 (13%), 0.1 x2416 (81%)
 
   -- selection --
-    best mean usable  : primary+ent_rel@attacks+complex_peak / log(rank) at 89.64%
-    SELECTED          : primary+ent_rel@attacks / rank  (7 features)
-    the leader beats it by +0.44 points and wins 80% of paired repeats,
+    best mean usable  : parts+tess+move / log(rank) at 88.35%
+    SELECTED          : parts+tess+move / log(rank)  (12 features)
+    no simpler candidate came within the predeclared margin.
+
+  -- paired differences against the selected candidate --
+    candidate                  scale       mean diff       wins
+    baseline                   rank          -11.59%         0%
+    baseline                   log(rank)     -10.91%         0%
+    primary_vocal              rank           -8.87%         0%
+    primary_vocal              log(rank)      -8.81%         0%
+    primary+phrase             rank           -8.72%         0%
+    primary+phrase             log(rank)      -8.99%         0%
+    primary+entropy_rel        rank           -6.16%         0%
+    primary+entropy_rel        log(rank)      -4.85%         0%
+    primary+markers            rank           -6.86%         0%
+    primary+markers            log(rank)      -4.57%         0%
+    primary+length_joint       rank           -7.56%         0%
+    primary+length_joint       log(rank)      -6.89%         0%
+    primary+length_separate    rank          -10.12%         0%
+    primary+length_separate    log(rank)      -8.69%         0%
+    primary_vocal@semitone     rank           -9.24%         0%
+    primary_vocal@semitone     log(rank)      -9.09%         0%
+    primary_vocal@tubes        rank           -8.17%         0%
+    primary_vocal@tubes        log(rank)      -5.85%         0%
+    full_vocal                 rank           -4.12%         0%
+    full_vocal                 log(rank)      -4.05%         0%
+    full_vocal@tubes           rank           -4.39%         0%
+    full_vocal@tubes           log(rank)      -4.05%         0%
+    primary_vocal@pitched      rank          -11.43%         0%
+    primary_vocal@pitched      log(rank)     -10.98%         0%
+    primary+range              rank           -5.12%         0%
+    primary+range              log(rank)      -4.70%         0%
+    primary@pitched+range      rank           -6.25%         0%
+    primary@pitched+range      log(rank)      -6.28%         0%
+    primary@pitched+entropy_p  rank           -5.95%         0%
+    primary@pitched+entropy_p  log(rank)      -5.58%         0%
+    full_vocal@pitched         rank           -2.74%         0%
+    full_vocal@pitched         log(rank)      -2.20%         0%
+    primary+range+breath       rank           -5.34%         0%
+    primary+range+breath       log(rank)      -4.97%         0%
+    primary+range+tess         rank           -3.08%         0%
+    primary+range+tess         log(rank)      -1.13%        10%
+    primary+range+tess@70      rank           -3.41%         0%
+    primary+range+tess@70      log(rank)      -3.08%         0%
+    primary+range+breath+tess  rank           -3.32%         0%
+    primary+range+breath+tess  log(rank)      -1.89%        10%
+    primary+range+breath+tess@70 rank           -3.14%         0%
+    primary+range+breath+tess@70 log(rank)      -3.63%         0%
+    full_vocal+all             rank           -2.10%         0%
+    full_vocal+all             log(rank)      -1.77%         0%
+    primary+range+parts        rank           -4.54%         0%
+    primary+range+parts        log(rank)      -2.13%         0%
+    primary+range+highhold     rank           -3.57%         0%
+    primary+range+highhold     log(rank)      -3.11%         0%
+    primary+range+parts+highhold rank           -2.87%         0%
+    primary+range+parts+highhold log(rank)      -1.77%         0%
+    primary+range+phrase_tail  rank           -5.06%         0%
+    primary+range+phrase_tail  log(rank)      -4.48%         0%
+    parts+tess                 rank           -2.77%         0%
+    parts+tess                 log(rank)      -1.86%        10%
+    parts+tess+ceiling         rank           -2.96%         0%
+    parts+tess+ceiling         log(rank)      -2.10%         0%
+    parts+tess+move            rank           -1.28%         0%
+    parts+tess+reentry         rank           -2.47%         0%
+    parts+tess+reentry         log(rank)      -1.43%        10%
+
+  -- worst 10 by tier distance, SELECTED model, averaged over repeats --
+    antsmarching             rank 441  predicted  192  said tier 2, actual 6  (4 off)
+    phantomoftheopera        rank 468  predicted  240  said tier 3, actual 6  (3 off)
+    sometimessalvation       rank 460  predicted  239  said tier 3, actual 6  (3 off)
+    nightsonbroadway         rank 470  predicted  269  said tier 3, actual 6  (3 off)
+    seventhson               rank 395  predicted  201  said tier 2, actual 5  (3 off)
+    flightoficarus           rank 442  predicted  262  said tier 3, actual 6  (3 off)
+    alliwannado              rank 438  predicted  261  said tier 3, actual 6  (3 off)
+    somebodytolove2          rank 495  predicted  320  said tier 4, actual 6  (2 off)
+    dontstopmenow            rank 457  predicted  292  said tier 4, actual 6  (2 off)
+    spoonman2                rank 437  predicted  283  said tier 4, actual 6  (2 off)
+
+  -- release gate, read from the pessimistic end of each interval --
+    usable lower bound :  85.12%   (floor 90%)
+    miss upper bound   :   4.08%   (ceiling 5%)
+    rho (mean)         : +0.668   (floor 0.70)
+    -> DOES NOT PASS:
+       - usable lower bound 85.1% is below the 90% floor
+       - rho 0.668 is below the 0.70 floor
+
+==================  KEYS  ==================
+  development rows : 266 rb3_dlc
+  always-training   : none - no auxiliary-origin rows for this instrument
+  disputed held out : 0
+  reserved test set : NOT DRAWN - this phase validates the approach, not a release
+
+  candidate                  scale        k  usable (mean)    gate lower bound miss    rho
+  baseline                   rank         2   88.83% [88.3-89.1]   85.26%           1.47%  +0.835
+  baseline                   log(rank)    2   89.29% [89.1-89.5]   85.76%           2.18%  +0.831
+  primary                    rank         6   88.98% [88.3-89.5]   85.43%           1.13%  +0.836
+  primary                    log(rank)    6   89.59% [89.0-89.9]   86.10%           1.88%  +0.838
+  primary+solo               rank         7   89.81% [89.4-90.2]   86.35%           1.24%  +0.841
+  primary+solo               log(rank)    7   89.70% [89.1-90.3]   86.22%           2.11%  +0.842
+  primary+movement           rank         9   88.50% [87.9-89.1]   84.88%           1.09%  +0.832
+  primary+movement           log(rank)    9   88.68% [87.6-89.9]   85.09%           1.95%  +0.833
+  primary+entropy            rank         7   89.96% [89.5-90.3]   86.52%           1.35%  +0.850
+  primary+entropy            log(rank)    7   90.60% [90.2-91.4]   87.24%           1.09%  +0.851
+  primary+entropy_rel        rank         7   89.14% [88.3-89.9]   85.59%           1.54%  +0.846
+  primary+entropy_rel        log(rank)    7   90.08% [89.4-90.6]   86.64%           1.35%  +0.847
+  primary+solo+entropy_rel   rank         8   90.08% [89.4-90.6]   86.64%           1.58%  +0.850
+  primary+solo+entropy_rel   log(rank)    8   90.75% [90.2-91.1]   87.41%           1.39%  +0.851
+  primary+ent_rel@attacks    rank         7   92.22% [91.3-92.9]   89.07%           0.75%  +0.872
+  primary+ent_rel@attacks    log(rank)    7   92.18% [91.7-92.6]   89.03%           0.68%  +0.873
+  full_keys                  rank        20   89.81% [89.4-90.3]   86.35%           1.80%  +0.843
+  full_keys                  log(rank)   20   90.56% [89.8-91.4]   87.19%           2.14%  +0.841
+  primary+entropy_rel+complex_peak rank         8   92.03% [91.4-92.5]   88.86%           0.49%  +0.863
+  primary+entropy_rel+complex_peak log(rank)    8   91.65% [90.9-92.5]   88.43%           0.75%  +0.864
+  primary+ent_rel+complex@attacks rank         8   92.97% [92.3-93.6]   89.94%           0.04%  +0.879
+  primary+ent_rel+complex@attacks log(rank)    8   92.41% [91.4-92.9]   89.29%           0.68%  +0.881
+  primary+ent_rel+complex-chord rank         7   92.33% [91.4-92.9]   89.20%           0.60%  +0.862
+  primary+ent_rel+complex-chord log(rank)    7   91.47% [90.6-92.1]   88.21%           0.75%  +0.864
+  primary+ent_rel+complex@attacks-chord rank         7   92.97% [92.7-93.6]   89.94%           0.04%  +0.878
+  primary+ent_rel+complex@attacks-chord log(rank)    7   92.37% [91.7-92.9]   89.24%           0.68%  +0.879
+  r16+chord_change           rank         8   93.20% [92.4-93.6]   90.20%           0.00%  +0.879
+  r16+chord_change           log(rank)    8   92.59% [92.1-92.9]   89.50%           0.45%  +0.880
+  r16+chord_span             rank         8   92.93% [92.7-93.6]   89.89%           0.19%  +0.876
+  r16+chord_span             log(rank)    8   92.37% [92.0-92.9]   89.24%           0.64%  +0.876
+  r16+chord_change+span      rank         9   93.16% [92.7-93.6]   90.15%           0.08%  +0.877
+  r16+chord_change+span      log(rank)    9   92.48% [92.4-92.9]   89.37%           0.60%  +0.878
+
+  usable (mean) is the average across repeats; [lo-hi] beside it is the 10th-90th
+  percentile ACROSS REPEATS, i.e. split noise only. The gate lower bound is the
+  one-sided 95% Wilson bound on the row count, which is the dominant uncertainty
+  at this sample size and is what the gate actually reads.
+
+  ridge chosen inside training folds: 1e-006 x262 (16%), 0.001 x29 (2%), 0.01 x317 (20%), 0.1 x973 (61%), 1 x19 (1%)
+
+  -- selection --
+    best mean usable  : r16+chord_change / rank at 93.20%
+    SELECTED          : primary+ent_rel+complex@attacks-chord / rank  (7 features)
+    the leader beats it by +0.23 points and wins 50% of paired repeats,
     which does not clear the predeclared bar (>1 points AND >70% of repeats),
     so the simpler candidate is selected.
 
   -- paired differences against the selected candidate --
     candidate                  scale       mean diff       wins
-    baseline                   rank           -3.59%         0%
-    baseline                   log(rank)      -6.53%         0%
-    primary                    rank           -3.19%         0%
-    primary                    log(rank)      -6.25%         0%
-    primary+solo               rank           -3.55%         0%
-    primary+solo               log(rank)      -6.41%         0%
-    primary+movement           rank           -4.58%         0%
-    primary+movement           log(rank)      -6.29%         0%
-    primary+entropy            rank           -3.78%         0%
-    primary+entropy            log(rank)      -2.95%         0%
-    primary+entropy_rel        rank           -3.51%         0%
-    primary+entropy_rel        log(rank)      -4.18%         0%
-    primary+solo+entropy_rel   rank           -3.19%         0%
-    primary+solo+entropy_rel   log(rank)      -4.54%         0%
-    primary+ent_rel@attacks    log(rank)      -0.96%         0%
-    full_keys                  rank           -4.26%         0%
-    full_keys                  log(rank)      -3.47%         0%
-    primary+shift              rank           -2.55%         0%
-    primary+shift              log(rank)      -3.31%         0%
-    primary+shift_rate         rank           -2.71%         0%
-    primary+shift_rate         log(rank)      -3.27%         0%
-    full_real_keys             rank           -3.78%         0%
-    full_real_keys             log(rank)      -3.15%         0%
-    primary+ent_rel+fingers    rank           -0.40%        20%
-    primary+ent_rel+fingers    log(rank)      -1.27%         0%
-    primary+ent_rel+fingers+held rank           -0.36%        10%
-    primary+ent_rel+fingers+held log(rank)      -1.51%         0%
-    primary+ent_rel@attacks+complex_peak rank           +0.00%        30%
-    primary+ent_rel@attacks+complex_peak log(rank)      +0.44%        80%
+    baseline                   rank           -4.14%         0%
+    baseline                   log(rank)      -3.68%         0%
+    primary                    rank           -3.98%         0%
+    primary                    log(rank)      -3.38%         0%
+    primary+solo               rank           -3.16%         0%
+    primary+solo               log(rank)      -3.27%         0%
+    primary+movement           rank           -4.47%         0%
+    primary+movement           log(rank)      -4.29%         0%
+    primary+entropy            rank           -3.01%         0%
+    primary+entropy            log(rank)      -2.37%         0%
+    primary+entropy_rel        rank           -3.83%         0%
+    primary+entropy_rel        log(rank)      -2.89%         0%
+    primary+solo+entropy_rel   rank           -2.89%         0%
+    primary+solo+entropy_rel   log(rank)      -2.22%         0%
+    primary+ent_rel@attacks    rank           -0.75%         0%
+    primary+ent_rel@attacks    log(rank)      -0.79%        10%
+    full_keys                  rank           -3.16%         0%
+    full_keys                  log(rank)      -2.41%         0%
+    primary+entropy_rel+complex_peak rank           -0.94%        10%
+    primary+entropy_rel+complex_peak log(rank)      -1.32%        10%
+    primary+ent_rel+complex@attacks rank           -0.00%        40%
+    primary+ent_rel+complex@attacks log(rank)      -0.56%         0%
+    primary+ent_rel+complex-chord rank           -0.64%        10%
+    primary+ent_rel+complex-chord log(rank)      -1.50%         0%
+    primary+ent_rel+complex@attacks-chord log(rank)      -0.60%        10%
+    r16+chord_change           rank           +0.23%        50%
+    r16+chord_change           log(rank)      -0.38%        10%
+    r16+chord_span             rank           -0.04%        30%
+    r16+chord_span             log(rank)      -0.60%         0%
+    r16+chord_change+span      rank           +0.19%        60%
+    r16+chord_change+span      log(rank)      -0.49%        10%
 
   -- worst 10 by tier distance, SELECTED model, averaged over repeats --
-    whativedone2             rank 147  predicted  291  said tier 3, actual 0  (3 off)
-    surrender                rank 178  predicted  323  said tier 3, actual 1  (2 off)
-    wearethechampions2       rank 414  predicted  279  said tier 3, actual 5  (2 off)
-    iveseenallgoodpeople     rank 460  predicted  333  said tier 4, actual 6  (2 off)
-    bluemonday               rank 172  predicted  297  said tier 3, actual 1  (2 off)
-    fireohio                 rank 407  predicted  282  said tier 3, actual 5  (2 off)
-    wedidntstartthefire      rank 160  predicted  280  said tier 3, actual 1  (2 off)
-    bicyclerace              rank 456  predicted  339  said tier 4, actual 6  (2 off)
-    dreamonlive              rank 170  predicted  283  said tier 3, actual 1  (2 off)
-    headlikeahole            rank 472  predicted  361  said tier 4, actual 6  (2 off)
+    surrender                rank 158  predicted  306  said tier 3, actual 1  (2 off)
+    tenementfunster          rank 181  predicted  316  said tier 3, actual 1  (2 off)
+    starshiptrooper          rank 476  predicted  349  said tier 4, actual 6  (2 off)
+    iveseenallgoodpeople     rank 460  predicted  335  said tier 4, actual 6  (2 off)
+    whativedone2             rank 146  predicted  262  said tier 2, actual 0  (2 off)
+    headlikeahole            rank 472  predicted  358  said tier 4, actual 6  (2 off)
+    weirdscience             rank 445  predicted  338  said tier 4, actual 6  (2 off)
+    nowimhere                rank 180  predicted  286  said tier 3, actual 1  (2 off)
+    bluemonday               rank 180  predicted  277  said tier 3, actual 1  (2 off)
+    airplanes                rank 150  predicted  247  said tier 2, actual 0  (2 off)
 
   -- worst 10 by tier distance, MEAN LEADER, averaged over repeats --
-    wearethechampions2       rank 414  predicted  260  said tier 2, actual 5  (3 off)
-    captainjack              rank 324  predicted  464  said tier 6, actual 3  (3 off)
-    weirdscience             rank 450  predicted  314  said tier 3, actual 6  (3 off)
-    fireohio                 rank 407  predicted  273  said tier 3, actual 5  (2 off)
-    headlikeahole            rank 472  predicted  339  said tier 4, actual 6  (2 off)
-    somebodytolove2          rank 456  predicted  333  said tier 4, actual 6  (2 off)
-    crythunder               rank 350  predicted  232  said tier 2, actual 4  (2 off)
-    whatdoesntkillyou2       rank 390  predicted  274  said tier 3, actual 5  (2 off)
-    somuchtosay              rank 340  predicted  225  said tier 2, actual 4  (2 off)
-    iveseenallgoodpeople     rank 460  predicted  345  said tier 4, actual 6  (2 off)
+    surrender                rank 158  predicted  305  said tier 3, actual 1  (2 off)
+    tenementfunster          rank 181  predicted  316  said tier 3, actual 1  (2 off)
+    starshiptrooper          rank 476  predicted  346  said tier 4, actual 6  (2 off)
+    iveseenallgoodpeople     rank 460  predicted  338  said tier 4, actual 6  (2 off)
+    headlikeahole            rank 472  predicted  353  said tier 4, actual 6  (2 off)
+    whativedone2             rank 146  predicted  261  said tier 2, actual 0  (2 off)
+    weirdscience             rank 445  predicted  339  said tier 4, actual 6  (2 off)
+    nowimhere                rank 180  predicted  285  said tier 3, actual 1  (2 off)
+    bluemonday               rank 180  predicted  274  said tier 3, actual 1  (2 off)
+    wedidntstartthefire      rank 199  predicted  292  said tier 3, actual 1  (2 off)
 
   -- release gate, read from the pessimistic end of each interval --
-    usable lower bound :  85.55%   (floor 90%)
-    miss upper bound   :   1.96%   (ceiling 5%)
-    rho (mean)         : +0.854   (floor 0.70)
+    usable lower bound :  89.94%   (floor 90%)
+    miss upper bound   :   1.08%   (ceiling 5%)
+    rho (mean)         : +0.878   (floor 0.70)
     -> DOES NOT PASS:
-       - usable lower bound 85.6% is below the 90% floor
+       - usable lower bound 89.9% is below the 90% floor
+
+==================  REAL_KEYS  ==================
+  development rows : 266 rb3_dlc
+  always-training   : none - no auxiliary-origin rows for this instrument
+  disputed held out : 0
+  reserved test set : NOT DRAWN - this phase validates the approach, not a release
+
+  candidate                  scale        k  usable (mean)    gate lower bound miss    rho
+  baseline                   rank         2   85.49% [85.0-85.7]   81.58%           2.29%  +0.819
+  baseline                   log(rank)    2   82.93% [82.7-83.5]   78.81%           2.71%  +0.814
+  primary                    rank         6   86.05% [85.3-86.8]   82.19%           2.07%  +0.821
+  primary                    log(rank)    6   83.23% [83.0-83.5]   79.13%           2.41%  +0.821
+  primary+solo               rank         7   85.45% [84.5-86.2]   81.54%           2.18%  +0.815
+  primary+solo               log(rank)    7   83.01% [82.6-83.5]   78.89%           2.82%  +0.815
+  primary+movement           rank         9   84.29% [83.5-85.0]   80.27%           1.84%  +0.819
+  primary+movement           log(rank)    9   82.74% [81.6-83.5]   78.61%           2.56%  +0.819
+  primary+entropy            rank         7   85.30% [84.5-86.1]   81.37%           2.11%  +0.834
+  primary+entropy            log(rank)    7   86.28% [85.3-86.9]   82.44%           2.52%  +0.837
+  primary+entropy_rel        rank         7   85.56% [84.9-86.1]   81.66%           1.69%  +0.835
+  primary+entropy_rel        log(rank)    7   84.89% [84.5-85.4]   80.92%           2.18%  +0.836
+  primary+solo+entropy_rel   rank         8   85.34% [85.0-85.8]   81.41%           2.03%  +0.827
+  primary+solo+entropy_rel   log(rank)    8   85.08% [84.5-85.8]   81.13%           2.63%  +0.829
+  primary+ent_rel@attacks    rank         7   89.40% [89.1-89.8]   85.89%           0.60%  +0.861
+  primary+ent_rel@attacks    log(rank)    7   89.02% [88.3-89.5]   85.47%           1.05%  +0.860
+  full_keys                  rank        20   85.30% [84.5-85.8]   81.37%           2.14%  +0.821
+  full_keys                  log(rank)   20   85.60% [84.6-86.5]   81.70%           2.41%  +0.822
+  primary+shift              rank         9   86.50% [85.7-87.2]   82.69%           1.99%  +0.835
+  primary+shift              log(rank)    9   85.71% [85.3-86.1]   81.82%           1.99%  +0.835
+  primary+shift_rate         rank         8   86.50% [86.1-86.9]   82.69%           1.92%  +0.836
+  primary+shift_rate         log(rank)    8   85.83% [85.3-86.2]   81.95%           1.95%  +0.837
+  full_real_keys             rank        23   85.38% [84.5-86.1]   81.46%           2.48%  +0.819
+  full_real_keys             log(rank)   23   86.50% [85.7-87.3]   82.69%           2.26%  +0.821
+  primary+ent_rel+fingers    rank        10   89.47% [88.6-90.2]   85.97%           0.79%  +0.857
+  primary+ent_rel+fingers    log(rank)   10   88.16% [87.6-88.7]   84.51%           1.58%  +0.856
+  primary+ent_rel+fingers+held rank        11   89.36% [88.3-89.9]   85.84%           0.83%  +0.857
+  primary+ent_rel+fingers+held log(rank)   11   88.27% [86.8-89.1]   84.63%           1.65%  +0.856
+  primary+ent_rel@attacks+complex_peak rank         8   89.32% [88.6-89.9]   85.80%           1.24%  +0.866
+  primary+ent_rel@attacks+complex_peak log(rank)    8   89.36% [89.1-89.5]   85.84%           1.35%  +0.866
+
+  usable (mean) is the average across repeats; [lo-hi] beside it is the 10th-90th
+  percentile ACROSS REPEATS, i.e. split noise only. The gate lower bound is the
+  one-sided 95% Wilson bound on the row count, which is the dominant uncertainty
+  at this sample size and is what the gate actually reads.
+
+  ridge chosen inside training folds: 1e-006 x448 (30%), 0.001 x64 (4%), 0.01 x395 (26%), 0.1 x570 (38%), 1 x23 (2%)
+
+  -- selection --
+    best mean usable  : primary+ent_rel+fingers / rank at 89.47%
+    SELECTED          : primary+ent_rel@attacks / rank  (7 features)
+    the leader beats it by +0.08 points and wins 50% of paired repeats,
+    which does not clear the predeclared bar (>1 points AND >70% of repeats),
+    so the simpler candidate is selected.
+
+  -- paired differences against the selected candidate --
+    candidate                  scale       mean diff       wins
+    baseline                   rank           -3.91%         0%
+    baseline                   log(rank)      -6.47%         0%
+    primary                    rank           -3.35%         0%
+    primary                    log(rank)      -6.17%         0%
+    primary+solo               rank           -3.95%         0%
+    primary+solo               log(rank)      -6.39%         0%
+    primary+movement           rank           -5.11%         0%
+    primary+movement           log(rank)      -6.65%         0%
+    primary+entropy            rank           -4.10%         0%
+    primary+entropy            log(rank)      -3.12%         0%
+    primary+entropy_rel        rank           -3.83%         0%
+    primary+entropy_rel        log(rank)      -4.51%         0%
+    primary+solo+entropy_rel   rank           -4.06%         0%
+    primary+solo+entropy_rel   log(rank)      -4.32%         0%
+    primary+ent_rel@attacks    log(rank)      -0.38%        10%
+    full_keys                  rank           -4.10%         0%
+    full_keys                  log(rank)      -3.80%         0%
+    primary+shift              rank           -2.89%         0%
+    primary+shift              log(rank)      -3.68%         0%
+    primary+shift_rate         rank           -2.89%         0%
+    primary+shift_rate         log(rank)      -3.57%         0%
+    full_real_keys             rank           -4.02%         0%
+    full_real_keys             log(rank)      -2.89%         0%
+    primary+ent_rel+fingers    rank           +0.08%        50%
+    primary+ent_rel+fingers    log(rank)      -1.24%         0%
+    primary+ent_rel+fingers+held rank           -0.04%        50%
+    primary+ent_rel+fingers+held log(rank)      -1.13%         0%
+    primary+ent_rel@attacks+complex_peak rank           -0.08%        30%
+    primary+ent_rel@attacks+complex_peak log(rank)      -0.04%        30%
+
+  -- worst 10 by tier distance, SELECTED model, averaged over repeats --
+    whativedone2             rank 147  predicted  292  said tier 3, actual 0  (3 off)
+    surrender                rank 178  predicted  320  said tier 3, actual 1  (2 off)
+    wearethechampions2       rank 414  predicted  279  said tier 3, actual 5  (2 off)
+    bluemonday               rank 172  predicted  303  said tier 3, actual 1  (2 off)
+    iveseenallgoodpeople     rank 460  predicted  335  said tier 4, actual 6  (2 off)
+    fireohio                 rank 407  predicted  285  said tier 3, actual 5  (2 off)
+    wedidntstartthefire      rank 160  predicted  281  said tier 3, actual 1  (2 off)
+    ghostofperdition         rank 421  predicted  304  said tier 3, actual 5  (2 off)
+    saturdaynightspecial     rank 263  predicted  377  said tier 4, actual 2  (2 off)
+    dreamonlive              rank 170  predicted  284  said tier 3, actual 1  (2 off)
+
+  -- worst 10 by tier distance, MEAN LEADER, averaged over repeats --
+    surrender                rank 178  predicted  331  said tier 4, actual 1  (3 off)
+    whativedone2             rank 147  predicted  297  said tier 3, actual 0  (3 off)
+    bluemonday               rank 172  predicted  307  said tier 3, actual 1  (2 off)
+    wearethechampions2       rank 414  predicted  283  said tier 3, actual 5  (2 off)
+    fireohio                 rank 407  predicted  284  said tier 3, actual 5  (2 off)
+    iveseenallgoodpeople     rank 460  predicted  340  said tier 4, actual 6  (2 off)
+    wedidntstartthefire      rank 160  predicted  280  said tier 3, actual 1  (2 off)
+    bicyclerace              rank 456  predicted  338  said tier 4, actual 6  (2 off)
+    ghostofperdition         rank 421  predicted  304  said tier 3, actual 5  (2 off)
+    captainjack              rank 324  predicted  438  said tier 5, actual 3  (2 off)
+
+  -- release gate, read from the pessimistic end of each interval --
+    usable lower bound :  85.89%   (floor 90%)
+    miss upper bound   :   2.02%   (ceiling 5%)
+    rho (mean)         : +0.861   (floor 0.70)
+    -> DOES NOT PASS:
+       - usable lower bound 85.9% is below the 90% floor
 
 Reading this report:
   * The SELECTED line is the model this protocol chooses. It is not necessarily

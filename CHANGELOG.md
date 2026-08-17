@@ -9,6 +9,28 @@ over 5. See `CLAUDE.md` → "Changelog / `@about` trimming" for the rule.
 
 `rock_band_general_helper_vkr.lua`
 
+**v0.9.52**
+  - Venue > Actions > Validate: new "Validate camera stacks" button. Only
+    two of bass/guitar/keys fit on stage at once, so a song charting all
+    three can be played by three different bands, and stacked camera shots
+    are how you cover each. This replays the game's shot pick for every
+    lineup your project can produce and reports where that breaks down:
+    shots that win under no lineup (they need an instrument never on
+    stage, or a stacked sibling outranks them everywhere they fit), and
+    spots where a lineup has no valid camera shot so the game picks for
+    you.
+    Read-only, like the lighting validator beside it.
+  - It also catches two mistakes that break stacking outright: the same
+    shot written twice on one tick, and two shots a few ticks apart that
+    were meant to be stacked - the game reads those as two separate cuts,
+    so the second replaces the first before you ever see it.
+  - Letting the game fall back is a valid authoring choice, so those spots
+    are listed as "where the game decides", not as errors - the same way
+    the lighting validator treats a hard cut. Uncovered spots are reported
+    one line per spot rather than per lineup, and the report names which
+    lineups your project can actually produce, so a four-piece song does
+    not read as the check having found nothing to do.
+
 **v0.9.51**
   - Venue > Preview: when several camera shots are stacked on one tick, the
     preview now shows the one the GAME would play. Authors stack shots so

@@ -81,34 +81,54 @@ local SELECTIONS = {
     -- one; the leader (primary+entropy@attacks) is +0.34 points and wins only 50% of
     -- paired repeats, nowhere near the bar, so the tie goes to the simpler model.
     { inst = 'bass',      candidate = 'baseline+entropy',                 scale = 'log(rank)' },
-    -- TOP-END CORPUS (318 -> 379 songs). Replaced 'full_drum'. full_drum still has the
-    -- higher raw mean (95.21%) but beats this by only +0.64 points on 80% of paired
-    -- repeats, missing the predeclared bar (>1 point AND >70%), so the simpler candidate
-    -- wins. Incidental benefit: full_drum carried both halves of two
-    -- duplicate-by-construction pairs (total_changes/pro_total_changes and
-    -- change_rate/pro_change_rate are bit-identical on 278 of 316 drum rows, and
-    -- tight_p10/tight_med against their pro_ twins on all 316), whose individual
-    -- coefficients are unidentifiable - the analysis report's unridged fit splits them
-    -- into +903/-906. This candidate contains neither twin.
+    -- KEYS TOP-UP (379 -> 394 songs). Back to 'full_drum', now on log(rank), after one
+    -- revision on primary+limbs+ent+offbeat and one on primary+entropy. This time it wins
+    -- outright - no simpler candidate came within the predeclared margin - and it is the
+    -- best drums has ever measured: usable lower bound 93.38%, rho +0.888.
     --
-    -- DRUMS IS THE UNSTABLE ONE. Across three consecutive corpus revisions the selection
-    -- has been full_drum/rank, primary+entropy/rank, and now this - because the leader's
-    -- margin sits just under the bar every time (+0.90, then +0.79, now +0.64), so tiny
-    -- data changes reorder the field. Re-read the protocol report after ANY rescore
-    -- rather than assuming this entry still matches; dev/tests checks exactly that.
-    { inst = 'drum',      candidate = 'primary+limbs+ent+offbeat',        scale = 'log(rank)' },
-    -- ROUND 16. Replaced 'primary+entropy_rel+complex_peak' / rank. That model measured
-    -- density in GEMS and carried chord_size_mean at -12.86 to divide chords back out of
-    -- the count - which charged a real chart ~28 rank per extra note in its voicing, so
-    -- the same music voiced as triads scored two tiers below the single-note version.
-    -- This one counts ATTACKS and drops the chord factor entirely, so voicing is not an
-    -- input at all. Equal accuracy (94.02% vs 93.77% cross-validated) and one factor
-    -- fewer. See dev/calibration/README.md, "a coefficient's sign is only interpretable
-    -- relative to the units of the factors beside it".
+    -- DRUMS RE-SELECTS ON ALMOST EVERY RESCORE. Four corpus revisions, four different
+    -- answers (full_drum/rank, primary+entropy/rank, primary+limbs+ent+offbeat/log,
+    -- full_drum/log), because for three of them the leader's margin sat just under the bar
+    -- (+0.90, +0.79, +0.64) and tiny data changes reordered the field. Re-read the protocol
+    -- report after ANY rescore rather than assuming this entry still matches; dev/tests
+    -- checks exactly that.
+    --
+    -- full_drum does NOT carry the duplicate-by-construction pro_ pairs. An earlier version
+    -- of this comment said it did; that was wrong. The pairs
+    -- (total_changes/pro_total_changes, change_rate/pro_change_rate, and tight_p10/tight_med
+    -- against their pro_ twins) are bit-identical on drum rows and blow up into +903/-906,
+    -- but only in the ANALYSIS report's unridged fit over every column. No declared drum
+    -- candidate contains both halves of any of them.
+    { inst = 'drum',      candidate = 'full_drum',                        scale = 'log(rank)' },
+    -- ROUND 16 chose these factors. Replaced 'primary+entropy_rel+complex_peak' / rank:
+    -- that model measured density in GEMS and carried chord_size_mean at -12.86 to divide
+    -- chords back out of the count - which charged a real chart ~28 rank per extra note in
+    -- its voicing, so the same music voiced as triads scored two tiers below the single-note
+    -- version. This one counts ATTACKS and drops the chord factor entirely, so voicing is
+    -- not an input at all. See dev/calibration/README.md, "a coefficient's sign is only
+    -- interpretable relative to the units of the factors beside it".
+    --
+    -- KEYS TOP-UP moved the SCALE from log(rank) to rank; the factor list is unchanged.
     { inst = 'keys',      candidate = 'primary+ent_rel+complex@attacks-chord',
-                                                                     scale = 'log(rank)' },
+                                                                     scale = 'rank'      },
     { inst = 'real_keys', candidate = 'primary+ent_rel@attacks',          scale = 'rank'      },
-    { inst = 'vocals',    candidate = 'primary+range+parts',              scale = 'log(rank)' },
+    -- ROUND 18. Replaced 'primary+range+parts'. Vocals under-rates its hardest charts by
+    -- ~117 rank, three times worse than any other instrument's top-end shrinkage, and two
+    -- explanations were eliminated before a factor was added: it is not a song-level label
+    -- (other instruments' ranks predict a vocals rank at only rho +0.219, the lowest of the
+    -- six), and it is not the "high AND held" interaction (super-linear forms of sustained
+    -- high time moved the top-end bias by under 1 rank, two of them the wrong way).
+    --
+    -- What was missing had never been declared: high_time_70, the fraction of sung time
+    -- above G4, is the largest single discriminator of the charts ranked 400+ at +1.28 sd,
+    -- and the tessitura family had only ever appeared in candidates that DROP vocal_parts.
+    -- With pc_change_rate beside it - the demand is high AND MOVING, not high and held -
+    -- vocals gains rho +0.617 -> +0.668 over the incumbent on the same rows.
+    --
+    -- STILL FAILS THE GATE, at a lower bound of 85.12% against the 90% floor and rho short
+    -- of 0.70. Shipped anyway, per the decision to get author feedback on the weak
+    -- instruments; the artifact's `experimental` badge is what says so in the UI.
+    { inst = 'vocals',    candidate = 'parts+tess+move',                  scale = 'log(rank)' },
 }
 
 -- Product maturity, from the product plan's status table. Carried in the artifact so the

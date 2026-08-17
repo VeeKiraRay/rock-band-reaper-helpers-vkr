@@ -368,15 +368,16 @@ Test.it('the selected candidate and scale are the ones the protocol chose', func
         -- TOP-END CORPUS. Was 'full_drum' / rank / 26. Drums re-selects on almost every
         -- rescore because the leader's margin sits just under the predeclared bar, so
         -- treat a failure here as "re-read the protocol report", not as a bug.
-        drum      = { 'primary+limbs+ent+offbeat',        'log(rank)', 9  },
+        drum      = { 'full_drum',                        'log(rank)', 26 },
         -- ROUND 16. Was 'primary+entropy_rel+complex_peak' / rank / 8. That model counted
         -- density in gems and needed chord_size_mean to divide chords back out, which
         -- charged ~28 rank per extra note of voicing - the same music as triads landed two
         -- tiers below its single-note version. This one counts attacks and has no chord
         -- factor, so voicing is not an input.
-        keys      = { 'primary+ent_rel+complex@attacks-chord', 'log(rank)', 7 },
+        -- KEYS TOP-UP moved the scale to rank; the factor list is unchanged.
+        keys      = { 'primary+ent_rel+complex@attacks-chord', 'rank',      7 },
         real_keys = { 'primary+ent_rel@attacks',          'rank',      7  },
-        vocals    = { 'primary+range+parts',              'log(rank)', 10 },
+        vocals    = { 'parts+tess+move',                  'log(rank)', 12 },
     }
     for inst, want in pairs(EXPECTED) do
         local m = RB_DIFFICULTY_MODELS[inst]
@@ -486,8 +487,8 @@ Test.it('training row counts match the protocol report', function()
     -- 379-song corpus. The second number is every AUXILIARY row pooled (45 lego + 15
     -- rb2), not lego alone; keys and Pro Keys have none, both games predating the part.
     local EXPECTED = {
-        guitar = { 312, 60 }, bass = { 315, 60 }, drum = { 313, 60 },
-        vocals = { 313, 60 }, keys = { 251, 0 },  real_keys = { 251, 0 },
+        guitar = { 327, 60 }, bass = { 330, 60 }, drum = { 328, 60 },
+        vocals = { 328, 60 }, keys = { 266, 0 },  real_keys = { 266, 0 },
     }
     for inst, want in pairs(EXPECTED) do
         local m, _, _, _, _, n_target, n_lego = Rebuild(inst)

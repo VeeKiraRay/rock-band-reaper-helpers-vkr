@@ -181,6 +181,7 @@ function WalkCorpus(root)
                     origin      = e.origin,
                     genre       = e.genre,
                     vocal_parts = e.vocal_parts,
+                    song_id     = e.song_id,
                     ranks       = e.ranks,
                     midi_path   = FileExists(mid) and mid or nil,
                     pack        = pack,

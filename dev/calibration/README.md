@@ -19,26 +19,39 @@ versioned nor deployed, so a deployed copy finds no songs. Register the repo cop
 
 ## Where things stand
 
-Selected model per instrument, as of round 17 (2026-08-16). Reproduced from
-`calibration_protocol_report.txt`, which is regenerated on every protocol run and is the
-authority if these disagree.
+Selected model per instrument, as of round 18 (2026-08-17), on the 394-song corpus.
+Reproduced from `calibration_protocol_report.txt`, which is regenerated on every protocol
+run and is the authority if these disagree.
 
 | instrument | selected candidate | scale | k | usable | usable lower bound | miss upper bound | rho | |
 |---|---|---|---:|---:|---:|---:|---:|---|
-| guitar | `full@attacks` | log(rank) | 21 | 95.70% | **92.18%** | 1.81% | +0.884 | **passes** |
-| bass | `baseline+ent_rel@attacks` | log(rank) | 3 | 95.28% | **91.68%** | 1.91% | +0.830 | **passes** |
-| drum | `full_drum` | rank | 26 | 95.28% | **91.68%** | 3.07% | +0.859 | **passes** |
-| keys | `primary+ent_rel+complex@attacks-chord` | log(rank) | 7 | 94.02% | 89.44% | 0.82% | +0.880 | fails narrowly |
-| real_keys | `primary+ent_rel@attacks` | rank | 7 | 86.89% | 81.05% | 4.47% | +0.833 | fails |
-| vocals | `primary+range+parts` | log(rank) | 10 | 90.83% | 86.32% | 5.04% | +0.626 | fails |
+| guitar | `full@attacks` | log(rank) | 21 | 94.16% | **91.64%** | 1.36% | +0.862 | **passes** |
+| bass | `baseline+entropy` | log(rank) | 3 | 94.18% | **91.68%** | 1.35% | +0.802 | **passes** |
+| drum | `full_drum` | log(rank) | 26 | 95.64% | **93.38%** | 1.40% | +0.888 | **passes** |
+| keys | `primary+ent_rel+complex@attacks-chord` | rank | 7 | 92.97% | 89.94% | 1.08% | +0.878 | fails by 0.06 |
+| real_keys | `primary+ent_rel@attacks` | rank | 7 | 89.40% | 85.89% | 2.02% | +0.861 | fails |
+| vocals | `parts+tess+move` | log(rank) | 12 | 88.35% | 85.12% | 4.08% | +0.668 | fails |
 
 "usable" is within-one-tier accuracy, averaged across repeats; the two bounds beside it are
-the pessimistic end of each interval, which is what the gate reads (floors: usable ≥ 90%,
-miss ≤ 5%, rho ≥ 0.70). Keys and Pro Keys fail on the usable lower bound alone; vocals
-fails all three criteria.
+the pessimistic end of each interval, which is what the gate reads (floors: usable >= 90%,
+miss <= 5%, rho >= 0.70). Keys and Pro Keys fail on the usable lower bound alone; vocals
+fails that and rho.
 
-Development rows per instrument: guitar 158, bass 159, drum 159, vocals 157, keys 122,
-real_keys 122 — all `rb3_dlc`, with 0 disputed rows held out.
+Development rows per instrument: guitar 327, bass 330, drum 328, vocals 328, keys 266,
+real_keys 266 - all `rb3_dlc`, with 0 disputed rows held out. Lego (45 rows) and the RB2
+disc export (15) always train at weight 0.30 and are never predicted.
+
+**The numbers fell when the corpus grew, and that is the corpus working.** Round 17's table
+read guitar 92.18% and vocals 86.32% on 205 songs whose coverage was thin at both ends.
+Filling the low end and then the top end moved every figure toward what a random song would
+actually get; a middle-heavy corpus flatters a model that hedges toward the middle.
+
+**Keys is the standing lesson about sample size.** It missed by 0.05 points at n=251, so 15
+charts were added specifically to close it - and it now misses by **0.06** at n=266. The
+larger n was exactly cancelled by a lower mean, because the added charts were deliberately
+drawn from tier 4, the model's weakest bracket. Adding songs the model already handles
+would have passed the gate and taught nothing. Read this as evidence that keys has a real
+accuracy ceiling rather than a sample-size shortfall.
 
 **Two things this table is not.**
 
@@ -46,9 +59,10 @@ real_keys 122 — all `rb3_dlc`, with 0 disputed rows held out.
    defined and has deliberately **never been drawn** — it can be spent only once, and it
    is worth more at a real release decision than as a progress check. Call these
    "development-gate passes", not "validated".
-2. A failing instrument is not a broken one. Keys misses by 0.86 points at n=122, which
-   is a sample-size statement about certifying a 90% floor, not a claim that the model
-   got worse.
+2. A failing instrument is not a broken one. Keys misses by **0.05 points** at n=251 with
+   the best rho of any instrument (+0.873) - a statement about certifying a 90% floor,
+   not a claim that the model got worse. Nine more keys charts at the same accuracy
+   would clear it.
 
 The reserved partition should be drawn **by whole pack**, not by random rows: the corpus's
 multi-song packs are thematic, so related songs would otherwise leak across the split, and
@@ -64,10 +78,13 @@ Order matters: everything downstream reads the CSV the first script writes.
    song's MIDI, scores every instrument, appends a row per (song, instrument) to
    `corpus_scores.csv`, and writes `corpus_scores.manifest.txt`.
 
-   Two roots as of 2026-08: `_external_docs/reference_songs/` (205 songs) and
+   Three roots as of 2026-08: `_external_docs/reference_songs/` (205 songs),
    `_external_docs/new_reference_songs/` (157, of which 44 are also in the first — a
    low-end set assembled by searching per instrument, so a pack easy on two instruments
-   appears in two folders). The song list is pooled and de-duplicated by shortname before
+   appears in two folders), and `_external_docs/hard_reference_songs/` (the top-end set,
+   searched the same way for tier 5+ charts). 379 songs are scored in total; most of the
+   third root is RBN, whose dta dialect is deliberately not parsed. The song list is
+   pooled and de-duplicated by shortname before
    anything is imported, and the roots are recorded in the manifest — origin counts alone
    cannot distinguish a corpus that includes the low-end set from one that does not, since
    both are `rb3_dlc`.
@@ -116,10 +133,19 @@ Order matters: everything downstream reads the CSV the first script writes.
    residuals, and the RB3-vs-Lego origin check. Writes
    `calibration_analysis_report.txt`.
 
-   Its coefficient table is **unstable by design** — an unridged fit over ~31 collinear
-   columns. It names the next factor to try; it does not decide anything. When the two
-   views disagree, the decision view is the answer. Measured worst case: the analysis put
-   `shadowsofthenight` four tiers out where every declared candidate got it within one.
+   Its coefficient table is **unstable by design** — an unridged fit over every column,
+   96 of them and heavily collinear. It names the next factor to try; it does not decide
+   anything. When the two views disagree, the decision view is the answer.
+
+   **Its residual list is the trap**, because it reads exactly like a model failure.
+   Measured worst case: the analysis put `deathontwolegs` **five tiers out** on keys —
+   *said tier 0, actual 5, −346 rank* — on a chart the shipped model rates correctly at
+   −30. The mechanism is worth knowing, because it will recur: that chart is **15.3 sd**
+   out on `solo_change_ratio` and on nothing else, the unridged fit hands that column a
+   *negative* coefficient, and with no ridge to restrain it the prediction floors. A
+   single extreme row cannot establish a coefficient's sign, and this view has nothing
+   stopping it from trying. (The previous record was `shadowsofthenight`, four tiers out
+   where every declared candidate got it within one.)
 
 4. **`run_calibration_diff_vkr.lua`** — diffs `corpus_scores_baseline.csv` against
    `corpus_scores.csv` per factor and per song. Run it after a scorer change to see *what
@@ -201,6 +227,30 @@ Order matters: everything downstream reads the CSV the first script writes.
    split, which is indistinguishable from a real effect. Measured on the 44 songs present
    in both corpora: **0 rank disagreements over 260 rows**, drift confined to `sustain_frac`
    (13 rows) plus one guitar chart whose final playing span closes 4 s earlier.
+
+9. **`run_label_probes_offline.lua`** — asks whether a failing instrument is limited by its
+   FACTORS or by its LABELS, without fitting anything shippable:
+
+   ```
+   lua dev/calibration/run_label_probes_offline.lua
+   ```
+
+   *Probe 1* scores each rank three ways under the locked protocol — the shipped candidate's
+   chart factors, the other instruments' ranks for the same song, and both — so the share of
+   a rank that is a property of the SONG rather than of the chart becomes visible. Anything
+   the other instruments already predict is unreachable from one chart, whatever factors are
+   added. A `chart, all` row repeats the first column over every target row and **must
+   reproduce `calibration_protocol_report.txt`**; if it does not, the harness is not running
+   the protocol and its other columns mean nothing.
+
+   *Probe 2* tests whether a part new to RB3 was ranked less consistently early on, using
+   `(song_id N)` from `songs.dta` as a release-order proxy inside a catalogue block. It
+   reports the raw id-vs-residual trend, the trend with **rank held fixed**, and
+   `rho(id, rank)` itself. The partial is the one to read: `song_id` correlates with rank on
+   exactly the instruments under test (vocals +0.22, Pro Keys −0.15), because the top-end
+   songs were added by a deliberate hard-song search and those skew late — so the raw trend
+   measures "later songs are harder" and would report it as "the ranks were still settling".
+   Vocals' raw +0.195 drops to +0.142 and stops being a finding; Pro Keys' −0.181 survives.
 
 Unit tests: **`dev/tests/run_difficulty_score.lua`** for the pure scorers, and
 **`dev/tests/run_difficulty_suggester.lua`** for the tiers, the predictor, and the frozen
@@ -519,6 +569,45 @@ model has to earn its place consistently, not post a higher average once.
 
   Regardless of any of this, **no shipped wording may state a difficulty direction for this
   factor** — see the header of `rock_band_general_helper_vkr/difficulty_explain.lua`.
+- **The vocal rank rewards singing HIGH AND MOVING, not high and sustained** (round 18).
+  Vocals under-predicts its hardest charts by ~117 rank, three times worse than any other
+  instrument's top-end shrinkage (guitar -37, bass -45, keys -40), so the shortfall is
+  vocal-specific rather than generic regression to the mean. Two readings were eliminated
+  before a factor was added. It is **not a song-level label**: predicting a vocals rank
+  from the *other* instruments' ranks of the same song reaches only rho **+0.219**, the
+  lowest of the six against guitar's +0.623 — the rhythm section locks to a shared groove
+  and predicts itself, a singer does not have to. And it is **not the "high AND held"
+  interaction**: super-linear forms of sustained high time (weighted by the square, and by
+  `2^(excess/6)`, of the register above G4) moved the top-end bias by under 1 rank, two of
+  them the wrong way, and were beaten by their own controls.
+
+  What was missing was simpler and had never been declared: `high_time_70`, the fraction of
+  sung time above G4, is the **largest single discriminator of the charts ranked 400+**, at
+  **+1.28 sd** above the rest of the corpus. The model knew how *high* a singer goes
+  (`pitch_p90`, `notated_range`) and not how *long* they stay up there. It went untested
+  because the tessitura family and `vocal_parts` only ever appeared in separate candidates —
+  `primary+range+tess` drops parts, the selected `primary+range+parts` drops tessitura — so
+  "both together" had no answer. With `pc_change_rate` beside it (`parts+tess+move`), vocals
+  moved **86.81% -> 88.47% usable, rho +0.624 -> +0.684**, and the top-end bias from -117 to
+  -104. All four pre-registered predictions held, including the one that mattered: **it still
+  does not pass**, at a lower bound of 85.16% against the 90% floor and rho short of +0.70.
+
+  The residual list is the sanity check — the worst misses are four Queen charts and two
+  Iron Maiden, melismatic and wide-ranging rather than held-note ballads.
+- **A mean-usable gate is structurally blind to rare patterns** — `deathontwolegs` is the
+  case. Its keys chart is tame except for one solo changing notes **24.26×** faster than
+  the rest of the chart; the next-highest `solo_change_ratio` in the corpus is 4.91, so it
+  sits **15.3 sd out and is extreme on no other column**. Guitar's `full@attacks` carries
+  `solo_frac_marked` *and* `solo_change_ratio`; the selected keys model carries neither,
+  and the keys candidates that do were tested and lost (`primary+solo+entropy_rel` 90.75%
+  against the selected 92.97%).
+
+  That is not an oversight. **1 of 266 keys charts has the pattern.** A factor with one
+  example to fit adds a column and no aggregate accuracy, so the protocol rejects it —
+  correctly, on the evidence available. Solos are ordinary on guitar and the same factors
+  earn their place there. The remedy is more concentrated-solo keys charts in the corpus,
+  not a cleverer candidate; and note the shipped model still lands this chart's tier, by
+  getting the average right rather than by seeing the solo.
 - **Playing time barely matters, and "sparse charts are penalised" is measured and false.**
   A recurring hypothesis, worth recording so it is not re-proposed: `playing_s` carries
   **-0.81** rank per sd on keys and **-0.34** on drums, against +32 for the largest lever
@@ -536,6 +625,41 @@ model has to earn its place consistently, not post a higher average once.
   `complex_peak`/`density_peak` **+0.88 keys only**, `tight_p10`/`tight_med` **+0.45 drums
   to +0.75 vocals**. The exporter therefore ships a `corr` table per model. Any future
   consumer that ranks or groups factors needs the same treatment.
+
+---
+
+## Open threads
+
+Where the three failing instruments actually stand, so this is not re-derived.
+
+- **Keys' 0.06-point gap is an accuracy ceiling, not a sample-size shortfall.** Two
+  collection attempts have now been made specifically to close it, and both failed the
+  same way: the added charts raised `n` and lowered the mean by almost exactly the
+  cancelling amount (89.95% at n=251 → **89.94%** at n=266). The second batch was drawn
+  from tier 4 on purpose, the model's weakest bracket — adding tier-2 charts would have
+  passed the gate and taught nothing. A third collection round is not the answer.
+- **Vocals is missing a factor, not a corpus.** Its rank is the *most* chart-specific of
+  the six — other instruments' ranks predict it at only **rho +0.219**, against guitar's
+  +0.623 — so the signal is reachable in principle. Round 18 found part of it
+  (`high_time_70`, tessitura) and the top-end bias only moved −117 → −104. What is ruled
+  out: the "high AND held" interaction, in both quadratic and exponential form.
+- **A "real singing difficulty" second score stays declined.** There is one label, so a
+  second output could never be calibrated or falsified. Round 13 declined it on that
+  ground and round 18 adds evidence: the realism-shaped proxies moved the official label
+  almost not at all, while "high and *moving*" did.
+- **The RBN packs buy validation, not training.** ~145 MIDIs in the hard-song set are
+  `ugc_plus`, whose dta dialect `ParseSongsDta` does not read — so they are invisible
+  rather than filtered, which is the worse failure mode. Worth fixing, but **every RBN
+  rank is exactly a tier floor** (7 distinct values against the DLC's 139–166), so they
+  are tier labels. That makes them a genuinely independent **held-out validation set** at
+  the resolution the gate already measures, and useless as regression rows.
+- **Cross-instrument chart factors are untested and nearly free.** Guitar and bass ranks
+  are substantially song-level (+0.623, +0.667) where vocals is not — the rhythm section
+  locks to a shared groove, a singer does not. Their *ranks* cannot be used at suggest
+  time (that is what the author is asking for), but the other instruments' **measured
+  factors** can, since the author has the whole MIDI. Every factor is already in
+  `corpus_scores.csv`, and `run_label_probes_offline.lua` already has the machinery for
+  injecting extra columns, so this needs no rescore and no harness change.
 
 ---
 
