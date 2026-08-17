@@ -516,8 +516,10 @@ See [`_future_ideas/`](_future_ideas/) for deferred work:
 
 **Difficulty suggester.** Its design notes live in `_future_ideas/` like the rest, but its
 calibration harness is real, tracked code in [`dev/calibration/`](../dev/calibration/) —
-fifteen rounds of model fitting against a corpus of officially-ranked songs, producing one
-selected model per instrument. [`dev/calibration/README.md`](../dev/calibration/README.md)
+many rounds of model fitting against a corpus of officially-ranked songs, producing one
+selected model per instrument. The round count is deliberately not repeated here; it has
+gone stale twice, and `protocol.lua`'s last declared round is the authority.
+[`dev/calibration/README.md`](../dev/calibration/README.md)
 is the version-controlled summary: results, file map, how to run it, the locked evaluation
 protocol, and the rules a new session must not break. Read it before touching anything in
 that folder — `_future_ideas/` is gitignored, so the README is the only tracked account.

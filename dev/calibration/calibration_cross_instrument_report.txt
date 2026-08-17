@@ -1,0 +1,105 @@
+======  Cross-instrument chart factors  ======
+
+CSV : dev/calibration/corpus_scores.csv   (2101 rows)
+Cross columns, one vocabulary for every pair: attack_density_peak, total_changes, entropy_h2_rel
+
+Three predictors of the same rank, scored by the LOCKED protocol (10 repeats, shared
+stratified folds, nested ridge, same clamp and tier grading):
+
+  chart        the shipped candidate's factors - today's model
+  chart+cross  the same, plus the other part's three columns
+  cross only   ONLY the other part's columns; no evidence from the chart being ranked
+
+`cross only` exists to size the ceiling, and is a diagnostic that must never become a
+candidate: the protocol's tie-break prefers the simpler model, so a 3-column cross-only
+entry landing within a point of a 7-column incumbent would WIN SELECTION and ship a keys
+model made entirely of Pro Keys columns. It is measured here, where nothing is selected,
+and deliberately not declared in protocol.lua.
+
+  target      predictor    usable    lower     rho       n       note
+  ----------------------------------------------------------------------------------
+  keys        chart          92.97%    89.94%   +0.878  266     <- real_keys [attack_density_peak, total_changes, entropy_h2_rel]
+              chart+cross    93.42%    90.46%   +0.881  266     
+              cross only     90.71%    87.36%   +0.850  266     
+              chart, all     92.97%    89.94%   +0.878  266     <- must match the protocol report
+              MEASURE ONLY - dependency runs the wrong way, see header
+
+  real_keys   chart          89.40%    85.89%   +0.861  266     <- keys [attack_density_peak, total_changes, entropy_h2_rel]
+              chart+cross    88.83%    85.26%   +0.873  266     
+              cross only     88.05%    84.38%   +0.849  266     
+              chart, all     89.40%    85.89%   +0.861  266     <- must match the protocol report
+              the shippable direction
+
+  vocals      chart          87.99%    84.69%   +0.659  323     <- guitar + drum [attack_density_peak, total_changes, entropy_h2_rel]
+              chart+cross    87.31%    83.95%   +0.651  323     
+              cross only     77.18%    73.13%   +0.037  323     
+              chart, all     88.35%    85.12%   +0.668  328     <- must match the protocol report
+              stage A only - pre-registered as a null
+
+  keys@geom   chart          92.97%    89.94%   +0.878  266     <- real_keys [chord_span_mean, move_mean, entropy_h2_rel]
+              chart+cross    93.20%    90.20%   +0.879  266     
+              cross only     64.74%    59.79%   +0.483  266     
+              chart, all     92.97%    89.94%   +0.878  266     <- must match the protocol report
+              ADDENDUM - the columns the reduction does NOT preserve
+
+  real_keys@geom chart          89.40%    85.89%   +0.861  266     <- keys [chord_span_mean, move_mean, entropy_h2_rel]
+              chart+cross    89.59%    86.10%   +0.866  266     
+              cross only     71.20%    66.44%   +0.609  266     
+              chart, all     89.40%    85.89%   +0.861  266     <- must match the protocol report
+              ADDENDUM - same, shippable direction
+
+ROW LOSS - rows dropped because the song lacks the source part
+----------------------------------------------------------------------------
+  keys        0 of 266 target rows (0.0%)   [real_keys 0]  as declared
+  real_keys   0 of 266 target rows (0.0%)   [keys 0]  as declared
+  vocals      5 of 328 target rows (1.5%)   [guitar 9, drum 6]
+  keys@geom   0 of 266 target rows (0.0%)   [real_keys 0]  as declared
+  real_keys@geom 0 of 266 target rows (0.0%)   [keys 0]  as declared
+
+
+WOULD THE PROTOCOL SELECT IT, AND WOULD IT PASS THE GATE?
+--------------------------------------------------------------------------------------------
+  bar: gain > 1.00 points AND wins > 70% of paired repeats.   gate: usable_lo >= 90%, miss_hi <= 5%, rho >= 0.70
+
+  target      gain     win share selected?   usable_lo miss_hi   rho      gate
+  ------------------------------------------------------------------------------------------
+  keys          +0.45        70%  no             90.46%      1.29%   +0.881  PASSES
+  real_keys     -0.56        10%  no             85.26%      2.25%   +0.873  fails
+  vocals        -0.68        40%  no             83.95%      4.15%   +0.651  fails
+  keys@geom     +0.23        50%  no             90.20%      1.01%   +0.879  PASSES
+  real_keys@geom   +0.19        50%  no             86.10%      2.08%   +0.866  fails
+
+
+PREDICTIONS RECORDED BEFORE RUNNING
+----------------------------------------------------------------------------
+  1. Vocals gains under 1 usable point from guitar and drum columns. A RANK
+     is a better summary of a chart than three of its densities, and other
+     instruments' ranks already reach only rho +0.219 on vocals.
+     -> gain -0.68 points, rho +0.659 -> +0.651.  HIT
+  2. keys <- real_keys gains more than real_keys <- keys. The reduction is
+     lossy in one direction only.
+     -> keys +0.45, Pro Keys -0.56.  HIT
+  3. `cross only` on keys reaches rho >= +0.70 - Pro Keys factors ALONE
+     nearly reproduce the keys rank. If true this is a statement about the
+     label, not a model.
+     -> rho +0.850.  HIT
+  4. Neither keyboard candidate clears the 90% usable LOWER bound. Keys' gap
+     is an accuracy ceiling, not a specification gap, and three correlated
+     columns do not lift a ceiling.
+     -> keys 90.46%, Pro Keys 85.26%.  MISSED
+     NOTE: the bound crossed, the SELECTION did not - gain +0.45 against a
+     1.00-point bar, winning 70% of paired repeats against a >70% rule.
+     The prediction failed as written and holds as stated: the ceiling is
+     intact and the crossing is inside the noise band the bar exists to reject.
+  5. Zero rows lost on the keyboard pair in both directions; a handful on
+     vocals <- guitar + drum.
+     -> keys 0, Pro Keys 0, vocals 5.  HIT
+  6. [registered after 1-5, before the @geom run] The geometry columns beat
+     the rhythm columns on keys <- Pro Keys, because the rhythm columns are
+     the SAME NUMBER on both charts (ratio 1.00) while span and movement
+     differ 2.5-3.2x. Both still fail the 1-point selection bar: the keys
+     ceiling is not a missing-column problem.
+     -> geometry +0.23 vs rhythm +0.45 on keys; Pro Keys geometry +0.19.
+        geometry beat rhythm: no   both still under the bar: YES
+
+Nothing here fits a shipped model. lib/ and corpus_scores.csv are untouched.

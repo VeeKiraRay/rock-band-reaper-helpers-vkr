@@ -1398,10 +1398,16 @@ end
 -- Column order for the calibration CSV, and the order the analysis fits over.
 -- One place so the writer and the reader cannot drift apart.
 --
--- 23 factors is more than this corpus should carry, and Phase 2 of the
--- implementation plan exists to cut it back. The additions here are recovered
--- AUTHORED annotations rather than newly invented ratios, which is a better reason
--- to add a column than most - but it is not a reason to keep it.
+-- This list is the CANDIDATE POOL, not a model. It is 96 columns wide once the
+-- vocal scorer has appended its own, and no fitted model carries anything like
+-- that many: the selected models run from 3 columns (bass) to 26 (drums), with 7
+-- on both keyboards, 12 on vocals and 21 on guitar. A wide pool is the point -
+-- the protocol chooses from it and the ridge is fitted inside each fold.
+--
+-- CHANGING THIS LIST IS A FULL RESCORE. Every consumer keys off the CSV header,
+-- which is the authoritative record of the factor set, and a CSV written under a
+-- different header can be neither refit nor row-compared against the current one.
+-- Add a column only with a rescore budgeted; see dev/calibration/README.md.
 SCORE_FACTOR_KEYS = {
     -- endurance / speed. The attack_* pair measures the same two rates in EVENTS
     -- rather than gems; they differ only on chordal charts and are declared as a
