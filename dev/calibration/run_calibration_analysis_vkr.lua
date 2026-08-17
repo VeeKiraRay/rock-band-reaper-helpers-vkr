@@ -15,9 +15,10 @@
 --     * The origin check: an rb3_dlc-only model applied to the Lego songs out of
 --       sample, giving the scale offset between the two eras.
 --
---   RB3 DLC is the target throughout. The Lego-era songs sit on a rank scale about
---   45 points below RB3 DLC's, so they are down-weighted and carry an is_lego
---   column: they add information without steering the model.
+--   RB3 DLC is the target throughout. Auxiliary origins (Lego, the RB2 disc export)
+--   sit on their own rank scales, so each is down-weighted and carries its own
+--   is_<origin> column: they add information without steering the model. The origin
+--   check below reports each offset overall and per rank band.
 --
 --   Read-only. Touches no project state, so it is safe to run in any project -
 --   but run it from the same repo checkout as run_calibration_vkr.lua, since it
@@ -173,16 +174,22 @@ local function Subset(list, idxs)
     return out
 end
 
--- Feature vector plus the is_lego indicator appended.
+-- Feature vector plus one indicator per auxiliary origin, appended in
+-- PROTOCOL.AUX_ORIGINS order (see WithOrigin in protocol.lua, which this mirrors).
 --
--- The indicator is a nuisance parameter, not a difficulty factor: it lets the fit
+-- Each indicator is a nuisance parameter, not a difficulty factor: it lets the fit
 -- account for "this row came from a differently-calibrated game" so the real
--- coefficients are estimated cleanly. Predictions for a new song pass 0, i.e. the
--- RB3 scale, which is the scale a custom should be rated on.
-local function WithOrigin(fv, is_lego)
+-- coefficients are estimated cleanly. Predictions for a new song pass 0 for all of
+-- them, i.e. the RB3 scale, which is the scale a custom should be rated on.
+--
+-- Takes the row's ORIGIN rather than a prepared flag, so a caller cannot write one
+-- origin's 1 into another's column once a second indicator exists.
+local function WithOrigin(fv, origin)
     local out = {}
     for j = 1, #fv do out[j] = fv[j] end
-    out[#out + 1] = is_lego
+    for _, aux in ipairs(PROTOCOL.AUX_ORIGINS) do
+        out[#out + 1] = (origin == aux.origin) and 1 or 0
+    end
     return out
 end
 
@@ -241,23 +248,26 @@ local function CrossValidate(d, target, extra, extra_weight)
             if g ~= f then
                 for _, ti in ipairs(folds[g]) do
                     local i = target[ti]
-                    X[#X + 1]   = WithOrigin(d.feats[i], 0)
+                    X[#X + 1]   = WithOrigin(d.feats[i], nil)
                     ys[#ys + 1] = d.ranks[i]
                     ws[#ws + 1] = 1.0
                 end
             end
         end
         for _, i in ipairs(extra) do
-            X[#X + 1]   = WithOrigin(d.feats[i], 1)
+            X[#X + 1]   = WithOrigin(d.feats[i], d.origins[i])
             ys[#ys + 1] = d.ranks[i]
-            ws[#ws + 1] = extra_weight
+            -- Per origin, so two auxiliary sets can carry different weights. The
+            -- extra_weight argument is the fallback for callers that pass a hand-built
+            -- set (the leaner-factor sweeps below).
+            ws[#ws + 1] = AuxWeight(d.origins[i]) or extra_weight
         end
         local fit = MultiFit(X, ys, nil, ws)
         if not fit then return nil end
         for _, ti in ipairs(folds[f]) do
             local i = target[ti]
             local n = #pred + 1
-            pred[n]  = ClampRank(ApplyFit(WithOrigin(d.feats[i], 0), fit), rank_lo, rank_hi)
+            pred[n]  = ClampRank(ApplyFit(WithOrigin(d.feats[i], nil), fit), rank_lo, rank_hi)
             act[n]   = d.ranks[i]
             order[n] = i
         end
@@ -313,10 +323,9 @@ local function AnalyseInstrument(csv, inst)
     local d = Collect(csv, inst)
 
     local rb_all, other_idx = PartitionIndices(d.origins, function(o) return o == 'rb3_dlc' end)
-    local lego_idx = {}
-    for _, i in ipairs(other_idx) do
-        if d.origins[i] == 'lego' then lego_idx[#lego_idx + 1] = i end
-    end
+    -- Every auxiliary origin, pooled. Still called lego_idx below for continuity with
+    -- the rest of this file; it is no longer Lego-only.
+    local lego_idx = AuxIndices(d.origins)
 
     -- Disputed labels, held out of the fit. The list is normally empty; when it is
     -- not, BOTH gates are reported below so an exclusion cannot flatter the result
@@ -337,8 +346,18 @@ local function AnalyseInstrument(csv, inst)
         return
     end
 
-    Msg(('  rows: %d rb3_dlc (the target), %d lego (weight %.2f), %d excluded from all fits\n')
-        :format(#rb_idx, #lego_idx, LEGO_WEIGHT, #other_idx - #lego_idx))
+    local aux_parts = {}
+    for _, a in ipairs(PROTOCOL.AUX_ORIGINS) do
+        local n = 0
+        for _, i in ipairs(lego_idx) do if d.origins[i] == a.origin then n = n + 1 end end
+        if n > 0 then
+            aux_parts[#aux_parts + 1] = ('%d %s (weight %.2f)'):format(n, a.origin, a.weight)
+        end
+    end
+    Msg(('  rows: %d rb3_dlc (the target), %s, %d excluded from all fits\n')
+        :format(#rb_idx,
+                #aux_parts > 0 and table.concat(aux_parts, ', ') or 'no auxiliary origins',
+                #other_idx - #lego_idx))
 
     -- Always printed, even at zero, so the mechanism is visibly working before it
     -- ever holds anything - and so a future run where it is non-zero looks different
@@ -429,17 +448,17 @@ local function AnalyseInstrument(csv, inst)
     if pred and act and #weird_idx > 0 then
         local Xw, yw, ww = {}, {}, {}
         for _, i in ipairs(rb_idx) do
-            Xw[#Xw + 1], yw[#yw + 1], ww[#ww + 1] = WithOrigin(d.feats[i], 0), d.ranks[i], 1.0
+            Xw[#Xw + 1], yw[#yw + 1], ww[#ww + 1] = WithOrigin(d.feats[i], nil), d.ranks[i], 1.0
         end
         for _, i in ipairs(lego_idx) do
-            Xw[#Xw + 1], yw[#yw + 1], ww[#ww + 1] = WithOrigin(d.feats[i], 1), d.ranks[i], LEGO_WEIGHT
+            Xw[#Xw + 1], yw[#yw + 1], ww[#ww + 1] = WithOrigin(d.feats[i], d.origins[i]), d.ranks[i], AuxWeight(d.origins[i]) or LEGO_WEIGHT
         end
         local fit_w = MultiFit(Xw, yw, nil, ww)
         if fit_w then
             local p2, a2 = {}, {}
             for n = 1, #pred do p2[n], a2[n] = pred[n], act[n] end
             for _, i in ipairs(weird_idx) do
-                p2[#p2 + 1] = ApplyFit(WithOrigin(d.feats[i], 0), fit_w)
+                p2[#p2 + 1] = ApplyFit(WithOrigin(d.feats[i], nil), fit_w)
                 a2[#a2 + 1] = d.ranks[i]
             end
             ReportMetrics('incl. disputed rows', inst, p2, a2)
@@ -487,14 +506,14 @@ local function AnalyseInstrument(csv, inst)
     -- headline, since a fit reports optimistically on its own training rows.
     local Xall, yall, wall = {}, {}, {}
     for _, i in ipairs(rb_idx) do
-        Xall[#Xall + 1] = WithOrigin(d.feats[i], 0)
+        Xall[#Xall + 1] = WithOrigin(d.feats[i], nil)
         yall[#yall + 1] = d.ranks[i]
         wall[#wall + 1] = 1.0
     end
     for _, i in ipairs(lego_idx) do
-        Xall[#Xall + 1] = WithOrigin(d.feats[i], 1)
+        Xall[#Xall + 1] = WithOrigin(d.feats[i], d.origins[i])
         yall[#yall + 1] = d.ranks[i]
-        wall[#wall + 1] = LEGO_WEIGHT
+        wall[#wall + 1] = AuxWeight(d.origins[i]) or LEGO_WEIGHT
     end
     local full = MultiFit(Xall, yall, nil, wall)
     if full then
@@ -502,15 +521,22 @@ local function AnalyseInstrument(csv, inst)
         for j, k in ipairs(SCORE_FACTOR_KEYS) do
             Msg(('    %-14s %+8.2f\n'):format(k, full.coefs[j]))
         end
-        if #lego_idx > 0 then
-            Msg(('    %-14s %+8.2f  <- scale shift, not a difficulty factor\n')
-                :format('is_lego', full.coefs[#full.coefs]))
-        else
-            -- No Lego rows exist for this instrument (Lego Rock Band predates keys, so
-            -- PART KEYS has none). The column is then constant, MultiFit neutralises it
-            -- by clamping its sd, and whatever coefficient comes back describes nothing.
-            Msg(('    %-14s      n/a  <- no %s rows exist for this instrument\n')
-                :format('is_lego', 'lego'))
+        -- The indicators occupy the trailing coefficients, in AUX_ORIGINS order.
+        local base = #full.coefs - #PROTOCOL.AUX_ORIGINS
+        for ai, a in ipairs(PROTOCOL.AUX_ORIGINS) do
+            local n = 0
+            for _, i in ipairs(lego_idx) do if d.origins[i] == a.origin then n = n + 1 end end
+            if n > 0 then
+                Msg(('    %-14s %+8.2f  <- scale shift, not a difficulty factor\n')
+                    :format(a.flag, full.coefs[base + ai]))
+            else
+                -- No rows of this origin for this instrument (Lego Rock Band and the RB2
+                -- export both predate keys, so PART KEYS has none of either). The column
+                -- is then constant, MultiFit neutralises it by clamping its sd, and
+                -- whatever coefficient comes back describes nothing.
+                Msg(('    %-14s      n/a  <- no %s rows exist for this instrument\n')
+                    :format(a.flag, a.origin))
+            end
         end
         Msg(('    %-14s %+8.2f\n'):format('(intercept)', full.intercept))
     end
@@ -549,11 +575,17 @@ local function AnalyseInstrument(csv, inst)
         end
     end
 
-    -- 5. Origin check: an rb3_dlc-only model applied to the Lego songs OUT OF
+    -- 5. Origin check: an rb3_dlc-only model applied to each auxiliary origin OUT OF
     -- SAMPLE. A least-squares fit is unbiased on its own training data, so the rb3
-    -- baseline is 0 by construction and the Lego mean IS the offset. (An earlier
+    -- baseline is 0 by construction and each origin's mean IS its offset. (An earlier
     -- version restricted both to a shared rank band, which broke that property and
     -- left two numbers that only meant something once differenced.)
+    --
+    -- Reported PER TIER BAND as well as overall, which tests a specific claim: a disc's
+    -- setlist is picked to span the difficulty range, so its ranks may be pushed apart
+    -- to fill the scale rather than measured independently - in which case the offset
+    -- would be small at the extremes and large in the middle, rather than a constant
+    -- shift the indicator column can absorb. A single mean cannot tell those apart.
     if #lego_idx >= 10 then
         local rb_fit = MultiFit(Subset(d.feats, rb_idx), rb_ranks)
         if rb_fit then
@@ -561,23 +593,56 @@ local function AnalyseInstrument(csv, inst)
             for _, i in ipairs(rb_idx) do
                 s_rb = s_rb + (ApplyFit(d.feats[i], rb_fit) - d.ranks[i])
             end
-            local s_lg = 0
-            for _, i in ipairs(lego_idx) do
-                s_lg = s_lg + (ApplyFit(d.feats[i], rb_fit) - d.ranks[i])
-            end
-            local off = s_lg / #lego_idx
-            Msg('\n  -- origin check: rb3_dlc-only model applied to lego out of sample --\n')
+            Msg('\n  -- origin check: rb3_dlc-only model applied to each origin out of sample --\n')
             Msg(('    mean (pred - actual) on rb3_dlc itself : %+.1f   <- ~0 by construction\n')
                 :format(s_rb / #rb_idx))
-            Msg(('    mean (pred - actual) on lego           : %+.1f   <- the scale offset\n')
-                :format(off))
-            if math.abs(off) < 15 then
-                Msg('    -> lego sits on the rb3_dlc scale\n')
-            else
-                Msg(('    -> lego rates the same chart about %.0f rank points LOWER than RB3.\n')
-                    :format(math.abs(off)))
-                Msg('       Absorbed by the is_lego column; a new song predicts with is_lego = 0,\n')
-                Msg('       i.e. on the RB3 scale.\n')
+
+            for _, a in ipairs(PROTOCOL.AUX_ORIGINS) do
+                local rows = {}
+                for _, i in ipairs(lego_idx) do
+                    if d.origins[i] == a.origin then rows[#rows + 1] = i end
+                end
+                if #rows == 0 then
+                    Msg(('    %-10s no rows for this instrument\n'):format(a.origin))
+                else
+                    local sum = 0
+                    for _, i in ipairs(rows) do
+                        sum = sum + (ApplyFit(d.feats[i], rb_fit) - d.ranks[i])
+                    end
+                    local off = sum / #rows
+                    Msg(('    mean (pred - actual) on %-8s : %+.1f  (n=%d)   <- the scale offset\n')
+                        :format(a.origin, off, #rows))
+                    if math.abs(off) < 15 then
+                        Msg(('    -> %s sits on the rb3_dlc scale\n'):format(a.origin))
+                    else
+                        Msg(('    -> %s rates the same chart about %.0f rank points %s than RB3.\n')
+                            :format(a.origin, math.abs(off), off > 0 and 'LOWER' or 'HIGHER'))
+                        Msg(('       Absorbed by the %s column; a new song predicts with it at 0,\n')
+                            :format(a.flag))
+                        Msg('       i.e. on the RB3 scale.\n')
+                    end
+                    -- Per tier band. A constant shift stays flat here; a setlist spread
+                    -- to fill the scale bows in the middle.
+                    if #rows >= 12 then
+                        local bands = { { 1, 200 }, { 200, 300 }, { 300, 1000 } }
+                        local parts = {}
+                        for _, b in ipairs(bands) do
+                            local s, n = 0, 0
+                            for _, i in ipairs(rows) do
+                                if d.ranks[i] >= b[1] and d.ranks[i] < b[2] then
+                                    s = s + (ApplyFit(d.feats[i], rb_fit) - d.ranks[i])
+                                    n = n + 1
+                                end
+                            end
+                            parts[#parts + 1] = n > 0
+                                and ('%d-%s: %+.0f (n=%d)'):format(b[1],
+                                    b[2] == 1000 and 'up' or tostring(b[2]), s / n, n)
+                                or ('%d-%s: -'):format(b[1],
+                                    b[2] == 1000 and 'up' or tostring(b[2]))
+                        end
+                        Msg(('       by rank band: %s\n'):format(table.concat(parts, ',  ')))
+                    end
+                end
             end
         end
     end
@@ -642,7 +707,7 @@ local function ReportControlledPatterns(inst, fit, rank_lo, rank_hi)
         return
     end
     Msg('\n  -- controlled patterns through the fitted model --\n')
-    Msg('    (synthetic charts, difficulty known by construction; is_lego = 0)\n')
+    Msg('    (synthetic charts, difficulty known by construction; origin flags = 0)\n')
 
     local function Rate(label, events, opts)
         local spans = { { s = events[1].s, e = events[#events].e } }
@@ -653,7 +718,11 @@ local function ReportControlledPatterns(inst, fit, rank_lo, rank_hi)
         -- vector rather than a zero, so ApplyFit walks off the end of it and dies in
         -- stats.lua with "arithmetic on a nil value". The CSV writer has the same guard.
         for j, k in ipairs(SCORE_FACTOR_KEYS) do fv[j] = sc[k] or 0 end
-        fv[#fv + 1] = 0                       -- is_lego: rate on the RB3 scale
+        -- One zero per auxiliary origin, matching what WithOrigin appends: rate on the
+        -- RB3 scale. Driven off AUX_ORIGINS rather than a literal, because appending a
+        -- fixed number here is the same hole the comment above describes - the vector
+        -- would come up short the moment a second origin was declared.
+        for _ = 1, #PROTOCOL.AUX_ORIGINS do fv[#fv + 1] = 0 end
         local rank = ApplyFit(fv, fit)
         local tier = TierForRank(inst, math.max(1, rank))
         -- A linear fit extrapolates without complaint, and a synthetic pattern can

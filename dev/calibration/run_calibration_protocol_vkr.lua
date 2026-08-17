@@ -174,11 +174,12 @@ local function AnalyseInstrument(csv, inst)
     local d = Collect(csv, inst)
 
     local rb_all = {}
-    local lego   = {}
     for i, o in ipairs(d.origins) do
-        if o == 'rb3_dlc' then rb_all[#rb_all + 1] = i
-        elseif o == 'lego' then lego[#lego + 1] = i end
+        if o == 'rb3_dlc' then rb_all[#rb_all + 1] = i end
     end
+    -- Every auxiliary origin, pooled: always training, never predicted, each carrying
+    -- its own indicator column and its own weight.
+    local aux = AuxIndices(d.origins)
     -- Disputed labels never train and never grade. Normally empty.
     local target, weird = {}, {}
     for _, i in ipairs(rb_all) do
@@ -188,14 +189,25 @@ local function AnalyseInstrument(csv, inst)
 
     Msg(('\n==================  %s  ==================\n'):format(inst:upper()))
     Msg(('  development rows : %d rb3_dlc\n'):format(#target))
-    if #lego > 0 then
-        Msg(('  always-training   : %d lego at weight %.2f\n'):format(#lego, PROTOCOL.LEGO_WEIGHT))
+    if #aux > 0 then
+        -- Per origin, not just a total: two origins at the same weight are not
+        -- interchangeable, and a run where one of them is empty for this instrument
+        -- should look different rather than merely smaller.
+        local parts = {}
+        for _, a in ipairs(PROTOCOL.AUX_ORIGINS) do
+            local n = 0
+            for _, i in ipairs(aux) do if d.origins[i] == a.origin then n = n + 1 end end
+            if n > 0 then
+                parts[#parts + 1] = ('%d %s at weight %.2f'):format(n, a.origin, a.weight)
+            end
+        end
+        Msg(('  always-training   : %s\n'):format(table.concat(parts, ', ')))
     else
-        -- Lego Rock Band predates the keyboard part, so PART KEYS has no Lego rows at
-        -- all. The is_lego column is then constant and contributes nothing (MultiFit
-        -- clamps a zero-variance column's sd), but the row count is smaller for it, and
-        -- that is what makes the gate harder to clear.
-        Msg('  always-training   : none - no lego rows exist for this instrument\n')
+        -- Lego Rock Band and the RB2 export both predate the keyboard part, so PART KEYS
+        -- has no auxiliary rows at all. Their indicator columns are then constant and
+        -- contribute nothing (MultiFit clamps a zero-variance column's sd), but the row
+        -- count is smaller for it, and that is what makes the gate harder to clear.
+        Msg('  always-training   : none - no auxiliary-origin rows for this instrument\n')
     end
     Msg(('  disputed held out : %d\n'):format(#weird))
     Msg(('  reserved test set : NOT DRAWN - this phase validates the approach, not a release\n'))
@@ -207,7 +219,7 @@ local function AnalyseInstrument(csv, inst)
     local pos = {}
     for j, k in ipairs(SCORE_FACTOR_KEYS) do pos[k] = j end
 
-    local results = RunProtocol(d, target, lego, inst, pos)
+    local results = RunProtocol(d, target, aux, inst, pos)
     ReportResults(results)
     ReportRidges(results)
 
@@ -256,7 +268,7 @@ local function AnalyseInstrument(csv, inst)
     -- lie on, and that song is #3 of 122 on peak gem/attack ratio. If the two lists
     -- disagree, THIS one is the answer. See the design doc, "the analysis view's
     -- worst-10 is not a bug report".
-    local resid = CandidateResiduals(d, target, lego, inst, pos, sel)
+    local resid = CandidateResiduals(d, target, aux, inst, pos, sel)
     if resid then
         Msg('\n  -- worst 10 by tier distance, SELECTED model, averaged over repeats --\n')
         for i = 1, math.min(10, #resid) do
@@ -271,7 +283,7 @@ local function AnalyseInstrument(csv, inst)
     -- gain may still be concentrated at (or absent from) the hard end that motivated
     -- the candidate.
     if leader ~= sel then
-        local leader_resid = CandidateResiduals(d, target, lego, inst, pos, leader)
+        local leader_resid = CandidateResiduals(d, target, aux, inst, pos, leader)
         if leader_resid then
             Msg('\n  -- worst 10 by tier distance, MEAN LEADER, averaged over repeats --\n')
             for i = 1, math.min(10, #leader_resid) do

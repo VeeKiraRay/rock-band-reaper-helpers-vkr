@@ -134,7 +134,7 @@ function DifficultyReportText(recs, opts)
             local m = rec.model or {}
             local n_factors = 0
             for _, k in ipairs(m.keys or {}) do
-                if k ~= 'is_lego' then n_factors = n_factors + 1 end
+                if not k:match('^is_') then n_factors = n_factors + 1 end
             end
             Emit(('%smodel    : %s / %s  (%d factors, %s)'):format(
                 INDENT, tostring(m.candidate), tostring(m.scale), n_factors,

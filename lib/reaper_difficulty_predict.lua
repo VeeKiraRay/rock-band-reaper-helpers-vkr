@@ -34,12 +34,14 @@ DIFFICULTY_SCALE_INV = {
 -- defaulted to zero, because a silent zero on a standardized column is not a neutral
 -- value - it is whatever (0 - mean)/sd happens to be, often several sd from the centre.
 --
--- `is_lego` is the exception and is supplied here, always 0: it is a training-time
--- origin flag, and every product prediction is made on the RB3 scale.
+-- The origin flags are the exception and are supplied here, always 0: they are
+-- training-time indicators (one per auxiliary corpus origin, named is_<origin>), and
+-- every product prediction is made on the RB3 scale. Matched by the `is_` prefix rather
+-- than by name, so adding an origin to the calibration harness needs no change here.
 function DifficultyModelInputs(model, factors)
     local out = {}
     for i, key in ipairs(model.keys) do
-        if key == 'is_lego' then
+        if key:match('^is_') then
             out[i] = 0
         else
             local v = factors[key]
@@ -88,12 +90,12 @@ end
 -- deviations. Drives the "notable properties" the suggestion explains itself with, so
 -- the explanation describes the CHART rather than reciting regression coefficients.
 --
--- Returns an array of { key, value, z, mean, sd }, in model factor order, skipping
--- is_lego (a training flag, not a chart property).
+-- Returns an array of { key, value, z, mean, sd }, in model factor order, skipping the
+-- is_<origin> flags (training indicators, not chart properties).
 function DifficultyFactorZ(model, factors)
     local out = {}
     for j, key in ipairs(model.keys) do
-        if key ~= 'is_lego' then
+        if not key:match('^is_') then
             local v = factors[key]
             if type(v) == 'number' then
                 local sd = model.sd[j]
@@ -115,7 +117,7 @@ end
 function DifficultyOutOfRange(model, factors)
     local out = {}
     for _, key in ipairs(model.keys) do
-        local b = key ~= 'is_lego' and model.bounds and model.bounds[key]
+        local b = not key:match('^is_') and model.bounds and model.bounds[key]
         local v = factors[key]
         if b and type(v) == 'number' then
             if v < b.min then

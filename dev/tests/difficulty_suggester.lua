@@ -167,18 +167,28 @@ end)
 
 Test.it('a floor-clamped Warmup chart reads as the bottom of the scale, not the top', function()
     -- THE REGRESSION THIS GUARDS. Tier 0's band used to run from rank 1, but no model can
-    -- produce a rank below its own rank_lo - so a chart clamped to the floor computed
-    -- 0.85-0.97 of the way up Warmup and drew one tick short of Apprentice, when what had
-    -- actually happened was that it fell off the other end of the scale. On drums the band
-    -- is 1..124 against a floor of 120: 97%.
+    -- produce a rank below its own rank_lo - so a chart clamped to the floor drew most of
+    -- the way up Warmup, one tick short of Apprentice, when what had actually happened was
+    -- that it fell off the other END of the scale. When this was found, drums measured
+    -- 1..124 against a floor of 120, i.e. 97%.
+    --
+    -- Asserted as the exact arithmetic rather than "> 0.8": how badly the old band
+    -- misreports depends on where each model's floor happens to sit, and the low-end
+    -- corpus moved every floor down (guitar 125 -> 75, so 0.97 -> 0.54). A magnitude
+    -- threshold measures the corpus, not the fix.
     for _, inst in ipairs(RB_DIFFICULTY_MODEL_ORDER) do
         local m  = RB_DIFFICULTY_MODELS[inst]
         local t1 = RANK_TIER_THRESHOLDS[inst][1]
         if m.rank_lo < t1 then   -- only instruments whose floor really lands in Warmup
             local before = TierPosition(inst, m.rank_lo, m.rank_hi) or -1
             local after  = TierPosition(inst, m.rank_lo, m.rank_hi, m.rank_lo) or -1
-            Test.expect(before > 0.8,
-                ('%s: expected the old band to misreport, got %.2f'):format(inst, before))
+            local unfixed = (m.rank_lo - 1) / (t1 - 1)
+            Test.expect(math.abs(before - unfixed) < 1e-9,
+                ('%s: the old band should read (rank_lo-1)/(t1-1) = %.4f, got %.4f')
+                    :format(inst, unfixed, before))
+            Test.expect(unfixed > 0.25,
+                ('%s: floor sits only %.2f into Warmup - this test no longer demonstrates '
+                 .. 'anything and should be revisited'):format(inst, unfixed))
             Test.expect(after < 1e-9,
                 ('%s: a chart at the floor should read 0, got %.4f'):format(inst, after))
         end
@@ -287,7 +297,7 @@ Test.it('flags factors outside the fitted range without moving the rank', functi
              == DifficultyPredictRank(m, { density_peak = 20 }), 'prediction should be stable')
 end)
 
-Test.it('reports factor z-scores for the explanation layer, skipping is_lego', function()
+Test.it('reports factor z-scores for the explanation layer, skipping origin flags', function()
     local zs = DifficultyFactorZ(ToyModel(), { density_peak = 14 })
     Test.expect(#zs == 1, 'is_lego should not be offered as a chart property')
     Test.expect(zs[1].key == 'density_peak', 'wrong factor reported')
@@ -302,9 +312,10 @@ Test.section('frozen model artifact')
 
 Test.it('loads, declares a schema this build understands, and covers six instruments', function()
     Test.expect(type(RB_DIFFICULTY_MODELS) == 'table', 'no RB_DIFFICULTY_MODELS table')
-    -- 2 added `corr`. Bumping this deliberately is the point of the field: a stale
-    -- artifact should fail loudly here rather than be read as a plausible but wrong model.
-    Test.expect(RB_DIFFICULTY_MODELS_SCHEMA == 2,
+    -- 2 added `corr`; 3 allows more than one trailing origin flag. Bumping this
+    -- deliberately is the point of the field: a stale artifact should fail loudly here
+    -- rather than be read as a plausible but wrong model.
+    Test.expect(RB_DIFFICULTY_MODELS_SCHEMA == 3,
         'unexpected artifact schema ' .. tostring(RB_DIFFICULTY_MODELS_SCHEMA))
     Test.expect(#RB_DIFFICULTY_MODEL_ORDER == 6,
         'expected 6 models, got ' .. #RB_DIFFICULTY_MODEL_ORDER)
@@ -320,7 +331,19 @@ Test.it('every model is internally consistent', function()
         local n = #m.keys
         Test.expect(#m.mean == n and #m.sd == n and #m.coefs == n,
             inst .. ': keys/mean/sd/coefs lengths disagree')
-        Test.expect(m.keys[n] == 'is_lego', inst .. ': is_lego must be the last factor')
+        -- The origin flags occupy the trailing slots, in AUX_ORIGINS order, and nothing
+        -- else may use the is_ prefix - the predictor supplies 0 for anything that does.
+        local flags = AuxFlagKeys()
+        for fi, flag in ipairs(flags) do
+            local at = n - #flags + fi
+            Test.expect(m.keys[at] == flag,
+                ('%s: expected %s at trailing slot %d, got %s')
+                    :format(inst, flag, fi, tostring(m.keys[at])))
+        end
+        for j = 1, n - #flags do
+            Test.expect(not m.keys[j]:match('^is_'),
+                inst .. ': ' .. m.keys[j] .. ' uses the reserved is_ prefix')
+        end
         Test.expect(DIFFICULTY_SCALE_INV[m.scale] ~= nil, inst .. ': unknown scale ' .. m.scale)
         Test.expect(m.rank_lo > 0 and m.rank_hi > m.rank_lo, inst .. ': bad rank clamp')
         for j = 1, n do
@@ -339,8 +362,13 @@ Test.it('the selected candidate and scale are the ones the protocol chose', func
     -- test is the thing that says the shipped model changed, out loud.
     local EXPECTED = {
         guitar    = { 'full@attacks',                     'log(rank)', 21 },
-        bass      = { 'baseline+ent_rel@attacks',         'log(rank)', 3  },
-        drum      = { 'full_drum',                        'rank',      26 },
+        -- LOW-END CORPUS. Was 'baseline+ent_rel@attacks'; same three factors with the
+        -- plain entropy rate instead of the relative one.
+        bass      = { 'baseline+entropy',                 'log(rank)', 3  },
+        -- TOP-END CORPUS. Was 'full_drum' / rank / 26. Drums re-selects on almost every
+        -- rescore because the leader's margin sits just under the predeclared bar, so
+        -- treat a failure here as "re-read the protocol report", not as a bug.
+        drum      = { 'primary+limbs+ent+offbeat',        'log(rank)', 9  },
         -- ROUND 16. Was 'primary+entropy_rel+complex_peak' / rank / 8. That model counted
         -- density in gems and needed chord_size_mean to divide chords back out, which
         -- charged ~28 rank per extra note of voicing - the same music as triads landed two
@@ -356,9 +384,10 @@ Test.it('the selected candidate and scale are the ones the protocol chose', func
             ('%s: candidate is %q, expected %q'):format(inst, m.candidate, want[1]))
         Test.expect(m.scale == want[2],
             ('%s: scale is %q, expected %q'):format(inst, m.scale, want[2]))
-        -- +1 for the appended is_lego column.
-        Test.expect(#m.keys == want[3] + 1,
-            ('%s: %d factors, expected %d'):format(inst, #m.keys - 1, want[3]))
+        -- Plus the appended origin flag columns, one per auxiliary origin.
+        local n_flags = #AuxFlagKeys()
+        Test.expect(#m.keys == want[3] + n_flags,
+            ('%s: %d factors, expected %d'):format(inst, #m.keys - n_flags, want[3]))
     end
 end)
 
@@ -423,15 +452,19 @@ local function Rebuild(inst)
                 local v = tonumber(F(k))
                 if v == nil then ok = false else vals[k] = v end
             end
-            local is_dev  = origin == 'rb3_dlc' and not IsWeirdlyScored(name, inst)
-            local is_lego = origin == 'lego'
-            if ok and (is_dev or is_lego) then
+            local is_dev = origin == 'rb3_dlc' and not IsWeirdlyScored(name, inst)
+            local aux_w  = AuxWeight(origin)
+            if ok and (is_dev or aux_w) then
+                local flags = AuxFlagKeys()
                 local fv = {}
-                for j = 1, #m.keys - 1 do fv[j] = vals[m.keys[j]] end
-                fv[#m.keys] = is_lego and 1 or 0
+                for j = 1, #m.keys - #flags do fv[j] = vals[m.keys[j]] end
+                for fi, _ in ipairs(flags) do
+                    fv[#m.keys - #flags + fi] =
+                        (origin == PROTOCOL.AUX_ORIGINS[fi].origin) and 1 or 0
+                end
                 X[#X + 1]  = fv
                 ys[#ys + 1] = scale_fwd(rank)
-                ws[#ws + 1] = is_lego and PROTOCOL.LEGO_WEIGHT or 1.0
+                ws[#ws + 1] = aux_w or 1.0
                 if is_dev then
                     n_target = n_target + 1
                     if rank < rank_lo then rank_lo = rank end
@@ -450,9 +483,11 @@ Test.it('training row counts match the protocol report', function()
     RequireCsv()
     -- From calibration_protocol_report.txt. A drifting count means the partition rule
     -- changed - a different disputed list, or a mis-read origin column.
+    -- 379-song corpus. The second number is every AUXILIARY row pooled (45 lego + 15
+    -- rb2), not lego alone; keys and Pro Keys have none, both games predating the part.
     local EXPECTED = {
-        guitar = { 158, 45 }, bass = { 159, 45 }, drum = { 159, 45 },
-        vocals = { 157, 45 }, keys = { 122, 0 },  real_keys = { 122, 0 },
+        guitar = { 312, 60 }, bass = { 315, 60 }, drum = { 313, 60 },
+        vocals = { 313, 60 }, keys = { 251, 0 },  real_keys = { 251, 0 },
     }
     for inst, want in pairs(EXPECTED) do
         local m, _, _, _, _, n_target, n_lego = Rebuild(inst)
@@ -504,9 +539,12 @@ Test.it('the predictor reproduces the fit on every development row', function()
         local fit = MultiFit(X, ys, m.ridge, ws)
         local inv = DIFFICULTY_SCALE_INV[m.scale]
         for _, row in ipairs(rows) do
+            -- One zero per origin flag, not a single one: the flags occupy the trailing
+            -- slots, and a short vector makes ApplyFit read past the end of it.
+            local n_flags = #AuxFlagKeys()
             local fv = {}
-            for j = 1, #m.keys - 1 do fv[j] = row.factors[m.keys[j]] end
-            fv[#m.keys] = 0
+            for j = 1, #m.keys - n_flags do fv[j] = row.factors[m.keys[j]] end
+            for k = #m.keys - n_flags + 1, #m.keys do fv[k] = 0 end
             local want = inv(ApplyFit(fv, fit))
             if want < m.rank_lo then want = m.rank_lo end
             if want > m.rank_hi then want = m.rank_hi end
@@ -548,7 +586,7 @@ local function FakeRec(inst, over)
     -- Start every factor at its training mean, i.e. a perfectly ordinary chart.
     local factors = {}
     for j, k in ipairs(m.keys) do
-        if k ~= 'is_lego' then factors[k] = m.mean[j] end
+        if not k:match('^is_') then factors[k] = m.mean[j] end
     end
     local rec = {
         instrument = inst, label = inst, ok = true, status = m.status,
@@ -582,7 +620,7 @@ Test.it('every factor of every shipped model has explanation wording', function(
     local missing = {}
     for _, inst in ipairs(RB_DIFFICULTY_MODEL_ORDER) do
         for _, k in ipairs(RB_DIFFICULTY_MODELS[inst].keys) do
-            if k ~= 'is_lego' then
+            if not k:match('^is_') then
                 local info = DIFFICULTY_FACTOR_INFO[k]
                 if not (info and info.label and info.high and info.low) then
                     missing[#missing + 1] = inst .. '.' .. k
@@ -607,9 +645,9 @@ end)
 Test.it('reports at most three properties, most unusual first', function()
     local rec = FakeRec('drum', { factors = {
         kick_density_peak = AtZ('drum', 'kick_density_peak', 3.0),
-        density_peak      = AtZ('drum', 'density_peak', 2.0),
-        offbeat_frac      = AtZ('drum', 'offbeat_frac', 1.5),
-        tom_frac          = AtZ('drum', 'tom_frac', 1.2),
+        hand_density_peak = AtZ('drum', 'hand_density_peak', 2.0),
+        stick_size_mean   = AtZ('drum', 'stick_size_mean', 1.5),
+        entropy_h2        = AtZ('drum', 'entropy_h2', 1.2),
     } })
     DifficultyAnnotate(rec)
     Test.expect(#rec.explanations == 3, 'expected 3 explanations, got ' .. #rec.explanations)
@@ -617,8 +655,8 @@ Test.it('reports at most three properties, most unusual first', function()
         'the most unusual factor should come first, got: ' .. rec.explanations[1].text)
     -- The full table is still available behind the expander - but NOT in this order: see
     -- the canonical-order test below.
-    Test.expect(#rec.factor_rows == #RB_DIFFICULTY_MODELS.drum.keys - 1,
-        'factor rows should cover every model factor except is_lego')
+    Test.expect(#rec.factor_rows == #RB_DIFFICULTY_MODELS.drum.keys - #AuxFlagKeys(),
+        'factor rows should cover every model factor except the origin flags')
 end)
 
 Test.it('the details table is in a fixed order, not a per-song one', function()
@@ -677,14 +715,16 @@ end)
 Test.section('explanation deduplication')
 
 Test.it('does not spend two slots on one observation', function()
-    -- entropy_h2 and entropy_h2_rel correlate +0.96 on drums: whichever is more unusual,
-    -- the other adds nothing. Before this, both took a slot on 20% of corpus rows while a
-    -- genuinely different property waited behind them.
+    -- total_changes and playing_s correlate +0.81 on drums: whichever is more unusual,
+    -- the other adds nothing. Before this, both took a slot while a genuinely different
+    -- property waited behind them. (The pair used to be entropy_h2/entropy_h2_rel, which
+    -- the current drum model no longer carries - the point is the mechanism, not the
+    -- particular pair.)
     local rec = FakeRec('drum', { factors = {
-        entropy_h2     = AtZ('drum', 'entropy_h2', 3.0),
-        entropy_h2_rel = AtZ('drum', 'entropy_h2_rel', 2.8),
+        total_changes  = AtZ('drum', 'total_changes', 3.0),
+        playing_s      = AtZ('drum', 'playing_s', 2.8),
         kick_density_peak = AtZ('drum', 'kick_density_peak', 2.0),
-        tom_frac          = AtZ('drum', 'tom_frac', 1.5),
+        hand_density_peak = AtZ('drum', 'hand_density_peak', 1.5),
     } })
     DifficultyAnnotate(rec)
 
@@ -693,17 +733,18 @@ Test.it('does not spend two slots on one observation', function()
     Test.expect(#rec.explanations == 3,
         'the freed slot should be reused, got ' .. #rec.explanations .. ' bullets')
 
-    local n_entropy = 0
+    local n_pair = 0
     for _, k in ipairs(keys) do
-        if k == 'entropy_h2' or k == 'entropy_h2_rel' then n_entropy = n_entropy + 1 end
+        if k == 'total_changes' or k == 'playing_s' then n_pair = n_pair + 1 end
     end
-    Test.expect(n_entropy == 1,
-        'expected one of the entropy pair, got ' .. n_entropy .. ': ' .. table.concat(keys, ', '))
-    Test.expect(keys[1] == 'entropy_h2', 'the more unusual of the pair should be the one kept')
+    Test.expect(n_pair == 1,
+        'expected one of the correlated pair, got ' .. n_pair .. ': ' .. table.concat(keys, ', '))
+    Test.expect(keys[1] == 'total_changes',
+        'the more unusual of the pair should be the one kept')
 
     -- And the slot the suppressed one would have taken goes to the next distinct factor,
     -- rather than being dropped.
-    Test.expect(keys[2] == 'kick_density_peak' and keys[3] == 'tom_frac',
+    Test.expect(keys[2] == 'kick_density_peak' and keys[3] == 'hand_density_peak',
         'the freed slot should go to the next distinct factor, got ' .. table.concat(keys, ', '))
 end)
 
@@ -711,11 +752,11 @@ Test.it('keeps every factor in the details table, deduplicated or not', function
     -- The bullets are a summary and may drop a restatement; the table is a complete list
     -- by definition, and a reader comparing two charts needs every row present.
     local rec = FakeRec('drum', { factors = {
-        entropy_h2     = AtZ('drum', 'entropy_h2', 3.0),
-        entropy_h2_rel = AtZ('drum', 'entropy_h2_rel', 2.8),
+        total_changes = AtZ('drum', 'total_changes', 3.0),
+        playing_s     = AtZ('drum', 'playing_s', 2.8),
     } })
     DifficultyAnnotate(rec)
-    Test.expect(#rec.factor_rows == #RB_DIFFICULTY_MODELS.drum.keys - 1,
+    Test.expect(#rec.factor_rows == #RB_DIFFICULTY_MODELS.drum.keys - #AuxFlagKeys(),
         'the details table must still cover every model factor')
 end)
 
@@ -728,14 +769,14 @@ Test.it('falls back to the old behaviour when the artifact has no correlations',
     stripped.corr = nil
 
     local rec = FakeRec('drum', { model = stripped, factors = {
-        entropy_h2     = AtZ('drum', 'entropy_h2', 3.0),
-        entropy_h2_rel = AtZ('drum', 'entropy_h2_rel', 2.8),
+        total_changes  = AtZ('drum', 'total_changes', 3.0),
+        playing_s      = AtZ('drum', 'playing_s', 2.8),
         kick_density_peak = AtZ('drum', 'kick_density_peak', 2.0),
     } })
     DifficultyAnnotate(rec)
     Test.expect(#rec.explanations == 3, 'expected three bullets without corr')
-    Test.expect(rec.explanations[1].key == 'entropy_h2'
-            and rec.explanations[2].key == 'entropy_h2_rel',
+    Test.expect(rec.explanations[1].key == 'total_changes'
+            and rec.explanations[2].key == 'playing_s',
         'with no corr the pair should both appear, as before')
 end)
 
@@ -750,8 +791,8 @@ Test.it('every shipped correlation is well formed', function()
             Test.expect(a and b, inst .. ': malformed pair key ' .. pair)
             Test.expect(named[a] and named[b],
                 ('%s: %s names a factor this model does not use'):format(inst, pair))
-            Test.expect(a ~= 'is_lego' and b ~= 'is_lego',
-                inst .. ': is_lego is an origin flag and can never be a bullet')
+            Test.expect(not a:match('^is_') and not b:match('^is_'),
+                inst .. ': an origin flag can never be a bullet')
             Test.expect(type(v) == 'number' and v >= -1 and v <= 1,
                 ('%s: %s = %s is not a correlation'):format(inst, pair, tostring(v)))
         end
@@ -824,7 +865,7 @@ Test.it('lists every factor of every model exactly once', function()
         DifficultyAnnotate(rec)
         local text = DifficultyReportText({ rec })
         for _, k in ipairs(RB_DIFFICULTY_MODELS[inst].keys) do
-            if k ~= 'is_lego' then
+            if not k:match('^is_') then
                 local label = DIFFICULTY_FACTOR_INFO[k].label
                 local n = select(2, text:gsub(label:gsub('%p', '%%%0'), ''))
                 Test.expect(n >= 1, ('%s: %s (%s) is missing from the report')
@@ -1119,7 +1160,7 @@ Test.it('a tooltip, where one exists, is a real explanation', function()
     for _, inst in ipairs(RB_DIFFICULTY_MODEL_ORDER) do
         for _, k in ipairs(RB_DIFFICULTY_MODELS[inst].keys) do
             local info = DIFFICULTY_FACTOR_INFO[k]
-            if k ~= 'is_lego' and not (info and info.high and info.low) then
+            if not k:match('^is_') and not (info and info.high and info.low) then
                 missing[#missing + 1] = inst .. '.' .. k
             end
         end

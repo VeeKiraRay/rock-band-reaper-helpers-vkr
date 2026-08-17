@@ -140,8 +140,13 @@ local function CollectDtaPaths(root, out, depth)
     depth = depth or 0
     if depth > 4 then return out end
 
-    local candidate = root .. 'Root/songs/songs.dta'
-    if FileExists(candidate) then out[#out + 1] = candidate end
+    -- Two layouts. The original corpus nests a pack under Root/songs/; the low-end set
+    -- added later is flat, with songs.dta and every MIDI in one folder. Probing both is
+    -- additive - a folder can only match one of them - so the original walk is unchanged.
+    for _, rel in ipairs({ 'Root/songs/songs.dta', 'songs.dta' }) do
+        local candidate = root .. rel
+        if FileExists(candidate) then out[#out + 1] = candidate end
+    end
 
     local i = 0
     while true do
@@ -160,11 +165,17 @@ end
 function WalkCorpus(root)
     local songs = {}
     for _, dta in ipairs(CollectDtaPaths(root)) do
-        local pack = dta:gsub('Root/songs/songs%.dta$', '')
+        -- Strip whichever layout's dta path this is, leaving the pack root.
+        local pack = dta:gsub('Root/songs/songs%.dta$', ''):gsub('songs%.dta$', '')
         local text = ReadFile(dta)
         if text then
             for _, e in ipairs(ParseSongsDta(text)) do
+                -- Nested first, then flat. A pack matches one or the other; trying both
+                -- costs a stat call and keeps the caller free of layout knowledge.
                 local mid = pack .. SongMidiRelPath(e.shortname)
+                if not FileExists(mid) then
+                    mid = pack .. SongMidiRelPathFlat(e.shortname)
+                end
                 songs[#songs + 1] = {
                     shortname   = e.shortname,
                     origin      = e.origin,

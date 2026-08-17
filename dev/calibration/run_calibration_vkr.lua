@@ -2,7 +2,8 @@
 -- @author VeeKiraRay
 -- @about
 --   Calibration pilot for the difficulty suggester. Walks the reference corpus in
---   _external_docs/reference_songs/, imports each song's MIDI, scores Expert
+--   _external_docs/ (see _corpora below - reference_songs/ plus the low-end set
+--   new_reference_songs/), imports each song's MIDI, scores Expert
 --   guitar and bass with the four planned difficulty factors, and appends a row
 --   per (song, instrument) to dev/calibration/corpus_scores.csv.
 --
@@ -31,7 +32,27 @@ local function _strip(d)
     return (d:match('^(.+)[/\\]+$') or d):match('^(.+[/\\])') or d
 end
 local _root   = _strip(_strip(_dir))                    -- repo root
-local _corpus   = _root .. '_external_docs/reference_songs/'
+-- Every corpus root, walked in order and pooled into one song list.
+--
+-- More than one because the low-end set added in 2026-08 sits beside the original corpus
+-- rather than inside it, and is laid out differently (flat packs; see SongMidiRelPathFlat).
+-- WalkCorpus handles both layouts, so a root only has to be named here.
+--
+-- ADDING A ROOT IS SAFE TO RE-RUN. The resume check is by (shortname, instrument) against
+-- the CSV, so songs already scored are skipped wherever they are found - including the 44
+-- that appear in both roots. A song is never scored twice and never duplicated.
+local _corpora = {
+    _root .. '_external_docs/reference_songs/',
+    _root .. '_external_docs/new_reference_songs/',
+    -- The top-end set, searched per instrument for tier 5+ charts. It fills the band the
+    -- low-end set could not reach: vocals was under-rating all 23 of its hardest charts
+    -- by ~97 rank, and no amount of easy songs addresses that.
+    --
+    -- Its packs are mostly RBN (game_origin ugc_plus), whose dta files the parser does
+    -- not read - deliberately, for now: every RBN rank is exactly a tier floor, so those
+    -- rows are tier labels rather than ranks and cannot be regression targets.
+    _root .. '_external_docs/hard_reference_songs/',
+}
 local _csv      = _dir .. 'corpus_scores.csv'
 local _manifest = _dir .. 'corpus_scores.manifest.txt'
 
@@ -240,13 +261,40 @@ end
 r.ClearConsole()
 r.ShowConsoleMsg('======  Difficulty calibration - corpus scoring  ======\n\n')
 
-local songs = WalkCorpus(_corpus)
+-- Pooled across roots, de-duplicated by shortname. The low-end set shares 44 songs with
+-- the original corpus, and a song listed twice would be imported and scored twice - the
+-- CSV resume check works on (shortname, instrument), so the second copy would be skipped,
+-- but only after paying for the import. First root named wins.
+--
+-- EXCEPT that an entry carrying a MIDI beats one without. A pack's songs.dta lists every
+-- song in the pack while only some of the MIDIs were ever extracted, so the same song is
+-- reported with its midi_path from the folder that holds the file and without it from a
+-- folder that only names it. Taking whichever came first drops the song entirely and
+-- reports it as MISSING MIDI, even though the file is right there under another folder.
+-- That cost 25 songs on the first two-root run, among them the ones holding the lowest
+-- drum, keys and Pro Keys ranks in the whole corpus.
+local by_name = {}
+for _, root in ipairs(_corpora) do
+    for _, song in ipairs(WalkCorpus(root)) do
+        local cur = by_name[song.shortname]
+        if not cur or (not cur.midi_path and song.midi_path) then
+            by_name[song.shortname] = song
+        end
+    end
+end
+
+local songs = {}
+for _, song in pairs(by_name) do songs[#songs + 1] = song end
+table.sort(songs, function(a, b) return a.shortname < b.shortname end)
+
 if #songs == 0 then
     -- A clean skip, not an error: the reference corpus is deliberately not
     -- versioned (the songs are not ours to redistribute), so on any checkout but
     -- the one that gathered it there is simply nothing to score. Anything built on
     -- top of this must tolerate that rather than fail.
-    r.ShowConsoleMsg(('No reference songs found under:\n  %s\n\n'):format(_corpus))
+    r.ShowConsoleMsg('No reference songs found under any corpus root:\n')
+    for _, root in ipairs(_corpora) do r.ShowConsoleMsg(('  %s\n'):format(root)) end
+    r.ShowConsoleMsg('\n')
     r.ShowConsoleMsg('Nothing to do - skipping rather than failing.\n\n')
     r.ShowConsoleMsg('If you expected songs there, the usual cause is running a deployed\n')
     r.ShowConsoleMsg('copy of this script instead of the repo one. The corpus path is derived\n')
@@ -418,6 +466,12 @@ local function WriteManifest()
     f:write(('date            : %s\n'):format(os.date('%Y-%m-%d %H:%M')))
     f:write(('scorer          : %s\n'):format(SCORER_BEHAVIOUR))
     f:write(('corpus songs    : %d  (%s)\n'):format(#songs, table.concat(origins, ', ')))
+    -- Which roots were pooled. Origin counts alone cannot show this: the low-end set is
+    -- rb3_dlc too, so a manifest without the roots gives no way to tell a corpus that
+    -- includes it from one that does not.
+    for i, root in ipairs(_corpora) do
+        f:write(('corpus root %d   : %s\n'):format(i, root))
+    end
     f:write(('rows this run   : %d\n'):format(n_scored))
     f:write(('rows skipped    : %d  (already present)\n'):format(n_skipped))
     f:write(('missing MIDI    : %d\n'):format(n_missing))

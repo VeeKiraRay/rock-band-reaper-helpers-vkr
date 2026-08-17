@@ -118,3 +118,15 @@ end
 function SongMidiRelPath(shortname)
     return ('Root/songs/%s/%s.mid'):format(shortname, shortname)
 end
+
+-- The same, for a FLAT pack: songs.dta and every MIDI sitting together in one folder,
+-- with no Root/songs/ tree. That is how the low-end reference set added in 2026-08 is
+-- laid out, and a folder there can hold several songs' MIDIs beside a single dta that
+-- describes the whole pack.
+--
+-- Built from the shortname for the same reason as above - a glob cannot tell a duplicate
+-- from a second song, and here a multi-song folder makes that ambiguity routine rather
+-- than exceptional.
+function SongMidiRelPathFlat(shortname)
+    return ('%s.mid'):format(shortname)
+end

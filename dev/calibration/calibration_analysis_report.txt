@@ -1,38 +1,38 @@
 
-Rows: 1061
+Rows: 2011
 
-==============  GUITAR  (n=203 fitted)  ==============
-  rows: 158 rb3_dlc (the target), 45 lego (weight 0.30), 1 excluded from all fits
+==============  GUITAR  (n=372 fitted)  ==============
+  rows: 312 rb3_dlc (the target), 45 lego (weight 0.30), 15 rb2 (weight 0.30), 4 excluded from all fits
   disputed labels held out: 0 of 0 on the list (cap ~2% of the corpus)
-  playing spans: 204 from animation events, 0 from the fallback
-  packs: 75 distinct across the rb3_dlc rows; largest holds 12 (8%)
+  playing spans: 375 from animation events, 1 from the fallback
+  packs: 164 distinct across the rb3_dlc rows; largest holds 14 (4%)
 
   -- individual factors vs rank, rb3_dlc only (Spearman) --
-    playing_s      rho = +0.444
-    density_avg    rho = +0.465
-    density_peak   rho = +0.513
-    change_rate    rho = +0.722
-    attack_density_avg rho = +0.606
-    attack_density_peak rho = +0.746
-    tight_p10      rho = -0.586
-    tight_med      rho = -0.404
-    chord_size_mean rho = -0.194
-    chord_span_mean rho = -0.042
-    chord_change_frac rho = -0.153
-    sounding_size_mean rho = -0.194
-    overlap_frac   rho = n/a
-    held_change_frac rho = n/a
-    move_mean      rho = +0.101
-    move_p90       rho = +0.173
-    anchor_frac    rho = -0.197
-    solo_frac_marked rho = +0.517
-    solo_change_ratio rho = +0.563
-    sustain_frac   rho = -0.117
-    solo_frac      rho = +0.487
-    force_hopo_rate rho = +0.437
-    force_strum_rate rho = +0.129
-    tremolo_frac   rho = +0.225
-    trill_frac     rho = +0.418
+    playing_s      rho = +0.439
+    density_avg    rho = +0.394
+    density_peak   rho = +0.439
+    change_rate    rho = +0.728
+    attack_density_avg rho = +0.546
+    attack_density_peak rho = +0.698
+    tight_p10      rho = -0.486
+    tight_med      rho = -0.412
+    chord_size_mean rho = -0.216
+    chord_span_mean rho = -0.034
+    chord_change_frac rho = -0.177
+    sounding_size_mean rho = -0.216
+    overlap_frac   rho = +0.005
+    held_change_frac rho = -0.006
+    move_mean      rho = +0.186
+    move_p90       rho = +0.168
+    anchor_frac    rho = -0.247
+    solo_frac_marked rho = +0.488
+    solo_change_ratio rho = +0.470
+    sustain_frac   rho = -0.105
+    solo_frac      rho = +0.436
+    force_hopo_rate rho = +0.387
+    force_strum_rate rho = +0.142
+    tremolo_frac   rho = +0.198
+    trill_frac     rho = +0.337
     gliss_frac     rho = n/a
     shift_rate     rho = n/a
     shift_span_mean rho = n/a
@@ -46,18 +46,18 @@ Rows: 1061
     stick_size_mean rho = n/a
     tom_frac       rho = n/a
     roll_frac      rho = n/a
-    offbeat_frac   rho = +0.418
+    offbeat_frac   rho = +0.404
     pro_total_changes rho = n/a
     pro_change_rate rho = n/a
     pro_tight_p10  rho = n/a
     pro_tight_med  rho = n/a
     pro_entropy_h2 rho = n/a
     pro_stations_peak rho = n/a
-    repetition     rho = +0.081
-    entropy_h2     rho = +0.448
-    entropy_h2_rel rho = +0.424
-    complex_peak   rho = +0.703
-    notes_total    rho = +0.633
+    repetition     rho = +0.051
+    entropy_h2     rho = +0.478
+    entropy_h2_rel rho = +0.460
+    complex_peak   rho = +0.683
+    notes_total    rho = +0.614
     total_changes  rho = +0.775
     syllables_total rho = n/a
     tubes_total    rho = n/a
@@ -107,52 +107,52 @@ Rows: 1061
     strongest single factor: total_changes (rho +0.775)
 
   -- 5-fold cross-validated fit, evaluated on rb3_dlc --
-    with lego (weighted)   usable  91.8%   rho +0.875   MAE  34.2   (n=158)
-    rb3_dlc alone          usable  91.8%   rho +0.866   MAE  35.0   (n=158)
+    with lego (weighted)   usable  92.3%   rho +0.862   MAE  32.0   (n=312)
+    rb3_dlc alone          usable  92.9%   rho +0.862   MAE  32.1   (n=312)
 
     grade distribution (rhythm-game style):
-      PERFECT  exact tier      77    48.7%
-      GOOD     1 tier off      68    43.0%
-      BAD      2 tiers off     13     8.2%
+      PERFECT  exact tier     149    47.8%
+      GOOD     1 tier off     139    44.6%
+      BAD      2 tiers off     24     7.7%
       MISS     3+ tiers off     0     0.0%
-      ->       usable         145    91.8%
+      ->       usable         288    92.3%
 
     VERDICT: GOOD - 92% land within one tier; usable as an advisory suggestion
 
   -- leaner factor sets, same cross-validation --
-    lean 2 (speed+volume)  usable  85.4%   rho +0.772   MAE  45.5   (n=158)
-    lean 4 (+tight, chord) usable  86.7%   rho +0.799   MAE  42.4   (n=158)
-    lean 6 (+endurance)    usable  88.0%   rho +0.800   MAE  41.7   (n=158)
-    no interactions        usable  86.1%   rho +0.815   MAE  41.8   (n=158)
-    movement + speed       usable  87.3%   rho +0.789   MAE  42.6   (n=158)
-    solo concentration     usable  90.5%   rho +0.842   MAE  37.6   (n=158)
+    lean 2 (speed+volume)  usable  86.5%   rho +0.793   MAE  41.3   (n=312)
+    lean 4 (+tight, chord) usable  88.1%   rho +0.805   MAE  40.2   (n=312)
+    lean 6 (+endurance)    usable  88.1%   rho +0.816   MAE  38.1   (n=312)
+    no interactions        usable  91.0%   rho +0.820   MAE  39.2   (n=312)
+    movement + speed       usable  88.8%   rho +0.799   MAE  40.0   (n=312)
+    solo concentration     usable  91.3%   rho +0.836   MAE  37.2   (n=312)
 
   -- coefficients (standardized; full fit, interpretation only) --
-    playing_s        +16.46
-    density_avg      +36.39
-    density_peak      -3.98
-    change_rate      +39.45
-    attack_density_avg   -25.50
-    attack_density_peak   +23.21
-    tight_p10         -5.67
-    tight_med         -0.19
-    chord_size_mean    -9.08
-    chord_span_mean    +0.25
-    chord_change_frac   +12.30
-    sounding_size_mean    -9.08
-    overlap_frac      -2.42
-    held_change_frac    +0.00
-    move_mean        -32.52
-    move_p90          +7.96
-    anchor_frac      -21.38
-    solo_frac_marked    +5.06
-    solo_change_ratio   +15.60
-    sustain_frac     +11.34
-    solo_frac         -4.21
-    force_hopo_rate    -4.44
-    force_strum_rate    -4.46
-    tremolo_frac      -0.79
-    trill_frac        -2.07
+    playing_s         +7.23
+    density_avg       +3.15
+    density_peak      -7.44
+    change_rate      +31.69
+    attack_density_avg    +2.22
+    attack_density_peak   +18.82
+    tight_p10         -1.27
+    tight_med         +2.96
+    chord_size_mean    -1.37
+    chord_span_mean    +0.68
+    chord_change_frac    +8.38
+    sounding_size_mean    -1.60
+    overlap_frac      +0.75
+    held_change_frac    -2.75
+    move_mean        -26.74
+    move_p90          +3.90
+    anchor_frac      -20.73
+    solo_frac_marked    +1.48
+    solo_change_ratio   +13.86
+    sustain_frac      +9.80
+    solo_frac         -0.57
+    force_hopo_rate    +0.41
+    force_strum_rate    -3.08
+    tremolo_frac      -0.21
+    trill_frac        -0.20
     gliss_frac        +0.00
     shift_rate        +0.00
     shift_span_mean    +0.00
@@ -166,19 +166,19 @@ Rows: 1061
     stick_size_mean    +0.00
     tom_frac          +0.00
     roll_frac         +0.00
-    offbeat_frac      +4.78
+    offbeat_frac      +5.78
     pro_total_changes    +0.00
     pro_change_rate    +0.00
     pro_tight_p10     +0.00
     pro_tight_med     +0.00
     pro_entropy_h2    +0.00
     pro_stations_peak    +0.00
-    repetition       -14.93
-    entropy_h2       -10.76
-    entropy_h2_rel    -2.07
-    complex_peak      +9.60
-    notes_total       -2.75
-    total_changes    +20.96
+    repetition        -7.92
+    entropy_h2        +3.79
+    entropy_h2_rel   -10.05
+    complex_peak     +16.79
+    notes_total       +3.94
+    total_changes    +21.52
     syllables_total    +0.00
     tubes_total       +0.00
     syl_density_avg    +0.00
@@ -224,72 +224,79 @@ Rows: 1061
     plus_frac         +0.00
     short_frac        +0.00
     short_moving_frac    +0.00
-    is_lego          -10.50  <- scale shift, not a difficulty factor
-    (intercept)     +268.36
+    is_lego           -6.43  <- scale shift, not a difficulty factor
+    is_rb2            +8.14  <- scale shift, not a difficulty factor
+    (intercept)     +254.43
 
   -- worst 10 by tier distance, cross-validated --
-    yourbetrayal             rb3_dlc  rank 400   said tier 3, actual 5  (2 off, rank -136)
-    webuiltthiscity          rb3_dlc  rank 418   said tier 4, actual 6  (2 off, rank -133)
-    diaryofamadman           rb3_dlc  rank 225   said tier 5, actual 3  (2 off, rank +125)
-    rainingblood             rb3_dlc  rank 430   said tier 4, actual 6  (2 off, rank -123)
-    saturdaynightspecial     rb3_dlc  rank 353   said tier 3, actual 5  (2 off, rank -109)
-    ridersonthestorm         rb3_dlc  rank 180   said tier 4, actual 2  (2 off, rank +91)
-    livelyupyourself2        rb3_dlc  rank 304   said tier 2, actual 4  (2 off, rank -88)
-    workingfortheweekend     rb3_dlc  rank 210   said tier 4, actual 2  (2 off, rank +88)
-    wedidntstartthefire      rb3_dlc  rank 196   said tier 4, actual 2  (2 off, rank +83)
-    killinginthename         rb3_dlc  rank 259   said tier 5, actual 3  (2 off, rank +83)
+    webuiltthiscity          rb3_dlc  rank 418   said tier 4, actual 6  (2 off, rank -141)
+    yourbetrayal             rb3_dlc  rank 400   said tier 3, actual 5  (2 off, rank -138)
+    theentertainer           rb3_dlc  rank 400   said tier 3, actual 5  (2 off, rank -136)
+    saturdaynightspecial     rb3_dlc  rank 353   said tier 3, actual 5  (2 off, rank -117)
+    golddustwoman            rb3_dlc  rank 250   said tier 1, actual 3  (2 off, rank -110)
+    fantasma2                rb3_dlc  rank 320   said tier 2, actual 4  (2 off, rank -104)
+    happyxmas                rb3_dlc  rank 150   said tier 3, actual 1  (2 off, rank +101)
+    letmerollit              rb3_dlc  rank 259   said tier 1, actual 3  (2 off, rank -94)
+    tonighttonight           rb3_dlc  rank 178   said tier 4, actual 2  (2 off, rank +89)
+    rimeoftheancientmariner  rb3_dlc  rank 410   said tier 4, actual 6  (2 off, rank -88)
 
-  -- origin check: rb3_dlc-only model applied to lego out of sample --
-    mean (pred - actual) on rb3_dlc itself : +0.0   <- ~0 by construction
-    mean (pred - actual) on lego           : +40.0   <- the scale offset
-    -> lego rates the same chart about 40 rank points LOWER than RB3.
-       Absorbed by the is_lego column; a new song predicts with is_lego = 0,
+  -- origin check: rb3_dlc-only model applied to each origin out of sample --
+    mean (pred - actual) on rb3_dlc itself : -0.0   <- ~0 by construction
+    mean (pred - actual) on lego     : +33.0  (n=45)   <- the scale offset
+    -> lego rates the same chart about 33 rank points LOWER than RB3.
+       Absorbed by the is_lego column; a new song predicts with it at 0,
        i.e. on the RB3 scale.
+       by rank band: 1-200: +53 (n=16),  200-300: +27 (n=24),  300-up: -1 (n=5)
+    mean (pred - actual) on rb2      : -70.3  (n=15)   <- the scale offset
+    -> rb2 rates the same chart about 70 rank points HIGHER than RB3.
+       Absorbed by the is_rb2 column; a new song predicts with it at 0,
+       i.e. on the RB3 scale.
+       by rank band: 1-200: -,  200-300: -0 (n=1),  300-up: -75 (n=14)
 
   -- controlled patterns through the fitted model --
-    (synthetic charts, difficulty known by construction; is_lego = 0)
-    240x 16ths @ 60 bpm                rank    240   tier 3  (Moderate)
-    240x 16ths @ 120 bpm               rank    436   tier 6  (Impossible)
-    240x 16ths @ 180 bpm               rank    635   tier 6  (Impossible)   <-- EXTRAPOLATED (corpus 125-605)
-    240x 16ths @ 240 bpm               rank    836   tier 6  (Impossible)   <-- EXTRAPOLATED (corpus 125-605)
-    240 notes, even 8ths               rank    230   tier 3  (Moderate)
-    240 notes, half slow + 32nd burst  rank    298   tier 4  (Challenging)
-      the same, burst marked as solo   rank    448   tier 6  (Impossible)
+    (synthetic charts, difficulty known by construction; origin flags = 0)
+    240x 16ths @ 60 bpm                rank    215   tier 2  (Solid)
+    240x 16ths @ 120 bpm               rank    383   tier 5  (Nightmare)
+    240x 16ths @ 180 bpm               rank    552   tier 6  (Impossible)
+    240x 16ths @ 240 bpm               rank    722   tier 6  (Impossible)   <-- EXTRAPOLATED (corpus 75-605)
+    240 notes, even 8ths               rank    215   tier 2  (Solid)
+    240 notes, half slow + 32nd burst  rank    249   tier 3  (Moderate)
+      the same, burst marked as solo   rank    374   tier 5  (Nightmare)
       the last two differ only in whether the hard part is MARKED, which is
       what solo_change_ratio is supposed to notice.
 
-==============  BASS  (n=204 fitted)  ==============
-  rows: 159 rb3_dlc (the target), 45 lego (weight 0.30), 1 excluded from all fits
+==============  BASS  (n=375 fitted)  ==============
+  rows: 315 rb3_dlc (the target), 45 lego (weight 0.30), 15 rb2 (weight 0.30), 4 excluded from all fits
   disputed labels held out: 0 of 0 on the list (cap ~2% of the corpus)
-  playing spans: 204 from animation events, 1 from the fallback
-  packs: 76 distinct across the rb3_dlc rows; largest holds 12 (8%)
+  playing spans: 377 from animation events, 2 from the fallback
+  packs: 166 distinct across the rb3_dlc rows; largest holds 14 (4%)
 
   -- individual factors vs rank, rb3_dlc only (Spearman) --
-    playing_s      rho = +0.488
-    density_avg    rho = +0.642
-    density_peak   rho = +0.776
-    change_rate    rho = +0.420
-    attack_density_avg rho = +0.636
-    attack_density_peak rho = +0.782
-    tight_p10      rho = -0.506
-    tight_med      rho = -0.531
-    chord_size_mean rho = +0.288
-    chord_span_mean rho = +0.310
-    chord_change_frac rho = +0.297
-    sounding_size_mean rho = +0.288
+    playing_s      rho = +0.428
+    density_avg    rho = +0.555
+    density_peak   rho = +0.698
+    change_rate    rho = +0.506
+    attack_density_avg rho = +0.554
+    attack_density_peak rho = +0.710
+    tight_p10      rho = -0.425
+    tight_med      rho = -0.485
+    chord_size_mean rho = +0.327
+    chord_span_mean rho = +0.334
+    chord_change_frac rho = +0.318
+    sounding_size_mean rho = +0.327
     overlap_frac   rho = n/a
     held_change_frac rho = n/a
-    move_mean      rho = -0.259
-    move_p90       rho = -0.214
-    anchor_frac    rho = +0.248
-    solo_frac_marked rho = +0.214
-    solo_change_ratio rho = +0.213
-    sustain_frac   rho = -0.387
-    solo_frac      rho = -0.125
-    force_hopo_rate rho = +0.210
-    force_strum_rate rho = +0.116
-    tremolo_frac   rho = +0.140
-    trill_frac     rho = +0.102
+    move_mean      rho = -0.103
+    move_p90       rho = -0.077
+    anchor_frac    rho = +0.094
+    solo_frac_marked rho = +0.190
+    solo_change_ratio rho = +0.190
+    sustain_frac   rho = -0.286
+    solo_frac      rho = -0.085
+    force_hopo_rate rho = +0.185
+    force_strum_rate rho = +0.072
+    tremolo_frac   rho = +0.116
+    trill_frac     rho = +0.082
     gliss_frac     rho = n/a
     shift_rate     rho = n/a
     shift_span_mean rho = n/a
@@ -303,19 +310,19 @@ Rows: 1061
     stick_size_mean rho = n/a
     tom_frac       rho = n/a
     roll_frac      rho = n/a
-    offbeat_frac   rho = +0.578
+    offbeat_frac   rho = +0.508
     pro_total_changes rho = n/a
     pro_change_rate rho = n/a
     pro_tight_p10  rho = n/a
     pro_tight_med  rho = n/a
     pro_entropy_h2 rho = n/a
     pro_stations_peak rho = n/a
-    repetition     rho = +0.336
-    entropy_h2     rho = +0.263
-    entropy_h2_rel rho = +0.255
-    complex_peak   rho = +0.795
-    notes_total    rho = +0.716
-    total_changes  rho = +0.628
+    repetition     rho = +0.235
+    entropy_h2     rho = +0.360
+    entropy_h2_rel rho = +0.309
+    complex_peak   rho = +0.779
+    notes_total    rho = +0.672
+    total_changes  rho = +0.655
     syllables_total rho = n/a
     tubes_total    rho = n/a
     syl_density_avg rho = n/a
@@ -361,55 +368,55 @@ Rows: 1061
     plus_frac      rho = n/a
     short_frac     rho = n/a
     short_moving_frac rho = n/a
-    strongest single factor: complex_peak (rho +0.795)
+    strongest single factor: complex_peak (rho +0.779)
 
   -- 5-fold cross-validated fit, evaluated on rb3_dlc --
-    with lego (weighted)   usable  93.7%   rho +0.807   MAE  35.4   (n=159)
-    rb3_dlc alone          usable  91.2%   rho +0.788   MAE  37.9   (n=159)
+    with lego (weighted)   usable  93.7%   rho +0.815   MAE  33.3   (n=315)
+    rb3_dlc alone          usable  93.7%   rho +0.814   MAE  33.5   (n=315)
 
     grade distribution (rhythm-game style):
-      PERFECT  exact tier      67    42.1%
-      GOOD     1 tier off      82    51.6%
-      BAD      2 tiers off     10     6.3%
-      MISS     3+ tiers off     0     0.0%
-      ->       usable         149    93.7%
+      PERFECT  exact tier     140    44.4%
+      GOOD     1 tier off     155    49.2%
+      BAD      2 tiers off     19     6.0%
+      MISS     3+ tiers off     1     0.3%
+      ->       usable         295    93.7%
 
     VERDICT: GOOD - 94% land within one tier; usable as an advisory suggestion
 
   -- leaner factor sets, same cross-validation --
-    lean 2 (speed+volume)  usable  91.8%   rho +0.791   MAE  36.3   (n=159)
-    lean 4 (+tight, chord) usable  91.8%   rho +0.780   MAE  36.0   (n=159)
-    lean 6 (+endurance)    usable  93.1%   rho +0.786   MAE  35.7   (n=159)
-    no interactions        usable  91.2%   rho +0.781   MAE  35.2   (n=159)
-    movement + speed       usable  90.6%   rho +0.784   MAE  36.5   (n=159)
-    solo concentration     usable  90.6%   rho +0.780   MAE  37.7   (n=159)
+    lean 2 (speed+volume)  usable  92.4%   rho +0.779   MAE  35.0   (n=315)
+    lean 4 (+tight, chord) usable  92.7%   rho +0.779   MAE  34.6   (n=315)
+    lean 6 (+endurance)    usable  92.4%   rho +0.779   MAE  34.6   (n=315)
+    no interactions        usable  91.4%   rho +0.771   MAE  35.6   (n=315)
+    movement + speed       usable  91.1%   rho +0.786   MAE  35.4   (n=315)
+    solo concentration     usable  93.0%   rho +0.780   MAE  35.1   (n=315)
 
   -- coefficients (standardized; full fit, interpretation only) --
-    playing_s        +12.12
-    density_avg     +184.14
-    density_peak     -69.73
-    change_rate       -3.46
-    attack_density_avg  -165.96
-    attack_density_peak   +72.98
-    tight_p10         -1.81
-    tight_med         +2.47
-    chord_size_mean   -14.81
-    chord_span_mean    +4.87
-    chord_change_frac   +24.15
-    sounding_size_mean   -14.81
-    overlap_frac      +0.00
+    playing_s         -6.92
+    density_avg      +16.53
+    density_peak     -22.60
+    change_rate       -8.33
+    attack_density_avg   -19.15
+    attack_density_peak   +42.66
+    tight_p10         -2.18
+    tight_med         +3.78
+    chord_size_mean    -0.36
+    chord_span_mean    +4.31
+    chord_change_frac    +2.73
+    sounding_size_mean    -0.36
+    overlap_frac      +2.20
     held_change_frac    +0.00
-    move_mean         -1.20
-    move_p90          +0.47
-    anchor_frac      -21.09
-    solo_frac_marked    +6.67
-    solo_change_ratio    -4.40
-    sustain_frac      +3.59
-    solo_frac         +2.05
-    force_hopo_rate    +0.38
-    force_strum_rate    -2.45
-    tremolo_frac      +3.23
-    trill_frac        +1.92
+    move_mean         -9.16
+    move_p90          +3.18
+    anchor_frac      -19.85
+    solo_frac_marked    +8.28
+    solo_change_ratio    -5.06
+    sustain_frac      +8.54
+    solo_frac         +1.23
+    force_hopo_rate    +3.68
+    force_strum_rate    -0.19
+    tremolo_frac      +1.56
+    trill_frac        +1.21
     gliss_frac        +0.00
     shift_rate        +0.00
     shift_span_mean    +0.00
@@ -423,19 +430,19 @@ Rows: 1061
     stick_size_mean    +0.00
     tom_frac          +0.00
     roll_frac         +0.00
-    offbeat_frac     +12.15
+    offbeat_frac      +8.87
     pro_total_changes    +0.00
     pro_change_rate    +0.00
     pro_tight_p10     +0.00
     pro_tight_med     +0.00
     pro_entropy_h2    +0.00
     pro_stations_peak    +0.00
-    repetition        +1.64
-    entropy_h2        +7.56
-    entropy_h2_rel    +2.12
-    complex_peak     +25.06
-    notes_total      +19.84
-    total_changes    -12.38
+    repetition        +4.78
+    entropy_h2       +20.98
+    entropy_h2_rel   -10.51
+    complex_peak     +25.89
+    notes_total      +26.62
+    total_changes     +7.50
     syllables_total    +0.00
     tubes_total       +0.00
     syl_density_avg    +0.00
@@ -481,66 +488,82 @@ Rows: 1061
     plus_frac         +0.00
     short_frac        +0.00
     short_moving_frac    +0.00
-    is_lego          -10.29  <- scale shift, not a difficulty factor
-    (intercept)     +230.84
+    is_lego           -6.23  <- scale shift, not a difficulty factor
+    is_rb2           +15.57  <- scale shift, not a difficulty factor
+    (intercept)     +225.87
 
   -- worst 10 by tier distance, cross-validated --
-    southofheaven            rb3_dlc  rank 295   said tier 6, actual 4  (2 off, rank +185)
-    wanteddeadoralive2       rb3_dlc  rank 315   said tier 2, actual 4  (2 off, rank -123)
-    welcometothefamily       rb3_dlc  rank 379   said tier 3, actual 5  (2 off, rank -106)
-    fallingawayfromme        rb3_dlc  rank 208   said tier 0, actual 2  (2 off, rank -91)
-    phantomoftheopera        rb3_dlc  rank 440   said tier 4, actual 6  (2 off, rank -88)
-    diaryofamadman           rb3_dlc  rank 224   said tier 4, actual 2  (2 off, rank +84)
-    lightmyfire              rb3_dlc  rank 177   said tier 3, actual 1  (2 off, rank +84)
-    ridersonthestorm         rb3_dlc  rank 170   said tier 3, actual 1  (2 off, rank +79)
-    surrender                rb3_dlc  rank 170   said tier 3, actual 1  (2 off, rank +71)
-    kaya                     rb3_dlc  rank 186   said tier 0, actual 2  (2 off, rank -55)
+    wanteddeadoralive2       rb3_dlc  rank 315   said tier 1, actual 4  (3 off, rank -135)
+    dreampolice              rb3_dlc  rank 299   said tier 6, actual 4  (2 off, rank +160)
+    pulseofthemaggots        rb3_dlc  rank 340   said tier 6, actual 4  (2 off, rank +120)
+    dameaire2                rb3_dlc  rank 333   said tier 2, actual 4  (2 off, rank -118)
+    welcometothefamily       rb3_dlc  rank 379   said tier 3, actual 5  (2 off, rank -102)
+    blurry                   rb3_dlc  rank 180   said tier 3, actual 1  (2 off, rank +100)
+    5minutesalone            rb3_dlc  rank 439   said tier 4, actual 6  (2 off, rank -92)
+    iveseenallgoodpeople     rb3_dlc  rank 365   said tier 3, actual 5  (2 off, rank -86)
+    shootingthemoon          rb3_dlc  rank 99    said tier 2, actual 0  (2 off, rank +86)
+    ridersonthestorm         rb3_dlc  rank 170   said tier 3, actual 1  (2 off, rank +83)
 
-  -- origin check: rb3_dlc-only model applied to lego out of sample --
-    mean (pred - actual) on rb3_dlc itself : +0.0   <- ~0 by construction
-    mean (pred - actual) on lego           : +40.9   <- the scale offset
-    -> lego rates the same chart about 41 rank points LOWER than RB3.
-       Absorbed by the is_lego column; a new song predicts with is_lego = 0,
+  -- origin check: rb3_dlc-only model applied to each origin out of sample --
+    mean (pred - actual) on rb3_dlc itself : -0.0   <- ~0 by construction
+    mean (pred - actual) on lego     : +31.9  (n=45)   <- the scale offset
+    -> lego rates the same chart about 32 rank points LOWER than RB3.
+       Absorbed by the is_lego column; a new song predicts with it at 0,
        i.e. on the RB3 scale.
+       by rank band: 1-200: +48 (n=30),  200-300: +3 (n=13),  300-up: -23 (n=2)
+    mean (pred - actual) on rb2      : -141.1  (n=15)   <- the scale offset
+    -> rb2 rates the same chart about 141 rank points HIGHER than RB3.
+       Absorbed by the is_rb2 column; a new song predicts with it at 0,
+       i.e. on the RB3 scale.
+       by rank band: 1-200: -,  200-300: -67 (n=2),  300-up: -153 (n=13)
 
   -- controlled patterns through the fitted model --
-    (synthetic charts, difficulty known by construction; is_lego = 0)
-    240x 16ths @ 60 bpm                rank    103   tier 0  (Warmup)   <-- EXTRAPOLATED (corpus 117-480)
-    240x 16ths @ 120 bpm               rank    147   tier 1  (Apprentice)
-    240x 16ths @ 180 bpm               rank    193   tier 2  (Solid)
-    240x 16ths @ 240 bpm               rank    240   tier 3  (Moderate)
-    240 notes, even 8ths               rank    103   tier 0  (Warmup)   <-- EXTRAPOLATED (corpus 117-480)
-    240 notes, half slow + 32nd burst  rank    161   tier 1  (Apprentice)
-      the same, burst marked as solo   rank    136   tier 1  (Apprentice)
+    (synthetic charts, difficulty known by construction; origin flags = 0)
+    240x 16ths @ 60 bpm                rank     83   tier 0  (Warmup)   <-- EXTRAPOLATED (corpus 89-480)
+    240x 16ths @ 120 bpm               rank     79   tier 0  (Warmup)   <-- EXTRAPOLATED (corpus 89-480)
+      <-- WARNING: faster chart rated LOWER than the slower one.
+          Tempo handling or the fit is wrong; investigate before
+          trusting anything above.
+    240x 16ths @ 180 bpm               rank     74   tier 0  (Warmup)   <-- EXTRAPOLATED (corpus 89-480)
+      <-- WARNING: faster chart rated LOWER than the slower one.
+          Tempo handling or the fit is wrong; investigate before
+          trusting anything above.
+    240x 16ths @ 240 bpm               rank     69   tier 0  (Warmup)   <-- EXTRAPOLATED (corpus 89-480)
+      <-- WARNING: faster chart rated LOWER than the slower one.
+          Tempo handling or the fit is wrong; investigate before
+          trusting anything above.
+    240 notes, even 8ths               rank     83   tier 0  (Warmup)   <-- EXTRAPOLATED (corpus 89-480)
+    240 notes, half slow + 32nd burst  rank    209   tier 2  (Solid)
+      the same, burst marked as solo   rank    143   tier 1  (Apprentice)
       the last two differ only in whether the hard part is MARKED, which is
       what solo_change_ratio is supposed to notice.
 
-==============  DRUM  (n=204 fitted)  ==============
-  rows: 159 rb3_dlc (the target), 45 lego (weight 0.30), 1 excluded from all fits
+==============  DRUM  (n=373 fitted)  ==============
+  rows: 313 rb3_dlc (the target), 45 lego (weight 0.30), 15 rb2 (weight 0.30), 4 excluded from all fits
   disputed labels held out: 0 of 0 on the list (cap ~2% of the corpus)
-  playing spans: 205 from animation events, 0 from the fallback
-  packs: 76 distinct across the rb3_dlc rows; largest holds 12 (8%)
+  playing spans: 377 from animation events, 0 from the fallback
+  packs: 166 distinct across the rb3_dlc rows; largest holds 14 (4%)
 
   -- individual factors vs rank, rb3_dlc only (Spearman) --
-    playing_s      rho = +0.203
-    density_avg    rho = +0.710
-    density_peak   rho = +0.797
-    change_rate    rho = +0.601
-    attack_density_avg rho = +0.761
-    attack_density_peak rho = +0.783
-    tight_p10      rho = -0.385
-    tight_med      rho = -0.368
-    chord_size_mean rho = -0.126
-    chord_span_mean rho = +0.203
-    chord_change_frac rho = -0.100
-    sounding_size_mean rho = -0.125
-    overlap_frac   rho = +0.184
-    held_change_frac rho = +0.105
-    move_mean      rho = +0.049
-    move_p90       rho = +0.201
-    anchor_frac    rho = -0.214
-    solo_frac_marked rho = +0.137
-    solo_change_ratio rho = +0.128
+    playing_s      rho = +0.284
+    density_avg    rho = +0.689
+    density_peak   rho = +0.809
+    change_rate    rho = +0.592
+    attack_density_avg rho = +0.759
+    attack_density_peak rho = +0.810
+    tight_p10      rho = -0.422
+    tight_med      rho = -0.391
+    chord_size_mean rho = -0.197
+    chord_span_mean rho = +0.135
+    chord_change_frac rho = -0.136
+    sounding_size_mean rho = -0.196
+    overlap_frac   rho = +0.167
+    held_change_frac rho = +0.064
+    move_mean      rho = +0.015
+    move_p90       rho = +0.164
+    anchor_frac    rho = -0.242
+    solo_frac_marked rho = +0.187
+    solo_change_ratio rho = +0.088
     sustain_frac   rho = n/a
     solo_frac      rho = n/a
     force_hopo_rate rho = n/a
@@ -554,25 +577,25 @@ Rows: 1061
     finger_reassign_p90 rho = n/a
     finger_reassign_peak rho = n/a
     held_independence_peak rho = n/a
-    kick_density   rho = +0.567
-    kick_density_peak rho = +0.674
-    hand_density_peak rho = +0.741
-    stick_size_mean rho = -0.167
-    tom_frac       rho = +0.047
-    roll_frac      rho = +0.200
-    offbeat_frac   rho = +0.487
-    pro_total_changes rho = +0.558
-    pro_change_rate rho = +0.601
-    pro_tight_p10  rho = -0.385
-    pro_tight_med  rho = -0.368
-    pro_entropy_h2 rho = +0.301
-    pro_stations_peak rho = +0.273
-    repetition     rho = -0.004
-    entropy_h2     rho = +0.337
-    entropy_h2_rel rho = +0.351
-    complex_peak   rho = +0.786
-    notes_total    rho = +0.602
-    total_changes  rho = +0.558
+    kick_density   rho = +0.532
+    kick_density_peak rho = +0.651
+    hand_density_peak rho = +0.742
+    stick_size_mean rho = -0.234
+    tom_frac       rho = +0.062
+    roll_frac      rho = +0.244
+    offbeat_frac   rho = +0.486
+    pro_total_changes rho = +0.604
+    pro_change_rate rho = +0.593
+    pro_tight_p10  rho = -0.422
+    pro_tight_med  rho = -0.391
+    pro_entropy_h2 rho = +0.415
+    pro_stations_peak rho = +0.254
+    repetition     rho = -0.083
+    entropy_h2     rho = +0.432
+    entropy_h2_rel rho = +0.415
+    complex_peak   rho = +0.809
+    notes_total    rho = +0.662
+    total_changes  rho = +0.604
     syllables_total rho = n/a
     tubes_total    rho = n/a
     syl_density_avg rho = n/a
@@ -618,49 +641,49 @@ Rows: 1061
     plus_frac      rho = n/a
     short_frac     rho = n/a
     short_moving_frac rho = n/a
-    strongest single factor: density_peak (rho +0.797)
+    strongest single factor: attack_density_peak (rho +0.810)
 
   -- 5-fold cross-validated fit, evaluated on rb3_dlc --
-    with lego (weighted)   usable  95.0%   rho +0.884   MAE  29.8   (n=159)
-    rb3_dlc alone          usable  93.7%   rho +0.863   MAE  32.3   (n=159)
+    with lego (weighted)   usable  95.5%   rho +0.891   MAE  31.2   (n=313)
+    rb3_dlc alone          usable  95.5%   rho +0.887   MAE  31.5   (n=313)
 
     grade distribution (rhythm-game style):
-      PERFECT  exact tier      97    61.0%
-      GOOD     1 tier off      54    34.0%
-      BAD      2 tiers off      8     5.0%
-      MISS     3+ tiers off     0     0.0%
-      ->       usable         151    95.0%
+      PERFECT  exact tier     172    55.0%
+      GOOD     1 tier off     127    40.6%
+      BAD      2 tiers off     13     4.2%
+      MISS     3+ tiers off     1     0.3%
+      ->       usable         299    95.5%
 
-    VERDICT: GOOD - 95% land within one tier; usable as an advisory suggestion
+    VERDICT: GOOD - 96% land within one tier; usable as an advisory suggestion
 
   -- leaner factor sets, same cross-validation --
-    lean 2 (speed+volume)  usable  91.2%   rho +0.798   MAE  41.6   (n=159)
-    lean 4 (+tight, chord) usable  92.5%   rho +0.838   MAE  38.6   (n=159)
-    lean 6 (+endurance)    usable  90.6%   rho +0.832   MAE  38.9   (n=159)
-    no interactions        usable  95.0%   rho +0.849   MAE  36.4   (n=159)
-    movement + speed       usable  93.7%   rho +0.835   MAE  37.8   (n=159)
-    solo concentration     usable  91.8%   rho +0.837   MAE  39.2   (n=159)
+    lean 2 (speed+volume)  usable  92.7%   rho +0.830   MAE  38.5   (n=313)
+    lean 4 (+tight, chord) usable  93.9%   rho +0.863   MAE  35.8   (n=313)
+    lean 6 (+endurance)    usable  93.6%   rho +0.861   MAE  36.2   (n=313)
+    no interactions        usable  94.9%   rho +0.861   MAE  35.7   (n=313)
+    movement + speed       usable  94.9%   rho +0.866   MAE  35.3   (n=313)
+    solo concentration     usable  93.3%   rho +0.865   MAE  36.0   (n=313)
 
   -- coefficients (standardized; full fit, interpretation only) --
-    playing_s         -0.26
-    density_avg      -33.31
-    density_peak     +57.79
-    change_rate     +257.19
-    attack_density_avg   +75.38
-    attack_density_peak   +15.07
-    tight_p10         -2.00
-    tight_med         +6.12
-    chord_size_mean    +7.29
-    chord_span_mean    +6.40
-    chord_change_frac    +3.57
-    sounding_size_mean    +5.95
-    overlap_frac     +13.13
-    held_change_frac    +2.68
-    move_mean         +0.75
-    move_p90          +4.15
-    anchor_frac       -6.41
-    solo_frac_marked    -0.57
-    solo_change_ratio    +9.80
+    playing_s         +3.58
+    density_avg       -2.06
+    density_peak     +51.86
+    change_rate     +596.91
+    attack_density_avg   +29.73
+    attack_density_peak   +11.75
+    tight_p10         -3.83
+    tight_med         +5.07
+    chord_size_mean    -1.15
+    chord_span_mean    +2.00
+    chord_change_frac    +6.86
+    sounding_size_mean    -1.33
+    overlap_frac     +10.33
+    held_change_frac    -0.06
+    move_mean         -2.57
+    move_p90          +0.82
+    anchor_frac       -4.63
+    solo_frac_marked    +2.26
+    solo_change_ratio    +5.53
     sustain_frac      +0.00
     solo_frac         +0.00
     force_hopo_rate    +0.00
@@ -674,25 +697,25 @@ Rows: 1061
     finger_reassign_p90    +0.00
     finger_reassign_peak    +0.00
     held_independence_peak    +0.00
-    kick_density     -39.97
-    kick_density_peak   +21.80
-    hand_density_peak   -51.43
-    stick_size_mean    +7.31
-    tom_frac          -0.68
-    roll_frac         -1.76
-    offbeat_frac      +8.55
-    pro_total_changes  +642.82
-    pro_change_rate  -251.73
-    pro_tight_p10     -2.00
-    pro_tight_med     +6.12
-    pro_entropy_h2   -28.70
-    pro_stations_peak    -3.12
-    repetition        +7.22
-    entropy_h2       +24.30
-    entropy_h2_rel   +13.78
-    complex_peak     +13.73
-    notes_total      +20.70
-    total_changes   -651.37
+    kick_density     -22.68
+    kick_density_peak   +17.53
+    hand_density_peak   -39.26
+    stick_size_mean    +4.78
+    tom_frac          +1.46
+    roll_frac         -3.72
+    offbeat_frac      +9.32
+    pro_total_changes  +793.69
+    pro_change_rate  -593.30
+    pro_tight_p10     -3.83
+    pro_tight_med     +5.07
+    pro_entropy_h2   -37.31
+    pro_stations_peak    -0.87
+    repetition        -0.39
+    entropy_h2       +41.36
+    entropy_h2_rel    +3.18
+    complex_peak     +14.02
+    notes_total       +4.38
+    total_changes   -781.58
     syllables_total    +0.00
     tubes_total       +0.00
     syl_density_avg    +0.00
@@ -738,55 +761,60 @@ Rows: 1061
     plus_frac         +0.00
     short_frac        +0.00
     short_moving_frac    +0.00
-    is_lego           -3.60  <- scale shift, not a difficulty factor
-    (intercept)     +250.61
+    is_lego           -1.70  <- scale shift, not a difficulty factor
+    is_rb2           +11.40  <- scale shift, not a difficulty factor
+    (intercept)     +244.72
 
   -- worst 10 by tier distance, cross-validated --
-    makemesmile2             rb3_dlc  rank 292   said tier 6, actual 4  (2 off, rank +192)
-    rimeoftheancientmariner  rb3_dlc  rank 455   said tier 4, actual 6  (2 off, rank -121)
-    snuff                    rb3_dlc  rank 171   said tier 4, actual 2  (2 off, rank +121)
-    wewerentborn             rb3_dlc  rank 133   said tier 3, actual 1  (2 off, rank +64)
-    ifyouleavemenow          rb3_dlc  rank 146   said tier 3, actual 1  (2 off, rank +61)
-    roadhouseblues           rb3_dlc  rank 205   said tier 1, actual 3  (2 off, rank -54)
-    wanteddeadoralive2       rb3_dlc  rank 120   said tier 2, actual 0  (2 off, rank +52)
-    whativedone2             rb3_dlc  rank 193   said tier 1, actual 3  (2 off, rank -51)
-    machinehead              rb3_dlc  rank 185   said tier 4, actual 3  (1 off, rank +94)
-    animallive2              rb3_dlc  rank 300   said tier 3, actual 4  (1 off, rank -92)
+    shootingthemoon          rb3_dlc  rank 183   said tier 0, actual 3  (3 off, rank -73)
+    makemesmile2             rb3_dlc  rank 292   said tier 6, actual 4  (2 off, rank +242)
+    rimeoftheancientmariner  rb3_dlc  rank 455   said tier 4, actual 6  (2 off, rank -124)
+    hammertofall             rb3_dlc  rank 173   said tier 4, actual 2  (2 off, rank +83)
+    cantgetenoughofyoubaby   rb3_dlc  rank 168   said tier 4, actual 2  (2 off, rank +75)
+    stillofthenight          rb3_dlc  rank 176   said tier 4, actual 2  (2 off, rank +74)
+    wedidntstartthefire      rb3_dlc  rank 150   said tier 3, actual 1  (2 off, rank +74)
+    ifyouleavemenow          rb3_dlc  rank 146   said tier 3, actual 1  (2 off, rank +71)
+    neverletmedownagain      rb3_dlc  rank 191   said tier 1, actual 3  (2 off, rank -59)
+    howdoyousleep            rb3_dlc  rank 198   said tier 1, actual 3  (2 off, rank -56)
 
-  -- origin check: rb3_dlc-only model applied to lego out of sample --
-    mean (pred - actual) on rb3_dlc itself : -0.0   <- ~0 by construction
-    mean (pred - actual) on lego           : +19.3   <- the scale offset
-    -> lego rates the same chart about 19 rank points LOWER than RB3.
-       Absorbed by the is_lego column; a new song predicts with is_lego = 0,
+  -- origin check: rb3_dlc-only model applied to each origin out of sample --
+    mean (pred - actual) on rb3_dlc itself : +0.0   <- ~0 by construction
+    mean (pred - actual) on lego     : +8.7  (n=45)   <- the scale offset
+    -> lego sits on the rb3_dlc scale
+       by rank band: 1-200: +21 (n=18),  200-300: +6 (n=18),  300-up: -10 (n=9)
+    mean (pred - actual) on rb2      : -101.6  (n=15)   <- the scale offset
+    -> rb2 rates the same chart about 102 rank points HIGHER than RB3.
+       Absorbed by the is_rb2 column; a new song predicts with it at 0,
        i.e. on the RB3 scale.
+       by rank band: 1-200: +117 (n=1),  200-300: -,  300-up: -117 (n=14)
 
   -- controlled patterns through the fitted model --
-    (synthetic charts, difficulty known by construction; is_lego = 0)
-    240x 16ths @ 60 bpm                rank    804   tier 6  (Impossible)   <-- EXTRAPOLATED (corpus 120-484)
-    240x 16ths @ 120 bpm               rank   2234   tier 6  (Impossible)   <-- EXTRAPOLATED (corpus 120-484)
-    240x 16ths @ 180 bpm               rank   3663   tier 6  (Impossible)   <-- EXTRAPOLATED (corpus 120-484)
-    240x 16ths @ 240 bpm               rank   5093   tier 6  (Impossible)   <-- EXTRAPOLATED (corpus 120-484)
-    240 notes, even 8ths               rank    811   tier 6  (Impossible)   <-- EXTRAPOLATED (corpus 120-484)
-    240 notes, half slow + 32nd burst  rank    875   tier 6  (Impossible)   <-- EXTRAPOLATED (corpus 120-484)
-      the same, burst marked as solo   rank   1558   tier 6  (Impossible)   <-- EXTRAPOLATED (corpus 120-484)
+    (synthetic charts, difficulty known by construction; origin flags = 0)
+    240x 16ths @ 60 bpm                rank   2106   tier 6  (Impossible)   <-- EXTRAPOLATED (corpus 93-550)
+    240x 16ths @ 120 bpm               rank   4814   tier 6  (Impossible)   <-- EXTRAPOLATED (corpus 93-550)
+    240x 16ths @ 180 bpm               rank   7523   tier 6  (Impossible)   <-- EXTRAPOLATED (corpus 93-550)
+    240x 16ths @ 240 bpm               rank  10232   tier 6  (Impossible)   <-- EXTRAPOLATED (corpus 93-550)
+    240 notes, even 8ths               rank   2109   tier 6  (Impossible)   <-- EXTRAPOLATED (corpus 93-550)
+    240 notes, half slow + 32nd burst  rank   1939   tier 6  (Impossible)   <-- EXTRAPOLATED (corpus 93-550)
+      the same, burst marked as solo   rank   2412   tier 6  (Impossible)   <-- EXTRAPOLATED (corpus 93-550)
       the last two differ only in whether the hard part is MARKED, which is
       what solo_change_ratio is supposed to notice.
 
-==============  VOCALS  (n=202 fitted)  ==============
-  rows: 157 rb3_dlc (the target), 45 lego (weight 0.30), 1 excluded from all fits
+==============  VOCALS  (n=373 fitted)  ==============
+  rows: 313 rb3_dlc (the target), 45 lego (weight 0.30), 15 rb2 (weight 0.30), 4 excluded from all fits
   disputed labels held out: 0 of 0 on the list (cap ~2% of the corpus)
-  playing spans: 0 from animation events, 203 from the fallback
-  packs: 74 distinct across the rb3_dlc rows; largest holds 12 (8%)
+  playing spans: 0 from animation events, 377 from the fallback
+  packs: 164 distinct across the rb3_dlc rows; largest holds 14 (4%)
 
   -- individual factors vs rank, rb3_dlc only (Spearman) --
-    playing_s      rho = +0.285
+    playing_s      rho = +0.280
     density_avg    rho = n/a
     density_peak   rho = n/a
     change_rate    rho = n/a
     attack_density_avg rho = n/a
     attack_density_peak rho = n/a
-    tight_p10      rho = -0.026
-    tight_med      rho = -0.017
+    tight_p10      rho = -0.084
+    tight_med      rho = -0.086
     chord_size_mean rho = n/a
     chord_span_mean rho = n/a
     chord_change_frac rho = n/a
@@ -826,87 +854,87 @@ Rows: 1061
     pro_stations_peak rho = n/a
     repetition     rho = n/a
     entropy_h2     rho = n/a
-    entropy_h2_rel rho = +0.424
+    entropy_h2_rel rho = +0.493
     complex_peak   rho = n/a
     notes_total    rho = n/a
     total_changes  rho = n/a
-    syllables_total rho = +0.154
-    tubes_total    rho = +0.216
-    syl_density_avg rho = -0.116
-    syl_density_peak rho = +0.097
-    tube_density_avg rho = -0.043
-    tube_density_peak rho = +0.169
-    pc_change_rate rho = +0.347
-    phrase_syl_mean rho = +0.044
-    phrase_syl_peak rho = +0.119
-    phrase_len_mean rho = +0.138
-    pc_interval_mean rho = +0.319
-    pc_interval_p90 rho = +0.293
-    pc_range       rho = +0.336
-    semi_interval_mean rho = +0.367
-    semi_interval_p90 rho = +0.357
-    pc_interval_mean_p rho = +0.260
-    pc_interval_p90_p rho = +0.237
-    pc_range_p     rho = +0.402
-    pc_change_rate_p rho = +0.344
-    entropy_h2_rel_p rho = +0.416
-    semi_interval_mean_p rho = +0.335
-    semi_interval_p90_p rho = +0.320
-    pitched_frac   rho = +0.126
-    notated_range  rho = +0.485
-    pitch_mean     rho = +0.372
-    pitch_p90      rho = +0.474
-    octave_jump_rate rho = +0.332
-    longest_note_s rho = +0.335
-    breath_load    rho = +0.266
-    longtime_frac  rho = +0.250
-    top_note       rho = +0.594
-    high_time_67   rho = +0.443
-    high_time_70   rho = +0.546
-    high_hold_time_70 rho = +0.351
-    high_longest_note_70 rho = +0.350
-    high_reentry_rate_70 rho = +0.230
-    pitch_p98_time rho = +0.553
-    phrase_density_p90 rho = -0.047
-    phrase_complex_p90 rho = +0.323
-    vocal_parts    rho = +0.473
-    talkie_frac    rho = -0.126
-    caret_frac     rho = +0.045
-    plus_frac      rho = +0.268
-    short_frac     rho = -0.006
-    short_moving_frac rho = +0.316
-    strongest single factor: top_note (rho +0.594)
+    syllables_total rho = +0.270
+    tubes_total    rho = +0.344
+    syl_density_avg rho = +0.043
+    syl_density_peak rho = +0.168
+    tube_density_avg rho = +0.157
+    tube_density_peak rho = +0.261
+    pc_change_rate rho = +0.433
+    phrase_syl_mean rho = +0.125
+    phrase_syl_peak rho = +0.191
+    phrase_len_mean rho = +0.053
+    pc_interval_mean rho = +0.265
+    pc_interval_p90 rho = +0.230
+    pc_range       rho = +0.285
+    semi_interval_mean rho = +0.317
+    semi_interval_p90 rho = +0.268
+    pc_interval_mean_p rho = +0.208
+    pc_interval_p90_p rho = +0.171
+    pc_range_p     rho = +0.342
+    pc_change_rate_p rho = +0.431
+    entropy_h2_rel_p rho = +0.478
+    semi_interval_mean_p rho = +0.281
+    semi_interval_p90_p rho = +0.238
+    pitched_frac   rho = +0.095
+    notated_range  rho = +0.425
+    pitch_mean     rho = +0.400
+    pitch_p90      rho = +0.476
+    octave_jump_rate rho = +0.333
+    longest_note_s rho = +0.196
+    breath_load    rho = +0.122
+    longtime_frac  rho = +0.126
+    top_note       rho = +0.567
+    high_time_67   rho = +0.478
+    high_time_70   rho = +0.556
+    high_hold_time_70 rho = +0.279
+    high_longest_note_70 rho = +0.281
+    high_reentry_rate_70 rho = +0.285
+    pitch_p98_time rho = +0.559
+    phrase_density_p90 rho = +0.080
+    phrase_complex_p90 rho = +0.382
+    vocal_parts    rho = +0.437
+    talkie_frac    rho = -0.095
+    caret_frac     rho = +0.005
+    plus_frac      rho = +0.264
+    short_frac     rho = +0.074
+    short_moving_frac rho = +0.341
+    strongest single factor: top_note (rho +0.567)
 
   -- 5-fold cross-validated fit, evaluated on rb3_dlc --
-    with lego (weighted)   usable  83.4%   rho +0.581   MAE  48.7   (n=157)
-    rb3_dlc alone          usable  80.9%   rho +0.541   MAE  53.2   (n=157)
+    with lego (weighted)   usable  88.2%   rho +0.672   MAE  47.0   (n=313)
+    rb3_dlc alone          usable  86.3%   rho +0.658   MAE  47.8   (n=313)
 
     grade distribution (rhythm-game style):
-      PERFECT  exact tier      63    40.1%
-      GOOD     1 tier off      68    43.3%
-      BAD      2 tiers off     22    14.0%
-      MISS     3+ tiers off     4     2.5%
-      ->       usable         131    83.4%
+      PERFECT  exact tier     131    41.9%
+      GOOD     1 tier off     145    46.3%
+      BAD      2 tiers off     28     8.9%
+      MISS     3+ tiers off     9     2.9%
+      ->       usable         276    88.2%
 
-    VERDICT: FAIR - 83% usable, 3% total misses; worth improving before shipping
+    VERDICT: FAIR - 88% usable, 3% total misses; worth improving before shipping
 
   -- leaner factor sets, same cross-validation --
-    lean 2 (speed+volume)  usable  82.2%   rho -0.170   MAE  58.0   (n=157)
-    lean 4 (+tight, chord) usable  82.2%   rho -0.084   MAE  57.8   (n=157)
-    lean 6 (+endurance)    usable  81.5%   rho +0.203   MAE  54.9   (n=157)
-    no interactions        usable  81.5%   rho +0.203   MAE  54.9   (n=157)
-    movement + speed       usable  82.2%   rho -0.084   MAE  57.8   (n=157)
-    solo concentration     usable  82.2%   rho -0.084   MAE  57.8   (n=157)
+    lean 2 (speed+volume)  usable  76.7%   rho -0.028   MAE  63.3   (n=313)
+    lean 4 (+tight, chord) usable  76.7%   rho +0.066   MAE  63.0   (n=313)
+    lean 6 (+endurance)    usable  75.1%   rho +0.255   MAE  60.1   (n=313)
+    no interactions        usable  75.1%   rho +0.255   MAE  60.1   (n=313)
+    movement + speed       usable  76.7%   rho +0.066   MAE  63.0   (n=313)
+    solo concentration     usable  76.7%   rho +0.066   MAE  63.0   (n=313)
 
   -- coefficients (standardized; full fit, interpretation only) --
-    playing_s        -35.90
+    playing_s        -17.94
     density_avg       +0.00
     density_peak      +0.00
     change_rate       +0.00
     attack_density_avg    +0.00
     attack_density_peak    +0.00
-    tight_p10        +14.99
-    tight_med         -4.13
+    tight_p10         +8.10
+    tight_med         -0.66
     chord_size_mean    +0.00
     chord_span_mean    +0.00
     chord_change_frac    +0.00
@@ -946,114 +974,121 @@ Rows: 1061
     pro_stations_peak    +0.00
     repetition        +0.00
     entropy_h2        +0.00
-    entropy_h2_rel   +42.87
+    entropy_h2_rel   +30.61
     complex_peak      +0.00
     notes_total       +0.00
     total_changes     +0.00
-    syllables_total   +19.07
-    tubes_total      +16.26
-    syl_density_avg   +28.33
-    syl_density_peak    +3.56
-    tube_density_avg   -63.27
-    tube_density_peak    +3.35
-    pc_change_rate   -90.72
-    phrase_syl_mean   +21.66
-    phrase_syl_peak    +2.78
-    phrase_len_mean   -25.30
-    pc_interval_mean   +22.40
-    pc_interval_p90    -0.97
-    pc_range          +4.28
-    semi_interval_mean   -40.77
-    semi_interval_p90   +37.98
-    pc_interval_mean_p   -95.91
-    pc_interval_p90_p   +11.22
-    pc_range_p        +3.59
-    pc_change_rate_p   +93.05
-    entropy_h2_rel_p   -19.88
-    semi_interval_mean_p  +105.23
-    semi_interval_p90_p   -37.52
-    pitched_frac     -17.74
-    notated_range     +5.89
-    pitch_mean       -34.04
-    pitch_p90        +26.84
-    octave_jump_rate    -5.02
-    longest_note_s    +8.84
-    breath_load      -19.97
-    longtime_frac    +28.28
-    top_note          +4.97
-    high_time_67      +1.54
-    high_time_70     +20.58
-    high_hold_time_70   -27.22
-    high_longest_note_70   +21.74
-    high_reentry_rate_70    -4.68
-    pitch_p98_time    +4.91
-    phrase_density_p90    +7.28
-    phrase_complex_p90   +17.25
-    vocal_parts      +17.91
-    talkie_frac      +16.94
-    caret_frac        +4.63
-    plus_frac        +29.26
-    short_frac       -14.31
-    short_moving_frac   +28.08
-    is_lego           -5.63  <- scale shift, not a difficulty factor
-    (intercept)     +243.03
+    syllables_total    -7.69
+    tubes_total      +33.85
+    syl_density_avg   -55.80
+    syl_density_peak   -12.35
+    tube_density_avg   +34.03
+    tube_density_peak   +12.22
+    pc_change_rate   -27.43
+    phrase_syl_mean   +18.57
+    phrase_syl_peak    +7.12
+    phrase_len_mean   -23.65
+    pc_interval_mean   +21.70
+    pc_interval_p90    -3.84
+    pc_range         -17.94
+    semi_interval_mean   -25.14
+    semi_interval_p90   +21.79
+    pc_interval_mean_p   -58.31
+    pc_interval_p90_p   +14.59
+    pc_range_p       +18.20
+    pc_change_rate_p   +22.81
+    entropy_h2_rel_p   -10.61
+    semi_interval_mean_p   +66.92
+    semi_interval_p90_p   -25.65
+    pitched_frac     -11.42
+    notated_range     +1.45
+    pitch_mean        -6.33
+    pitch_p90        -23.11
+    octave_jump_rate    +0.83
+    longest_note_s    +7.72
+    breath_load       -3.51
+    longtime_frac    +11.42
+    top_note          +4.62
+    high_time_67      +5.41
+    high_time_70     +15.37
+    high_hold_time_70    -8.63
+    high_longest_note_70    +5.53
+    high_reentry_rate_70    +1.81
+    pitch_p98_time   +25.10
+    phrase_density_p90    +4.73
+    phrase_complex_p90   +11.85
+    vocal_parts      +16.21
+    talkie_frac      +11.61
+    caret_frac        -0.18
+    plus_frac        -11.59
+    short_frac       -17.14
+    short_moving_frac   +30.74
+    is_lego           -6.20  <- scale shift, not a difficulty factor
+    is_rb2           +11.32  <- scale shift, not a difficulty factor
+    (intercept)     +255.74
 
   -- worst 10 by tier distance, cross-validated --
-    phantomoftheopera        rb3_dlc  rank 468   said tier 3, actual 6  (3 off, rank -213)
-    waitingfortheend         rb3_dlc  rank 255   said tier 6, actual 3  (3 off, rank +198)
-    youthofthenation         rb3_dlc  rank 189   said tier 5, actual 2  (3 off, rank +185)
-    pianoman                 rb3_dlc  rank 283   said tier 1, actual 4  (3 off, rank -138)
-    somebodytolove2          rb3_dlc  rank 495   said tier 4, actual 6  (2 off, rank -177)
-    seventhson               rb3_dlc  rank 395   said tier 3, actual 5  (2 off, rank -171)
-    dontstopmenow            rb3_dlc  rank 457   said tier 4, actual 6  (2 off, rank -148)
-    flightoficarus           rb3_dlc  rank 442   said tier 4, actual 6  (2 off, rank -142)
-    leftbehind               rb3_dlc  rank 177   said tier 4, actual 2  (2 off, rank +142)
-    dreampolice              rb3_dlc  rank 220   said tier 5, actual 3  (2 off, rank +134)
+    antsmarching             rb3_dlc  rank 441   said tier 2, actual 6  (4 off, rank -238)
+    nookie2                  rb3_dlc  rank 216   said tier 5, actual 2  (3 off, rank +198)
+    nightsonbroadway         rb3_dlc  rank 470   said tier 3, actual 6  (3 off, rank -191)
+    phantomoftheopera        rb3_dlc  rank 468   said tier 3, actual 6  (3 off, rank -190)
+    sometimessalvation       rb3_dlc  rank 460   said tier 3, actual 6  (3 off, rank -186)
+    raiseyourglass           rb3_dlc  rank 437   said tier 3, actual 6  (3 off, rank -186)
+    spoonman2                rb3_dlc  rank 437   said tier 3, actual 6  (3 off, rank -165)
+    alliwannado              rb3_dlc  rank 438   said tier 3, actual 6  (3 off, rank -163)
+    pianoman                 rb3_dlc  rank 283   said tier 1, actual 4  (3 off, rank -119)
+    oneweek                  rb3_dlc  rank 394   said tier 3, actual 5  (2 off, rank -162)
 
-  -- origin check: rb3_dlc-only model applied to lego out of sample --
+  -- origin check: rb3_dlc-only model applied to each origin out of sample --
     mean (pred - actual) on rb3_dlc itself : -0.0   <- ~0 by construction
-    mean (pred - actual) on lego           : +17.8   <- the scale offset
-    -> lego rates the same chart about 18 rank points LOWER than RB3.
-       Absorbed by the is_lego column; a new song predicts with is_lego = 0,
+    mean (pred - actual) on lego     : +30.9  (n=45)   <- the scale offset
+    -> lego rates the same chart about 31 rank points LOWER than RB3.
+       Absorbed by the is_lego column; a new song predicts with it at 0,
        i.e. on the RB3 scale.
+       by rank band: 1-200: +45 (n=28),  200-300: +24 (n=13),  300-up: -45 (n=4)
+    mean (pred - actual) on rb2      : -93.8  (n=15)   <- the scale offset
+    -> rb2 rates the same chart about 94 rank points HIGHER than RB3.
+       Absorbed by the is_rb2 column; a new song predicts with it at 0,
+       i.e. on the RB3 scale.
+       by rank band: 1-200: +27 (n=4),  200-300: -83 (n=3),  300-up: -158 (n=8)
 
   -- controlled patterns: skipped for vocals --
     The synthetic charts here are gem runs with no lyrics and no phrases,
     so every vocal factor would read 0 and the rating would be arithmetic
     on an empty chart. Vocals needs its own pattern builder.
 
-==============  KEYS  (n=122 fitted)  ==============
-  rows: 122 rb3_dlc (the target), 0 lego (weight 0.30), 0 excluded from all fits
+==============  KEYS  (n=251 fitted)  ==============
+  rows: 251 rb3_dlc (the target), no auxiliary origins, 0 excluded from all fits
   disputed labels held out: 0 of 0 on the list (cap ~2% of the corpus)
-  playing spans: 122 from animation events, 0 from the fallback
-  packs: 60 distinct across the rb3_dlc rows; largest holds 12 (10%)
+  playing spans: 251 from animation events, 0 from the fallback
+  packs: 134 distinct across the rb3_dlc rows; largest holds 12 (5%)
 
   -- individual factors vs rank, rb3_dlc only (Spearman) --
-    playing_s      rho = +0.321
-    density_avg    rho = +0.630
-    density_peak   rho = +0.784
-    change_rate    rho = +0.678
-    attack_density_avg rho = +0.657
-    attack_density_peak rho = +0.800
-    tight_p10      rho = -0.481
-    tight_med      rho = -0.624
-    chord_size_mean rho = +0.114
-    chord_span_mean rho = -0.009
-    chord_change_frac rho = +0.033
-    sounding_size_mean rho = +0.037
-    overlap_frac   rho = -0.079
-    held_change_frac rho = +0.033
-    move_mean      rho = -0.070
-    move_p90       rho = +0.014
-    anchor_frac    rho = +0.075
-    solo_frac_marked rho = +0.396
-    solo_change_ratio rho = +0.400
-    sustain_frac   rho = -0.372
+    playing_s      rho = +0.413
+    density_avg    rho = +0.648
+    density_peak   rho = +0.742
+    change_rate    rho = +0.660
+    attack_density_avg rho = +0.650
+    attack_density_peak rho = +0.792
+    tight_p10      rho = -0.576
+    tight_med      rho = -0.628
+    chord_size_mean rho = +0.116
+    chord_span_mean rho = +0.004
+    chord_change_frac rho = +0.047
+    sounding_size_mean rho = +0.038
+    overlap_frac   rho = -0.039
+    held_change_frac rho = +0.096
+    move_mean      rho = -0.041
+    move_p90       rho = +0.003
+    anchor_frac    rho = +0.097
+    solo_frac_marked rho = +0.411
+    solo_change_ratio rho = +0.396
+    sustain_frac   rho = -0.448
     solo_frac      rho = n/a
     force_hopo_rate rho = n/a
     force_strum_rate rho = n/a
     tremolo_frac   rho = n/a
-    trill_frac     rho = +0.204
+    trill_frac     rho = +0.255
     gliss_frac     rho = n/a
     shift_rate     rho = n/a
     shift_span_mean rho = n/a
@@ -1067,19 +1102,19 @@ Rows: 1061
     stick_size_mean rho = n/a
     tom_frac       rho = n/a
     roll_frac      rho = n/a
-    offbeat_frac   rho = +0.430
+    offbeat_frac   rho = +0.555
     pro_total_changes rho = n/a
     pro_change_rate rho = n/a
     pro_tight_p10  rho = n/a
     pro_tight_med  rho = n/a
     pro_entropy_h2 rho = n/a
     pro_stations_peak rho = n/a
-    repetition     rho = -0.008
-    entropy_h2     rho = +0.579
-    entropy_h2_rel rho = +0.613
-    complex_peak   rho = +0.840
-    notes_total    rho = +0.711
-    total_changes  rho = +0.732
+    repetition     rho = -0.050
+    entropy_h2     rho = +0.576
+    entropy_h2_rel rho = +0.567
+    complex_peak   rho = +0.822
+    notes_total    rho = +0.772
+    total_changes  rho = +0.753
     syllables_total rho = n/a
     tubes_total    rho = n/a
     syl_density_avg rho = n/a
@@ -1125,46 +1160,55 @@ Rows: 1061
     plus_frac      rho = n/a
     short_frac     rho = n/a
     short_moving_frac rho = n/a
-    strongest single factor: complex_peak (rho +0.840)
+    strongest single factor: complex_peak (rho +0.822)
 
   -- 5-fold cross-validated fit, evaluated on rb3_dlc --
-    with lego (weighted)   fit failed
-    rb3_dlc alone          fit failed
+    with lego (weighted)   usable  91.6%   rho +0.832   MAE  38.7   (n=251)
+    rb3_dlc alone          usable  91.6%   rho +0.832   MAE  38.7   (n=251)
+
+    grade distribution (rhythm-game style):
+      PERFECT  exact tier     124    49.4%
+      GOOD     1 tier off     106    42.2%
+      BAD      2 tiers off     18     7.2%
+      MISS     3+ tiers off     3     1.2%
+      ->       usable         230    91.6%
+
+    VERDICT: GOOD - 92% land within one tier; usable as an advisory suggestion
 
   -- leaner factor sets, same cross-validation --
-    lean 2 (speed+volume)  usable  87.7%   rho +0.808   MAE  42.3   (n=122)
-    lean 4 (+tight, chord) usable  90.2%   rho +0.819   MAE  42.0   (n=122)
-    lean 6 (+endurance)    usable  90.2%   rho +0.817   MAE  42.3   (n=122)
-    no interactions        usable  88.5%   rho +0.815   MAE  41.7   (n=122)
-    movement + speed       usable  87.7%   rho +0.819   MAE  42.0   (n=122)
-    solo concentration     usable  87.7%   rho +0.812   MAE  43.4   (n=122)
+    lean 2 (speed+volume)  usable  88.8%   rho +0.831   MAE  40.9   (n=251)
+    lean 4 (+tight, chord) usable  88.4%   rho +0.832   MAE  41.2   (n=251)
+    lean 6 (+endurance)    usable  88.8%   rho +0.832   MAE  41.2   (n=251)
+    no interactions        usable  88.4%   rho +0.813   MAE  41.8   (n=251)
+    movement + speed       usable  88.8%   rho +0.826   MAE  41.7   (n=251)
+    solo concentration     usable  89.6%   rho +0.839   MAE  40.1   (n=251)
 
   -- coefficients (standardized; full fit, interpretation only) --
-    playing_s         +6.33
-    density_avg      +10.77
-    density_peak      -1.55
-    change_rate       +0.71
-    attack_density_avg   +10.70
-    attack_density_peak   +39.43
-    tight_p10         -2.66
-    tight_med         +8.90
-    chord_size_mean   -58.29
-    chord_span_mean    -4.05
-    chord_change_frac    +1.61
-    sounding_size_mean   +69.34
-    overlap_frac     -17.51
-    held_change_frac    +5.21
-    move_mean        -11.12
-    move_p90         +19.73
-    anchor_frac       -5.22
-    solo_frac_marked    +2.07
-    solo_change_ratio    +2.67
-    sustain_frac      +2.42
+    playing_s        +16.29
+    density_avg       -8.78
+    density_peak     -15.83
+    change_rate      +20.26
+    attack_density_avg    +6.95
+    attack_density_peak   +42.41
+    tight_p10         -3.47
+    tight_med         +2.52
+    chord_size_mean    -8.40
+    chord_span_mean    -1.62
+    chord_change_frac    +0.57
+    sounding_size_mean   +21.50
+    overlap_frac      +0.89
+    held_change_frac    +5.41
+    move_mean         -4.99
+    move_p90          +3.36
+    anchor_frac       -6.02
+    solo_frac_marked    +6.45
+    solo_change_ratio    -2.57
+    sustain_frac      +3.83
     solo_frac         +0.00
     force_hopo_rate    +0.00
     force_strum_rate    +0.00
     tremolo_frac      +0.00
-    trill_frac        -8.53
+    trill_frac        -6.00
     gliss_frac        +0.00
     shift_rate        +0.00
     shift_span_mean    +0.00
@@ -1178,19 +1222,19 @@ Rows: 1061
     stick_size_mean    +0.00
     tom_frac          +0.00
     roll_frac         +0.00
-    offbeat_frac      +4.01
+    offbeat_frac     +10.87
     pro_total_changes    +0.00
     pro_change_rate    +0.00
     pro_tight_p10     +0.00
     pro_tight_med     +0.00
     pro_entropy_h2    +0.00
     pro_stations_peak    +0.00
-    repetition        -1.15
-    entropy_h2        +1.71
-    entropy_h2_rel   +20.04
-    complex_peak     +25.26
-    notes_total       -8.95
-    total_changes    +12.12
+    repetition        -8.61
+    entropy_h2        +5.03
+    entropy_h2_rel    -1.31
+    complex_peak     +32.94
+    notes_total      +18.45
+    total_changes    -10.16
     syllables_total    +0.00
     tubes_total       +0.00
     syl_density_avg    +0.00
@@ -1237,78 +1281,91 @@ Rows: 1061
     short_frac        +0.00
     short_moving_frac    +0.00
     is_lego             n/a  <- no lego rows exist for this instrument
-    (intercept)     +281.03
+    is_rb2              n/a  <- no rb2 rows exist for this instrument
+    (intercept)     +275.83
+
+  -- worst 10 by tier distance, cross-validated --
+    deathontwolegs           rb3_dlc  rank 436   said tier 0, actual 5  (5 off, rank -346)
+    surrender                rb3_dlc  rank 158   said tier 4, actual 1  (3 off, rank +222)
+    whativedone2             rb3_dlc  rank 146   said tier 3, actual 0  (3 off, rank +124)
+    crippledinside           rb3_dlc  rank 470   said tier 4, actual 6  (2 off, rank -139)
+    iveseenallgoodpeople     rb3_dlc  rank 460   said tier 4, actual 6  (2 off, rank -131)
+    tenementfunster          rb3_dlc  rank 181   said tier 3, actual 1  (2 off, rank +130)
+    nowimhere                rb3_dlc  rank 180   said tier 3, actual 1  (2 off, rank +121)
+    weirdscience             rb3_dlc  rank 445   said tier 4, actual 6  (2 off, rank -115)
+    starshiptrooper          rb3_dlc  rank 476   said tier 4, actual 6  (2 off, rank -114)
+    livingdeadgirl           rb3_dlc  rank 359   said tier 2, actual 4  (2 off, rank -112)
 
   -- controlled patterns through the fitted model --
-    (synthetic charts, difficulty known by construction; is_lego = 0)
-    240x 16ths @ 60 bpm                rank    144   tier 0  (Warmup)
-    240x 16ths @ 120 bpm               rank    279   tier 3  (Moderate)
-    240x 16ths @ 180 bpm               rank    416   tier 5  (Nightmare)
-    240x 16ths @ 240 bpm               rank    553   tier 6  (Impossible)   <-- EXTRAPOLATED (corpus 130-488)
-    240 notes, even 8ths               rank    145   tier 0  (Warmup)
-    240 notes, half slow + 32nd burst  rank    316   tier 3  (Moderate)
-      the same, burst marked as solo   rank    364   tier 4  (Challenging)
+    (synthetic charts, difficulty known by construction; origin flags = 0)
+    240x 16ths @ 60 bpm                rank    189   tier 1  (Apprentice)
+    240x 16ths @ 120 bpm               rank    337   tier 4  (Challenging)
+    240x 16ths @ 180 bpm               rank    488   tier 6  (Impossible)
+    240x 16ths @ 240 bpm               rank    639   tier 6  (Impossible)   <-- EXTRAPOLATED (corpus 90-495)
+    240 notes, even 8ths               rank    188   tier 1  (Apprentice)
+    240 notes, half slow + 32nd burst  rank    324   tier 3  (Moderate)
+      the same, burst marked as solo   rank    325   tier 3  (Moderate)
       the last two differ only in whether the hard part is MARKED, which is
       what solo_change_ratio is supposed to notice.
 
-==============  REAL_KEYS  (n=122 fitted)  ==============
-  rows: 122 rb3_dlc (the target), 0 lego (weight 0.30), 0 excluded from all fits
+==============  REAL_KEYS  (n=251 fitted)  ==============
+  rows: 251 rb3_dlc (the target), no auxiliary origins, 0 excluded from all fits
   disputed labels held out: 0 of 0 on the list (cap ~2% of the corpus)
-  playing spans: 122 from animation events, 0 from the fallback
-  packs: 60 distinct across the rb3_dlc rows; largest holds 12 (10%)
+  playing spans: 251 from animation events, 0 from the fallback
+  packs: 134 distinct across the rb3_dlc rows; largest holds 12 (5%)
 
   -- individual factors vs rank, rb3_dlc only (Spearman) --
-    playing_s      rho = +0.299
-    density_avg    rho = +0.592
-    density_peak   rho = +0.739
-    change_rate    rho = +0.649
-    attack_density_avg rho = +0.636
-    attack_density_peak rho = +0.772
-    tight_p10      rho = -0.417
-    tight_med      rho = -0.622
-    chord_size_mean rho = +0.103
-    chord_span_mean rho = -0.049
-    chord_change_frac rho = +0.041
-    sounding_size_mean rho = +0.025
-    overlap_frac   rho = -0.074
-    held_change_frac rho = +0.075
-    move_mean      rho = -0.006
-    move_p90       rho = +0.092
-    anchor_frac    rho = +0.078
-    solo_frac_marked rho = +0.395
-    solo_change_ratio rho = +0.363
-    sustain_frac   rho = -0.374
+    playing_s      rho = +0.413
+    density_avg    rho = +0.622
+    density_peak   rho = +0.698
+    change_rate    rho = +0.654
+    attack_density_avg rho = +0.638
+    attack_density_peak rho = +0.770
+    tight_p10      rho = -0.495
+    tight_med      rho = -0.644
+    chord_size_mean rho = +0.142
+    chord_span_mean rho = +0.001
+    chord_change_frac rho = +0.069
+    sounding_size_mean rho = +0.070
+    overlap_frac   rho = -0.059
+    held_change_frac rho = +0.128
+    move_mean      rho = +0.050
+    move_p90       rho = +0.114
+    anchor_frac    rho = +0.112
+    solo_frac_marked rho = +0.390
+    solo_change_ratio rho = +0.351
+    sustain_frac   rho = -0.463
     solo_frac      rho = n/a
     force_hopo_rate rho = n/a
     force_strum_rate rho = n/a
     tremolo_frac   rho = n/a
-    trill_frac     rho = +0.270
-    gliss_frac     rho = +0.234
-    shift_rate     rho = +0.458
-    shift_span_mean rho = +0.215
-    finger_reassign_mean rho = -0.140
-    finger_reassign_p90 rho = -0.046
-    finger_reassign_peak rho = +0.646
-    held_independence_peak rho = +0.019
+    trill_frac     rho = +0.296
+    gliss_frac     rho = +0.276
+    shift_rate     rho = +0.434
+    shift_span_mean rho = +0.227
+    finger_reassign_mean rho = -0.068
+    finger_reassign_p90 rho = -0.011
+    finger_reassign_peak rho = +0.656
+    held_independence_peak rho = -0.005
     kick_density   rho = n/a
     kick_density_peak rho = n/a
     hand_density_peak rho = n/a
     stick_size_mean rho = n/a
     tom_frac       rho = n/a
     roll_frac      rho = n/a
-    offbeat_frac   rho = +0.436
+    offbeat_frac   rho = +0.555
     pro_total_changes rho = n/a
     pro_change_rate rho = n/a
     pro_tight_p10  rho = n/a
     pro_tight_med  rho = n/a
     pro_entropy_h2 rho = n/a
     pro_stations_peak rho = n/a
-    repetition     rho = -0.186
-    entropy_h2     rho = +0.514
-    entropy_h2_rel rho = +0.536
-    complex_peak   rho = +0.797
-    notes_total    rho = +0.678
-    total_changes  rho = +0.692
+    repetition     rho = -0.228
+    entropy_h2     rho = +0.516
+    entropy_h2_rel rho = +0.540
+    complex_peak   rho = +0.761
+    notes_total    rho = +0.750
+    total_changes  rho = +0.745
     syllables_total rho = n/a
     tubes_total    rho = n/a
     syl_density_avg rho = n/a
@@ -1354,72 +1411,81 @@ Rows: 1061
     plus_frac      rho = n/a
     short_frac     rho = n/a
     short_moving_frac rho = n/a
-    strongest single factor: complex_peak (rho +0.797)
+    strongest single factor: attack_density_peak (rho +0.770)
 
   -- 5-fold cross-validated fit, evaluated on rb3_dlc --
-    with lego (weighted)   fit failed
-    rb3_dlc alone          fit failed
+    with lego (weighted)   usable  88.8%   rho +0.833   MAE  42.2   (n=251)
+    rb3_dlc alone          usable  88.8%   rho +0.833   MAE  42.2   (n=251)
+
+    grade distribution (rhythm-game style):
+      PERFECT  exact tier     110    43.8%
+      GOOD     1 tier off     113    45.0%
+      BAD      2 tiers off     23     9.2%
+      MISS     3+ tiers off     5     2.0%
+      ->       usable         223    88.8%
+
+    VERDICT: FAIR - 89% usable, 2% total misses; worth improving before shipping
 
   -- leaner factor sets, same cross-validation --
-    lean 2 (speed+volume)  usable  79.5%   rho +0.784   MAE  47.4   (n=122)
-    lean 4 (+tight, chord) usable  81.1%   rho +0.799   MAE  46.2   (n=122)
-    lean 6 (+endurance)    usable  81.1%   rho +0.797   MAE  46.8   (n=122)
-    no interactions        usable  83.6%   rho +0.790   MAE  45.6   (n=122)
-    movement + speed       usable  84.4%   rho +0.828   MAE  45.7   (n=122)
-    solo concentration     usable  80.3%   rho +0.790   MAE  47.9   (n=122)
+    lean 2 (speed+volume)  usable  85.3%   rho +0.814   MAE  45.0   (n=251)
+    lean 4 (+tight, chord) usable  84.9%   rho +0.816   MAE  45.4   (n=251)
+    lean 6 (+endurance)    usable  85.3%   rho +0.815   MAE  45.4   (n=251)
+    no interactions        usable  86.9%   rho +0.803   MAE  46.0   (n=251)
+    movement + speed       usable  85.3%   rho +0.811   MAE  45.3   (n=251)
+    solo concentration     usable  85.7%   rho +0.801   MAE  46.0   (n=251)
 
   -- coefficients (standardized; full fit, interpretation only) --
-    playing_s        +31.49
-    density_avg      +44.17
-    density_peak     -17.42
-    change_rate      -12.88
-    attack_density_avg   +25.67
-    attack_density_peak   +61.93
-    tight_p10         -4.94
-    tight_med         +6.48
-    chord_size_mean    -1.56
-    chord_span_mean   -10.58
-    chord_change_frac    -6.93
-    sounding_size_mean   +21.10
-    overlap_frac      -4.96
-    held_change_frac    +4.69
-    move_mean        -54.93
-    move_p90         +44.90
-    anchor_frac      -35.87
-    solo_frac_marked    -1.74
-    solo_change_ratio    -4.78
-    sustain_frac      -3.66
+    playing_s        +26.14
+    density_avg       +0.55
+    density_peak     -14.80
+    change_rate      +24.72
+    attack_density_avg   +10.56
+    attack_density_peak   +45.95
+    tight_p10         -0.78
+    tight_med         -2.53
+    chord_size_mean   -56.01
+    chord_span_mean    +0.36
+    chord_change_frac    +0.00
+    sounding_size_mean   +67.55
+    overlap_frac      -5.79
+    held_change_frac    +1.11
+    move_mean        -35.88
+    move_p90         +24.59
+    anchor_frac      -13.04
+    solo_frac_marked    -0.08
+    solo_change_ratio    -2.29
+    sustain_frac      -2.95
     solo_frac         +0.00
     force_hopo_rate    +0.00
     force_strum_rate    +0.00
     tremolo_frac      +0.00
-    trill_frac        -6.08
-    gliss_frac        -5.42
-    shift_rate       +14.16
-    shift_span_mean    -2.55
-    finger_reassign_mean   +22.92
-    finger_reassign_p90    -9.43
-    finger_reassign_peak   -30.11
-    held_independence_peak    +0.45
+    trill_frac        -8.26
+    gliss_frac        -8.22
+    shift_rate        +3.98
+    shift_span_mean    -0.65
+    finger_reassign_mean   +17.66
+    finger_reassign_p90    -9.17
+    finger_reassign_peak    -9.75
+    held_independence_peak    -6.81
     kick_density      +0.00
     kick_density_peak    +0.00
     hand_density_peak    +0.00
     stick_size_mean    +0.00
     tom_frac          +0.00
     roll_frac         +0.00
-    offbeat_frac     +10.65
+    offbeat_frac     +15.24
     pro_total_changes    +0.00
     pro_change_rate    +0.00
     pro_tight_p10     +0.00
     pro_tight_med     +0.00
     pro_entropy_h2    +0.00
     pro_stations_peak    +0.00
-    repetition       -21.72
-    entropy_h2        +1.95
-    entropy_h2_rel    -2.18
-    complex_peak     +39.84
-    notes_total      -47.87
-    total_changes    +23.22
+    repetition       -20.76
+    entropy_h2        -4.20
+    entropy_h2_rel    +3.33
+    complex_peak     +29.37
+    notes_total       +1.21
+    total_changes     -7.47
     syllables_total    +0.00
     tubes_total       +0.00
     syl_density_avg    +0.00
@@ -1466,17 +1532,30 @@ Rows: 1061
     short_frac        +0.00
     short_moving_frac    +0.00
     is_lego             n/a  <- no lego rows exist for this instrument
-    (intercept)     +291.76
+    is_rb2              n/a  <- no rb2 rows exist for this instrument
+    (intercept)     +288.43
+
+  -- worst 10 by tier distance, cross-validated --
+    deathontwolegs           rb3_dlc  rank 436   said tier 0, actual 5  (5 off, rank -356)
+    nowimhere                rb3_dlc  rank 205   said tier 4, actual 1  (3 off, rank +161)
+    somuchtosay              rb3_dlc  rank 340   said tier 1, actual 4  (3 off, rank -134)
+    captainjack              rb3_dlc  rank 324   said tier 6, actual 3  (3 off, rank +127)
+    whativedone2             rb3_dlc  rank 147   said tier 3, actual 0  (3 off, rank +123)
+    surrender                rb3_dlc  rank 178   said tier 3, actual 1  (2 off, rank +140)
+    beautifuldisaster        rb3_dlc  rank 140   said tier 2, actual 0  (2 off, rank +129)
+    wedidntstartthefire      rb3_dlc  rank 160   said tier 3, actual 1  (2 off, rank +110)
+    wearethechampions2       rb3_dlc  rank 414   said tier 3, actual 5  (2 off, rank -106)
+    rockthecasbah            rb3_dlc  rank 428   said tier 3, actual 5  (2 off, rank -104)
 
   -- controlled patterns through the fitted model --
-    (synthetic charts, difficulty known by construction; is_lego = 0)
-    240x 16ths @ 60 bpm                rank    210   tier 1  (Apprentice)
-    240x 16ths @ 120 bpm               rank    407   tier 5  (Nightmare)
-    240x 16ths @ 180 bpm               rank    611   tier 6  (Impossible)   <-- EXTRAPOLATED (corpus 135-489)
-    240x 16ths @ 240 bpm               rank    816   tier 6  (Impossible)   <-- EXTRAPOLATED (corpus 135-489)
-    240 notes, even 8ths               rank    210   tier 1  (Apprentice)
-    240 notes, half slow + 32nd burst  rank    422   tier 5  (Nightmare)
-      the same, burst marked as solo   rank    339   tier 4  (Challenging)
+    (synthetic charts, difficulty known by construction; origin flags = 0)
+    240x 16ths @ 60 bpm                rank    227   tier 2  (Solid)
+    240x 16ths @ 120 bpm               rank    434   tier 5  (Nightmare)
+    240x 16ths @ 180 bpm               rank    646   tier 6  (Impossible)   <-- EXTRAPOLATED (corpus 80-505)
+    240x 16ths @ 240 bpm               rank    859   tier 6  (Impossible)   <-- EXTRAPOLATED (corpus 80-505)
+    240 notes, even 8ths               rank    226   tier 2  (Solid)
+    240 notes, half slow + 32nd burst  rank    370   tier 4  (Challenging)
+      the same, burst marked as solo   rank    360   tier 4  (Challenging)
       the last two differ only in whether the hard part is MARKED, which is
       what solo_change_ratio is supposed to notice.
 

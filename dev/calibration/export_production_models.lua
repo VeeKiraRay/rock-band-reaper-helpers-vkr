@@ -53,7 +53,10 @@ local _out = _root .. 'lib/reaper_difficulty_models.lua'
 -- refuses a table it does not understand, which is what stops a stale artifact from being
 -- read as a plausible but wrong model.
 -- 2: added `corr`, per-model factor correlations for explanation deduplication.
-local SCHEMA = 2
+-- 3: more than one trailing origin flag. `keys` used to end with exactly is_lego; it now
+--    ends with one is_<origin> per PROTOCOL.AUX_ORIGINS entry (is_lego, is_rb2), so a
+--    consumer counting back from the end must not assume a single flag.
+local SCHEMA = 3
 
 dofile(_dir .. 'difficulty_score.lua')          -- SCORE_FACTOR_KEYS
 dofile(_dir .. 'difficulty_score_vocals.lua')   -- appends the vocal columns to it
@@ -73,8 +76,27 @@ dofile(_root .. 'lib/reaper_difficulty_predict.lua')   -- DIFFICULTY_SCALE_INV, 
 
 local SELECTIONS = {
     { inst = 'guitar',    candidate = 'full@attacks',                     scale = 'log(rank)' },
-    { inst = 'bass',      candidate = 'baseline+ent_rel@attacks',         scale = 'log(rank)' },
-    { inst = 'drum',      candidate = 'full_drum',                        scale = 'rank'      },
+    -- LOW-END CORPUS (205 -> 318 songs). Replaced 'baseline+ent_rel@attacks'. Same three
+    -- factors and the same shape, with the plain entropy rate in place of the relative
+    -- one; the leader (primary+entropy@attacks) is +0.34 points and wins only 50% of
+    -- paired repeats, nowhere near the bar, so the tie goes to the simpler model.
+    { inst = 'bass',      candidate = 'baseline+entropy',                 scale = 'log(rank)' },
+    -- TOP-END CORPUS (318 -> 379 songs). Replaced 'full_drum'. full_drum still has the
+    -- higher raw mean (95.21%) but beats this by only +0.64 points on 80% of paired
+    -- repeats, missing the predeclared bar (>1 point AND >70%), so the simpler candidate
+    -- wins. Incidental benefit: full_drum carried both halves of two
+    -- duplicate-by-construction pairs (total_changes/pro_total_changes and
+    -- change_rate/pro_change_rate are bit-identical on 278 of 316 drum rows, and
+    -- tight_p10/tight_med against their pro_ twins on all 316), whose individual
+    -- coefficients are unidentifiable - the analysis report's unridged fit splits them
+    -- into +903/-906. This candidate contains neither twin.
+    --
+    -- DRUMS IS THE UNSTABLE ONE. Across three consecutive corpus revisions the selection
+    -- has been full_drum/rank, primary+entropy/rank, and now this - because the leader's
+    -- margin sits just under the bar every time (+0.90, then +0.79, now +0.64), so tiny
+    -- data changes reorder the field. Re-read the protocol report after ANY rescore
+    -- rather than assuming this entry still matches; dev/tests checks exactly that.
+    { inst = 'drum',      candidate = 'primary+limbs+ent+offbeat',        scale = 'log(rank)' },
     -- ROUND 16. Replaced 'primary+entropy_rel+complex_peak' / rank. That model measured
     -- density in GEMS and carried chord_size_mean at -12.86 to divide chords back out of
     -- the count - which charged a real chart ~28 rank per extra note in its voicing, so
@@ -228,15 +250,16 @@ local function Collect(csv, inst)
 end
 
 -- The protocol's training partition: rb3_dlc rows minus any disputed label are the
--- development rows, lego rows are always-training at LEGO_WEIGHT, and the single greenday
--- row is neither (it is scored into the CSV but never fitted).
+-- development rows, every auxiliary origin (see PROTOCOL.AUX_ORIGINS) is always-training
+-- at its own weight, and any other origin is neither - scored into the CSV but never
+-- fitted, which is where the lone greenday row goes.
 local function Partition(d, inst)
     local target, extra, weird = {}, {}, {}
     for i, o in ipairs(d.origins) do
         if o == 'rb3_dlc' then
             if IsWeirdlyScored(d.names[i], inst) then weird[#weird + 1] = i
             else target[#target + 1] = i end
-        elseif o == 'lego' then
+        elseif AuxWeight(o) then
             extra[#extra + 1] = i
         end
     end
@@ -248,15 +271,22 @@ end
 ----------------------------------------------------------------------
 
 -- Rows in the shape RunOneRepeat builds them: the candidate's factors in declared order,
--- then the is_lego origin flag. Every product prediction passes 0 for that flag.
-local function BuildRows(d, idx, keys, pos, scale, is_lego, weight, X, ys, ws)
+-- then one origin flag per PROTOCOL.AUX_ORIGINS entry, in that order. Every product
+-- prediction passes 0 for all of them.
+--
+-- The row's ORIGIN drives the flags rather than a caller-supplied value, and the weight
+-- comes from the same table, so the design matrix here cannot disagree with the one the
+-- protocol measured - which is the whole reason the exported coefficients mean anything.
+local function BuildRows(d, idx, keys, pos, scale, X, ys, ws)
     for _, i in ipairs(idx) do
         local row = {}
         for j, k in ipairs(keys) do row[j] = d.feats[i][pos[k]] end
-        row[#row + 1] = is_lego
+        for _, a in ipairs(PROTOCOL.AUX_ORIGINS) do
+            row[#row + 1] = (d.origins[i] == a.origin) and 1 or 0
+        end
         X[#X + 1]  = row
         ys[#ys + 1] = scale.fwd(d.ranks[i])
-        ws[#ws + 1] = weight
+        ws[#ws + 1] = AuxWeight(d.origins[i]) or 1.0
     end
 end
 
@@ -281,10 +311,10 @@ local function ChooseRidgePooled(d, target, extra, inst, keys, pos, scale)
                 if g ~= f then
                     local rows = {}
                     for _, ti in ipairs(folds[g]) do rows[#rows + 1] = target[ti] end
-                    BuildRows(d, rows, keys, pos, scale, 0, 1.0, X, ys, ws)
+                    BuildRows(d, rows, keys, pos, scale, X, ys, ws)
                 end
             end
-            BuildRows(d, extra, keys, pos, scale, 1, PROTOCOL.LEGO_WEIGHT, X, ys, ws)
+            BuildRows(d, extra, keys, pos, scale, X, ys, ws)
 
             -- The protocol's own nested search, but scoring every grid value instead of
             -- keeping only the winner. KFoldIndices is deterministic round-robin, so the
@@ -387,8 +417,8 @@ end
 -- made on the RB3 scale, so the correlations the product reasons about are RB3's.
 --
 -- Only pairs at or above the threshold are emitted - the artifact carries what it needs to
--- suppress a restatement, not a full matrix. is_lego is excluded: it is a training-time
--- origin flag and can never be a bullet.
+-- suppress a restatement, not a full matrix. The origin flags are excluded: they are
+-- training-time indicators and can never be a bullet.
 ----------------------------------------------------------------------
 
 -- Below this two factors are treated as saying different things. Must not be raised above
@@ -415,7 +445,7 @@ end
 local function FactorCorrelations(d, target, keys, pos)
     local cols = {}
     for _, k in ipairs(keys) do
-        if k ~= 'is_lego' then
+        if not k:match('^is_') then
             local vals = {}
             for _, i in ipairs(target) do vals[#vals + 1] = d.feats[i][pos[k]] end
             cols[k] = vals
@@ -571,9 +601,11 @@ for _, sel in ipairs(SELECTIONS) do
         for _, k in ipairs(cand.keys) do
             if not pos[k] then Fail('%s: factor %s is not in SCORE_FACTOR_KEYS', sel.inst, k) end
             if seen[k] then Fail('%s: factor %s is declared twice', sel.inst, k) end
-            -- Appended by BuildRows, so a candidate declaring it too would fit the origin
-            -- flag twice and shift every later coefficient.
-            if k == 'is_lego' then Fail('%s: is_lego is appended, not declared', sel.inst) end
+            -- Appended by BuildRows, so a candidate declaring one too would fit that
+            -- origin flag twice and shift every later coefficient.
+            if k:match('^is_') then
+                Fail('%s: %s is appended, not declared', sel.inst, k)
+            end
             seen[k] = true
         end
 
@@ -582,8 +614,21 @@ for _, sel in ipairs(SELECTIONS) do
 
         io.write(('  candidate        : %s / %s  (%d features)\n')
             :format(cand.name, scale.name, #cand.keys))
-        io.write(('  training rows    : %d rb3_dlc + %d lego at weight %.2f  (%d disputed held out)\n')
-            :format(#target, #extra, PROTOCOL.LEGO_WEIGHT, #weird))
+        -- Per origin. "+ 60 lego" would be a lie now that extra pools two origins, and a
+        -- wrong provenance line in the export log is exactly the kind of thing nobody
+        -- rechecks once it looks plausible.
+        local aux_parts = {}
+        for _, a in ipairs(PROTOCOL.AUX_ORIGINS) do
+            local n = 0
+            for _, ix in ipairs(extra) do if d.origins[ix] == a.origin then n = n + 1 end end
+            if n > 0 then
+                aux_parts[#aux_parts + 1] = ('%d %s at weight %.2f'):format(n, a.origin, a.weight)
+            end
+        end
+        io.write(('  training rows    : %d rb3_dlc + %s  (%d disputed held out)\n')
+            :format(#target,
+                    #aux_parts > 0 and table.concat(aux_parts, ' + ') or 'no auxiliary rows',
+                    #weird))
 
         if #target == 0 then
             Fail('%s: no development rows', sel.inst)
@@ -600,8 +645,8 @@ for _, sel in ipairs(SELECTIONS) do
 
             -- The final fit: one pass over every allowed training row at that ridge.
             local X, ys, ws = {}, {}, {}
-            BuildRows(d, target, cand.keys, pos, scale, 0, 1.0, X, ys, ws)
-            BuildRows(d, extra,  cand.keys, pos, scale, 1, PROTOCOL.LEGO_WEIGHT, X, ys, ws)
+            BuildRows(d, target, cand.keys, pos, scale, X, ys, ws)
+            BuildRows(d, extra,  cand.keys, pos, scale, X, ys, ws)
             local fit, ferr = MultiFit(X, ys, ridge, ws)
 
             if not fit then
@@ -610,7 +655,7 @@ for _, sel in ipairs(SELECTIONS) do
                 local rank_lo, rank_hi = RankRange(d, target)
                 local keys = {}
                 for i, k in ipairs(cand.keys) do keys[i] = k end
-                keys[#keys + 1] = 'is_lego'
+                for _, flag in ipairs(AuxFlagKeys()) do keys[#keys + 1] = flag end
 
                 models[#models + 1] = {
                     inst      = sel.inst,
@@ -644,7 +689,11 @@ for _, sel in ipairs(SELECTIONS) do
                     local got = DifficultyPredictRank(m, factors)
                     local row = {}
                     for j, k in ipairs(cand.keys) do row[j] = d.feats[i][pos[k]] end
-                    row[#row + 1] = 0
+                    -- One zero per auxiliary origin, matching BuildRows. Derived rather
+                    -- than a literal: a fixed count silently shortens the vector the
+                    -- moment another origin is declared, and ApplyFit then reads past
+                    -- the end of it.
+                    for _ = 1, #PROTOCOL.AUX_ORIGINS do row[#row + 1] = 0 end
                     local want = scale.inv(ApplyFit(row, fit))
                     want = math.max(rank_lo, math.min(rank_hi, want))
                     local diff = math.abs(got - want)
@@ -687,8 +736,9 @@ W([[
 -- nothing applied to raw factors by hand.
 --
 -- Field notes:
---   keys        factor order. The LAST entry is always is_lego, a training-time origin
---               flag; product predictions always pass 0 for it.
+--   keys        factor order. The TRAILING entries are the training-time origin flags,
+--               one per PROTOCOL.AUX_ORIGINS entry and named is_<origin>; product
+--               predictions always pass 0 for every one of them.
 --   mean / sd   standardization statistics from the fit, over ALL training rows including
 --               the down-weighted lego ones. Only valid paired with these coefs.
 --   rank_lo/hi  observed rank range of the rb3_dlc training rows. The final rank is

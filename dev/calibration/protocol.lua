@@ -52,6 +52,23 @@ PROTOCOL = {
     -- Down-weight on the Lego-era rows, unchanged from earlier rounds (a sweep from 0
     -- to 1.0 moved rho by at most +/-0.02, so it is not a sensitive knob).
     LEGO_WEIGHT = 0.3,
+    -- Auxiliary origins: rows that always train, are never predicted, and carry their
+    -- own indicator column so the fit can absorb a scale offset instead of smearing it
+    -- across the real factors. rb3_dlc is the target and is not listed here.
+    --
+    -- ORDER IS PART OF THE ARTIFACT. The indicators are appended in this order, so the
+    -- exported keys list ends with is_lego, is_rb2 - and reordering this table would
+    -- silently reassign every exported coefficient. Append only.
+    --
+    -- rb2 is the RB2 disc export. Its ranks are continuous like DLC's (58 of 60 sampled
+    -- values sit off a tier floor), unlike RBN's, which are all tier floors and so
+    -- cannot be regression targets at all. It starts at the Lego weight because that
+    -- number was measured to be insensitive and 13 songs cannot justify tuning a second
+    -- one; the analysis report's origin check reports its offset per run.
+    AUX_ORIGINS = {
+        { origin = 'lego', flag = 'is_lego', weight = 0.3 },
+        { origin = 'rb2',  flag = 'is_rb2',  weight = 0.3 },
+    },
     -- Gate thresholds. USABLE_FLOOR is read against the interval LOWER bound and
     -- MISS_CEILING against the miss rate's UPPER bound - both the pessimistic end, so
     -- a pass cannot come from a lucky split.
@@ -1206,10 +1223,44 @@ local function Slice(feats, keys, pos)
     return out
 end
 
-local function WithOrigin(fv, is_lego)
+-- Feature vector plus one indicator per auxiliary origin, appended in AUX_ORIGINS
+-- order. Takes the row's ORIGIN rather than a prepared flag: with more than one
+-- indicator, a caller passing flags positionally is one append away from writing a
+-- Lego 1 into the rb2 column, and nothing downstream would notice.
+local function WithOrigin(fv, origin)
     local out = {}
     for j = 1, #fv do out[j] = fv[j] end
-    out[#out + 1] = is_lego
+    for _, aux in ipairs(PROTOCOL.AUX_ORIGINS) do
+        out[#out + 1] = (origin == aux.origin) and 1 or 0
+    end
+    return out
+end
+
+-- The indicator column names, in the order WithOrigin appends them. The exporter
+-- appends these to a candidate's key list so the artifact records what each trailing
+-- coefficient belongs to.
+function AuxFlagKeys()
+    local out = {}
+    for _, aux in ipairs(PROTOCOL.AUX_ORIGINS) do out[#out + 1] = aux.flag end
+    return out
+end
+
+-- Training weight for an always-training row, or nil when the origin is not auxiliary
+-- (i.e. it is the target, or an origin excluded from every fit).
+function AuxWeight(origin)
+    for _, aux in ipairs(PROTOCOL.AUX_ORIGINS) do
+        if aux.origin == origin then return aux.weight end
+    end
+    return nil
+end
+
+-- Row indices for every auxiliary origin, pooled. These always train and are never
+-- predicted.
+function AuxIndices(origins)
+    local out = {}
+    for i, o in ipairs(origins) do
+        if AuxWeight(o) then out[#out + 1] = i end
+    end
     return out
 end
 
@@ -1265,16 +1316,16 @@ function RunOneRepeat(d, target, extra, folds, keys, pos, scale)
             if g ~= f then
                 for _, ti in ipairs(folds[g]) do
                     local i = target[ti]
-                    X[#X + 1]   = WithOrigin(feats[i], 0)
+                    X[#X + 1]   = WithOrigin(feats[i], d.origins[i])
                     ys[#ys + 1] = scale.fwd(d.ranks[i])
                     ws[#ws + 1] = 1.0
                 end
             end
         end
         for _, i in ipairs(extra) do
-            X[#X + 1]   = WithOrigin(feats[i], 1)
+            X[#X + 1]   = WithOrigin(feats[i], d.origins[i])
             ys[#ys + 1] = scale.fwd(d.ranks[i])
-            ws[#ws + 1] = PROTOCOL.LEGO_WEIGHT
+            ws[#ws + 1] = AuxWeight(d.origins[i]) or PROTOCOL.LEGO_WEIGHT
         end
 
         local ridge = ChooseRidge(X, ys, ws)
@@ -1286,7 +1337,10 @@ function RunOneRepeat(d, target, extra, folds, keys, pos, scale)
             local i = target[ti]
             local n = #pred + 1
             -- Mapped back through inv, so both scales are graded on the rank scale.
-            pred[n] = scale.inv(ApplyFit(WithOrigin(feats[i], 0), fit))
+            -- Predicted with every origin indicator at 0, i.e. on the RB3 scale, which
+            -- is the scale a custom chart should be rated on. nil is not an auxiliary
+            -- origin, so WithOrigin writes zeros for all of them.
+            pred[n] = scale.inv(ApplyFit(WithOrigin(feats[i], nil), fit))
             act[n]  = d.ranks[i]
         end
     end

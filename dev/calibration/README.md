@@ -60,9 +60,34 @@ a pack-level split doubles as the domain-shift check.
 
 Order matters: everything downstream reads the CSV the first script writes.
 
-1. **`run_calibration_vkr.lua`** — walks `_external_docs/reference_songs/`, imports each
+1. **`run_calibration_vkr.lua`** — walks every root in its own `_corpora` list, imports each
    song's MIDI, scores every instrument, appends a row per (song, instrument) to
    `corpus_scores.csv`, and writes `corpus_scores.manifest.txt`.
+
+   Two roots as of 2026-08: `_external_docs/reference_songs/` (205 songs) and
+   `_external_docs/new_reference_songs/` (157, of which 44 are also in the first — a
+   low-end set assembled by searching per instrument, so a pack easy on two instruments
+   appears in two folders). The song list is pooled and de-duplicated by shortname before
+   anything is imported, and the roots are recorded in the manifest — origin counts alone
+   cannot distinguish a corpus that includes the low-end set from one that does not, since
+   both are `rb3_dlc`.
+
+   The two layouts differ and both are handled: the original nests a pack under
+   `Root/songs/<name>/<name>.mid`, the low-end set is flat, with `songs.dta` and every MIDI
+   in one folder. A flat pack's dta describes the whole pack, so most of its entries have
+   no MIDI present and are reported rather than silently skipped.
+
+   **De-duplication prefers an entry that carries a MIDI, and this is load-bearing.** Because
+   a pack's dta names every song in the pack while only some MIDIs were extracted, the same
+   shortname is reported *with* its `midi_path` from the folder holding the file and
+   *without* it from a folder that merely lists it. The first version of the pooled walk
+   kept whichever entry came first and dropped 25 songs as MISSING MIDI whose files were
+   present under another folder — among them the songs holding the lowest drum (93), keys
+   (90) and Pro Keys (80) ranks in the corpus, so the low-end set failed at exactly the job
+   it was assembled for, and the manifest's `missing MIDI` count absorbed the loss without
+   looking wrong. Reorganising the folders on disk is not a substitute: it collapses only
+   the repeated-pack-folder case, leaving the 2 songs listed by two different packs and the
+   44 shared with the original root still needing the same rule.
 
    **Run it in a scratch project.** It imports tracks, deletes them again, and snapshots
    and restores the tempo map around each song. It is resumable — re-running skips
@@ -74,6 +99,17 @@ Order matters: everything downstream reads the CSV the first script writes.
    paired repeated cross-validation, nested ridge, and the release gate read from interval
    lower bounds. Writes `calibration_protocol_report.txt` as well as the console, because
    REAPER's console truncates at about 16 KB and this report is longer.
+
+   **Run it offline — `lua dev/calibration/run_protocol_offline.lua`.** At 318 songs the
+   in-REAPER action stopped completing: a ReaScript holds REAPER's main thread for the
+   whole computation, so the UI goes "Not responding" and the run was killed partway
+   through writing the report. The offline driver finishes the same work in about two
+   minutes, and the numbers are not merely comparable but **identical** — fold assignment
+   is explicitly seeded and both interpreters are Lua 5.4, verified by diffing against a
+   crashed run's partial report (all 59 completed lines byte-identical). Sleeps or
+   coroutines would not help; see the header of `run_protocol_offline.lua` for why. The
+   REAPER action is kept because it still works on smaller corpora and is the reference
+   the driver shims.
 
 3. **`run_calibration_analysis_vkr.lua`** — **the diagnostic view.** Per-factor Spearman
    correlations, a cross-validated all-factor fit, standardized coefficients, worst
@@ -144,6 +180,27 @@ Order matters: everything downstream reads the CSV the first script writes.
    `sustain_frac`, whose thresholds sit exactly on common note lengths — see the file
    header. It cannot prove REAPER's own MIDI APIs behave like the mock, so it complements
    the in-REAPER fixture test rather than replacing it.
+
+8. **`dev/tools/score_corpus_offline.lua`** — scores an arbitrary corpus root into
+   `corpus_scores.csv`'s exact schema, without REAPER:
+
+   ```
+   lua dev/tools/score_corpus_offline.lua _external_docs/new_reference_songs out.csv
+   ```
+
+   For **looking at a candidate corpus before committing to the REAPER pass** — row counts,
+   rank coverage, what the clamp floors would become. It resolves MIDIs by indexing every
+   `.mid` under the root by basename rather than by any path convention, so it handles both
+   layouts, packs holding several songs, and dta entries whose MIDI was never extracted.
+   Duplicate basenames are resolved silently when the bytes match and reported loudly when
+   they do not.
+
+   **Its output must never be merged into a REAPER-scored corpus.** The drift is small but
+   systematic — this converts ticks through the SMF's tempo map and the CSV through
+   REAPER's — so mixing them would put a measurement difference exactly along the new/old
+   split, which is indistinguishable from a real effect. Measured on the 44 songs present
+   in both corpora: **0 rank disagreements over 260 rows**, drift confined to `sustain_frac`
+   (13 rows) plus one guitar chart whose final playing span closes 4 s earlier.
 
 Unit tests: **`dev/tests/run_difficulty_score.lua`** for the pure scorers, and
 **`dev/tests/run_difficulty_suggester.lua`** for the tiers, the predictor, and the frozen
