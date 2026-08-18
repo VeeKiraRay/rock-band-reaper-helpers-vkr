@@ -144,6 +144,20 @@ local function SuggestOne(spec, vocal_parts)
     rec.span_source   = info.span_source
     rec.rank          = rank
     rec.raw_rank      = raw
+    -- THE INTEGER TO SHOW, and it is FLOORED rather than rounded. Both display sites used
+    -- to round independently while the tier below is taken from the unrounded rank, so any
+    -- prediction in [T-0.5, T) for a threshold T printed the tier BELOW T beside the number
+    -- T: a vocal chart at 217.6 rendered as "Solid (rank 218)" when 218 is the Moderate
+    -- floor. Solid was the correct tier - 217.6 really is below the floor - so the printed
+    -- number was the lie, and flooring is what stops a rounded integer claiming a threshold
+    -- the tier has not reached.
+    --
+    -- Flooring CANNOT disagree with the tier: every threshold in RANK_TIER_THRESHOLDS is an
+    -- integer, so floor(x) >= T exactly when x >= T. That is why this is a display-only fix
+    -- and leaves the tier, the ruler and the calibration figures alone - the alternative,
+    -- computing the tier from a rounded rank, would move every boundary down half a rank
+    -- and make the shipped tiers disagree with every usable% in the protocol report.
+    rec.rank_shown    = math.floor(rank)
     rec.clamped       = clamped
     rec.tier          = TierForRank(spec.key, rank)
     rec.tier_name     = TierName(rec.tier)

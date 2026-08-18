@@ -368,7 +368,10 @@ Test.it('the selected candidate and scale are the ones the protocol chose', func
         -- TOP-END CORPUS. Was 'full_drum' / rank / 26. Drums re-selects on almost every
         -- rescore because the leader's margin sits just under the predeclared bar, so
         -- treat a failure here as "re-read the protocol report", not as a bug.
-        drum      = { 'full_drum',                        'log(rank)', 26 },
+        -- ROUND 22. Was 'full_drum'. Same 26 factors, with the three PEAK columns swapped
+        -- for their roll-lane twins: a 126/127 lane is leniency, so the old peaks read a
+        -- free-play region as the chart's densest passage. makemesmile2 550 -> 362.
+        drum      = { 'full_drum@noroll',                 'log(rank)', 26 },
         -- ROUND 16. Was 'primary+entropy_rel+complex_peak' / rank / 8. That model counted
         -- density in gems and needed chord_size_mean to divide chords back out, which
         -- charged ~28 rank per extra note of voicing - the same music as triads landed two
@@ -377,7 +380,11 @@ Test.it('the selected candidate and scale are the ones the protocol chose', func
         -- KEYS TOP-UP moved the scale to rank; the factor list is unchanged.
         keys      = { 'primary+ent_rel+complex@attacks-chord', 'rank',      7 },
         real_keys = { 'primary+ent_rel@attacks',          'rank',      7  },
-        vocals    = { 'parts+tess+move',                  'log(rank)', 12 },
+        -- ROUND 20. Was 'parts+tess+move'. Same 12 factors, with the linear vocal_parts
+        -- term replaced by parts_3: one part and two measured 0.4 rank apart once the rest
+        -- is held, so a linear count over-credited every two-part song. The free two-step
+        -- control tied the single step exactly, which is what makes it a finding.
+        vocals    = { 'parts+tess+move@parts_step3',      'log(rank)', 12 },
     }
     for inst, want in pairs(EXPECTED) do
         local m = RB_DIFFICULTY_MODELS[inst]
@@ -602,6 +609,10 @@ local function FakeRec(inst, over)
             rec[k] = v
         end
     end
+    -- After the overrides, so a test that sets a fractional rank gets the matching
+    -- integer. Mirrors SuggestOne: FLOOR, never round - a rounded integer can name a tier
+    -- threshold the tier itself has not reached.
+    if rec.rank_shown == nil and rec.rank then rec.rank_shown = math.floor(rec.rank) end
     return rec
 end
 
@@ -646,7 +657,7 @@ end)
 Test.it('reports at most three properties, most unusual first', function()
     local rec = FakeRec('drum', { factors = {
         kick_density_peak = AtZ('drum', 'kick_density_peak', 3.0),
-        hand_density_peak = AtZ('drum', 'hand_density_peak', 2.0),
+        hand_density_peak_noroll = AtZ('drum', 'hand_density_peak_noroll', 2.0),
         stick_size_mean   = AtZ('drum', 'stick_size_mean', 1.5),
         entropy_h2        = AtZ('drum', 'entropy_h2', 1.2),
     } })
@@ -725,7 +736,7 @@ Test.it('does not spend two slots on one observation', function()
         total_changes  = AtZ('drum', 'total_changes', 3.0),
         playing_s      = AtZ('drum', 'playing_s', 2.8),
         kick_density_peak = AtZ('drum', 'kick_density_peak', 2.0),
-        hand_density_peak = AtZ('drum', 'hand_density_peak', 1.5),
+        hand_density_peak_noroll = AtZ('drum', 'hand_density_peak_noroll', 1.5),
     } })
     DifficultyAnnotate(rec)
 
@@ -745,7 +756,7 @@ Test.it('does not spend two slots on one observation', function()
 
     -- And the slot the suppressed one would have taken goes to the next distinct factor,
     -- rather than being dropped.
-    Test.expect(keys[2] == 'kick_density_peak' and keys[3] == 'hand_density_peak',
+    Test.expect(keys[2] == 'kick_density_peak' and keys[3] == 'hand_density_peak_noroll',
         'the freed slot should go to the next distinct factor, got ' .. table.concat(keys, ', '))
 end)
 
@@ -856,6 +867,68 @@ local function ReportRec(over)
     DifficultyAnnotate(rec)
     return rec
 end
+
+Test.it('the rank it PRINTS never names a tier it did not reach', function()
+    -- THE REGRESSION THIS EXISTS FOR. The card and the report each rounded the rank while
+    -- the tier came from the unrounded value, so any prediction in [T-0.5, T) printed the
+    -- tier below T beside the number T. A vocal chart at 217.6 rendered as
+    -- "Solid (rank 218)" with 218 being the Moderate floor. The suite missed it because it
+    -- checked tier and rank separately and never that the RENDERED pair agrees.
+    --
+    -- The invariant: every threshold is an integer, so flooring cannot cross one.
+    for _, inst in ipairs(RB_DIFFICULTY_MODEL_ORDER) do
+        local th = RANK_TIER_THRESHOLDS[inst]
+        for _, t in ipairs(th) do
+            for _, d in ipairs({ -0.9, -0.5, -0.4, -0.1, 0, 0.1, 0.5 }) do
+                local rank = t + d
+                local shown = math.floor(rank)
+                Test.expect(TierForRank(inst, shown) == TierForRank(inst, rank),
+                    ('%s: rank %.1f shows %d, tier %s vs %s'):format(
+                        inst, rank, shown,
+                        TierName(TierForRank(inst, rank)),
+                        TierName(TierForRank(inst, shown))))
+            end
+        end
+    end
+end)
+
+Test.it('rounding the rank WOULD have named a tier it did not reach', function()
+    -- The counter-test, so the one above cannot pass vacuously if flooring is ever
+    -- "tidied" back into rounding. Half a rank below any threshold, rounding crosses it
+    -- and the tier does not.
+    local crossings = 0
+    for _, inst in ipairs(RB_DIFFICULTY_MODEL_ORDER) do
+        for _, t in ipairs(RANK_TIER_THRESHOLDS[inst]) do
+            local rank = t - 0.4
+            if TierForRank(inst, math.floor(rank + 0.5)) ~= TierForRank(inst, rank) then
+                crossings = crossings + 1
+            end
+        end
+    end
+    Test.expect(crossings > 0,
+        'rounding should cross at least one threshold, or this test proves nothing')
+end)
+
+Test.it('the pasteable report prints the floored rank, not a rounded one', function()
+    -- Two call sites printed the rank independently and drifted; both now read
+    -- rec.rank_shown. This drives the REPORT with the exact value from the bug report -
+    -- a vocal chart just under the Moderate floor of 218 - so reverting that site to a
+    -- local round() fails here rather than in a screenshot months later. The card is
+    -- ImGui and cannot be driven from these tests, but it reads the same field.
+    local rec = FakeRec('vocals', { rank = 217.6, tier = 2, tier_name = 'Solid' })
+    Test.expect(rec.rank_shown == 217,
+        'rank_shown should floor 217.6 to 217, got ' .. tostring(rec.rank_shown))
+    DifficultyAnnotate(rec)
+    local text = DifficultyReportText({ rec })
+    Test.expect(text:find('rank 217', 1, true) ~= nil,
+        'the report should print the floored rank')
+    Test.expect(text:find('rank 218', 1, true) == nil,
+        'the report must not round up to 218, which is the Moderate floor this chart '
+        .. 'did not reach')
+    -- And the tier it prints beside that number is the one the raw rank actually earns.
+    Test.expect(TierForRank('vocals', 217.6) == 2,
+        '217.6 is Solid, so "Solid (rank 217)" is the honest pair')
+end)
 
 Test.it('lists every factor of every model exactly once', function()
     -- THE REGRESSION THIS EXISTS FOR. The hand-copied drum table that prompted the copy
@@ -1169,16 +1242,16 @@ Test.it('a tooltip, where one exists, is a real explanation', function()
     Test.expect(#missing == 0, 'factors with no wording: ' .. table.concat(missing, ', '))
 
     -- And where there is a tip it has to reach the bullet, not just sit in the table.
-    -- hand_density_peak is one of the factors that keeps one: "the busiest stretch with
+    -- hand_density_peak_noroll is one of the factors that keeps one: "the busiest stretch with
     -- the kick taken out" is not recoverable from "Very fast hand passages".
     local rec = FakeRec('drum', { factors = {
-        hand_density_peak = AtZ('drum', 'hand_density_peak', 3.0) } })
+        hand_density_peak_noroll = AtZ('drum', 'hand_density_peak_noroll', 3.0) } })
     DifficultyAnnotate(rec)
-    Test.expect(rec.explanations[1].tip == DIFFICULTY_FACTOR_INFO.hand_density_peak.tip,
+    Test.expect(rec.explanations[1].tip == DIFFICULTY_FACTOR_INFO.hand_density_peak_noroll.tip,
         'the bullet should carry its factor tip')
     local carried = false
     for _, row in ipairs(rec.factor_rows) do
-        if row.key == 'hand_density_peak' then carried = row.tip ~= nil end
+        if row.key == 'hand_density_peak_noroll' then carried = row.tip ~= nil end
     end
     Test.expect(carried, 'detail rows should carry it too')
 end)

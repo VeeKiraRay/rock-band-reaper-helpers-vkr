@@ -124,6 +124,17 @@ DIFFICULTY_FACTOR_INFO = {
     density_peak = { label = 'peak gem density', fmt = 'num',
         high = 'Very high peak gem density',
         low  = 'No especially dense passages' },
+    -- THE ROLL-LANE TWINS. A 126/127 lane is a leniency device: the notes under it are a
+    -- free-play region rather than required strikes, so the busiest window of a chart that
+    -- ends on a roll was reading the easiest bar in the song as the hardest. The label
+    -- says "outside rolls" rather than reusing the plain one, because a pasted report has
+    -- to let the reader tell which measurement produced the number.
+    density_peak_noroll = { label = 'peak gem density outside rolls', fmt = 'num',
+        high = 'Very high peak gem density',
+        low  = 'No especially dense passages',
+        tip = 'Gems per second in the busiest stretch, ignoring\n' ..
+              'anything under a roll lane - a roll does not ask\n' ..
+              'for every note under it to be hit.' },
     attack_density_avg = { label = 'average attack rate', fmt = 'num',
         high = 'A high average attack rate',
         low  = 'A low average attack rate',
@@ -133,6 +144,12 @@ DIFFICULTY_FACTOR_INFO = {
         high = 'Very high peak attack density',
         low  = 'No especially fast passages',
         tip = 'Strikes per second in the busiest stretch, counting a whole chord as one.' },
+    attack_density_peak_noroll = { label = 'peak attack rate outside rolls', fmt = 'num',
+        high = 'Very high peak attack density',
+        low  = 'No especially fast passages',
+        tip = 'Strikes per second in the busiest stretch, counting\n' ..
+              'a chord as one and ignoring anything under a roll\n' ..
+              'lane.' },
     change_rate = { label = 'change rate', fmt = 'num',
         high = 'Gem shapes change very often',
         low  = 'Gem shapes change rarely' },
@@ -234,6 +251,12 @@ DIFFICULTY_FACTOR_INFO = {
         high = 'Very fast hand passages',
         low  = 'No especially fast hand passages',
         tip = 'The busiest stretch with the kick taken out, so it is the hands alone.' },
+    hand_density_peak_noroll = { label = 'peak hand rate outside rolls', fmt = 'num',
+        high = 'Very fast hand passages',
+        low  = 'No especially fast hand passages',
+        tip = 'The busiest stretch with the kick taken out and\n' ..
+              'roll lanes ignored, so it is the hands alone on\n' ..
+              'the notes the chart actually asks for.' },
     stick_size_mean = { label = 'limbs landing together', fmt = 'num',
         high = 'Many hits land on several limbs at once',
         low  = 'Mostly single-limb streams',
@@ -296,6 +319,19 @@ DIFFICULTY_FACTOR_INFO = {
         high = 'Multiple vocal parts are associated with the official vocal scale',
         low  = 'A single vocal part',
         tip = 'How many parts the song carries, counted from the HARM tracks.' },
+    -- THE HARMONY COUNT AS A STEP RATHER THAN A NUMBER. Entering it linearly asserted that
+    -- one singer to two costs what two to three costs; measured on the corpus with the
+    -- other eleven factors held, one part and two sit 0.4 rank apart and the whole effect
+    -- is the move to three. The wording claims an ASSOCIATION and not a cause, following
+    -- vocal_parts above: three parts is the house default for a produced song, and the
+    -- official rank grades PART VOCALS alone, so this reads arrangement scale rather than
+    -- work the singer has to do.
+    parts_3 = { label = 'full three-part harmony', fmt = 'int',
+        high = 'Full three-part harmony is associated with the official vocal scale',
+        low  = 'Fewer than three vocal parts',
+        tip = 'Whether all three parts are authored. One part and\n' ..
+              'two measured the same against the official scale;\n' ..
+              'only the third separates.' },
 }
 
 ----------------------------------------------------------------------
@@ -320,7 +356,8 @@ DIFFICULTY_FACTOR_ORDER = {
     -- endurance and volume
     'playing_s', 'notes_total', 'total_changes',
     -- density
-    'density_avg', 'density_peak', 'attack_density_avg', 'attack_density_peak',
+    'density_avg', 'density_peak', 'density_peak_noroll',
+    'attack_density_avg', 'attack_density_peak', 'attack_density_peak_noroll',
     'change_rate',
     -- tightness
     'tight_p10', 'tight_med',
@@ -335,11 +372,13 @@ DIFFICULTY_FACTOR_ORDER = {
     -- predictability
     'entropy_h2', 'entropy_h2_rel', 'complex_peak',
     -- drums
-    'kick_density', 'kick_density_peak', 'hand_density_peak', 'stick_size_mean',
+    'kick_density', 'kick_density_peak', 'hand_density_peak',
+    'hand_density_peak_noroll', 'stick_size_mean',
     'tom_frac', 'roll_frac', 'offbeat_frac', 'pro_stations_peak',
     -- vocals
     'syl_density_avg', 'syl_density_peak', 'pc_change_rate', 'pc_interval_mean',
-    'notated_range', 'pitch_p90', 'high_time_70', 'octave_jump_rate', 'vocal_parts',
+    'notated_range', 'pitch_p90', 'high_time_70', 'octave_jump_rate',
+    'vocal_parts', 'parts_3',
 }
 
 local ORDER_INDEX = {}

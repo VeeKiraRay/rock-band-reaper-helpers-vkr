@@ -1059,6 +1059,38 @@ Test.it('roll lanes are a fraction of playing time, like the guitar technique la
         'and it does not leak into the guitar-named columns')
 end)
 
+Test.it('the noroll peaks discount a roll lane and the originals do NOT move', function()
+    -- makemesmile2 reduced: the densest passage sits under a roll lane, which is a
+    -- leniency device rather than a demand to hit every gem. The twin must see that and
+    -- the shipped column must not - it is fitted in five models, and silently redefining
+    -- it would re-open every instrument at once.
+    local ev = Run(64, 0.25, 120, Alternating)
+    local plain = ScoreChart(ev, SpanAll(ev), DrumOpts({}))
+    local rolled = ScoreChart(ev, SpanAll(ev),
+        DrumOpts({ roll_spans = { { s = ev[1].s, e = ev[32].e } } }))
+    Test.expect(rolled.density_peak == plain.density_peak,
+        'density_peak is untouched by the presence of a lane')
+    Test.expect(rolled.attack_density_peak == plain.attack_density_peak,
+        'and so is attack_density_peak')
+    Test.expect(rolled.density_peak_noroll < plain.density_peak_noroll,
+        'while the twin drops once half the gems stop counting')
+    Test.expect(rolled.hand_density_peak_noroll < rolled.hand_density_peak,
+        'the hand twin discounts the lane too')
+end)
+
+Test.it('an instrument with no roll lanes gets twins equal to the originals', function()
+    -- A structural zero here would read as "this chart has no peak density", which is a
+    -- different claim and would put every guitar row several sd from the column mean.
+    local ev = Run(24, 0.5, 120, function() return { 96 } end)
+    local g = ScoreChart(ev, SpanAll(ev), {})
+    Test.expect(g.density_peak_noroll == g.density_peak,
+        'guitar carries no roll_spans, so the twin IS the original')
+    Test.expect(g.attack_density_peak_noroll == g.attack_density_peak,
+        'the same for attacks')
+    Test.expect(g.hand_density_peak_noroll == g.hand_density_peak,
+        'and for hands')
+end)
+
 ----------------------------------------------------------------------
 Test.section('ScoreChart - Pro Drums: a tom and a cymbal are two different gems')
 

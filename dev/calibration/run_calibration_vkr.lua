@@ -373,6 +373,13 @@ local baseline  = r.CountTracks(0)
 local n_scored, n_skipped, n_missing, n_warn = 0, 0, 0, 0
 local warnings  = {}
 
+-- How many consecutive songs may import with a flat tempo map before the run gives up.
+-- Large enough that a genuine cluster of 120 bpm songs cannot trip it (the corpus has
+-- 1.4% such rows, so twelve in a row is about 1 in 10^22), small enough that the run
+-- stops in seconds rather than hours.
+local TEMPO_CHECK_AFTER = 12
+local n_tempo_seen, n_tempo_flat = 0, 0
+
 
 r.PreventUIRefresh(1)
 
@@ -396,6 +403,36 @@ for si, song in ipairs(songs) do
             warnings[#warnings + 1] = ('IMPORT FAILED  %s (created no tracks)'):format(song.shortname)
             n_warn = n_warn + 1
         else
+            -- TEMPO IMPORT TRIPWIRE. bpm_at_first_note and tempo_markers were added to
+            -- make a systematic tempo-import failure VISIBLE, and they did their job -
+            -- but only after a full multi-hour run and a hand-read diff. A run where
+            -- REAPER is not importing the MIDI tempo map produces 120 bpm and a single
+            -- marker for EVERY song, which silently invalidates playing_s and every
+            -- density, rate and per-second column downstream of it. That is not a result
+            -- worth finishing, so stop while it is cheap.
+            --
+            -- A song genuinely at 120 with no tempo changes is real and common enough
+            -- (1.4% of corpus rows), so one hit means nothing; a whole opening run of
+            -- them cannot be a coincidence at this corpus's tempo spread.
+            n_tempo_seen = n_tempo_seen + 1
+            if r.CountTempoTimeSigMarkers(0) <= 1 then
+                n_tempo_flat = n_tempo_flat + 1
+            end
+            if n_tempo_seen == TEMPO_CHECK_AFTER and n_tempo_flat == n_tempo_seen then
+                r.ShowConsoleMsg(('\n\nSTOPPING: the first %d songs imported with NO tempo map.\n')
+                    :format(TEMPO_CHECK_AFTER))
+                r.ShowConsoleMsg('Every one read a single tempo marker, so every row would be\n')
+                r.ShowConsoleMsg('scored at REAPER\'s default 120 bpm. playing_s and every density,\n')
+                r.ShowConsoleMsg('rate and per-second column would be meaningless.\n\n')
+                r.ShowConsoleMsg('This is a REAPER import setting, not a scorer bug: ImportSongMidi\n')
+                r.ShowConsoleMsg('is just InsertMedia, and whether that brings the tempo map with it\n')
+                r.ShowConsoleMsg('is decided by the MIDI import preferences.\n\n')
+                r.ShowConsoleMsg('Check by importing one song by hand and watching the tempo ruler.\n')
+                r.ShowConsoleMsg('Then DELETE the partial corpus_scores.csv and start again.\n')
+                CleanupImport(from_idx)
+                return
+            end
+
             for _, inst in ipairs(todo) do
                 local row, err = ScoreInstrument(song, inst, from_idx)
                 if row then

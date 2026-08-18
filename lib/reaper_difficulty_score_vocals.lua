@@ -310,6 +310,13 @@ function ScoreVocalChart(notes, spans, opts)
         -- (long_frac -0.013, note_len_mean -0.035) because the two arms cancel under a
         -- rank correlation. These look only at the long tail and recover +0.21 to +0.28.
         longest_note_s = 0, breath_load = 0, longtime_frac = 0,
+        -- BREATH GROUPS (round 21): a passage with no gap long enough to inhale in,
+        -- which the per-note columns above cannot see. Suffix is MILLISECONDS, not a
+        -- MIDI pitch as on high_time_67 / high_time_70.
+        breath_max_50 = 0, breath_mean_50 = 0,
+        breath_move_50 = 0, breath_movemax_50 = 0,
+        breath_max_100 = 0, breath_mean_100 = 0,
+        breath_move_100 = 0, breath_movemax_100 = 0,
         -- TESSITURA. Where the part SITS, as distinct from how wide it ranges.
         -- `flightoficarus` is the case: notated_range z -0.62 (narrow) yet 46.7% of its
         -- sung time above G4 against a 19% corpus mean, and an 11-second held note.
@@ -321,9 +328,29 @@ function ScoreVocalChart(notes, spans, opts)
         high_reentry_rate_70 = 0, pitch_p98_time = 0,
         -- PHRASE TAIL. Whole-song means erase a small number of decisive phrases.
         phrase_density_p90 = 0, phrase_complex_p90 = 0,
+        -- THE PHRASE AS A PITCH JOURNEY (round 19). notated_range is the whole song and
+        -- pc_interval_* is one step at a time, mod-12, so an octave-scale leap reads as
+        -- small; neither can see a phrase that walks from MIDI 50 to 66 with no rest to
+        -- reset the voice. SPAN is how far a phrase reaches, TRAVEL is how much ground it
+        -- covers getting there - a phrase climbing an octave and a phrase see-sawing
+        -- inside three semitones can share a syllable count and a mean interval, and are
+        -- not the same thing to sing. Raw semitones, the same reversal round 12 made for
+        -- notated_range, applied to the phrase instead of the song.
+        phrase_span_mean = 0, phrase_span_p90 = 0,
+        phrase_travel_mean = 0, phrase_travel_p90 = 0,
         -- Label context, supplied from songs.dta. It does not claim that the lead chart
         -- became harder; it tests whether Harmonix's one vocal rank includes harmonies.
         vocal_parts = opts.vocal_parts or 1,
+        -- HOW THAT COUNT ENTERS THE MODEL (round 20). vocal_parts is fitted as a number,
+        -- which forces the claim that 1 -> 2 singers costs what 2 -> 3 costs. Measured on
+        -- the corpus it does not: with the other eleven factors held, one part and two
+        -- parts sit 0.4 rank apart and three parts sits 34 above them. These are pure
+        -- functions of the label above, so they read no MIDI and cost nothing to compute;
+        -- they exist because a candidate can only name a column. Declared as competing
+        -- SHAPES and never fitted together.
+        parts_2   = ((opts.vocal_parts or 1) >= 2) and 1 or 0,
+        parts_3   = ((opts.vocal_parts or 1) >= 3) and 1 or 0,
+        parts_log = math.log(math.max(1, opts.vocal_parts or 1)),
         talkie_frac = 0, caret_frac = 0, plus_frac = 0,
         short_frac = 0, short_moving_frac = 0,
         entropy_h2_rel = 0, entropy_contexts = 0,
@@ -436,6 +463,74 @@ function ScoreVocalChart(notes, spans, opts)
         table.sort(semi_iv)
         out.semi_interval_p90 = Percentile(semi_iv, 0.90)
     end
+
+    ------------------------------------------------------------------
+    -- Breath groups (round 21)
+    ------------------------------------------------------------------
+    -- The existing breath family (longest_note_s, breath_load, longtime_frac) measures
+    -- ONE NOTE at a time, so a run of twenty short syllables sung back to back with no
+    -- rest reads as twenty easy notes. To a singer that is one long demand on the air,
+    -- and it is the shape the worst-predicted charts have: phrases spanning four to six
+    -- measures with no gap to breathe in.
+    --
+    -- A breath group is a maximal run of notes whose gaps are all SHORTER than the
+    -- threshold - i.e. a passage with no room to inhale. Phrase boundaries always split a
+    -- group, since a phrase marker is a rest by construction.
+    --
+    -- ON ALL NOTES, NOT THE @pitched TWINS, and outside the n_pitched guard on purpose:
+    -- a fast rapped or shouted passage still needs air. `killinginthename` is 0 of 628
+    -- pitched and would register no breath demand at all under a pitched-only reading.
+    -- MOVEMENT inside a group is the exception - it steps between consecutive PITCHED
+    -- notes, skipping talkies so their written pitch (which the game does not score)
+    -- cannot invent motion, the same rule semi_interval_mean_p already uses.
+    --
+    -- TWO THRESHOLDS, DECLARED AS A SUBSTITUTION, never fitted together - the standing of
+    -- high_time_67 against high_time_70. NOTE THE SUFFIX MEANS MILLISECONDS HERE, where
+    -- on the tessitura columns it is a MIDI pitch. 50 ms is "no gap at all", continuous
+    -- phonation; 100 ms is a quick catch-breath. They are different claims and the corpus
+    -- decides. Looser thresholds were NOT declared even though the exploratory standalone
+    -- gradient keeps rising to 150 ms: at that width a chart that already scores correctly
+    -- on agility gains as much as the underperformers, which is the signature of a column
+    -- measuring legato phrasing rather than absence of breathing room.
+    local function BreathStats(gap_s)
+        local durs, moves = {}, {}
+        for _, seg in ipairs(segs) do
+            local i = 1
+            while i <= #seg do
+                local first, last, j = seg[i], seg[i], i + 1
+                local travel, prev_p = 0, VocalNoteIsPitched(seg[i]) and seg[i] or nil
+                while j <= #seg and (seg[j].s - last.e) < gap_s do
+                    if VocalNoteIsPitched(seg[j]) then
+                        if prev_p then
+                            travel = travel + math.abs(seg[j].pitch - prev_p.pitch)
+                        end
+                        prev_p = seg[j]
+                    end
+                    last = seg[j]
+                    j = j + 1
+                end
+                durs[#durs + 1]  = last.e - first.s
+                moves[#moves + 1] = travel
+                i = j
+            end
+        end
+        if #durs == 0 then return 0, 0, 0, 0 end
+        local dsum, msum, dmax, mmax = 0, 0, 0, 0
+        for k = 1, #durs do
+            dsum = dsum + durs[k]
+            msum = msum + moves[k]
+            if durs[k] > dmax then dmax = durs[k] end
+            if moves[k] > mmax then mmax = moves[k] end
+        end
+        return dmax, dsum / #durs, msum / #moves, mmax
+    end
+    -- Each quantity in a MEAN and a MAX form, a declared aggregation substitution and
+    -- never fitted together - round 14's lesson that a whole-song mean erases the few
+    -- decisive passages, which is the entire claim being tested here.
+    out.breath_max_50, out.breath_mean_50, out.breath_move_50, out.breath_movemax_50 =
+        BreathStats(0.050)
+    out.breath_max_100, out.breath_mean_100, out.breath_move_100, out.breath_movemax_100 =
+        BreathStats(0.100)
 
     ------------------------------------------------------------------
     -- The @pitched twins, and range / register
@@ -571,6 +666,40 @@ function ScoreVocalChart(notes, spans, opts)
         end
         out.high_reentry_rate_70 = reentries / playing_s
 
+        -- Per-phrase pitch geometry, over psegs rather than the phrase loop further down.
+        -- That loop walks the talkie-INCLUSIVE list and guards its pitch step on adjacency
+        -- there, so a shouted syllable sitting between two sung notes breaks the pair; here
+        -- the talkie is already filtered out and those two notes are neighbours, which is
+        -- the same reading semi_interval_mean_p and octave_jump_rate use. Segment structure
+        -- means neither quantity can cross a phrase boundary.
+        local phrase_span, phrase_travel = {}, {}
+        for _, seg in ipairs(psegs) do
+            local lo, hi, travel = seg[1].pitch, seg[1].pitch, 0
+            for i = 2, #seg do
+                local p = seg[i].pitch
+                if p < lo then lo = p end
+                if p > hi then hi = p end
+                travel = travel + math.abs(p - seg[i - 1].pitch)
+            end
+            -- A one-note phrase is span 0 and travel 0, and is counted rather than
+            -- skipped: there genuinely is no journey in it, and excluding it would make
+            -- the denominator depend on the chart's phrasing style.
+            phrase_span[#phrase_span + 1]     = hi - lo
+            phrase_travel[#phrase_travel + 1] = travel
+        end
+        -- psegs is non-empty whenever n_pitched > 0, so no division guard is needed.
+        local span_sum, travel_sum = 0, 0
+        for i = 1, #phrase_span do
+            span_sum   = span_sum   + phrase_span[i]
+            travel_sum = travel_sum + phrase_travel[i]
+        end
+        out.phrase_span_mean   = span_sum   / #phrase_span
+        out.phrase_travel_mean = travel_sum / #phrase_travel
+        table.sort(phrase_span)
+        table.sort(phrase_travel)
+        out.phrase_span_p90   = Percentile(phrase_span, 0.90)
+        out.phrase_travel_p90 = Percentile(phrase_travel, 0.90)
+
         local nc = 0
         for _ in pairs(classes_p) do nc = nc + 1 end
         out.pc_range_p = nc
@@ -683,12 +812,25 @@ VOCAL_FACTOR_KEYS = {
     -- BREATH: the long arm of the U-shaped length relationship, which a monotonic
     -- measure reads as zero because the short arm cancels it.
     'longest_note_s', 'breath_load', 'longtime_frac',
+    -- BREATH GROUPS (round 21). The 50 ms and 100 ms sets are a declared threshold
+    -- SUBSTITUTION and are never fitted together.
+    'breath_max_50', 'breath_mean_50', 'breath_move_50', 'breath_movemax_50',
+    'breath_max_100', 'breath_mean_100', 'breath_move_100', 'breath_movemax_100',
     -- TESSITURA: where the part sits. high_time_67 and high_time_70 are a declared
     -- threshold SUBSTITUTION, never fitted together.
     'top_note', 'high_time_67', 'high_time_70',
     'high_hold_time_70', 'high_longest_note_70', 'high_reentry_rate_70',
     'pitch_p98_time', 'phrase_density_p90', 'phrase_complex_p90',
+    -- THE PHRASE AS A PITCH JOURNEY (round 19), raw semitones over pitched notes. The
+    -- mean and p90 of each quantity are a declared AGGREGATION SUBSTITUTION, never fitted
+    -- together - the same standing as high_time_67 against high_time_70.
+    'phrase_span_mean', 'phrase_span_p90',
+    'phrase_travel_mean', 'phrase_travel_p90',
     'vocal_parts',
+    -- HOW THE HARMONY COUNT ENTERS THE MODEL (round 20). Competing SHAPES for the column
+    -- above, never fitted together: parts_3 is a step, parts_log is diminishing returns,
+    -- and parts_2 exists only to pair with parts_3 as the assumption-free two-step form.
+    'parts_2', 'parts_3', 'parts_log',
     'talkie_frac', 'caret_frac', 'plus_frac',
     'short_frac', 'short_moving_frac',
     'entropy_h2_rel',

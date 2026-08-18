@@ -453,6 +453,259 @@ Test.it('vocal_parts is an explicit supplied label-context factor', function()
     Test.expect(res.vocal_parts == 3, 'three-part metadata survives into the factors')
 end)
 
+Test.it('the harmony count is offered in three competing shapes', function()
+    -- Round 20. The count enters the model as a number, which asserts that 1 -> 2 costs
+    -- what 2 -> 3 costs; the corpus says one and two parts are the same level and the
+    -- whole effect is the step to three. These are the alternative shapes, and they are
+    -- pure functions of the label - no chart is read to produce them.
+    local notes = { VSec(0, 60, 'la', 0.5) }
+    local spans = { { s = 0, e = 1 } }
+    local got = {}
+    for p = 1, 3 do got[p] = ScoreVocalChart(notes, spans, { vocal_parts = p }) end
+
+    Test.expect(got[1].parts_2 == 0 and got[2].parts_2 == 1 and got[3].parts_2 == 1,
+        'parts_2 is the "has any harmony" step')
+    Test.expect(got[1].parts_3 == 0 and got[2].parts_3 == 0 and got[3].parts_3 == 1,
+        'parts_3 is the "full three-part" step, and two parts is NOT half of it')
+    Test.expect(got[1].parts_log == 0 and got[3].parts_log > got[2].parts_log
+        and got[2].parts_log > got[1].parts_log,
+        'parts_log rises with the count but by a shrinking step')
+    -- The two indicators together are the assumption-free form: every level distinct.
+    Test.expect(got[1].parts_2 + got[1].parts_3 == 0
+        and got[2].parts_2 + got[2].parts_3 == 1
+        and got[3].parts_2 + got[3].parts_3 == 2,
+        'parts_2 and parts_3 together separate all three levels')
+end)
+
+Test.it('the harmony shapes survive a chart with nothing to measure', function()
+    -- The early returns leave the initialiser table, so a chart with no usable notes
+    -- must still carry the label shapes rather than nil - an unset column reaches the
+    -- CSV as empty and drops the whole row from every fit.
+    local res = ScoreVocalChart({}, {}, { vocal_parts = 3 })
+    Test.expect(res.parts_3 == 1 and res.parts_2 == 1,
+        'a chart with no notes still reports its declared harmony count')
+    local d = ScoreVocalChart({ VSec(0, 60, 'la', 0.5) }, { { s = 0, e = 1 } })
+    Test.expect(d.parts_2 == 0 and d.parts_3 == 0 and d.parts_log == 0,
+        'an absent count defaults to one part in every shape, never nil')
+end)
+
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+Test.section('Vocals - breath groups')
+
+-- Absolute seconds, so a gap can be stated in milliseconds without going through qn.
+local function BSec(s, len, pitch, lyric)
+    return { s = s, e = s + len, qn = s * 2, qn_e = (s + len) * 2,
+             pitch = pitch or 60, lyric = lyric or 'la' }
+end
+
+Test.it('back-to-back short notes are ONE demand on the air', function()
+    -- The reason the round exists. Ten tenth-second syllables with no gap are ten easy
+    -- notes to longest_note_s and one continuous second of singing to a singer.
+    local notes = {}
+    for i = 0, 9 do notes[#notes + 1] = BSec(i * 0.1, 0.1) end
+    local res = ScoreVocalChart(notes, { { s = 0, e = 2 } })
+    Test.expect(math.abs(res.longest_note_s - 0.1) < 1e-9,
+        'every individual note is a tenth of a second')
+    Test.expect(math.abs(res.breath_max_100 - 1.0) < 1e-9,
+        'and together they are one unbroken second')
+end)
+
+Test.it('the threshold is what decides, and the two are not the same column', function()
+    -- A 75 ms gap is room to breathe at the tight threshold and not at the wide one.
+    -- If this passes with both equal, the substitution is measuring one thing twice.
+    local notes = { BSec(0, 0.2), BSec(0.275, 0.2) }
+    local res = ScoreVocalChart(notes, { { s = 0, e = 1 } })
+    Test.expect(math.abs(res.breath_max_50 - 0.2) < 1e-9,
+        '75 ms is a breath at the 50 ms threshold, so the run splits')
+    Test.expect(math.abs(res.breath_max_100 - 0.475) < 1e-9,
+        'and is not one at 100 ms, so the run holds together')
+end)
+
+Test.it('a phrase boundary ends a group even when the notes nearly touch', function()
+    -- Two phrases separated by a marker gap, with notes only 20 ms apart across the seam.
+    -- Without the segment split those 20 ms are well inside every threshold and the two
+    -- phrases would read as one passage.
+    local a, b = BSec(0.1, 0.2), BSec(0.32, 0.18)
+    local res = ScoreVocalChart({ a, b }, { { s = 0, e = 0.31 }, { s = 0.315, e = 0.6 } })
+    Test.expect(math.abs(res.breath_max_50 - 0.2) < 1e-9,
+        'the group stops at the phrase edge rather than spanning both')
+end)
+
+Test.it('phrases that touch exactly are one passage, and that is correct', function()
+    -- EventsInSegments merges spans that share an edge, so a zero-length seam is not a
+    -- split. Inherited behaviour, and for THIS family it is the honest reading rather
+    -- than a wart to work around: breath is wall-clock, and a phrase marker that ends
+    -- exactly where the next begins gives the singer no air whatsoever. Pinned so that a
+    -- later fix to the segment seam is a deliberate decision about breath and not a
+    -- silent side effect.
+    local a, b = BSec(0, 0.3), BSec(0.3, 0.3)
+    local res = ScoreVocalChart({ a, b }, { { s = 0, e = 0.3 }, { s = 0.3, e = 0.6 } })
+    Test.expect(math.abs(res.breath_max_100 - 0.6) < 1e-9,
+        'no gap in wall-clock time means no breath, whatever the markers say')
+end)
+
+Test.it('a shouted chart still registers breath demand', function()
+    -- killinginthename is 0 of 628 notes pitched. Computing breath on the @pitched twins
+    -- would report nothing at all for it, and a fast rapped passage needs air like any
+    -- other. Movement is the deliberate exception: a talkie's written pitch is not scored
+    -- by the game and must not invent motion.
+    local notes = {}
+    for i = 0, 9 do notes[#notes + 1] = BSec(i * 0.15, 0.15, 55 + i, 'x#') end
+    local res = ScoreVocalChart(notes, { { s = 0, e = 2 } })
+    Test.expect(res.pitched_frac == 0, 'nothing on this chart is pitched')
+    Test.expect(math.abs(res.breath_max_100 - 1.5) < 1e-9,
+        'and it is still an unbroken passage of singing')
+    Test.expect(res.breath_move_100 == 0,
+        'while the talkies contribute no pitch movement')
+end)
+
+Test.it('movement steps over a talkie rather than breaking on it', function()
+    -- The same rule semi_interval_mean_p uses. A talkie between two sung notes an octave
+    -- apart must leave them adjacent, or every rap-inflected chart reads as motionless.
+    local notes = { BSec(0, 0.2, 60, 'la'), BSec(0.2, 0.2, 41, 'yeah#'),
+                    BSec(0.4, 0.2, 72, 'la') }
+    local res = ScoreVocalChart(notes, { { s = 0, e = 1 } })
+    Test.expect(math.abs(res.breath_move_100 - 12) < 1e-9,
+        'one group, and the octave between the two sung notes is the whole travel')
+end)
+
+Test.it('the mean and max movement forms are a real substitution', function()
+    -- One busy passage among three still ones. The mean dilutes it by the count of quiet
+    -- groups; the max reports it. Round 14's finding is that the decisive passage is the
+    -- one that sets the rank, and this is the pair that lets the corpus rule on it.
+    local notes, t = {}, 0
+    for _ = 1, 4 do notes[#notes + 1] = BSec(t, 0.2, 60); t = t + 0.2 end
+    t = t + 0.5
+    for i = 1, 4 do notes[#notes + 1] = BSec(t, 0.2, 60 + (i % 2) * 9); t = t + 0.2 end
+    local res = ScoreVocalChart(notes, { { s = 0, e = 3 } })
+    Test.expect(res.breath_movemax_100 > res.breath_move_100,
+        'the busiest group exceeds the average over both groups')
+    Test.expect(math.abs(res.breath_movemax_100 - 27) < 1e-9,
+        'and the max is that group\'s own travel, undiluted')
+end)
+
+Test.it('degenerate charts read zero without dividing by nothing', function()
+    local one = ScoreVocalChart({ BSec(0, 0.4) }, { { s = 0, e = 1 } })
+    Test.expect(math.abs(one.breath_max_100 - 0.4) < 1e-9 and one.breath_move_100 == 0,
+        'a single note is a group of itself and travels nowhere')
+    for _, k in ipairs({ 'breath_max_50', 'breath_mean_50',
+                         'breath_move_50', 'breath_movemax_50',
+                         'breath_max_100', 'breath_mean_100',
+                         'breath_move_100', 'breath_movemax_100' }) do
+        local v = ScoreVocalChart({}, {})[k]
+        Test.expect(v == 0, k .. ' is a structural zero on an empty chart, not nil')
+    end
+    -- A group cannot outlast the part it is measured on.
+    local notes = {}
+    for i = 0, 9 do notes[#notes + 1] = BSec(i * 0.1, 0.1) end
+    local res = ScoreVocalChart(notes, { { s = 0, e = 2 } })
+    Test.expect(res.breath_max_100 <= res.playing_s + 1e-9,
+        'the longest group never exceeds the playing time')
+    Test.expect(res.breath_mean_100 <= res.breath_max_100 + 1e-9,
+        'and the mean group never exceeds the longest')
+end)
+
+----------------------------------------------------------------------
+Test.section('Vocals - the phrase as a pitch journey')
+
+Test.it('span sees a climb that every interval measure reads as small', function()
+    -- The antsmarching shape, reduced: one phrase walking from MIDI 50 to 66 in whole
+    -- tones. Every step is two semitones, so the interval columns report an easy melody;
+    -- the phrase still spans sixteen semitones with no rest to reset the voice. This is
+    -- the entire reason the factor exists.
+    local notes = VRun(9, 1, function(i) return 48 + i * 2 end)   -- 50, 52 ... 66
+    local res = ScoreVocalChart(notes, VSpanAll(notes))
+    Test.expect(math.abs(res.semi_interval_mean_p - 2) < 1e-9,
+        'every interval is two semitones')
+    Test.expect(math.abs(res.pc_interval_mean - 2) < 1e-9,
+        'and two in pitch class as well')
+    Test.expect(res.phrase_span_p90 == 16,
+        ('the phrase spans sixteen semitones, read as %d'):format(res.phrase_span_p90))
+end)
+
+Test.it('travel separates a see-saw from a straight line of the same width', function()
+    -- Two phrases of equal note count and equal span. The climb passes through its range
+    -- once; the see-saw crosses it repeatedly. Same reach, different amount of singing.
+    local climb  = VRun(7, 1, function(i) return 60 + (i - 1) * 2 end)  -- 60..72
+    local seesaw = VRun(7, 1, function(i) return (i % 2 == 1) and 60 or 72 end)
+    local rc = ScoreVocalChart(climb,  VSpanAll(climb))
+    local rs = ScoreVocalChart(seesaw, VSpanAll(seesaw))
+    Test.expect(rc.phrase_span_p90 == rs.phrase_span_p90,
+        'the two phrases reach equally far')
+    Test.expect(rs.phrase_travel_p90 > rc.phrase_travel_p90,
+        ('the see-saw covers more ground: %d against %d')
+            :format(rs.phrase_travel_p90, rc.phrase_travel_p90))
+end)
+
+Test.it('span separates two phrases that travel the same distance', function()
+    -- The converse, so neither column is assumed to stand in for the other: an out-and-back
+    -- and a straight climb both travel twelve semitones and reach different distances.
+    local outback = VRun(7, 1, function(i) return 60 + (i <= 4 and (i - 1) * 2
+                                                                or (7 - i) * 2) end)
+    local climb   = VRun(7, 1, function(i) return 60 + (i - 1) * 2 end)
+    local ro = ScoreVocalChart(outback, VSpanAll(outback))
+    local rc = ScoreVocalChart(climb,   VSpanAll(climb))
+    Test.expect(ro.phrase_travel_p90 == rc.phrase_travel_p90,
+        'both cover the same ground')
+    Test.expect(rc.phrase_span_p90 > ro.phrase_span_p90,
+        ('the climb reaches further: %d against %d')
+            :format(rc.phrase_span_p90, ro.phrase_span_p90))
+end)
+
+Test.it('a talkie between two sung notes joins them rather than breaking the pair', function()
+    -- Computed over psegs, where the talkie is already filtered out, so the two sung notes
+    -- are neighbours - the same reading semi_interval_mean_p and octave_jump_rate use.
+    -- The phrase loop further down the scorer walks the talkie-INCLUSIVE list and guards
+    -- its pitch step on adjacency there, so an implementation moved into that loop would
+    -- read zero here. That is what this test is for.
+    local notes = { VNote(0, 60, 'la'), VNote(1, 65, 'yo#'), VNote(2, 72, 'la') }
+    local res = ScoreVocalChart(notes, { { s = notes[1].s, e = notes[3].e } })
+    Test.expect(res.phrase_travel_p90 == 12,
+        ('the octave is travelled through the talkie, read as %d'):format(res.phrase_travel_p90))
+    Test.expect(res.phrase_span_p90 == 12, 'and the span ignores the talkie pitch')
+end)
+
+Test.it('neither quantity crosses a phrase boundary', function()
+    -- Two phrases an octave apart, each flat. The song ranges twelve semitones and no
+    -- phrase asks the singer to move at all.
+    local notes = {}
+    for i = 0, 3 do notes[#notes + 1] = VNote(i, 60, 'la') end
+    for i = 8, 11 do notes[#notes + 1] = VNote(i, 72, 'la') end
+    local res = ScoreVocalChart(notes, {
+        { s = VNote(0, 60).s, e = VNote(3, 60).e },
+        { s = VNote(8, 72).s, e = VNote(11, 72).e },
+    })
+    Test.expect(res.notated_range == 12, 'the song ranges an octave')
+    Test.expect(res.phrase_travel_p90 == 0 and res.phrase_span_p90 == 0,
+        'but no phrase moves, so travel and span are both zero')
+end)
+
+Test.it('degenerate charts read zero, and span never exceeds the song range', function()
+    -- One-note phrases have no journey in them and are counted rather than skipped:
+    -- excluding them would make the denominator depend on the chart's phrasing style.
+    local single = { VNote(0, 60, 'la') }
+    local rs = ScoreVocalChart(single, VSpanAll(single))
+    Test.expect(rs.phrase_span_p90 == 0 and rs.phrase_travel_p90 == 0,
+        'a one-note phrase is span zero and travel zero')
+
+    local shouted = {}
+    for i = 0, 15 do shouted[#shouted + 1] = VNote(i, 50 + (i % 12), 'yo#') end
+    local rt = ScoreVocalChart(shouted, { { s = 0, e = 8 } })
+    for _, k in ipairs({ 'phrase_span_mean', 'phrase_span_p90',
+                         'phrase_travel_mean', 'phrase_travel_p90' }) do
+        Test.expect(rt[k] == 0, 'an all-talkie chart reads zero for ' .. k)
+        Test.expect(rt[k] == rt[k], k .. ' is not NaN')
+    end
+
+    -- A phrase cannot reach wider than the song it sits in.
+    local wander = VRun(24, 1, function(i) return 55 + ((i * 7) % 13) end)
+    local rw = ScoreVocalChart(wander, VSpanAll(wander))
+    Test.expect(rw.phrase_span_p90 <= rw.notated_range,
+        ('phrase span %d within song range %d')
+            :format(rw.phrase_span_p90, rw.notated_range))
+end)
+
 ----------------------------------------------------------------------
 Test.section('Vocals - guards and the factor list')
 

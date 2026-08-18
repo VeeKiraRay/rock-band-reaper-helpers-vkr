@@ -1014,6 +1014,12 @@ function ScoreChart(events, spans, opts)
         vocal_parts = 0,
         -- drums (see the block at the end of ScoreChart)
         kick_density = 0, kick_density_peak = 0, hand_density_peak = 0,
+        -- The three peak columns with roll-lane gems excluded (round 22). A declared
+        -- SUBSTITUTION for their originals, never fitted beside them. Set from the
+        -- originals on any instrument that has no roll lanes, so they are never a
+        -- structural zero.
+        density_peak_noroll = 0, attack_density_peak_noroll = 0,
+        hand_density_peak_noroll = 0,
         stick_size_mean = 0, tom_frac = 0, roll_frac = 0, offbeat_frac = 0,
         -- the same chart read as PRO drums, where a tom and a cymbal on one colour are
         -- two different gems rather than one
@@ -1345,6 +1351,56 @@ function ScoreChart(events, spans, opts)
     -- the same kind of factor: a leniency device that marks where a part is too fast or
     -- too loose to chart literally. Combined into one column because 127 is 9 events in
     -- the whole corpus, far too sparse to fit on its own.
+    -- THE PEAK COLUMNS COUNT GEMS THE PLAYER DOES NOT HAVE TO HIT. Found by reading a
+    -- chart rather than the corpus: `makemesmile2` ends on a 11.7 s roll lane carrying 48
+    -- hand notes per measure, and that passage sets density_peak for the whole song. A
+    -- roll lane is a LENIENCY device - the notes under it are a free-play region, not 48
+    -- required strikes - so counting them literally reads the easiest bar as the hardest.
+    -- Excluding roll-covered gems from the peaks moves that chart 550 -> 368, i.e. tier 6
+    -- -> 5 against an official tier 4.
+    --
+    -- DECLARED AS NEW TWINS RATHER THAN A FIX TO THE EXISTING COLUMNS, deliberately. The
+    -- three peak columns below are fitted in five shipped models; silently redefining
+    -- them would re-open every instrument at once and the rescore's own check (every old
+    -- column reads 0% moved) would fire on all of them. The corpus rules on the
+    -- substitution instead.
+    --
+    -- ONLY DRUMS HAVE roll_spans, so on guitar, bass and keys each twin is byte-identical
+    -- to its original and the substitution is a pure drums test. Whether the guitar/bass
+    -- TREMOLO and TRILL lanes deserve the same treatment is a separate open question:
+    -- those are also free-play regions, but they are far rarer and the case has not been
+    -- measured. Do not fold it in here on the strength of the analogy.
+    if opts.roll_spans then
+        local rolls = NormalizeSpans(opts.roll_spans)
+        local function UnderRoll(ev)
+            for _, sp in ipairs(rolls) do
+                if ev.s >= sp.s and ev.s <= sp.e then return true end
+            end
+            return false
+        end
+        out.density_peak_noroll = PeakDensity(segs, window_s, pctl, function(ev)
+            return UnderRoll(ev) and 0 or #ev.pitches
+        end)
+        out.attack_density_peak_noroll = PeakDensity(segs, window_s, pctl, function(ev)
+            return UnderRoll(ev) and 0 or 1
+        end)
+        local kick = opts.kick_pitch or 96
+        out.hand_density_peak_noroll = PeakDensity(segs, window_s, pctl, function(ev)
+            if UnderRoll(ev) then return 0 end
+            local n = 0
+            for _, p in ipairs(ev.pitches) do if p ~= kick then n = n + 1 end end
+            return n
+        end)
+    else
+        -- No lanes to exclude, so the twins ARE the originals. Written out rather than
+        -- left at the initialiser zero: a structural zero here would read as "this chart
+        -- has no peak density", which is a different claim entirely and would put every
+        -- guitar row several sd from the column's own mean.
+        out.density_peak_noroll        = out.density_peak
+        out.attack_density_peak_noroll = out.attack_density_peak
+        out.hand_density_peak_noroll   = out.hand_density_peak
+    end
+
     if opts.roll_spans then
         out.roll_frac = SpanOverlapSeconds(spans, NormalizeSpans(opts.roll_spans)) / playing_s
     end
@@ -1438,6 +1494,10 @@ SCORE_FACTOR_KEYS = {
     -- instrument-agnostic and gets measured everywhere, but is declared only in drum
     -- candidates until some later round offers it to the instruments already fitted.
     'kick_density', 'kick_density_peak', 'hand_density_peak', 'stick_size_mean',
+    -- ROLL-LANE LENIENCY (round 22): the peak columns with gems under a 126/127 lane
+    -- excluded. A declared substitution for density_peak / attack_density_peak /
+    -- hand_density_peak, never fitted beside them.
+    'density_peak_noroll', 'attack_density_peak_noroll', 'hand_density_peak_noroll',
     'tom_frac', 'roll_frac', 'offbeat_frac',
     -- PRO DRUMS: the same factors over an eight-gem vocabulary, where a tom and a cymbal
     -- on one colour are two different gems. Declared as a paired SUBSTITUTION for their

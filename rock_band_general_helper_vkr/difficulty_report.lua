@@ -127,9 +127,12 @@ function DifficultyReportText(recs, opts)
             Emit(('%s - not scored'):format(rec.label or rec.instrument or '?'))
             Emit(INDENT .. (rec.reason or 'No chart'))
         else
+            -- rank_shown is floored, not rounded, and the card uses the same value: a
+            -- rounded integer can name a tier threshold the tier itself has not reached.
+            -- See difficulty_suggester.lua.
             Emit(('%s - %s (rank %d)'):format(
                 rec.label or rec.instrument or '?', rec.tier_name or '?',
-                math.floor((rec.rank or 0) + 0.5)))
+                rec.rank_shown or math.floor(rec.rank or 0)))
 
             local m = rec.model or {}
             local n_factors = 0

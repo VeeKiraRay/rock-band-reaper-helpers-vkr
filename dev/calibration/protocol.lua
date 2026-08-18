@@ -1216,6 +1216,462 @@ for _, c in ipairs({
     CANDIDATES_VOCALS[#CANDIDATES_VOCALS + 1] = c
 end
 
+----------------------------------------------------------------------
+-- ROUND 19: VOCALS - THE PHRASE AS A PITCH JOURNEY
+--
+-- Declared before running. Prior candidates remain byte-for-byte intact above.
+--
+-- WHY THIS ROUND EXISTS. parts+tess+move still fails both floors (85.12% against 90%,
+-- rho +0.668 against +0.70) and still under-predicts its hardest charts by ~104 rank.
+-- Two things were established before any factor was proposed:
+--
+--   * THE MISSES ARE INVISIBLE, NOT MIS-WEIGHTED. Across the ten worst-predicted charts,
+--     the mean |z| on all twelve of the model's own factors is <= 0.42. Nothing about
+--     them is unusual to the model. It is not weighting a signal badly; it has none.
+--   * THEY ARE VOCAL-SPECIFIC. The same ten songs miss by -3.08 sd on vocals against
+--     -0.19 guitar, -0.94 bass, -0.67 drums, -0.43 keys, -0.89 Pro Keys. Whatever this
+--     is, it is in the singing and not in the song.
+--
+-- Reading those charts by hand then found a shape the vocabulary has no word for: a
+-- single phrase walking from MIDI 50 to 66, and constant up-and-down motion inside long
+-- phrases sung without a rest.
+--
+-- WHAT WAS MISSING, PRECISELY. notated_range is the whole song. pc_interval_* is one step
+-- at a time and is mod-12, so an octave-scale leap reads as small. phrase_complex_p90 is
+-- density x mean pitch-CLASS step. Nothing measured how far a phrase TRAVELS, and nothing
+-- measured how wide one phrase REACHES. The two are declared together because either
+-- alone conflates real cases: a climb from 50 to 66 and a jigsaw crossing four semitones
+-- four times have the SAME travel and very different spans, while one big leap and a slow
+-- wide climb have the same span and very different travel.
+--
+-- Raw semitones, on pitched notes, aggregated per phrase with no time denominator - the
+-- same reversal round 12 made for notated_range, applied to the phrase instead of the
+-- song.
+--
+-- MEASURED AND REJECTED BEFORE DECLARATION, so none of these is retried:
+--
+--   * PER-PHRASE COUNTS - "divide the density family by the phrase marker instead of by
+--     seconds, so a slow song is not read as sparse". Syllables-per-phrase already exists
+--     as phrase_syl_mean and is -0.001 against rank; it was fitted as primary+phrase and
+--     scored -8.72% at 0% of paired repeats. Pitch-changes-per-phrase measures +0.237
+--     against pc_change_rate's +0.440 - the per-phrase currency HALVES the signal - and is
+--     +0.78 collinear with phrase length, so it mostly injects phrase-length noise. The
+--     denominator instinct is right and is why travel carries no denominator at all; the
+--     payload has to be semitones, not counts.
+--   * TEMPO. bpm derived from qn against seconds is +0.026 against rank and +0.74 / +0.73
+--     collinear with tight_p10 / tight_med, which the incumbent already carries. That is
+--     arithmetic, not coincidence: syl_density_avg [syl/s] x tight_med [QN/syl] is QN/s,
+--     so the model already holds both the per-second and the per-beat view of speed. The
+--     independent proxy agrees - bpm_at_first_note, a meta column in the CSV since round
+--     8, is +0.011 against the vocal rank over 328 rows. Note also that the hypothesis
+--     ("per-second density under-reads slow charts") is an INTERACTION, and an additive
+--     standardized term cannot express one.
+--   * PHRASE-FINAL HOLD - "long phrases ending on a held note". Every form measures
+--     NEGATIVE against rank: last-note seconds mean -0.114, p90 -0.047, as a fraction of
+--     the phrase -0.151. Phrases ending on a held note go with EASIER charts. This is the
+--     phrase-local refinement of round 13's breath family, and it is worse than the
+--     whole-song version, which never earned selection either.
+--   * PHRASE LENGTH p90. +0.060, against the existing phrase_len_mean's +0.058 and ~0.9
+--     collinear with it. Round 12 already answered this.
+--   * TRAVEL PER SECOND (+0.393, +0.82 collinear with pc_change_rate - a restatement of
+--     an in-model column) and TRAVEL PER NOTE, which is semi_interval_mean_p, already a
+--     column and +0.87 collinear with in-model pc_interval_mean. Per phrase with no
+--     denominator is the only form carrying information the CSV lacks.
+--   * TIME SIGNATURE, and it needs no column: only 17 of 543 corpus songs are primarily
+--     non-4/4, and all 17 are 3/4, 6/8, 6/4 or 2/4 - familiar meters. The genuinely
+--     awkward signatures (5/x, 7/x, 11/x) exist only as seconds-long fragments. There is
+--     nothing to fit, the same finding as the concentrated keys solo in round 16. 34.6%
+--     of songs DO change meter at least once, which is well populated - but that is a
+--     song-level property, and the cross-instrument result above says these misses are
+--     not song-level.
+--
+-- The exploratory figures above are NOT evidence. They came from screening ~13 variants
+-- against the same rows, which is exactly what inflates a selection estimate, and this
+-- document's most repeated error is that standalone rho does not predict fitted gain in
+-- either direction. They are recorded to make these predictions falsifiable and to
+-- justify the FORM chosen, nothing more.
+--
+-- PRE-REGISTERED PREDICTIONS:
+--   1. parts+tess+move+travel is the strongest of the five and the only one with a real
+--      chance of selection. phrase_travel_p90 screened at +0.452 standalone, above
+--      notated_range (+0.413) and pc_change_rate (+0.424).
+--   2. TRAVEL BEATS SPAN. How much ground a phrase covers matters more than how far it
+--      reaches, because the residual list is melismatic wide-ranging singing rather than
+--      one big leap. If span wins instead, the mechanism is reach and not motion, and the
+--      wording of any shipped explanation has to change with it.
+--   3. THE p90 TWIN BEATS THE MEAN TWIN on both quantities. Whole-song means erase the
+--      small number of decisive phrases - the round-14 argument, restated.
+--   4. @phrasespan LOSES to the addition. phrase_span_p90 is only +0.49 collinear with
+--      notated_range, so they are different questions and dropping the song-level one
+--      costs information rather than tidying it away.
+--   5. NONE PASSES THE GATE. Expect rho +0.69 to +0.72 and the usable lower bound still
+--      under 88%. On the ten worst charts these two columns sit at the largest z of
+--      anything measured on them, and still not large enough to explain a -104 bias.
+--   6. The top-end bias improves from -104 to between -80 and -95, and no further.
+--
+-- IF PREDICTION 1 FAILS AND NOTHING IS SELECTED, that is the round's answer and it is
+-- worth as much as a win: it would mean the phrase-level pitch journey is measurable and
+-- does not move the official vocal rank, which together with the five rejections above
+-- closes the last mechanism this corpus can reach for on vocals.
+for _, c in ipairs({
+    -- Travel alone: the round's primary hypothesis, kept separable from everything else.
+    { name = 'parts+tess+move+travel',
+      keys = { 'syl_density_avg', 'syl_density_peak', 'tight_p10', 'tight_med',
+               'pc_interval_mean', 'playing_s',
+               'notated_range', 'pitch_p90', 'octave_jump_rate', 'vocal_parts',
+               'high_time_70', 'pc_change_rate', 'phrase_travel_p90' } },
+
+    -- Span alone, so reach and motion are never entangled inside one number.
+    { name = 'parts+tess+move+span',
+      keys = { 'syl_density_avg', 'syl_density_peak', 'tight_p10', 'tight_med',
+               'pc_interval_mean', 'playing_s',
+               'notated_range', 'pitch_p90', 'octave_jump_rate', 'vocal_parts',
+               'high_time_70', 'pc_change_rate', 'phrase_span_p90' } },
+
+    -- Both - the round's best guess at where vocals lands.
+    { name = 'parts+tess+move+phrase_pitch',
+      keys = { 'syl_density_avg', 'syl_density_peak', 'tight_p10', 'tight_med',
+               'pc_interval_mean', 'playing_s',
+               'notated_range', 'pitch_p90', 'octave_jump_rate', 'vocal_parts',
+               'high_time_70', 'pc_change_rate',
+               'phrase_travel_p90', 'phrase_span_p90' } },
+
+    -- AGGREGATION SUBSTITUTION: identical but for mean instead of p90. Declared rather
+    -- than quietly dropped, for the same reason high_time_67 and high_time_70 both exist
+    -- - the exploratory pass already knows which measures better, so picking it in
+    -- silence would be exactly the fishing this file exists to prevent.
+    { name = 'parts+tess+move+phrase_pitch@mean',
+      keys = { 'syl_density_avg', 'syl_density_peak', 'tight_p10', 'tight_med',
+               'pc_interval_mean', 'playing_s',
+               'notated_range', 'pitch_p90', 'octave_jump_rate', 'vocal_parts',
+               'high_time_70', 'pc_change_rate',
+               'phrase_travel_mean', 'phrase_span_mean' } },
+
+    -- RANGE SUBSTITUTION, same feature count as the incumbent: is the demand the span of
+    -- the SONG or the span of a PHRASE? Declared later than parts+tess+move, so the
+    -- incumbent wins the simplicity tie and this must CLEARLY beat it to be selected.
+    { name = 'parts+tess+move@phrasespan',
+      keys = { 'syl_density_avg', 'syl_density_peak', 'tight_p10', 'tight_med',
+               'pc_interval_mean', 'playing_s',
+               'phrase_span_p90', 'pitch_p90', 'octave_jump_rate', 'vocal_parts',
+               'high_time_70', 'pc_change_rate' } },
+}) do
+    CANDIDATES_VOCALS[#CANDIDATES_VOCALS + 1] = c
+end
+
+----------------------------------------------------------------------
+-- ROUND 20: VOCALS - HOW THE HARMONY COUNT ENTERS THE MODEL
+--
+-- Prior candidates remain byte-for-byte intact above.
+--
+-- THIS ROUND IS DECLARED AFTER MEASUREMENT, AND SAYS SO. Every candidate below was
+-- already fitted on these rows under these fold seeds before this block was written, so
+-- the "predictions" further down are not blind and must not be read as though they were.
+-- The declaration still does two things worth doing: it FIXES the candidate set, so no
+-- further shape gets tried until a new round says so, and it puts the reasoning in the
+-- artifact, so a later reader can see why the shipped model stopped being linear. Every
+-- other round in this file was declared first; this one was not, and the difference is
+-- recorded rather than smoothed over.
+--
+-- WHY IT EXISTS. vocal_parts is fitted as a NUMBER, which forces the model to assert
+-- that going from one singer to two costs exactly what going from two to three costs.
+-- Nothing ever checked that. Fitting the other eleven factors and reading the residual
+-- by level says it is false:
+--
+--     parts   n     mean residual   worth at the anchor   step
+--       1     53         -0.0772            -18 rank
+--       2     87         -0.0787            -19 rank      -0.4 rank
+--       3    187         +0.0595            +15 rank       +34 rank
+--
+-- One part and two parts are the SAME LEVEL. The whole effect is the step to three. A
+-- linear term cannot express that, so it splits the difference and over-credits every
+-- two-part song by about +12 rank - 87 of 328 rows.
+--
+-- WHAT THE COUNT IS ACTUALLY A PROXY FOR. It is a label, not a measurement: the
+-- (vocal_parts N) integer out of songs.dta, sitting beside twelve measured columns, and
+-- the rank it predicts grades PART VOCALS alone - HARM1/2/3 are never read. Three parts
+-- is the HOUSE DEFAULT (187 of 328, 57%), so the fitted term is not "harmony adds work"
+-- but "an arrangement that did not earn full harmonies is a smaller production". That
+-- also explains the step's shape: an author adds HARM2 for any backing vocal worth
+-- capturing, which is a low bar a lot of ordinary songs clear, while HARM3 needs three
+-- distinct simultaneous lines and selects for elaborate arrangements.
+--
+-- MEASURED AND REJECTED BEFORE DECLARATION:
+--
+--   * READING THE HARMONY TRACKS. The obvious upgrade is to stop trusting the count and
+--     measure whether HARM2/HARM3 are real parts or the lead doubled. Swept over every
+--     corpus MIDI: a harmony is almost never a unison double (same pitch as the lead:
+--     mean 0.124, median 0.030). The typical HARM2 is a DIFFERENT pitch on the SAME words
+--     at the SAME time covering about 40% of the chart - musically a second part,
+--     structurally dependent. Duplication of the lead's note starts AND ends is bimodal:
+--     29 of 461 harmony tracks (6.3%) duplicate at exactly 1.000, ZERO sit between 0.999
+--     and 1.000, and only 5 between 0.990 and 0.999. Authors either paste the lead's
+--     rhythm or write something else. Fitted every way it can be fitted:
+--         @parts_eff at 0.90 / 0.95 / 0.99 / 1.00   +0.40 / +0.37 / +0.49 / +0.52 points
+--         @parts_graded  (each harmony discounted by how mirrored it is)  -0.98, 0% wins
+--         @harm_indep    (independence replacing the count)               -1.55, 0% wins
+--         +harm_indep / +harm_cover  (measurement BESIDE the count)       +0.21 / +0.09
+--     Three findings. A graded discount is actively HARMFUL, because it drags 68.6% of
+--     songs below their declared count and erases the production-scale reading that was
+--     doing the work. Only the STRICTEST cut-offs help, which agrees with the bimodality.
+--     And the best of them is +0.52 against a 1.00-point bar while moving 23 of 328 rows,
+--     so it is half a bar short for a new reader path through HARM1/2/3. NOT PURSUED, and
+--     no candidate below names a harmony column. One asymmetry is recorded without being
+--     acted on: 6% is HARMONIX's authoring practice, and a custom author copy-pasting
+--     harmonies is the fast way to write them, so this may matter more to the tool's
+--     users than to the corpus that calibrates it. That is a reason to have measured it,
+--     not a reason to ship an unearned column.
+--   * DROPPING THE COUNT ALTOGETHER. -1.25 points at 10% of paired repeats. The term is
+--     small but it is real, so the question is its shape and not its presence.
+--
+-- WHAT WAS ALREADY MEASURED, since these are not predictions:
+--   1. @parts_step3 posts 88.63% / rho +0.674 against the incumbent's 88.35% / +0.668,
+--      a paired +0.27 points at 40% of repeats. It does NOT clear the selection bar.
+--   2. @parts_free ties @parts_step3 exactly (88.63%). The extra degree of freedom buys
+--      NOTHING, which is the round's real result: given a fit that is not told the two
+--      steps are equal, it does not use the permission. That is what makes the step a
+--      finding rather than a curve-fit.
+--   3. @parts_log is WORSE than the incumbent (-0.21 points, 10% of repeats). The shape
+--      is a step, not diminishing returns.
+--   4. The gate still fails, and by roughly the same margin: 85.4% against the 90% floor
+--      and rho +0.674 against +0.70. This round changes what the model CLAIMS, not
+--      whether vocals can ship.
+--
+-- SO WHY SELECT IT AT ALL. Not on the gain - +0.27 at 40% of repeats is noise, and the
+-- bar exists precisely to refuse that. @parts_step3 carries the SAME feature count as the
+-- incumbent, and the declared tie-break among equal-complexity candidates is the better
+-- mean (see SelectCandidate). It wins on mean, on rho and on the gate lower bound
+-- simultaneously, having been declared as one of three competing shapes rather than
+-- picked from a sweep. If the protocol run disagrees, the incumbent stays.
+for _, c in ipairs({
+    -- The step the residual pass pointed at. Same k as the incumbent, so it can only
+    -- arrive through the equal-complexity tie-break, never by clearing the gain bar.
+    { name = 'parts+tess+move@parts_step3',
+      keys = { 'syl_density_avg', 'syl_density_peak', 'tight_p10', 'tight_med',
+               'pc_interval_mean', 'playing_s',
+               'notated_range', 'pitch_p90', 'octave_jump_rate', 'parts_3',
+               'high_time_70', 'pc_change_rate' } },
+
+    -- SHAPE SUBSTITUTION: diminishing returns instead of a step, so the round tests
+    -- "which shape" rather than "linear or the one shape that was measured to win".
+    { name = 'parts+tess+move@parts_log',
+      keys = { 'syl_density_avg', 'syl_density_peak', 'tight_p10', 'tight_med',
+               'pc_interval_mean', 'playing_s',
+               'notated_range', 'pitch_p90', 'octave_jump_rate', 'parts_log',
+               'high_time_70', 'pc_change_rate' } },
+
+    -- THE ASSUMPTION-FREE CONTROL, and the one that makes the round interpretable: one
+    -- coefficient per step, so the fit is told nothing about how the levels relate. If
+    -- this beats @parts_step3 the step is too crude; if it ties, the levels really do
+    -- collapse. k+1, so it must clearly beat both to be selected.
+    { name = 'parts+tess+move@parts_free',
+      keys = { 'syl_density_avg', 'syl_density_peak', 'tight_p10', 'tight_med',
+               'pc_interval_mean', 'playing_s',
+               'notated_range', 'pitch_p90', 'octave_jump_rate', 'parts_2', 'parts_3',
+               'high_time_70', 'pc_change_rate' } },
+}) do
+    CANDIDATES_VOCALS[#CANDIDATES_VOCALS + 1] = c
+end
+
+----------------------------------------------------------------------
+-- ROUND 22: DRUMS - THE PEAK COLUMNS COUNT GEMS NOBODY HAS TO HIT
+--
+-- Declared before running. Prior candidates remain byte-for-byte intact above.
+--
+-- FOUND BY READING A CHART, NOT THE CORPUS, which is worth saying because it is the
+-- second time that has produced something (the finger-load rule was the first).
+-- `makemesmile2` is predicted 550 against an official 292 - the most over-predicted drum
+-- chart on record, tier 6 against an official tier 4. The author's reading was that it is
+-- an endurance chart with a constant half-beat kick, hard but not that hard.
+--
+-- The cause is its ending: an 11.7 s roll lane carrying 48 hand notes per measure, which
+-- is the densest passage in the song and therefore sets density_peak for the whole chart.
+-- A roll lane is a LENIENCY DEVICE - the notes under it are a free-play region and the
+-- player is not required to hit them - so counting them literally reads the easiest bar in
+-- the song as the hardest. Excluding roll-covered gems from the peaks moves it 550 -> 368,
+-- tier 6 -> 5 against an official 4. This is the same class of error the Pro Keys
+-- glissando lane already avoids via gliss_frac, applied to the instrument where the
+-- device is common: 2.7% of drum playing time corpus-wide sits under a 126/127 lane.
+--
+-- WHAT WAS RULED OUT FIRST, so the substitution is not a guess:
+--   * NOT THE KICK. kick_density_peak is z +0.86 on this chart, unremarkable, and the
+--     model's kick coefficient is doing what it should.
+--   * NOT FIXABLE BY SWAPPING FACTORS. complex_peak in place of density_peak moves the
+--     prediction by +0.24 rank. The measurement is right; its INPUT is wrong.
+--   * NOT A LABEL DISPUTE. The chart is not in WEIRDLY_SCORED and the author agrees it is
+--     genuinely hard, only not tier 6.
+--
+-- NEW TWINS RATHER THAN A REDEFINITION. density_peak, attack_density_peak and
+-- hand_density_peak are fitted in five shipped models. Changing them in place would
+-- re-open every instrument at once and the rescore's own diff check (every pre-existing
+-- column must read 0% moved) would fire on all of them, hiding any real regression in the
+-- noise. The twins carry the originals' values verbatim on any instrument with no roll
+-- lanes, so this is a pure drums test and the guitar/bass/keys rows are untouched.
+--
+-- NOT FOLDED IN, and deliberately: the guitar and bass TREMOLO (126) and TRILL (127)
+-- lanes are also free-play regions and the same argument would seem to apply. It has not
+-- been measured, those lanes are far rarer, and one chart's worth of reasoning about
+-- drums is not evidence about guitar. A separate round, if ever.
+--
+-- PRE-REGISTERED PREDICTIONS:
+--   1. full_drum@noroll beats full_drum. Drums is already the strongest instrument
+--      (93.38% lower bound) so the headroom is small, and the gain will be under a point.
+--   2. THE GAIN IS CONCENTRATED, NOT BROAD. Only 2.7% of drum playing time is under a
+--      lane, so most charts will not move at all. If usable% rises by more than a point
+--      something other than roll lanes has changed and the result should be distrusted.
+--   3. makemesmile2's own prediction improves by at least 100 rank. This is the one
+--      number the round was built from and it is the one that would falsify it.
+--   4. The partial swap (density only, leaving attacks and hands literal) is WORSE than
+--      swapping all three, because the lane inflates every count that passes through it.
+for _, c in ipairs({
+    -- All three peaks read with roll-covered gems discounted.
+    { name = 'full_drum@noroll',
+      keys = { 'playing_s', 'density_avg', 'density_peak_noroll', 'change_rate',
+               'attack_density_avg', 'attack_density_peak_noroll',
+               'tight_p10', 'tight_med', 'chord_size_mean', 'chord_span_mean',
+               'chord_change_frac', 'move_mean', 'move_p90', 'anchor_frac',
+               'kick_density', 'kick_density_peak', 'hand_density_peak_noroll',
+               'stick_size_mean', 'tom_frac', 'roll_frac', 'offbeat_frac',
+               'pro_stations_peak', 'entropy_h2', 'entropy_h2_rel',
+               'notes_total', 'total_changes' } },
+
+    -- The discrimination check behind prediction 4: only the gem peak swapped, so the
+    -- attack and hand peaks still count the lane. If this ties the full swap, the lane
+    -- only ever inflated one column.
+    { name = 'full_drum@noroll_density',
+      keys = { 'playing_s', 'density_avg', 'density_peak_noroll', 'change_rate',
+               'attack_density_avg', 'attack_density_peak',
+               'tight_p10', 'tight_med', 'chord_size_mean', 'chord_span_mean',
+               'chord_change_frac', 'move_mean', 'move_p90', 'anchor_frac',
+               'kick_density', 'kick_density_peak', 'hand_density_peak',
+               'stick_size_mean', 'tom_frac', 'roll_frac', 'offbeat_frac',
+               'pro_stations_peak', 'entropy_h2', 'entropy_h2_rel',
+               'notes_total', 'total_changes' } },
+}) do
+    CANDIDATES_DRUM[#CANDIDATES_DRUM + 1] = c
+end
+
+----------------------------------------------------------------------
+-- ROUND 21: VOCALS - THE PASSAGE WITH NO ROOM TO BREATHE
+--
+-- Declared before running. Prior candidates remain byte-for-byte intact above.
+--
+-- WHY THIS ROUND EXISTS. Rounds 13 and 19 both went at sustain and both measured ONE NOTE
+-- at a time - longest_note_s, breath_load, longtime_frac, and round 19's phrase-final
+-- hold, which came back negative in every form. That vocabulary cannot see the shape the
+-- worst-predicted charts actually have: twenty short syllables sung back to back with no
+-- gap, which reads as twenty easy notes and is one long demand on the air.
+--
+-- The author's framing, and it is the right one: look for the notes with practically no
+-- room to breathe. A breath group is a maximal run whose gaps are all shorter than a
+-- threshold. It is the sustain counterpart to round 19's phrase geometry - that measured
+-- where a phrase GOES, this measures how long the singer is committed before the next
+-- chance to inhale.
+--
+-- ON ALL NOTES, NOT THE @pitched TWINS. Round 19 built on psegs; this deliberately does
+-- not. A fast rapped or shouted passage needs air like any other, and
+-- `killinginthename` is 0 of 628 pitched - a pitched-only reading would report no breath
+-- demand for the chart most obviously made of them. Movement inside a group is the one
+-- exception and steps between consecutive PITCHED notes, since a talkie's written pitch
+-- is not scored and must not invent motion.
+--
+-- THRESHOLD CHOICE IS THE ROUND'S REAL RISK, and it was made on mechanism rather than on
+-- the best number. 50 ms is "no gap at all", continuous phonation; 100 ms is a quick
+-- catch-breath. A prototype swept 20 / 50 / 100 / 150 / 200 ms and the standalone
+-- correlation keeps RISING through 150 ms (movemax +0.213 at 50, +0.367 at 100, +0.417 at
+-- 150). Those wider thresholds are NOT declared, because at 150 ms and beyond
+-- `weirdscience` - a chart that already scores near-correctly on agility and does not
+-- need a sustain bump - gains as much as the underperformers do. That is the signature of
+-- a column measuring legato phrasing rather than absence of breathing room, and taking
+-- the better standalone number would have been exactly the fishing this file exists to
+-- prevent. 20 ms is also excluded, and for a concrete reason: at that width MOVEMENT
+-- inside a group is 0.000 for every song sampled - the groups are too short to contain
+-- any, so the measure stops existing.
+--
+-- MEASURED AND REJECTED BEFORE DECLARATION:
+--   * PHRASE-FINAL HOLD, PHRASE LENGTH p90, PER-PHRASE COUNTS, TEMPO, TIME SIGNATURE -
+--     all five recorded under round 19 above and none retried here.
+--   * DE-SHRINKING THE PREDICTION, which is the other way to attack a top-end bias.
+--     Measured across all six instruments and it is worse on four, and MONOTONICALLY
+--     worse on vocals (88.4 -> 87.2 -> 86.3 -> 86.0 at 1.15 / 1.30 / 1.50x). See the
+--     README finding "The fit/grade mismatch is already spent".
+--
+-- THE PROTOTYPE NUMBERS BELOW ARE NOT EVIDENCE AND ARE NOT EVEN REPRODUCIBLE HERE. They
+-- came from a scratch implementation that grouped notes slightly differently and screened
+-- roughly twenty variants against these same rows. They justify the FORM and the
+-- thresholds; they do not predict the fitted gain, and this document's most repeated
+-- error is assuming standalone rho does.
+--
+-- PRE-REGISTERED PREDICTIONS:
+--   1. breath_mean_50 is the strongest single addition. The prototype put it at +0.73,
+--      the best of anything measured on vocals in that session, and notably it did that
+--      on a standalone rho of -0.109 - the clearest case yet of the two disagreeing.
+--   2. THE HONEST GAIN IS NEARER +0.4 THAN +0.73. Twenty variants on one set of rows
+--      inflates a selection estimate, and this is the round where that correction is
+--      being stated in advance rather than discovered afterwards.
+--   3. NONE PASSES THE GATE. Vocals needs +4.9 points of usable lower bound and +0.03 of
+--      rho; nothing in this family is that size.
+--   4. THE MIXED-THRESHOLD PAIR BEATS EITHER ALONE. Duration wants the tight threshold
+--      (at 100 ms `weirdscience` merges into long passages it does not sing) and movement
+--      wants the wide one (at 50 ms there is barely room to move inside a group). If the
+--      pair does NOT win, the two quantities are one thing and the substitution structure
+--      is wrong.
+--   5. The max forms beat the mean forms on movement and LOSE on duration. Movement is
+--      concentrated in a few passages; time without air is not.
+--
+-- IF NOTHING IS SELECTED, that is the answer and it closes the sustain thread: rounds 13,
+-- 19 and 21 will then have measured single-note hold, phrase-final hold, and continuous
+-- passage length, and none of the three moves the official vocal rank.
+for _, c in ipairs({
+    -- Duration at the tight threshold - the round's primary claim, alone.
+    { name = 'parts+tess+move+breath',
+      keys = { 'syl_density_avg', 'syl_density_peak', 'tight_p10', 'tight_med',
+               'pc_interval_mean', 'playing_s',
+               'notated_range', 'pitch_p90', 'octave_jump_rate', 'vocal_parts',
+               'high_time_70', 'pc_change_rate', 'breath_max_50' } },
+
+    -- THRESHOLD SUBSTITUTION, never fitted beside the 50 ms twin.
+    { name = 'parts+tess+move+breath@100',
+      keys = { 'syl_density_avg', 'syl_density_peak', 'tight_p10', 'tight_med',
+               'pc_interval_mean', 'playing_s',
+               'notated_range', 'pitch_p90', 'octave_jump_rate', 'vocal_parts',
+               'high_time_70', 'pc_change_rate', 'breath_max_100' } },
+
+    -- AGGREGATION SUBSTITUTION on duration, and the prototype's strongest single column.
+    { name = 'parts+tess+move+breath@mean50',
+      keys = { 'syl_density_avg', 'syl_density_peak', 'tight_p10', 'tight_med',
+               'pc_interval_mean', 'playing_s',
+               'notated_range', 'pitch_p90', 'octave_jump_rate', 'vocal_parts',
+               'high_time_70', 'pc_change_rate', 'breath_mean_50' } },
+
+    -- Movement inside a passage rather than its length: not merely committed, but
+    -- committed AND having to move while committed.
+    { name = 'parts+tess+move+breathmove',
+      keys = { 'syl_density_avg', 'syl_density_peak', 'tight_p10', 'tight_med',
+               'pc_interval_mean', 'playing_s',
+               'notated_range', 'pitch_p90', 'octave_jump_rate', 'vocal_parts',
+               'high_time_70', 'pc_change_rate', 'breath_movemax_100' } },
+
+    -- AGGREGATION SUBSTITUTION on movement.
+    { name = 'parts+tess+move+breathmove@mean',
+      keys = { 'syl_density_avg', 'syl_density_peak', 'tight_p10', 'tight_med',
+               'pc_interval_mean', 'playing_s',
+               'notated_range', 'pitch_p90', 'octave_jump_rate', 'vocal_parts',
+               'high_time_70', 'pc_change_rate', 'breath_move_100' } },
+
+    -- BOTH, each at the threshold its own mechanism argues for. Prediction 4 is the test
+    -- of whether the two are separate demands at all, and this is the candidate the round
+    -- was designed around.
+    { name = 'parts+tess+move+breath_both',
+      keys = { 'syl_density_avg', 'syl_density_peak', 'tight_p10', 'tight_med',
+               'pc_interval_mean', 'playing_s',
+               'notated_range', 'pitch_p90', 'octave_jump_rate', 'vocal_parts',
+               'high_time_70', 'pc_change_rate',
+               'breath_max_50', 'breath_movemax_100' } },
+}) do
+    CANDIDATES_VOCALS[#CANDIDATES_VOCALS + 1] = c
+end
+
 -- Which declaration governs an instrument. Anything without its own entry uses the
 -- guitar/bass set, so adding an instrument without declaring candidates for it fails
 -- visibly (unavailable factors are reported, not silently dropped) rather than quietly
@@ -1249,6 +1705,27 @@ end
 -- MAE IS NOT COMPARABLE ACROSS SCALES and must never be used to choose between them:
 -- fitting log(rank) buys proportional accuracy at the cost of absolute accuracy, so
 -- its MAE can rise while its tier accuracy improves. Grade on tier distance.
+-- A THIRD SCALE WAS BUILT, MEASURED, AND IS NOT HERE. log(rank) fixes the SCALE half of
+-- the fit/grade mismatch; the LOSS half - squared error not knowing where the boundaries
+-- are - was closed by constructing the tier coordinate that maps threshold k to exactly k
+-- and interpolates log-linearly inside each band, so squared error in it IS squared tier
+-- distance. It verified (thresholds land on their own tier number, inv round-trips to
+-- 1e-9) and there was real room to gain: interior band widths in log space vary 1.25x on
+-- guitar but 2.29x on keys and 2.16x on drums, so log(rank) is demonstrably not already
+-- tier-uniform. Measured against each instrument's OWN shipped scale - keys and real_keys
+-- ship on `rank`, so grading it against log(rank) would use a baseline neither of them
+-- has - it is worth nothing:
+--
+--     guitar -0.06 (30% of repeats)   bass +0.06 (50%)   drum +0.27 (60%)
+--     keys   +0.15 (40%)              real_keys +0.04 (10%)   vocals -0.18 (30%)
+--
+-- and rho moves by at most 0.003 anywhere. Not added, because a scale that changes
+-- nothing still has to be carried by the exporter, the shipped model artifact (which
+-- holds no instrument field, so DIFFICULTY_SCALE_INV could not resolve the thresholds
+-- without a schema bump) and every future reader. See README, "The fit/grade mismatch is
+-- already spent", for the miss anatomy that explains why: misses need a median 7-28 rank
+-- of movement while correct rows carry 48-63 of slack, so they are model error and not
+-- boundary-adjacent accidents a loss function could reclaim.
 SCALES = {
     { name = 'rank',      fwd = function(v) return v end,
                           inv = function(v) return v end },

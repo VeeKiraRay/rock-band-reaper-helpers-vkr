@@ -19,18 +19,23 @@ versioned nor deployed, so a deployed copy finds no songs. Register the repo cop
 
 ## Where things stand
 
-Selected model per instrument, as of round 18 (2026-08-17), on the 394-song corpus.
-Reproduced from `calibration_protocol_report.txt`, which is regenerated on every protocol
-run and is the authority if these disagree.
+Selected model per instrument, as of round 22 (2026-08-18), on the 394-song corpus at 114
+factor columns. Reproduced from `calibration_protocol_report.txt`, which is regenerated on
+every protocol run and is the authority if these disagree.
 
 | instrument | selected candidate | scale | k | usable | usable lower bound | miss upper bound | rho | |
 |---|---|---|---:|---:|---:|---:|---:|---|
 | guitar | `full@attacks` | log(rank) | 21 | 94.16% | **91.64%** | 1.36% | +0.862 | **passes** |
 | bass | `baseline+entropy` | log(rank) | 3 | 94.18% | **91.68%** | 1.35% | +0.802 | **passes** |
-| drum | `full_drum` | log(rank) | 26 | 95.64% | **93.38%** | 1.40% | +0.888 | **passes** |
+| drum | `full_drum@noroll` | log(rank) | 26 | 96.46% | **94.37%** | 1.35% | +0.894 | **passes** |
 | keys | `primary+ent_rel+complex@attacks-chord` | rank | 7 | 92.97% | 89.94% | 1.08% | +0.878 | fails by 0.06 |
 | real_keys | `primary+ent_rel@attacks` | rank | 7 | 89.40% | 85.89% | 2.02% | +0.861 | fails |
-| vocals | `parts+tess+move` | log(rank) | 12 | 88.35% | 85.12% | 4.08% | +0.668 | fails |
+| vocals | `parts+tess+move@parts_step3` | log(rank) | 12 | 88.63% | 85.42% | 4.32% | +0.674 | fails |
+
+Rounds 19-22 changed two of the six. Drums took the roll-lane peak twins (+0.99 on the
+lower bound) and vocals took the harmony count as a step instead of a number (+0.30).
+Guitar, bass, keys and Pro Keys are unchanged **to the decimal**, which is what confirms
+the eighteen new columns did not leak into the four instruments they were not for.
 
 "usable" is within-one-tier accuracy, averaged across repeats; the two bounds beside it are
 the pessimistic end of each interval, which is what the gate reads (floors: usable >= 90%,
@@ -483,6 +488,46 @@ model has to earn its place consistently, not post a higher average once.
 - **The vocal rank includes harmony burden.** Scoring `PART VOCALS` alone under-rates
   3-part songs by ~34 rank points and over-rates 1- and 2-part songs by ~17. Adding
   `vocal_parts` as a context term is worth +1.53 points and rho +0.579 → +0.626.
+- **But the harmony term is a *step at three*, not a ramp — and it is a production-scale
+  label, not a difficulty measurement.** Fitting the other eleven vocal factors and reading
+  the residual by level: one part **−0.0772**, two parts **−0.0787**, three parts
+  **+0.0595**. One and two singers are the *same level* (0.4 rank apart); the entire effect
+  is the step to three (+34 rank). The linear term cannot say that, so it splits the
+  difference and over-credits all 87 two-part songs by ~12 rank. The reason is authoring
+  practice, not vocal load: three parts is the **house default** (187 of 328, 57%), an
+  author adds HARM2 for any backing vocal worth capturing, and HARM3 needs three distinct
+  simultaneous lines. So the term reads "this arrangement did not earn full harmonies",
+  which is why it works at all — the rank it predicts grades `PART VOCALS` alone and the
+  harmony tracks are never read. Declared as round 20; `parts_3` posts 88.63% / rho +0.674
+  against the incumbent's 88.35% / +0.668. **The assumption-free control is the real
+  result**: given one free coefficient per step, the fit ties the single step exactly
+  (88.63%), so it does not use the permission.
+- **Measuring inside the harmony tracks does not beat the free label. Do not build the
+  reader.** The obvious upgrade — detect whether HARM2/HARM3 are real parts or the lead
+  doubled — was swept over every corpus MIDI and fitted every way it can be fitted.
+  - **Harmonies are almost never unison doubles.** Same pitch as the lead: mean **0.124**,
+    median **0.030**. The typical HARM2 is a *different* pitch on the *same* words at the
+    *same* time covering ~40% of the chart — musically a second part, structurally
+    dependent on the lead. Duplication has to be measured on note starts *and* ends, not on
+    pitch, or it reads every parallel-third harmony as independent.
+  - **Duplication is bimodal, and 1.000 is a real mode.** Of 461 harmony tracks, **29
+    (6.3%) duplicate at exactly 1.000**, **zero** sit between 0.999 and 1.000, and only 5
+    between 0.990 and 0.999. Authors either paste the lead's rhythm or write something
+    else; there is no continuum to grade along.
+  - **A graded discount is actively harmful**: −0.98 points at **0%** of paired repeats,
+    rho +0.668 → +0.632. Discounting each harmony by how mirrored it is drags 68.6% of
+    songs below their declared count and erases the production-scale reading that was doing
+    the work. Replacing the count with independence outright is worse still (−1.55, 0%).
+  - **Only the strictest cut-offs help, and not enough.** `parts_eff` at 0.90 / 0.95 / 0.99
+    / 1.00 gains +0.40 / +0.37 / **+0.49** / **+0.52** points — best at the strictest, which
+    agrees with the bimodality. Against a 1.00-point bar, while moving 23 of 328 rows, for
+    a new parsing path through HARM1/2/3. Adding a harmony measurement *beside* the count
+    buys +0.21 / +0.09. **Not pursued.**
+  - One asymmetry, recorded rather than acted on: 6% is *Harmonix's* practice. A custom
+    author copy-pasting harmonies is the fast way to write them, and the one non-corpus
+    chart checked (`oliver_t_cowboys_d_cry_vkr`) mirrors at **1.000 on both parts**. This
+    may matter more to the tool's users than to the corpus that calibrates it — which is a
+    reason to have measured it, not a reason to ship an unearned column.
 - **The vocal rank means "sing it as written".** Register was initially refused as a factor
   on the rule that difficulty follows what the game *requires* — pitch-class scoring
   ignores the octave. Reversing that made the two register columns the strongest factors in
@@ -719,6 +764,45 @@ model has to earn its place consistently, not post a higher average once.
   If a Pro-Keys-aware **note** is ever wanted in the product, range and movement are the
   quantities to phrase it from — note count and strike rate are identical on the two charts
   and would state nothing.
+- **The fit/grade mismatch is already spent. Stop looking for a better loss function.**
+  The models are *fitted* by squared error on `rank` or `log(rank)` and *graded* on tier
+  distance. `log(rank)` closed the scale half of that gap; three attempts at the loss half
+  all failed, and the third explains the first two.
+  - **A tier coordinate is worth nothing.** Built and verified: threshold *k* maps to
+    exactly *k*, log-linear inside each band, so squared error in it *is* squared tier
+    distance. There was real room — interior band widths in log space vary **1.25x** on
+    guitar but **2.29x** on keys and 2.16x on drums, so `log(rank)` is measurably not
+    already tier-uniform. Against each instrument's **own shipped scale** (keys and
+    real_keys ship on `rank`, so `log(rank)` is the wrong baseline for them): guitar
+    −0.06, bass +0.06, drum +0.27, keys +0.15, real_keys +0.04, vocals −0.18, with win
+    shares 10–60% and rho moving ≤0.003 anywhere.
+  - **De-shrinkage is worse, not better.** Squared-error regression compresses toward the
+    mean by construction — `sd(pred)/sd(actual)` is guitar 0.88, bass 0.83, drum 0.91,
+    keys 0.85, real_keys 0.83, **vocals 0.63** — and that compression *is* the mechanism
+    behind every top-end bias here (vocals −125, everything else −34 to −50). Expanding
+    predictions back out is worse on four of six and **monotonically worse on vocals**
+    (88.4 → 87.2 → 86.3 → 86.0 at 1.15/1.30/1.50x). Amplifying a weakly-correlated
+    prediction adds noise faster than it removes bias, so the instrument that looks most
+    compressed is the one this helps least. It also cannot touch rho, being monotone.
+  - **Why, and this is the part to keep: misses are model error, not near-misses.** For
+    every cross-validated miss, the rank movement needed to become usable against the
+    slack the *correct* rows have — guitar 7 vs 48, keys 17 vs 63, drum 18 vs 58, bass 24
+    vs 49, vocals 26 vs 55, real_keys 28 vs 57 (medians). Wrong predictions need real
+    movement and right ones sit two to seven times further from an edge. There is no
+    reallocation available; a loss function can only trade near boundaries.
+- **The equal-complexity tie-break can flip a release gate on noise. Read the gate on a
+  configuration fixed in advance.** `SelectCandidate` prefers the better mean among
+  candidates of equal complexity, with **no gain bar applied** — the bar only governs
+  *bigger* models beating smaller ones. A scale change keeps the feature count, so it
+  enters through that door: adopting the tier coordinate on keys moves its usable lower
+  bound **89.94% → 90.11%**, i.e. from failing the 90% floor to passing it, on a
+  difference worth **+0.15 points that wins 40% of paired repeats**. Nothing about that
+  is a real improvement. The tie-break is correct as a way to avoid arbitrary choices
+  (it was added because `log` sorted before `rank` alphabetically), but it was never
+  meant to carry a ship/no-ship decision. Note the contrast with round 20, where the same
+  door admits `@parts_step3` on vocals — harmless there, because vocals fails its gate
+  either way and only the model's *claim* changes. Keys is 0.06 points from the floor and
+  is the case where this matters.
 - **The selected factors are collinear enough to matter downstream.** Not a modelling
   result — the ridge handles it — but the explanation UI shows the three *most unusual*
   measurements, and on 20% of corpus rows two of those were a correlated pair restating one
@@ -762,6 +846,162 @@ Where the three failing instruments actually stand, so this is not re-derived.
   the protocol declines it independently. Do not re-propose without a new mechanism — and
   note that the mechanism most likely to be reached for first, "Pro Keys knows something
   the reduction lost", has now been measured directly and is the *weaker* of the two.
+- **Vocals reaches the top tier by exactly one route, and it is fragile.** Harmonix puts
+  48 vocal charts in tiers 5-6; the model puts **9**, and tier 6 exactly **once** in 328.
+  The other three instruments manage ~70% of Harmonix's top-tier count (guitar 43 of 61,
+  drums 38 of 54, keys 32 of 45), so this is not a property of linear models — guitar's
+  top prediction is 605 against an official 600. The one vocal chart that gets there,
+  `weirdscience`, does it on `octave_jump_rate` at **z +7.88** (worth +45 rank) plus
+  `pc_change_rate` at +2.09 (+41). Its opposite, `somebodytolove2` (the corpus's hardest
+  vocal chart at 495, predicted 321), is *below average* on travel and extreme on the
+  sustain family instead — `high_hold_time_70` **+2.34**, `breath_load` +1.74,
+  `longtime_frac` +1.32 — none of which is in the model, all of which lost selection in
+  rounds 13 and 18. **The vocal vocabulary is rich for agility and nearly empty for
+  sustained high singing**, and that is the sharpest statement of the vocal gap so far.
+
+---
+
+## Rounds 19-22, and what they settled
+
+All four were declared, rescored on 2026-08-18, and decided. Two changed a shipped model.
+
+| round | what | outcome |
+|---|---|---|
+| 19 | phrase pitch geometry (span, travel, per phrase) | best `+phrase_pitch` 88.48%, below the round-20 step. **Not selected.** |
+| 20 | the harmony count as a step (`parts_3`) rather than a number | **SELECTED**, 88.35% → 88.63%, rho +0.668 → +0.674 |
+| 21 | breath groups — passages with no gap long enough to inhale | best `+breath@mean50` **89.02%**, the highest vocal figure recorded. **Refused** at +0.40 / 80% against a >1.00 / >70% bar. |
+| 22 | the three drum peak columns with roll-lane gems excluded | **SELECTED**, 93.38% → 94.37% lower bound, rho +0.888 → +0.894 |
+
+The eighteen columns all stay in the CSV — measured, tested and cheap to carry — whether or
+not they were selected.
+
+### Round 21's refusal was substantively right, not merely conservative
+
+This is the one worth keeping, because a +0.40 refusal normally reads as the bar being
+pedantic. It was not. The breath columns were designed specifically to reach the
+under-predicted hard charts, and **on those charts they do nothing**:
+
+| chart | rank | `parts+tess+move` | `@step3` | `breath@mean50` |
+|---|---:|---:|---:|---:|
+| antsmarching | 441 | 192 | 200 | **192** |
+| phantomoftheopera | 468 | 240 | 242 | **240** |
+| flightoficarus | 442 | 262 | 264 | **259** |
+| somebodytolove2 | 495 | 320 | 321 | **315** |
+| dontstopmenow | 457 | 292 | 295 | **280** |
+
+Same list, same order, and it pushes three of the hardest charts *down*. Its entire gain
+comes from middling charts (`saturdaynightspecial`, `shadowoftheday`,
+`whatdoesntkillyou2`). **Three mechanisms — phrase geometry, harmony shape, breath
+grouping — now measure null on the same ten charts.** That closes the sustain thread with
+evidence rather than exhaustion, and it re-confirms the pre-round-19 finding on real
+REAPER-scored data: the misses are invisible to the model, not mis-weighted.
+
+### Round 22's cost, and the general lesson in it
+
+3 charts fixed, 2 broken. `makemesmile2` moved **550 → 362** (188 rank, two tiers out to
+one) and `tearsdontfall` also cleared; `dreamonlive` and `wearethechampions2` broke.
+
+**The two it broke have identical values on the twins and their originals** — neither has a
+lane under its peak window, so nothing about their charts changed. What moved is the
+column's *scale*: dropping the leniency passages cut `attack_density_peak`'s corpus sd by
+**17.7%** and `hand_density_peak`'s by **16.5%**, because the excluded values were the
+extreme outliers. Standardization is global, so every chart's z rose on those columns —
+`dreamonlive`'s attack z went **+0.44 → +0.62** with its own chart untouched.
+
+Excluding outliers from a standardized column never stays local to the outliers. The
+measurement change was concentrated (6.1% of drum rows); the model effect was corpus-wide.
+
+---
+
+## Queued for the next full rescore
+
+Adding or changing a scored column forces a full REAPER re-run of all 2101 rows
+(`run_calibration_vkr.lua` refuses to resume on a column-set change). Nothing below is
+worth triggering a rescore on its own; it is here so that whenever one happens for another
+reason, it goes in too.
+
+### Big Rock Endings are over-charted bonus material and are being counted
+
+**The same class of error as the drum roll lane, and it lands on five instruments.** A BRE
+is a free-play region: the notes exist so the characters animate, and the player may play
+as much or as little as they like. Every gem inside one inflates density, attack rate, note
+totals and playing time without asking anything of the player. Vocals is exempt by spec —
+nothing may be authored during a BRE.
+
+**Use `[coda]` in the EVENTS track, never the lanes.** The lanes are pitch 120-124, but on
+drums that range is also the activation/fill lane. Measured over 394 corpus songs:
+
+```
+[coda] in EVENTS        :  18
+120-124 lane present    : 392
+both (a real BRE)       :  18
+lane but NO coda        : 374   <- drum fills, not BREs
+coda but no lane        :   0
+```
+
+Reading the lanes alone would strip material from **374 songs that have no BRE at all**.
+The authoring doc's requirement holds perfectly in this corpus, so `[coda]` is exact.
+
+**One coda per song, always — 0 of 18 have more than one.** So the implementation needs no
+per-instrument lane parsing at all: find the single `[coda]`, cut everything after it. That
+also sidesteps the drums 120-124 ambiguity entirely, because the lanes are never read.
+
+**The cut also discards the required final hit, and that is fine.** The doc requires a hit
+*after* the lanes end, so a coda cutoff eats it — measured at a median of 1-3 gems per
+instrument and a maximum of 9, against chart totals of 1000-2600. In practice a short roll,
+a crash, or a few chords. A deliberate approximation, recorded here so it is not later
+mistaken for an oversight.
+
+Where a BRE exists it is worth 3-4% of gems on average, up to **16.2%** (`2112pt3` bass,
+149 of 918 over 17.4s). `dreamonlive` — the chart whose regression in round 22 prompted
+this — carries 84 drum gems across 10.7s, 8.3% of the chart.
+
+**The LOCAL direction is a coin flip:**
+
+```
+over-predicted   38 rows, mean error +38   -> exclusion helps
+under-predicted  40 rows, mean error -47   -> exclusion hurts
+```
+
+and the losing half loses harder. The charts most at risk are already badly under-read:
+`rizeofthefenix` drum **-157**, `2112pt3` drum **-129**, `starshiptrooper` keys **-125**,
+`flightoficarus` drum **-123**. Stripping 3-16% of their gems pushes them further down.
+
+**But that check cannot answer the question, and an earlier version of this section wrongly
+concluded from it that the round was not worth running.** It measures where the 18 BRE
+charts currently sit and infers the sign of a *local* effect. Round 22 proved that is the
+smaller half: its two regressions, `dreamonlive` and `wearethechampions2`, had
+**byte-identical measurements** before and after, and broke only because removing the
+outliers cut the column's corpus sd by 17.7% and re-scaled every chart's z. **Excluding an
+outlier from a standardized column moves the 376 songs that do not have one.**
+
+So the honest position is that the corpus-wide effect is *unmeasured*, the mechanism that
+dominated round 22 is present here too, and 18 songs' worth of extreme values is enough to
+move an sd. The round is worth running; a prediction from the local signs is not a
+substitute for running it. The one thing the local check does establish is that this is not
+the same easy win as the roll lanes - there is no concentrated set of obviously-wrong
+predictions waiting to be fixed, so expect the gain to come from re-scaling rather than
+from the BRE charts themselves, and declare it that way.
+
+A Stage A offline preview is possible and cheap: the cutoff is a **tick** (the `[coda]`
+position), so the exclusion itself is exact offline. The resulting density values depend on
+the tempo map, so the preview may differ from REAPER in the last decimals and **must never
+be merged into the REAPER-scored CSV** - name it `_2N_*` per the usual rule.
+
+**The product argument is separate and the corpus cannot see it.** An author who writes a
+BRE and gets a rank inflated by their own bonus section is being handed a wrong answer,
+whether or not fixing it moves a corpus statistic. Unlike the harmony-mirroring case this
+is not a judgement call — a BRE is a documented, unambiguous free-play region. So the
+recommendation is: fold it in when a rescore happens anyway, not before.
+
+**`playing_s` is the subtler half and the round must declare it.** BRE time currently
+counts as playing time. Removing the gems but not the time lowers every density twice over;
+removing both is the honest treatment, but `playing_s` carries a positive coefficient in
+five of six models, so the two effects partly cancel. Declare it as one substitution, not
+two.
+
+Implementation cost, once a rescore is happening anyway: one EVENTS text scan and one time
+cutoff in `difficulty_read.lua`, which does not parse the EVENTS track today.
 
 ---
 

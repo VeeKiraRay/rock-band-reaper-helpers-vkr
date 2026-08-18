@@ -201,8 +201,9 @@ local function DrawCard(rec, lbl_col)
     DrawDifficultyDots(rec.tier)
     Tooltip(TIPS.diff_dots)
     r.ImGui_SameLine(ctx)
+    -- rank_shown, not a local rounding: see difficulty_suggester.lua on why it is floored.
     r.ImGui_Text(ctx, ('%s (rank %d)')
-        :format(rec.tier_name, math.floor(rec.rank + 0.5)))
+        :format(rec.tier_name, rec.rank_shown or math.floor(rec.rank)))
     if rec.ruler then
         -- The band's own name on the left, what lies above it on the right, the ruler
         -- between. lbl_col comes from the whole card set rather than this card, so the six

@@ -99,7 +99,23 @@ local SELECTIONS = {
     -- against their pro_ twins) are bit-identical on drum rows and blow up into +903/-906,
     -- but only in the ANALYSIS report's unridged fit over every column. No declared drum
     -- candidate contains both halves of any of them.
-    { inst = 'drum',      candidate = 'full_drum',                        scale = 'log(rank)' },
+    -- ROUND 22 swapped the three PEAK columns for their roll-lane twins. The factor list
+    -- is otherwise unchanged. A 126/127 roll lane is a leniency device - the player is not
+    -- required to hit the notes under it - so the peaks were reading a free-play region as
+    -- the densest passage in the song. `makemesmile2` was the worst over-prediction on
+    -- record at 550 against an official 292 and now reads 362, a 188-rank move that takes
+    -- it from two tiers out to one. Corpus: 93.38% -> 94.37% lower bound, rho +0.888 ->
+    -- +0.894, and 3 charts fixed against 2 broken.
+    --
+    -- THE TWO IT BREAKS ARE NOT A MEASUREMENT ERROR, and the mechanism is worth keeping.
+    -- `dreamonlive` and `wearethechampions2` have IDENTICAL values on the twins and their
+    -- originals - neither has a lane under its peak window. What moved is the column's
+    -- SCALE: dropping the leniency passages cut attack_density_peak's corpus sd by 17.7%
+    -- and hand_density_peak's by 16.5%, because the excluded values were the extreme
+    -- outliers. Standardization is global, so every chart's z rose on those columns
+    -- (`dreamonlive`'s attack z went +0.44 -> +0.62 with its chart untouched). Excluding
+    -- outliers from a standardized column never stays local to the outliers.
+    { inst = 'drum',      candidate = 'full_drum@noroll',                 scale = 'log(rank)' },
     -- ROUND 16 chose these factors. Replaced 'primary+entropy_rel+complex_peak' / rank:
     -- that model measured density in GEMS and carried chord_size_mean at -12.86 to divide
     -- chords back out of the count - which charged a real chart ~28 rank per extra note in
@@ -128,7 +144,35 @@ local SELECTIONS = {
     -- STILL FAILS THE GATE, at a lower bound of 85.12% against the 90% floor and rho short
     -- of 0.70. Shipped anyway, per the decision to get author feedback on the weak
     -- instruments; the artifact's `experimental` badge is what says so in the UI.
-    { inst = 'vocals',    candidate = 'parts+tess+move',                  scale = 'log(rank)' },
+    -- ROUND 20 replaced the linear vocal_parts term with parts_3, a step. Same factor
+    -- count, same everything else. Entering the harmony count as a NUMBER asserted that one
+    -- singer to two costs what two to three costs; with the other eleven factors held the
+    -- corpus says one part and two sit 0.4 rank apart and the entire effect is the move to
+    -- three, so the linear term was over-crediting all 87 two-part songs by ~12 rank.
+    --
+    -- THE CONTROL IS WHAT MAKES IT A FINDING. `@parts_free` - one free coefficient per step,
+    -- told nothing about how the levels relate - ties `@parts_step3` at 88.63%, identically.
+    -- Given permission to price the two steps differently the fit does not use it.
+    --
+    -- IT ARRIVES BY THE EQUAL-COMPLEXITY TIE-BREAK, not by clearing the gain bar: +0.27
+    -- points at 40% of paired repeats is noise, and SelectCandidate prefers the better mean
+    -- among candidates of the same size. That door is safe here precisely because vocals
+    -- fails its gate either way - only the model's CLAIM changes. See the README finding on
+    -- why the same door must not be trusted on keys, which sits 0.06 points from its floor.
+    --
+    -- WHAT ROUND 21 MEASURED AND DID NOT WIN. `parts+tess+move+breath@mean50` posts 89.02%,
+    -- the highest vocal figure this project has recorded, and was refused at +0.40 points /
+    -- 80% of repeats against a bar of >1.00 and >70%. The refusal is substantively right and
+    -- not merely conservative: on the ten worst-predicted charts the breath columns move
+    -- nothing (antsmarching 192 -> 192, phantomoftheopera 240 -> 240) and push three of the
+    -- hardest DOWN (somebodytolove2 320 -> 315, dontstopmenow 292 -> 280). Its whole gain
+    -- comes from middling charts. Three mechanisms - phrase geometry, harmony shape, breath
+    -- grouping - now all measure null on the same ten charts.
+    --
+    -- STILL FAILS THE GATE, 85.42% against the 90% floor and rho +0.674 against 0.70.
+    -- Shipped anyway, per the decision to get author feedback on the weak instruments; the
+    -- artifact's `experimental` badge is what says so in the UI.
+    { inst = 'vocals',    candidate = 'parts+tess+move@parts_step3',      scale = 'log(rank)' },
 }
 
 -- Product maturity, from the product plan's status table. Carried in the artifact so the
