@@ -5,7 +5,7 @@ Three REAPER ReaScript tools for custom Rock Band song authoring, sharing a comm
 | Script                                                                 | What it does                                                                                              |
 | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | **[Rock Band Vocal Helper](rock_band_vocal_helper_vkr/README.md)**     | Generate timing-aligned MIDI notes from a vocal stem, with pitch assignment and lyric assignment built in |
-| **[Rock Band General Helper](rock_band_general_helper_vkr/README.md)** | Audio alignment utilities, audio-driven tempo map generation from a drum stem, and VENUE track validation |
+| **[Rock Band General Helper](rock_band_general_helper_vkr/README.md)** | Audio alignment, audio-driven tempo map generation from a drum stem, difficulty reduction and validation, ASCII tab input, MIDI utilities, VENUE track validation, and genre/difficulty-rank suggestions |
 | **Rock Band Music Theory Helper**                                       | Interactive instrument reference — drum notation legend, common drum patterns, and a guitar chord-shape explorer, with hover highlighting and audio playback (playback needs [SWS](#sws-extension-audio-playback-only)) |
 
 ---

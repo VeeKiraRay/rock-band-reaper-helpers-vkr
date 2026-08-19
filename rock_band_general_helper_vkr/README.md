@@ -17,7 +17,7 @@
 
 ## UI overview
 
-The window is organized into tabs plus a status panel at the bottom. Five tabs are always visible; four more (Tempo Map, Drums, Keys, Guitar) are work-in-progress and hidden until enabled.
+The window is organized into tabs plus a status panel at the bottom. Six tabs are always visible; four more (Tempo Map, Drums, Keys, Guitar) are work-in-progress and hidden until enabled.
 
 | Tab            | Purpose                                                                              |
 | -------------- | ------------------------------------------------------------------------------------ |
@@ -26,6 +26,7 @@ The window is organized into tabs plus a status panel at the bottom. Five tabs a
 | **Tab Input**  | Reference guide: parse ASCII tab notation for Guitar/Bass, Keys/Pro Keys, or Vocal  |
 | **MIDI**       | Align, length-sync, or find-and-replace patterns on MIDI items                      |
 | **Venue**      | Validate and generate text events on the VENUE and EVENTS tracks                    |
+| **Metadata**   | Convert a real-world genre to the closest supported Rock Band genre, and suggest a difficulty rank and tier for each finished Expert chart |
 
 <a id="wip-tabs"></a>
 
@@ -482,6 +483,61 @@ The VENUE spec includes three categories of events:
 | **Camera cuts**     | `[coop_all_near]`, `[directed_drums]`, `[directed_vocals_cls]`, …  |
 | **Post-processing** | `[bloom.pp]`, `[film_b+w.pp]`, `[video_trails.pp]`, …              |
 | **Lighting**        | `[lighting (verse)]`, `[lighting (frenzy)]`, `[lighting (bre)]`, … |
+
+---
+
+## Metadata tab
+
+Contains two sub-tabs: **Genre** and **Difficulty**. Both answer questions about the song as a whole rather than editing anything — neither writes to the project or creates an undo point.
+
+### Genre sub-tab
+
+![Genre sub-tab](../assets/g_metadata_genre.jpg)
+
+Converts the genre you'd actually call your song into the closest genre Rock Band supports.
+
+Pick a broad **family** first, then the **genre** itself — the full list runs past 200 entries, which is more than one dropdown can be read from. Changing the family resets the genre below it.
+
+That list is deliberately wider than what Rock Band supports. It holds styles like Djent, Easycore and Synthwave that have no supported category of their own, which is the entire reason a conversion is needed. If your genre isn't there, pick the nearest one in the same family.
+
+The result is the closest supported **major genre and subgenre**. Some styles have more than one defensible home, and where that's true you get two or three candidates, each saying what would tip the choice toward it — real released songs in that style were genuinely filed both ways. A single suggestion means the catalogue agrees with itself and the call is settled.
+
+A **See also** line, where one appears, points at a different entry in the *input* list rather than at another Rock Band category — Post-Grunge points at Grunge, in case your song belongs to the early-90s wave instead. It's a check on whether you picked the right input.
+
+Two things worth knowing about the output:
+
+- **These are display names, never `songs.dta` tokens.** Token spellings drift between game eras — RB1/RB2's `urban` became RB3's `hiphoprap`, and subgenre tokens are scoped to their parent — and the packaging tool that writes `songs.dta` has its own picker. Use that for the actual string.
+- **Subgenres aren't shown in-game.** They feed the visualiser cards, so the major genre is the choice that actually matters.
+
+The vocabulary is transcribed from the RBN/C3 subgenre documentation: 29 major genres and 126 subgenres.
+
+### Difficulty sub-tab
+
+![Difficulty sub-tab](../assets/g_metadata_difficulty.jpg)
+
+Not to be confused with the **Difficulty tab** further up, which reduces and validates charts. This one doesn't touch your notes — it estimates what *rank* each finished Expert chart would be given, and which tier that lands in.
+
+**Where the numbers come from.** The weightings aren't one author's opinion about what makes a chart hard. Each instrument has its own model, fitted against the official ranks of around 400 released Rock Band songs read from their own `songs.dta`. The tool is trying to reproduce how the official DLC was actually ranked.
+
+Press **Refresh suggestions** to score the project. It's read-only — nothing is written and no undo point is created. The whole chart is scored, so a time selection makes no difference, and results aren't saved with the project: re-run it after editing a chart.
+
+Each part gets a card showing:
+
+- **Five dots**, the way the game itself displays difficulty. Two tiers share five filled dots because that's what the game does; Impossible fills all five in red.
+- **A ruler** showing where the chart landed between the tier it earned and the next one up. A tier is a threshold, so a chart sitting near either end could reasonably be called either tier, and the marker shows how much room there was. An amber marker pinned to one end means the score ran past the end of the scale and the real position is further out than the ruler can draw.
+- **A few bullet points** naming the measurements on which this chart is unusual compared with the reference songs. They describe what was measured — they are not a claim about *why* the rank came out where it did.
+
+Above the cards, anything that applies to the whole song is noted once. Currently that's the **Big Rock Ending**: Rock Band doesn't require you to play the notes authored there, but they're still counted in the suggestion, so the note says so and lets you judge.
+
+#### How much to trust it
+
+Guitar, bass and drums are the strongest of the six. Keys and Pro Keys are close behind.
+
+More useful than ranking the instruments, though, is where on the scale you are. **Every part agrees most closely with the official rank through the middle of the scale**, and gets less certain toward the extremes. If a chart lands in one of the top tiers, a suggestion is more likely to read low than high — most noticeably on vocals.
+
+It's advisory. Official ranks and player judgment can differ from each other too, so treat a suggestion as a starting point rather than a verdict.
+
+The models are still evolving. **If a chart of yours scores clearly wrong, that's the most useful thing you can report** — see [A note on validation rules](../README.md#a-note-on-validation-rules) in the main README for where to send it.
 
 ---
 
