@@ -377,6 +377,15 @@ function DrawMetadataTab(ctx)
                 end
                 local lbl_col = LabelColWidth(edge_labels)
 
+                -- SONG-LEVEL notes, above the cards and drawn once. A Big Rock Ending is a
+                -- property of the project - there is exactly one [coda] per song - so
+                -- putting it on each instrument card would say one thing five times.
+                -- Wrapped, per the convention for anything that can exceed a line.
+                for _, note in ipairs(DifficultySongNotes(recs)) do
+                    r.ImGui_Spacing(ctx)
+                    r.ImGui_TextWrapped(ctx, note.text)
+                end
+
                 for i, rec in ipairs(recs) do
                     if i > 1 then r.ImGui_Separator(ctx) end
                     r.ImGui_Spacing(ctx)

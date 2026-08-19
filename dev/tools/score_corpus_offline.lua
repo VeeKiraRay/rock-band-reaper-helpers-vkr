@@ -119,6 +119,30 @@ dofile(_root .. 'lib/reaper_difficulty_score_vocals.lua')
 dofile(_root .. 'rock_band_general_helper_vkr/difficulty_read.lua')
 dofile(_root .. 'dev/calibration/songs_dta.lua')
 
+-- BIG ROCK ENDING variant, for the round-23b Stage A preview. An ENVIRONMENT VARIABLE
+-- rather than a positional arg because arg[3] is already the row limit, and adding a
+-- fourth positional would make the limit mandatory whenever a variant is wanted.
+--
+--   RB_BRE_MODE=gems      lua dev/tools/score_corpus_offline.lua ...
+--   RB_BRE_MODE=gemstime  lua dev/tools/score_corpus_offline.lua ...
+--
+-- Unset is the shipped behaviour, so an ordinary preview is unaffected and no caller has
+-- to know this exists. The three variants must be compared against EACH OTHER and never
+-- against the REAPER-scored corpus_scores.csv: the offline tempo map is not guaranteed
+-- identical to REAPER's, so a mixed comparison would put the measurement difference
+-- exactly along the split being tested.
+do
+    local mode = os.getenv('RB_BRE_MODE')
+    if mode == 'gems' or mode == 'gemstime' then
+        DIFFICULTY_BRE_MODE = mode
+        io.write(('BRE variant active: %s (gem instruments only; vocals is the control)\n')
+            :format(mode))
+    elseif mode and mode ~= '' and mode ~= 'off' then
+        io.write(('unknown RB_BRE_MODE %q - expected gems, gemstime or unset\n'):format(mode))
+        os.exit(1)
+    end
+end
+
 ----------------------------------------------------------------------
 -- The CSV schema
 --

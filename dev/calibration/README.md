@@ -861,9 +861,9 @@ Where the three failing instruments actually stand, so this is not re-derived.
 
 ---
 
-## Rounds 19-22, and what they settled
+## Rounds 19-23a, and what they settled
 
-All four were declared, rescored on 2026-08-18, and decided. Two changed a shipped model.
+All five were declared and decided on 2026-08-18. Two changed a shipped model.
 
 | round | what | outcome |
 |---|---|---|
@@ -871,9 +871,47 @@ All four were declared, rescored on 2026-08-18, and decided. Two changed a shipp
 | 20 | the harmony count as a step (`parts_3`) rather than a number | **SELECTED**, 88.35% → 88.63%, rho +0.668 → +0.674 |
 | 21 | breath groups — passages with no gap long enough to inhale | best `+breath@mean50` **89.02%**, the highest vocal figure recorded. **Refused** at +0.40 / 80% against a >1.00 / >70% bar. |
 | 22 | the three drum peak columns with roll-lane gems excluded | **SELECTED**, 93.38% → 94.37% lower bound, rho +0.888 → +0.894 |
+| 23a | `complex_peak` re-tested against the now roll-aware drum model | **+0.00 points at 20% of repeats.** Not selected, and see below. |
 
 The eighteen columns all stay in the CSV — measured, tested and cheap to carry — whether or
 not they were selected.
+
+### Round 23a: a factor that corrects for a confound is worth nothing once the confound is fixed at source
+
+`complex_peak` is peak *(gems per window × conditional entropy of relative motion)* — the
+measurement that says the same note count is harder spread across lanes than repeated on
+one. It has been in the CSV since round 6 and no declared drum candidate carried it. Tested
+once against the round-18 `full_drum` it gained **+0.24 points**, which read as "the idea is
+right and the corpus does not care much".
+
+That test was confounded. The old `density_peak` counted every gem under a roll lane, so a
+single-lane roll drove it to an extreme while `complex_peak` correctly read the same passage
+as low-complexity — `makemesmile2` sat at z **+7.24** on one and **+1.18** on the other. The
+two columns were competing to describe the same artifact, so some of that +0.24 was
+`complex_peak` partially undoing roll inflation.
+
+Round 22 removed the inflation at source. Re-asked cleanly:
+
+```
+full_drum@noroll          (k=26)   96.46%   rho +0.894      <- incumbent, retained
+full_drum@noroll+complex  (k=27)   96.46%   rho +0.896      paired +0.00%, 20% of repeats
+full_drum@noroll@complex  (k=26)   96.34%   rho +0.894      paired -0.12%, 20% of repeats
+```
+
+**Exactly nothing.** The pre-registered prediction was that it would gain *more* than +0.24
+now that the confound was gone; the opposite happened, and that is the finding: the roll fix
+absorbed what `complex_peak` had been contributing. A factor whose value came from
+compensating for a bad measurement has no value once the measurement is fixed.
+
+The diagnostic recorded before the fit, per the round's own prediction 4: `complex_peak`
+against `density_peak_noroll` on drum rows is **+0.747** Pearson (+0.722 Spearman), against
+**+0.853** for the keys pair. Less redundant than keys, but still above the **0.70** line
+this document uses elsewhere to call two factors one observation — consistent with the null.
+Its standalone correlation with the drum rank is strong (**+0.801**), which is exactly why
+standalone rho must not be read as evidence of fitted gain.
+
+Costs nothing to re-open if the drum vocabulary changes again: it is column 70 and needs no
+rescore. **Do not re-test it without a reason of that kind** — this was the clean ask.
 
 ### Round 21's refusal was substantively right, not merely conservative
 

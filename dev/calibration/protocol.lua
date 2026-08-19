@@ -1552,6 +1552,78 @@ for _, c in ipairs({
 end
 
 ----------------------------------------------------------------------
+-- ROUND 23a: DRUMS - COMPLEXITY-WEIGHTED PEAK DENSITY, RE-ASKED
+--
+-- Declared before running. Prior candidates remain byte-for-byte intact above.
+--
+-- WHY IT IS BEING ASKED AGAIN. `complex_peak` is peak (gems per window x conditional
+-- entropy of relative motion), i.e. the measurement that says the same note count is
+-- harder spread across lanes than repeated on one. It has been in the CSV since round 6
+-- and is carried by NO declared drum candidate. It was tested once against the round-18
+-- `full_drum` and gained +0.24 points - a quarter of the bar, and easy to read as "the
+-- idea is right and the corpus does not care".
+--
+-- That test was confounded, and round 22 removed the confound. The old `density_peak`
+-- counted every gem under a roll lane, so a single-lane roll drove it to an extreme while
+-- `complex_peak` correctly read the same passage as low-complexity. The two columns were
+-- therefore competing to describe the SAME artifact, and the fit could take either.
+-- `makemesmile2` is the case in one line: z +7.24 on density_peak against +1.18 on
+-- complex_peak. With the incumbent's peaks now roll-aware, that disagreement is gone and
+-- the question "does lane spread matter beyond raw rate" is being asked cleanly for the
+-- first time.
+--
+-- The author's framing, which is the same mechanism from the other side: a fast single-lane
+-- snare roll and the same note count moving around the kit are not equally hard, and the
+-- roll fix only removed the cases where the game says so with a marker. Where an author
+-- charts a dense single-lane passage WITHOUT a lane marker, nothing currently reads it as
+-- easier.
+--
+-- COSTS NO RESCORE. complex_peak is column 70 of the existing CSV.
+--
+-- PRE-REGISTERED PREDICTIONS:
+--   1. +complex gains MORE than the +0.24 it managed against the pre-roll-fix incumbent,
+--      because the confound it was fighting is gone.
+--   2. It still does NOT clear the bar. Drums is already the strongest instrument at a
+--      94.37% lower bound, it already carries 26 factors, and there is little headroom
+--      left above it.
+--   3. @complex LOSES to +complex. Raw peak rate and complexity-weighted peak rate are
+--      different questions; dropping the raw one should cost information rather than tidy
+--      it away.
+--   4. THE DIAGNOSTIC THAT DECIDES HOW TO READ ALL OF THE ABOVE: the measured pairwise
+--      correlation of complex_peak against density_peak_noroll on drum rows. It is +0.88
+--      with density_peak on KEYS, and if drums is similar then this round is restating one
+--      observation and prediction 1 fails. Report it either way, before interpreting any
+--      gain.
+for _, c in ipairs({
+    -- Beside the raw peak, not instead of it. k=27 against the incumbent's 26, so it must
+    -- clearly beat it and cannot arrive on a tie-break.
+    { name = 'full_drum@noroll+complex',
+      keys = { 'playing_s', 'density_avg', 'density_peak_noroll', 'change_rate',
+               'attack_density_avg', 'attack_density_peak_noroll',
+               'tight_p10', 'tight_med', 'chord_size_mean', 'chord_span_mean',
+               'chord_change_frac', 'move_mean', 'move_p90', 'anchor_frac',
+               'kick_density', 'kick_density_peak', 'hand_density_peak_noroll',
+               'stick_size_mean', 'tom_frac', 'roll_frac', 'offbeat_frac',
+               'pro_stations_peak', 'entropy_h2', 'entropy_h2_rel',
+               'notes_total', 'total_changes', 'complex_peak' } },
+
+    -- The sharper test: if complexity-weighted peak density is the better MEASUREMENT, it
+    -- should be able to replace the raw one rather than sit beside it. Same k as the
+    -- incumbent, so this one can arrive on the equal-complexity tie-break.
+    { name = 'full_drum@noroll@complex',
+      keys = { 'playing_s', 'density_avg', 'complex_peak', 'change_rate',
+               'attack_density_avg', 'attack_density_peak_noroll',
+               'tight_p10', 'tight_med', 'chord_size_mean', 'chord_span_mean',
+               'chord_change_frac', 'move_mean', 'move_p90', 'anchor_frac',
+               'kick_density', 'kick_density_peak', 'hand_density_peak_noroll',
+               'stick_size_mean', 'tom_frac', 'roll_frac', 'offbeat_frac',
+               'pro_stations_peak', 'entropy_h2', 'entropy_h2_rel',
+               'notes_total', 'total_changes' } },
+}) do
+    CANDIDATES_DRUM[#CANDIDATES_DRUM + 1] = c
+end
+
+----------------------------------------------------------------------
 -- ROUND 21: VOCALS - THE PASSAGE WITH NO ROOM TO BREATHE
 --
 -- Declared before running. Prior candidates remain byte-for-byte intact above.

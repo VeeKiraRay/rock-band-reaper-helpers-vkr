@@ -142,6 +142,10 @@ local function SuggestOne(spec, vocal_parts)
     rec.model         = model
     rec.factors       = factors
     rec.span_source   = info.span_source
+    -- Big Rock Ending share, nil on the 95% of charts that have no [coda]. Carried through
+    -- so difficulty_explain.lua can report it: that file is pure and cannot read a track.
+    rec.bre_gem_frac  = info.bre_gem_frac
+    rec.bre_seconds   = info.bre_seconds
     rec.rank          = rank
     rec.raw_rank      = raw
     -- THE INTEGER TO SHOW, and it is FLOORED rather than rounded. Both display sites used

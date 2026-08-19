@@ -53,6 +53,13 @@ local COLLINEAR_R = 0.70
 local BOUNDARY_LOW  = 0.15
 local BOUNDARY_HIGH = 0.85
 
+-- Share of a chart's gems that must sit inside a Big Rock Ending before it is worth a
+-- sentence. Chosen from the corpus: of the 78 rows carrying BRE gems, this fires on about
+-- 15 - rare enough to mean something - and it catches every row whose busiest window is
+-- meaningfully inside the BRE. Below it the note would be noise, down to `childintime`
+-- drum, which has a BRE containing 0.0% of its gems.
+local BRE_NOTABLE_FRAC = 0.05
+
 ----------------------------------------------------------------------
 -- The vocabulary
 --
@@ -681,6 +688,62 @@ function DifficultyWarnings(rec)
 end
 
 -- Fill in the presentation fields on a suggestion record, in place.
+----------------------------------------------------------------------
+-- SONG-LEVEL notes: facts about the project rather than about one chart
+--
+-- Takes the whole suggestion list and returns { kind, text } in the same shape as
+-- DifficultyWarnings, so a caller renders them the same way - once, above the per-chart
+-- cards, rather than repeated on each.
+--
+-- The Big Rock Ending is the first of these and the reason the seam exists. There is
+-- exactly ONE [coda] per song, so a BRE is a property of the project; reporting it on five
+-- instrument cards would say one thing five times.
+--
+-- THE WORDING MAKES NO DIFFICULTY CLAIM IN EITHER DIRECTION, and that is measured rather
+-- than cautious. Excluding BRE gems and refitting made the 18 corpus songs that have one
+-- WORSE - 4 tier flips toward the official rank against 6 away, with `2112pt3` bass going
+-- from a near-exact 399 (actual 390) to 288. On this corpus the official ranks behave as
+-- though the ending counts, so a sentence hinting the number is inflated would contradict
+-- the evidence.
+--
+-- It also must not imply anything about an instrument that has NO notes in the BRE. Drums
+-- is the one part whose animations come from a separate note set, so a drum chart can
+-- legitimately carry an empty BRE (`childintime` is 12.9% on guitar and 0.0% on drums)
+-- while every other instrument needs played notes there. Community charts usually do have
+-- drum notes, since deleting them after generating the animations gains nothing. Either
+-- way it is not evidence about difficulty, so the note says only that nothing is excluded.
+function DifficultySongNotes(recs)
+    local out = {}
+    if type(recs) ~= 'table' then return out end
+
+    local secs, parts, any = 0, {}, false
+    for _, rec in ipairs(recs) do
+        if rec.ok and rec.bre_gem_frac then
+            any = true
+            if (rec.bre_seconds or 0) > secs then secs = rec.bre_seconds end
+            if rec.bre_gem_frac >= BRE_NOTABLE_FRAC then
+                parts[#parts + 1] = ('%s %.0f%%')
+                    :format(rec.label or rec.instrument or '?', rec.bre_gem_frac * 100)
+            end
+        end
+    end
+    if not any then return out end
+
+    -- The per-instrument list is only for parts carrying a material share. An instrument
+    -- below the threshold is left out rather than printed at 0-4%, which would invite
+    -- exactly the difficulty inference the paragraph above rules out.
+    local text = 'This song has a Big Rock Ending'
+    if secs > 0 then text = text .. (' (%.0f seconds)'):format(secs) end
+    text = text .. '. Rock Band 3 does not require the notes authored there to be played, '
+                .. 'but they are rated as authored - nothing is excluded from the '
+                .. 'suggestion.'
+    if #parts > 0 then
+        text = text .. ' Gems inside it: ' .. table.concat(parts, ', ') .. '.'
+    end
+    out[#out + 1] = { kind = 'bre', text = text }
+    return out
+end
+
 function DifficultyAnnotate(rec)
     if not rec then return rec end
     rec.explanations  = DifficultyExplanations(rec)

@@ -600,6 +600,68 @@ KICK_PITCH   = 96
 TOM_MARKERS  = { [98] = 110, [99] = 111, [100] = 112 }
 ROLL_PITCHES = { 126, 127 }
 
+-- BIG ROCK ENDINGS. A BRE is a free-play region at the end of a song: the notes exist so
+-- the characters animate, and the player may play as much or as little as they like. Every
+-- gem inside one inflates density, attack rate, note totals and playing time while asking
+-- nothing of the player.
+--
+-- READ THE [coda] EVENT, NEVER THE LANES. The BRE lanes are pitch 120-124, but on drums
+-- that same range is the activation/fill lane, so pitch alone cannot tell a BRE from a
+-- fill. Measured over the 394-song corpus: 392 songs carry a 120-124 lane and only 18
+-- carry a [coda], with no song having a coda and no lane. Reading the lanes would strip
+-- material from 374 songs that have no BRE at all.
+--
+-- ONE CODA PER SONG, ALWAYS - 0 of 18 have more - so this needs no per-instrument lane
+-- parsing: find the single [coda] and cut everything after it. (Newer games support
+-- [midcoda] and charting past it; Rock Band 3 does not, and the corpus agrees.)
+--
+-- THE REQUIRED FINAL HIT IS DISCARDED BY THIS CUT, deliberately. The authoring doc puts a
+-- hit AFTER the lanes end, so a coda cutoff eats it: measured at a median of 1-3 gems per
+-- instrument and a maximum of 9, against chart totals of 1000-2600. A short roll, a crash,
+-- or a few chords. Negligible against every density and rate column, and recorded here so
+-- it is not later mistaken for an oversight.
+--
+-- VOCALS IS EXEMPT BY SPEC and is deliberately NOT filtered - nothing may be authored
+-- during a BRE, so a vocal chart that moves under this switch means either the corpus
+-- violates the spec or the cutoff is wrong. That makes vocals a free control group and it
+-- must stay untouched.
+BRE_EVENTS_TRACK = 'EVENTS'
+
+-- Which BRE treatment is active. nil or 'off' is the shipped behaviour and must remain the
+-- default: this is a declared round under evaluation, not a decided one.
+--   'gems'     drop gem events at or after the coda; leave playing spans alone
+--   'gemstime' also clip the playing spans, so playing_s loses the bonus section too
+DIFFICULTY_BRE_MODE = nil
+
+-- Project time of the song's [coda], or nil when there is none - which is 376 of 394 corpus
+-- songs, so the nil path is the common one.
+--
+-- Tolerant of both meta types: the corpus writes [coda] as a type-1 TEXT event, but type 5
+-- (lyric) costs nothing to accept and some authoring tools emit it. MIDI_CountEvts returns
+-- the text/sysex count as its FOURTH value - the third is the CC count, which is the
+-- classic misread.
+function ReadCodaTime(from_idx)
+    local track = FindTrackExact(BRE_EVENTS_TRACK, from_idx)
+    if not track then return nil end
+    local best
+    for i = 0, r.CountTrackMediaItems(track) - 1 do
+        local item = r.GetTrackMediaItem(track, i)
+        local take = r.GetActiveTake(item)
+        if take and r.TakeIsMIDI(take) then
+            local _, _, _, textcnt = r.MIDI_CountEvts(take)
+            for j = 0, (textcnt or 0) - 1 do
+                local ok, _, muted, ppq, evtype, msg = r.MIDI_GetTextSysexEvt(take, j)
+                if ok and not muted and (evtype == 1 or evtype == 5)
+                   and tostring(msg or ''):lower():find('coda', 1, true) then
+                    local t = r.MIDI_GetProjTimeFromPPQPos(take, ppq)
+                    if not best or t < best then best = t end
+                end
+            end
+        end
+    end
+    return best
+end
+
 -- PRO KEYS lane-shift marker -> base pitch of the display window it selects. The six
 -- white notes of the bottom octave; the mapping is simply `pitch + 48`. Written out
 -- rather than computed so an undocumented marker cannot be silently accepted.
@@ -672,6 +734,9 @@ end
 -- info carries what the CSV writer needs and what the suggestion reports:
 --   span_source  'phrase' | 'anim' | 'fallback_idle_only' | 'fallback_no_events'
 --   n_anim, n_fhopo, n_fstrum, n_tom, first_onset
+--   bre_gem_frac, bre_seconds  present only on a gem chart that HAS a [coda]; the share
+--                              of its gems sitting inside the Big Rock Ending, and how
+--                              long that section runs. Reported, never subtracted.
 function ScoreChartForSpec(spec, from_idx, opts)
     opts = opts or {}
     local track = FindTrackExact(spec.track, from_idx)
@@ -709,6 +774,38 @@ function ScoreChartForSpec(spec, from_idx, opts)
 
     local events = ReadGemEvents(track, spec.lo or EXPERT_LO, spec.hi or EXPERT_HI)
 
+    -- BIG ROCK ENDING. The coda is read ALWAYS, not only when the filter is armed: the
+    -- shipped product reports the share of a chart that sits inside a BRE as a note, and
+    -- that has to work with DIFFICULTY_BRE_MODE off, which is the default and the only
+    -- state the corpus was fitted in.
+    local coda = ReadCodaTime(from_idx)
+    if coda then
+        local inside, last = 0, 0
+        for _, e in ipairs(events) do
+            if e.s >= coda then inside = inside + 1 end
+            if e.e and e.e > last then last = e.e end
+        end
+        info.bre_gem_frac = (#events > 0) and (inside / #events) or 0
+        info.bre_seconds  = math.max(0, last - coda)
+    end
+
+    -- The cut itself, gem instruments only, applied to the EVENTS before anything derives
+    -- from them so the DeriveSpansFromEvents fallback below already sees the trimmed chart.
+    --
+    -- MEASURED AND NOT ADOPTED - see the README. Excluding these gems moves only the 18
+    -- corpus songs that have a BRE plus about 1 rank of refit ripple on everything else,
+    -- and on the songs it targets it is net NEGATIVE: 4 tier flips toward the official
+    -- rank against 6 away. `2112pt3` bass is the case that settles it, predicted 399
+    -- against an actual 390 and dropping to 288 once its BRE is removed. The official
+    -- ranks appear to include the ending, so the shipped behaviour counts it.
+    if coda and DIFFICULTY_BRE_MODE and DIFFICULTY_BRE_MODE ~= 'off' then
+        local keep = {}
+        for _, e in ipairs(events) do
+            if e.s < coda then keep[#keep + 1] = e end
+        end
+        events = keep
+    end
+
     -- Playing spans normally come off the instrument's own track. Falling back to the gem
     -- track keeps a missing PART KEYS out of the fatal path for Pro Keys; it then hits the
     -- no-animation fallback below, which is the correct handling anyway.
@@ -732,6 +829,22 @@ function ScoreChartForSpec(spec, from_idx, opts)
     if #spans == 0 then
         spans = DeriveSpansFromEvents(events)
         info.span_source = (n_anim > 0) and 'fallback_idle_only' or 'fallback_no_events'
+    end
+
+    -- The second half of the BRE treatment, and a declared substitution against 'gems'
+    -- rather than an obvious extra: a BRE is arguably not playing time in any meaningful
+    -- sense, but playing_s carries a POSITIVE coefficient in five of the six models, so
+    -- shortening it pushes a prediction down at the same time as removing gems pushes
+    -- density up. The two effects partly cancel and the sign is not predictable by
+    -- reasoning, which is why both variants are previewed rather than one being chosen.
+    if coda and DIFFICULTY_BRE_MODE == 'gemstime' then
+        local clipped = {}
+        for _, sp in ipairs(spans) do
+            if sp.s < coda then
+                clipped[#clipped + 1] = { s = sp.s, e = math.min(sp.e, coda) }
+            end
+        end
+        spans = clipped
     end
 
     -- Drum-only reads. The tom markers are spans, not note-aligned modifiers: the doc says

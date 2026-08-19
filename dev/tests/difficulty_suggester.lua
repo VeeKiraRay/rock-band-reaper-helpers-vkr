@@ -868,6 +868,75 @@ local function ReportRec(over)
     return rec
 end
 
+Test.it('a Big Rock Ending is reported once for the song, not once per chart', function()
+    -- There is exactly one [coda] per song, so a BRE is a property of the project. The
+    -- shares differ per instrument though - childintime is 12.9% on guitar and 0.0% on
+    -- drums, because drums is the one part whose animations come from a separate note set
+    -- and can legitimately carry an empty BRE.
+    local recs = {
+        FakeRec('guitar', { label = 'Guitar', bre_gem_frac = 0.129, bre_seconds = 8.2 }),
+        FakeRec('bass',   { label = 'Bass',   bre_gem_frac = 0.060, bre_seconds = 8.2 }),
+        FakeRec('drum',   { label = 'Drums',  bre_gem_frac = 0.000, bre_seconds = 8.2 }),
+    }
+    local notes = DifficultySongNotes(recs)
+    Test.expect(#notes == 1, 'exactly one song-level note, got ' .. #notes)
+    local t = notes[1].text
+    Test.expect(t:find('Big Rock Ending', 1, true) ~= nil, 'names the thing')
+    Test.expect(t:find('Guitar 13%', 1, true) ~= nil, 'lists the material share')
+    Test.expect(t:find('Drums', 1, true) == nil,
+        'an instrument below the threshold is left out rather than printed at 0%')
+
+    -- And the per-chart warnings must NOT also carry it - that was the redundancy this
+    -- replaced.
+    for _, rec in ipairs(recs) do
+        DifficultyAnnotate(rec)
+        for _, w in ipairs(rec.warnings or {}) do
+            Test.expect(w.kind ~= 'bre',
+                (rec.instrument .. ': the BRE note should be song-level only'))
+        end
+    end
+end)
+
+Test.it('the BRE note claims nothing about difficulty in either direction', function()
+    -- Measured, not stylistic: excluding BRE gems and refitting made the 18 corpus songs
+    -- that have one WORSE (4 tier flips toward the official rank, 6 away), so wording that
+    -- hinted the rank was inflated would contradict the evidence. It must also imply
+    -- nothing about a part with no notes in the BRE.
+    local recs = { FakeRec('guitar', { label = 'Guitar',
+                                       bre_gem_frac = 0.129, bre_seconds = 8.2 }) }
+    local t = DifficultySongNotes(recs)[1].text:lower()
+    for _, banned in ipairs({ 'inflat', 'too high', 'too low', 'easier', 'harder',
+                              'overrat', 'underrat', 'unfair', 'should be' }) do
+        Test.expect(t:find(banned, 1, true) == nil,
+            ('the note must not say %q - it makes a difficulty claim'):format(banned))
+    end
+    Test.expect(t:find('nothing is excluded', 1, true) ~= nil,
+        'it should say plainly that the notes are counted')
+end)
+
+Test.it('no Big Rock Ending means no note at all', function()
+    local recs = { FakeRec('guitar'), FakeRec('drum') }
+    Test.expect(#DifficultySongNotes(recs) == 0, 'a song without a coda gets no note')
+    Test.expect(#DifficultySongNotes({}) == 0, 'and neither does an empty list')
+    -- A BRE whose every share is below the threshold still gets the general statement:
+    -- once per song it is information, not noise.
+    local small = { FakeRec('guitar', { bre_gem_frac = 0.022, bre_seconds = 4 }) }
+    local n = DifficultySongNotes(small)
+    Test.expect(#n == 1 and n[1].text:find('Gems inside it', 1, true) == nil,
+        'the statement appears without a per-instrument list')
+end)
+
+Test.it('the song-level note reaches the pasteable report', function()
+    -- It would otherwise be visible on screen and invisible to whoever the author pastes
+    -- the report to, which is most of what the report is for.
+    local recs = { FakeRec('guitar', { label = 'Guitar',
+                                       bre_gem_frac = 0.129, bre_seconds = 8.2 }) }
+    for _, rec in ipairs(recs) do DifficultyAnnotate(rec) end
+    local text = DifficultyReportText(recs)
+    Test.expect(text:find('Big Rock Ending', 1, true) ~= nil,
+        'the report should carry the song-level note')
+end)
+
 Test.it('the rank it PRINTS never names a tier it did not reach', function()
     -- THE REGRESSION THIS EXISTS FOR. The card and the report each rounded the rank while
     -- the tier came from the unrounded value, so any prediction in [T-0.5, T) printed the

@@ -90,6 +90,15 @@ function DifficultyReportText(recs, opts)
         return table.concat(lines, '\n')
     end
 
+    -- Song-level notes, before any per-instrument block, matching where the panel puts
+    -- them. A report pasted into a discussion has to carry the same context the author
+    -- saw - a Big Rock Ending explains a number to whoever reads it second-hand, and it
+    -- would be invisible if it lived only on screen.
+    for _, note in ipairs(DifficultySongNotes(recs)) do
+        Emit('')
+        Emit(Wrap(note.text, WRAP_AT, ''))
+    end
+
     ------------------------------------------------------------------
     -- One column width for every block
     --
