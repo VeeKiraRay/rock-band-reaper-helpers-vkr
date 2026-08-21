@@ -1,7 +1,7 @@
 ======  Difficulty calibration - LOCKED PROTOCOL  ======
 
 corpus_scores.csv  07aae114239c9dbb  1140165 bytes, 2101 rows
-protocol.lua       9401abf17a8fe862
+protocol.lua       0b4a64b14b9ffea6
 factor set         73d526ddb35359fe  114 columns
 interpreter        Lua 5.4
 
@@ -121,6 +121,14 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
     modal tier    pooled  60.24%   macro  42.86%
     median rank   pooled  65.44%   macro  42.86%
     SELECTED over the better baseline: +29.05 pooled, +47.92 macro
+
+  -- pack-grouped folds, SELECTED model, matched seeds --
+    170 packs over 327 rows, largest 15 rows (4.6% of the corpus)
+    row-level folds leak a pack sibling into training for 61.0% of rows
+    metric      row-level    grouped   difference
+    pooled         94.16%     93.85%    -0.31 (sd 1.08)
+    macro          90.80%     90.20%    -0.60 (sd 1.82)
+    rho             0.862      0.858   -0.004 (sd 0.004)
 
   -- release gate --
     usable lower bound :  91.64%   (floor 90%, one-sided 95% Wilson)
@@ -258,6 +266,16 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
     modal tier    pooled  59.70%   macro  42.86%
     median rank   pooled  74.55%   macro  42.86%
     SELECTED over the better baseline: +19.70 pooled, +46.53 macro
+
+  -- pack-grouped folds, SELECTED model, matched seeds --
+    172 packs over 330 rows, largest 15 rows (4.5% of the corpus)
+    row-level folds leak a pack sibling into training for 60.5% of rows
+    metric      row-level    grouped   difference
+    pooled         94.18%     94.18%    +0.00 (sd 0.29)
+    macro          88.58%     87.37%    -1.21 (sd 2.19)
+    rho             0.802      0.798   -0.004 (sd 0.004)
+    NOTE: tier 6 in 3 packs - fewer packs than folds, so that tier cannot reach every
+    fold and its per-tier rate is NOISIER under grouping, not cleaner.
 
   -- release gate --
     usable lower bound :  91.68%   (floor 90%, one-sided 95% Wilson)
@@ -405,6 +423,14 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
     modal tier    pooled  72.56%   macro  42.86%
     median rank   pooled  72.56%   macro  42.86%
     SELECTED over the better baseline: +23.78 pooled, +47.73 macro
+
+  -- pack-grouped folds, SELECTED model, matched seeds --
+    172 packs over 328 rows, largest 15 rows (4.6% of the corpus)
+    row-level folds leak a pack sibling into training for 59.8% of rows
+    metric      row-level    grouped   difference
+    pooled         96.46%     96.22%    -0.24 (sd 0.40)
+    macro          90.89%     90.59%    -0.30 (sd 1.17)
+    rho             0.894      0.890   -0.005 (sd 0.005)
 
   -- release gate --
     usable lower bound :  94.37%   (floor 90%, one-sided 95% Wilson)
@@ -669,6 +695,16 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
     median rank   pooled  77.13%   macro  42.86%
     SELECTED over the better baseline: +11.89 pooled, +38.27 macro
 
+  -- pack-grouped folds, SELECTED model, matched seeds --
+    170 packs over 328 rows, largest 15 rows (4.6% of the corpus)
+    row-level folds leak a pack sibling into training for 61.1% of rows
+    metric      row-level    grouped   difference
+    pooled         88.63%     88.60%    -0.03 (sd 0.51)
+    macro          80.98%     81.20%    +0.22 (sd 0.69)
+    rho             0.674      0.666   -0.008 (sd 0.014)
+    NOTE: tier 0 in 2 packs - fewer packs than folds, so that tier cannot reach every
+    fold and its per-tier rate is NOISIER under grouping, not cleaner.
+
   -- release gate --
     usable lower bound :  85.42%   (floor 90%, one-sided 95% Wilson)
     miss upper bound   :   4.32%   (ceiling 5%, one-sided 95% Wilson)
@@ -822,6 +858,14 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
     median rank   pooled  51.50%   macro  42.86%
     SELECTED over the better baseline: +41.73 pooled, +48.66 macro
 
+  -- pack-grouped folds, SELECTED model, matched seeds --
+    140 packs over 266 rows, largest 12 rows (4.5% of the corpus)
+    row-level folds leak a pack sibling into training for 59.7% of rows
+    metric      row-level    grouped   difference
+    pooled         92.97%     92.44%    -0.53 (sd 0.73)
+    macro          91.30%     90.90%    -0.40 (sd 0.70)
+    rho             0.878      0.874   -0.004 (sd 0.005)
+
   -- release gate --
     usable lower bound :  89.94%   (floor 90%, one-sided 95% Wilson)
     miss upper bound   :   1.08%   (ceiling 5%, one-sided 95% Wilson)
@@ -969,6 +1013,14 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
     modal tier    pooled  45.86%   macro  42.86%
     median rank   pooled  50.38%   macro  42.86%
     SELECTED over the better baseline: +39.10 pooled, +45.88 macro
+
+  -- pack-grouped folds, SELECTED model, matched seeds --
+    140 packs over 266 rows, largest 12 rows (4.5% of the corpus)
+    row-level folds leak a pack sibling into training for 59.6% of rows
+    metric      row-level    grouped   difference
+    pooled         89.40%     89.59%    +0.19 (sd 0.44)
+    macro          88.63%     88.69%    +0.06 (sd 0.75)
+    rho             0.861      0.857   -0.004 (sd 0.008)
 
   -- release gate --
     usable lower bound :  85.89%   (floor 90%, one-sided 95% Wilson)

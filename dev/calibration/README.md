@@ -268,6 +268,56 @@ the middle tiers already run at 96–100%; grade it on macro or report all three
 it is spent, "everything unwalked is reserved" stops being the right policy, and the
 replacement is a new declaration with its own reasoning.
 
+### Pack leakage in the CV folds, measured
+
+Peer review finding 7: `pack` is CSV column 3 and the fold assignment never read it, so a
+song could be graded while a sibling from the same DLC pack sat in training. Songs in a
+pack share an authoring team, an era and often a deliberate difficulty spread, and the
+corpus grows one pack at a time — so the pack, not the song, is the honest unit of "data
+we did not have".
+
+**The exposure is much larger than pack sizes suggest.** Under row-level folds about
+**60% of validation rows** have a pack sibling in training (59.6–61.1% across the six
+instruments). That is not visible from the largest pack being 15 rows of ~330: the corpus
+is ~170 packs over ~330 rows, so half the packs are singletons contributing no exposure
+at all, while the rows concentrate in the multi-song packs.
+
+`StratifiedGroupFolds` (`stats.lua`) deals whole packs while still balancing tiers, and
+the report now prints the selected model under both schemes on matched seeds. Measured
+2026-08-22, grouped minus row-level, sd is of the paired per-repeat difference:
+
+| instrument | pooled | macro | rho |
+|---|---:|---:|---:|
+| guitar | −0.31 (sd 1.08) | −0.60 (sd 1.82) | −0.004 |
+| bass | +0.00 (sd 0.29) | −1.21 (sd 2.19) | −0.004 |
+| drum | −0.24 (sd 0.40) | −0.30 (sd 1.17) | −0.005 |
+| vocals | −0.03 (sd 0.51) | +0.22 (sd 0.69) | −0.008 |
+| keys | −0.53 (sd 0.73) | −0.40 (sd 0.70) | −0.004 |
+| real_keys | +0.19 (sd 0.44) | +0.06 (sd 0.75) | −0.004 |
+
+**Leakage is real and negligible.** Every pooled and macro delta is smaller than the
+spread of the difference that produced it, so on those metrics grouping is indistinguishable
+from noise here. Rho is where it shows: **all six instruments moved down**, by 0.004–0.008,
+and six of six in one direction is about a 1-in-32 coincidence. So the effect exists, and
+it is worth roughly five thousandths of rho.
+
+The reason it is this small despite 60% exposure is that a pack sibling is a weak hint —
+packs routinely mix an easy song with a hard one, so a neighbour's rank barely narrows the
+target. The 60% counts rows with *any* sibling in training, which is exposure, not
+advantage taken.
+
+**No gate verdict changes**, at effectively unchanged margins. `PROTOCOL.GROUP_FOLDS`
+therefore stays `false` and the published figures remain row-level — not because grouping
+was rejected, but because it costs nothing to keep the historical basis when the two agree.
+Had the deltas been ~3 points, the grouped number would be the honest one to publish.
+
+**Grouping makes the sparsest tiers worse, not better**, and any per-tier reading of a
+grouped run has to say so: bass tier 6 sits in 3 packs and vocals tier 0 in 2, against 5
+folds, so those tiers cannot reach every fold. The report prints this note itself.
+
+This is separate from — and does not substitute for — drawing the **reserved partition** by
+whole pack, which remains the plan above.
+
 ### The 2026-08-21 consolidation
 
 The corpus arrived as `all_rb3_dlc_reference_songs/` — **244 packages, 566 MIDIs, 563
@@ -786,6 +836,14 @@ model has to earn its place consistently, not post a higher average once.
    A better number on the current rows cannot earn the word back — only new pack-held-out
    data can. See `PARTITION` / `PackIsReserved` in `protocol.lua` for the rule that
    decides which packs those are, committed before any of them exist.
+
+11. **`PROTOCOL.GROUP_FOLDS` is not a flag to flip.** Every published figure is measured
+   under row-level folds. Setting it true changes all of them at once, which README rule 1
+   makes a declared new experiment with its own pre-registration — not a repair. The
+   grouped scheme is *measured and reported* beside the row-level one for exactly this
+   reason. As of 2026-08-22 the two agree, so there is nothing to decide; if a future
+   corpus makes them disagree by more than about a point, the grouped number is the honest
+   one and the switch is the whole experiment, artifact regeneration included.
 
 ---
 

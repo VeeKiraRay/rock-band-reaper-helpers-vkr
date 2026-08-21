@@ -351,6 +351,144 @@ function ShuffledStratifiedFolds(strata, k, seed)
     return folds
 end
 
+-- Shuffled fold assignment that keeps whole GROUPS together while still balancing
+-- strata - "stratified group k-fold".
+--
+-- WHY. ShuffledStratifiedFolds above deals individual rows, so two songs from the same
+-- DLC pack can land one in training and one in validation. Songs in a pack share an
+-- authoring team, an era and often a difficulty intent, so such a split lets the model
+-- see a near-sibling of the row it is being graded on. Whatever accuracy that buys is
+-- not accuracy on an unseen song, and the corpus grows one pack at a time, so it is the
+-- realistic unit of "new data" as well.
+--
+-- The two goals genuinely conflict - whole packs cannot always be dealt so that every
+-- tier stays even - so this is a greedy balance, not an exact one:
+--
+--   1. Group rows by group key, and note each group's per-stratum counts.
+--   2. Order groups largest first (a big group placed late has nowhere good to go),
+--      breaking ties with a seeded random key so repeats differ.
+--   3. Place each group in whichever fold leaves the per-stratum counts most even,
+--      measured as the summed spread of each stratum's counts across folds.
+--
+--   strata  parallel array of stratum keys, as above.
+--   groups  parallel array of group keys. nil or '' means "no group", and such a row
+--           becomes its own singleton group rather than joining one big nil bucket -
+--           silently merging every unlabelled row would be the opposite of the intent.
+--   seed    RECORDED, same contract as ShuffledStratifiedFolds.
+--
+-- WHAT IT CANNOT DO. A stratum spread over fewer than k groups cannot reach k folds -
+-- bass Impossible is 3 songs in 3 packs, vocals Warmup is 2 songs in 2 packs. Grouping
+-- therefore makes the sparsest tiers' per-tier rates NOISIER, not cleaner, and any
+-- per-tier reading of a grouped run has to say so. Callers can see this coming from
+-- the returned second value.
+--
+-- Returns folds, plus a diagnostics table { n_groups, largest_group, thin_strata },
+-- where thin_strata maps stratum -> group count for any stratum held by fewer than k
+-- groups.
+function StratifiedGroupFolds(strata, groups, k, seed)
+    local n = #strata
+    k = math.max(2, math.min(k or 5, n))
+    math.randomseed(seed or 1)
+
+    -- Stable key order first, so the shuffle is a function of the seed alone and not of
+    -- Lua's table iteration order.
+    local by, keys = {}, {}
+    for i = 1, n do
+        local g = groups and groups[i]
+        if g == nil or g == '' then g = '\0row' .. i end
+        g = tostring(g)
+        if not by[g] then by[g] = { rows = {}, counts = {} }; keys[#keys + 1] = g end
+        local rec = by[g]
+        rec.rows[#rec.rows + 1] = i
+        local s = tostring(strata[i])
+        rec.counts[s] = (rec.counts[s] or 0) + 1
+    end
+    table.sort(keys)
+
+    -- Every stratum present, in a fixed order, so the cost below is deterministic.
+    local slist, seen = {}, {}
+    for i = 1, n do
+        local s = tostring(strata[i])
+        if not seen[s] then seen[s] = true; slist[#slist + 1] = s end
+    end
+    table.sort(slist)
+
+    -- Draw tie-break keys in sorted-key order, then sort largest-first. The comparator
+    -- is a total order (size, then key, then name), so table.sort's instability cannot
+    -- make the result depend on anything but the seed.
+    local tie = {}
+    for _, g in ipairs(keys) do tie[g] = math.random() end
+    local order = {}
+    for i, g in ipairs(keys) do order[i] = g end
+    table.sort(order, function(a, b)
+        local na, nb = #by[a].rows, #by[b].rows
+        if na ~= nb then return na > nb end
+        if tie[a] ~= tie[b] then return tie[a] < tie[b] end
+        return a < b
+    end)
+
+    local folds, fill = {}, {}
+    local per = {}                       -- per[stratum][fold] = count so far
+    for f = 1, k do folds[f] = {}; fill[f] = 0 end
+    for _, s in ipairs(slist) do
+        per[s] = {}
+        for f = 1, k do per[s][f] = 0 end
+    end
+
+    for _, g in ipairs(order) do
+        local rec = by[g]
+        local best, best_cost, best_fill
+        for f = 1, k do
+            -- Summed spread of each stratum's per-fold counts, if this group went here.
+            -- Standard deviation rather than range: range ignores everything between the
+            -- two extremes, and with 7 tiers most of the imbalance lives there.
+            local cost = 0
+            for _, s in ipairs(slist) do
+                local add, row = rec.counts[s] or 0, per[s]
+                local mean = 0
+                for x = 1, k do mean = mean + row[x] end
+                mean = (mean + add) / k
+                local var = 0
+                for x = 1, k do
+                    local c = row[x] + ((x == f) and add or 0)
+                    var = var + (c - mean) * (c - mean)
+                end
+                cost = cost + math.sqrt(var / k)
+            end
+            -- Ties on the stratum cost are common (most groups are one song), so break
+            -- them on total fold size to keep the folds themselves near-equal.
+            if not best or cost < best_cost - 1e-12
+               or (cost < best_cost + 1e-12 and fill[f] < best_fill) then
+                best, best_cost, best_fill = f, cost, fill[f]
+            end
+        end
+        for _, i in ipairs(rec.rows) do
+            folds[best][#folds[best] + 1] = i
+        end
+        fill[best] = fill[best] + #rec.rows
+        for _, s in ipairs(slist) do
+            per[s][best] = per[s][best] + (rec.counts[s] or 0)
+        end
+    end
+
+    -- Diagnostics the caller is expected to report rather than discard.
+    local groups_per_stratum = {}
+    for _, g in ipairs(keys) do
+        for s in pairs(by[g].counts) do
+            groups_per_stratum[s] = (groups_per_stratum[s] or 0) + 1
+        end
+    end
+    local thin = {}
+    for _, s in ipairs(slist) do
+        if groups_per_stratum[s] < k then thin[s] = groups_per_stratum[s] end
+    end
+    local largest = 0
+    for _, g in ipairs(keys) do
+        if #by[g].rows > largest then largest = #by[g].rows end
+    end
+    return folds, { n_groups = #keys, largest_group = largest, thin_strata = thin }
+end
+
 -- One-sided Wilson score bounds for a proportion.
 --
 -- WHY THESE AND NOT THE SPREAD ACROSS CV REPEATS. Repeat-to-repeat spread measures
@@ -402,4 +540,15 @@ function MeanOf(values)
     local s = 0
     for _, v in ipairs(values) do s = s + v end
     return s / #values
+end
+
+-- Sample standard deviation (n-1). Zero for fewer than two values rather than nil, so
+-- a caller formatting a report never has to branch: with one repeat there is no spread
+-- to report, and 0 says that as honestly as nil would.
+function SampleSd(values)
+    local n = #values
+    if n < 2 then return 0 end
+    local m, v = MeanOf(values), 0
+    for _, x in ipairs(values) do v = v + (x - m) * (x - m) end
+    return math.sqrt(v / (n - 1))
 end

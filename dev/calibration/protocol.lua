@@ -97,6 +97,11 @@ PROTOCOL = {
         { origin = 'lego', flag = 'is_lego', weight = 0.3 },
         { origin = 'rb2',  flag = 'is_rb2',  weight = 0.3 },
     },
+    -- PACK-GROUPED FOLDS. false means the gate keeps dealing individual rows, which is
+    -- what every published figure was measured under. See the GROUPED FOLDS block below
+    -- RunProtocol for what this is, what it measured, and why moving the gate onto it is
+    -- a separate decision rather than a flag flip.
+    GROUP_FOLDS = false,
     -- Gate thresholds. USABLE_FLOOR is read against the interval LOWER bound and
     -- MISS_CEILING against the miss rate's UPPER bound - both the pessimistic end, so
     -- a pass cannot come from a lucky split.
@@ -2334,6 +2339,181 @@ function RunProtocol(d, target, extra, inst, factor_pos)
         end
     end
     return results, folds_by_repeat
+end
+
+----------------------------------------------------------------------
+-- GROUPED FOLDS - how much of the score is pack leakage?
+----------------------------------------------------------------------
+
+-- THE PROBLEM. Every figure this protocol publishes was measured with folds that deal
+-- individual SONGS. DLC ships in packs, and songs in a pack share an authoring team, an
+-- era, and often a deliberate difficulty spread. Dealing rows therefore lets the model
+-- train on a near-sibling of the row it is graded on, and the corpus grows one pack at a
+-- time, so a pack - not a song - is the honest unit of "data we did not have".
+--
+-- HOW EXPOSED THE CURRENT SCHEME IS, measured rather than assumed. Under row-level
+-- folds, about 60% of validation rows share a pack with at least one training row
+-- (guitar 59.3%, bass 59.4%, drum 61.0%, keys 59.8%, vocals 60.7%). That is much higher
+-- than the pack SIZES suggest - the largest rb3 pack is 15 rows out of ~330, under 5% -
+-- because the corpus is 170 packs over 330 rows: half the packs are singletons and
+-- contribute no exposure at all, while the rows concentrate in the multi-song packs.
+--
+-- WHAT IS PRE-REGISTERED. Written before the probe below was first run, so it cannot be
+-- rewritten into a prediction that came true:
+--
+--   Grouped folds are expected to score LOWER, by roughly 0.5 to 2 points pooled, on
+--   every instrument. Direction is asserted with more confidence than size. The reason
+--   for expecting the effect to be small despite 60% exposure is that the factors are
+--   chart geometry, not authorship fingerprints, and packs routinely mix an easy song
+--   with a hard one - so a pack sibling is a weak label hint. A drop beyond about 3
+--   points would mean the opposite, and would make the grouped number the honest one to
+--   publish rather than a diagnostic.
+--
+-- The last previous prediction recorded in this file (that pairing would tighten the
+-- macro spread) was WRONG, which is exactly why this one is written down first.
+--
+-- WHAT IT MEASURED, 2026-08-22, selected model per instrument, matched seeds, 10 repeats
+-- (grouped minus row-level; sd is of the paired per-repeat difference):
+--
+--   instrument   pooled          macro           rho       leak% under row folds
+--   guitar       -0.31 (sd 1.08) -0.60 (sd 1.82) -0.004        61.0
+--   bass         +0.00 (sd 0.29) -1.21 (sd 2.19) -0.004        60.5
+--   drum         -0.24 (sd 0.40) -0.30 (sd 1.17) -0.005        59.8
+--   vocals       -0.03 (sd 0.51) +0.22 (sd 0.69) -0.008        61.1
+--   keys         -0.53 (sd 0.73) -0.40 (sd 0.70) -0.004        59.7
+--   real_keys    +0.19 (sd 0.44) +0.06 (sd 0.75) -0.004        59.6
+--
+-- SCORING THE PREDICTION. Direction: right on rho, where all six instruments moved down,
+-- and only 4 of 6 on pooled. Size: WRONG, and wrong in the pessimistic direction - the
+-- predicted 0.5-2 point pooled drop did not appear on any instrument. Every pooled and
+-- macro delta is smaller than the spread of the difference that produced it, so on those
+-- two metrics grouping is not distinguishable from noise on this corpus.
+--
+-- Rho is the one place the leakage is visible. All six instruments moved down, by
+-- 0.004-0.008, and six of six in the same direction is not something a coin flip
+-- produces often (about 1 chance in 32 under a sign test). So pack leakage is REAL and
+-- its effect is about five thousandths of rho - detectable in the sign, negligible in
+-- the size.
+--
+-- WHY SO SMALL, given 60% exposure. Because a pack sibling is a weak hint, as predicted:
+-- the corpus is 170 packs over 330 rows, the largest holds 15, and packs routinely mix
+-- an easy song with a hard one, so knowing a neighbour's rank barely narrows the target.
+-- The 60% figure counts rows with ANY sibling in training, which is the exposure, not
+-- the advantage taken from it.
+--
+-- CONSEQUENCE FOR THE GATE: none. No instrument's verdict changes under grouping -
+-- guitar, bass and drums still pass, vocals and both keyboard parts still fail, at
+-- effectively the same margins. That is the finding, and it is the reason the flag stays
+-- false rather than a reason grouping was rejected: if the deltas had been 3 points the
+-- grouped number would be the honest one to publish.
+--
+-- WHAT THIS DOES NOT DO. It does not move the gate. PROTOCOL.GROUP_FOLDS stays false and
+-- SelectCandidate is untouched, for the same reason macro is measured but not selected
+-- on: switching the scheme changes every published number at once, and README rule 1
+-- says a changed evaluation scheme is a DECLARED NEW EXPERIMENT, not a flag flip. The
+-- probe puts the size of the effect on the table so that decision can be made on
+-- evidence. If the gate does move, the artifact's figures must be regenerated together.
+
+-- Rows in a validation fold that share a group with some training row, as a fraction of
+-- all rows. Zero by construction under grouped folds; the point is to report the number
+-- for the ROW-LEVEL scheme, where it is the size of the problem.
+function PackLeakageRate(folds, groups)
+    local n, leaked = 0, 0
+    for f = 1, #folds do
+        local in_train = {}
+        for g = 1, #folds do
+            if g ~= f then
+                for _, ti in ipairs(folds[g]) do in_train[groups[ti]] = true end
+            end
+        end
+        for _, ti in ipairs(folds[f]) do
+            n = n + 1
+            if in_train[groups[ti]] then leaked = leaked + 1 end
+        end
+    end
+    if n == 0 then return 0 end
+    return leaked / n
+end
+
+-- Run ONE candidate under both fold schemes on matched seeds and difference the result.
+--
+-- Paired by repeat index, so repeat 3's grouped run and repeat 3's row-level run share
+-- a seed. That does NOT make them the same split - grouping changes the assignment by
+-- construction - so this pairing removes less noise than the candidate-vs-candidate
+-- pairing above. It is still worth doing: the two schemes see the same rows in the same
+-- order, and the alternative is comparing two independent 10-repeat means.
+--
+--   groups   parallel array over target, holding each target row's pack key.
+--
+-- Returns a record with both schemes' means and the grouped-minus-row differences, or
+-- nil when the candidate cannot be fitted.
+function GroupedFoldProbe(d, target, extra, inst, factor_pos, keys, scale, groups)
+    local strata = {}
+    for n, ti in ipairs(target) do
+        strata[n] = tostring(TierForRank(inst, d.ranks[ti]))
+    end
+    local rank_lo, rank_hi = RankRange(d, target)
+
+    local out = {
+        row     = { usable = {}, macro = {}, rho = {} },
+        grouped = { usable = {}, macro = {}, rho = {} },
+        leak_row = 0, diag = nil,
+    }
+
+    local function Score(folds)
+        local pred, act = RunOneRepeat(d, target, extra, folds, keys, factor_pos, scale)
+        if not pred then return nil end
+        local pt, at = {}, {}
+        for i = 1, #pred do
+            pred[i] = ClampRank(pred[i], rank_lo, rank_hi)
+            pt[i] = TierForRank(inst, pred[i])
+            at[i] = TierForRank(inst, act[i])
+        end
+        local dist = TierDistance(pt, at)
+        return dist.usable / dist.n, MacroUsable(pt, at), (Spearman(pred, act) or 0), dist.n
+    end
+
+    local leak_sum, leak_n = 0, 0
+    for rep = 1, PROTOCOL.N_REPEATS do
+        local seed = PROTOCOL.SEED + rep
+        local rfolds = ShuffledStratifiedFolds(strata, PROTOCOL.NFOLD, seed)
+        local gfolds, diag = StratifiedGroupFolds(strata, groups, PROTOCOL.NFOLD, seed)
+        out.diag = out.diag or diag
+        leak_sum = leak_sum + PackLeakageRate(rfolds, groups)
+        leak_n   = leak_n + 1
+
+        local u, m, rh, nrows = Score(rfolds)
+        if u then
+            out.row.usable[#out.row.usable + 1] = u
+            out.row.macro[#out.row.macro + 1]   = m
+            out.row.rho[#out.row.rho + 1]       = rh
+            out.n_rows = nrows
+        end
+        u, m, rh = Score(gfolds)
+        if u then
+            out.grouped.usable[#out.grouped.usable + 1] = u
+            out.grouped.macro[#out.grouped.macro + 1]   = m
+            out.grouped.rho[#out.grouped.rho + 1]       = rh
+        end
+    end
+    if #out.row.usable == 0 or #out.grouped.usable == 0 then return nil end
+    out.leak_row = leak_sum / math.max(1, leak_n)
+
+    for _, key in ipairs({ 'usable', 'macro', 'rho' }) do
+        out[key .. '_row']     = MeanOf(out.row[key])
+        out[key .. '_grouped'] = MeanOf(out.grouped[key])
+        -- Paired difference and the spread of that difference, so a delta can be read
+        -- against how much it moves rather than against zero.
+        local n, sum, diffs = math.min(#out.row[key], #out.grouped[key]), 0, {}
+        for i = 1, n do
+            local dd = out.grouped[key][i] - out.row[key][i]
+            diffs[#diffs + 1] = dd
+            sum = sum + dd
+        end
+        out[key .. '_delta']    = (n > 0) and (sum / n) or 0
+        out[key .. '_delta_sd'] = SampleSd(diffs)
+    end
+    return out
 end
 
 ----------------------------------------------------------------------

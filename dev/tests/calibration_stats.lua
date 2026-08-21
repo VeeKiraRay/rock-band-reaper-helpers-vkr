@@ -281,6 +281,136 @@ Test.it('a thin stratum is spread across folds rather than dumped in one', funct
 end)
 
 ----------------------------------------------------------------------
+Test.section('StratifiedGroupFolds - whole packs, or the score is leakage')
+
+local function FoldSig(folds)
+    local parts = {}
+    for _, f in ipairs(folds) do
+        local t = {}
+        for _, i in ipairs(f) do t[#t + 1] = i end
+        table.sort(t)
+        parts[#parts + 1] = table.concat(t, '.')
+    end
+    return table.concat(parts, '|')
+end
+
+-- 60 rows, 20 packs of 3, 4 tiers dealt across them.
+local function GroupedFixture(n, per_pack, ntier)
+    local st, gp = {}, {}
+    for i = 1, n do
+        st[i] = 'tier' .. tostring(i % ntier)
+        gp[i] = 'pack' .. tostring(math.floor((i - 1) / per_pack))
+    end
+    return st, gp
+end
+
+Test.it('no group is ever split across two folds', function()
+    -- This is the whole point of the function: a split group is exactly the leakage the
+    -- row-level scheme has, and it must be structurally impossible here.
+    local st, gp = GroupedFixture(60, 3, 4)
+    local folds = StratifiedGroupFolds(st, gp, 5, 11)
+    local fold_of = {}
+    for fi, f in ipairs(folds) do
+        for _, i in ipairs(f) do
+            Test.expect(fold_of[gp[i]] == nil or fold_of[gp[i]] == fi,
+                ('%s spans folds %s and %d'):format(gp[i], tostring(fold_of[gp[i]]), fi))
+            fold_of[gp[i]] = fi
+        end
+    end
+end)
+
+Test.it('every row lands in exactly one fold', function()
+    local st, gp = GroupedFixture(60, 3, 4)
+    local folds = StratifiedGroupFolds(st, gp, 5, 11)
+    local seen, total = {}, 0
+    for _, f in ipairs(folds) do
+        for _, i in ipairs(f) do
+            Test.expect(not seen[i], 'row ' .. i .. ' appears twice')
+            seen[i] = true
+            total = total + 1
+        end
+    end
+    Test.expect(total == 60, 'all 60 rows placed; got ' .. total)
+end)
+
+Test.it('the same seed reproduces, a different seed reshuffles', function()
+    local st, gp = GroupedFixture(60, 3, 4)
+    Test.expect(FoldSig(StratifiedGroupFolds(st, gp, 5, 7))
+             == FoldSig(StratifiedGroupFolds(st, gp, 5, 7)),
+        'same seed must reproduce - a reported delta has to be recheckable')
+    Test.expect(FoldSig(StratifiedGroupFolds(st, gp, 5, 7))
+             ~= FoldSig(StratifiedGroupFolds(st, gp, 5, 8)),
+        'a different seed must move whole packs, or the repeats measure nothing')
+end)
+
+Test.it('folds stay near-equal in size despite grouping', function()
+    -- Grouping is allowed to cost some balance; it is not allowed to produce a fold
+    -- holding half the corpus, which would make the per-fold rate meaningless.
+    local st, gp = GroupedFixture(60, 3, 4)
+    local folds = StratifiedGroupFolds(st, gp, 5, 11)
+    local lo, hi = math.huge, 0
+    for _, f in ipairs(folds) do
+        lo = math.min(lo, #f)
+        hi = math.max(hi, #f)
+    end
+    Test.expect(hi - lo <= 3, ('fold sizes spread %d..%d, too uneven'):format(lo, hi))
+end)
+
+Test.it('an unlabelled row becomes its own group, not one shared bucket', function()
+    -- Merging every pack-less row would be the opposite of the intent: it would force
+    -- rows with nothing in common to share a fold and call that leakage-free.
+    local st, gp = {}, {}
+    for i = 1, 30 do st[i] = 'tier' .. tostring(i % 3); gp[i] = '' end
+    local folds = StratifiedGroupFolds(st, gp, 5, 5)
+    local sizes = 0
+    for _, f in ipairs(folds) do
+        Test.expect(#f > 0, 'a fold came out empty with 30 singleton groups')
+        sizes = sizes + #f
+    end
+    Test.expect(sizes == 30, 'all rows placed; got ' .. sizes)
+end)
+
+Test.it('reports thin strata rather than hiding them', function()
+    -- bass Impossible is 3 songs in 3 packs against 5 folds. Grouping CANNOT reach every
+    -- fold there, and the caller has to be told so it can say so in the report.
+    local st, gp = {}, {}
+    for i = 1, 50 do st[i] = 'common'; gp[i] = 'pack' .. math.floor((i - 1) / 5) end
+    for i = 51, 53 do st[i] = 'rare'; gp[i] = 'rare_pack' .. i end
+    local _, diag = StratifiedGroupFolds(st, gp, 5, 3)
+    Test.expect(diag.thin_strata['rare'] == 3,
+        'rare sits in 3 packs and must be flagged as thin')
+    Test.expect(diag.thin_strata['common'] == nil,
+        'common sits in 10 packs and must not be flagged')
+    Test.expect(diag.n_groups == 13, 'expected 13 groups, got ' .. tostring(diag.n_groups))
+    Test.expect(diag.largest_group == 5, 'largest pack is 5 rows')
+end)
+
+Test.it('PackLeakageRate is zero for grouped folds and positive for row-level', function()
+    -- The number the report quotes. If this ever reads non-zero on grouped folds, the
+    -- grouping is broken and every delta beside it is meaningless.
+    local st, gp = GroupedFixture(60, 3, 4)
+    local grouped = StratifiedGroupFolds(st, gp, 5, 11)
+    local rowlevel = ShuffledStratifiedFolds(st, 5, 11)
+    Test.expect(PackLeakageRate(grouped, gp) == 0,
+        'grouped folds must leak nothing by construction')
+    Test.expect(PackLeakageRate(rowlevel, gp) > 0.5,
+        'with 20 packs of 3 over 5 folds, most rows should have a sibling in training')
+end)
+
+----------------------------------------------------------------------
+Test.section('SampleSd')
+
+Test.it('matches a hand-computed n-1 standard deviation', function()
+    local sd = SampleSd({ 2, 4, 4, 4, 5, 5, 7, 9 })
+    Test.expect(math.abs(sd - 2.13809) < 1e-4, 'got ' .. tostring(sd))
+end)
+
+Test.it('returns 0 rather than nil below two values', function()
+    Test.expect(SampleSd({}) == 0, 'empty')
+    Test.expect(SampleSd({ 3 }) == 0, 'single value has no spread')
+end)
+
+----------------------------------------------------------------------
 Test.section('Wilson bounds - the interval the gate reads')
 
 Test.it('reproduces the guitar figure the protocol reports', function()

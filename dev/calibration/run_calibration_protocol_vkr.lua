@@ -198,7 +198,10 @@ local function Field(csv, row, name)
 end
 
 local function Collect(csv, inst)
-    local d = { feats = {}, ranks = {}, origins = {}, names = {} }
+    -- packs is read for the grouped-fold probe. It is CSV column 3 and went unread until
+    -- 2026-08-21, which is finding 7 of the peer review: the fold assignment could not
+    -- know two rows came from the same DLC pack.
+    local d = { feats = {}, ranks = {}, origins = {}, names = {}, packs = {} }
     for _, row in ipairs(csv.rows) do
         if Field(csv, row, 'instrument') == inst then
             local rank = tonumber(Field(csv, row, 'rank'))
@@ -213,6 +216,7 @@ local function Collect(csv, inst)
                 d.ranks[n]   = rank
                 d.origins[n] = Field(csv, row, 'origin')
                 d.names[n]   = Field(csv, row, 'shortname')
+                d.packs[n]   = Field(csv, row, 'pack')
             end
         end
     end
@@ -480,6 +484,46 @@ local function AnalyseInstrument(csv, inst)
                                                 base.median_rank.pooled)) * 100,
                         ((diag.macro or 0) - math.max(base.modal_tier.macro or 0,
                                                       base.median_rank.macro or 0)) * 100))
+        end
+    end
+
+    -- How much of the score survives when whole DLC PACKS are held out instead of
+    -- individual songs. Peer review finding 7: `pack` is CSV column 3 and the fold
+    -- assignment never read it, so a song could be graded while a pack sibling sat in
+    -- training. Reported, NOT gated on - see the GROUPED FOLDS block in protocol.lua for
+    -- the pre-registered prediction and why moving the gate is a separate decision.
+    local groups = {}
+    for n, ti in ipairs(target) do groups[n] = d.packs and d.packs[ti] end
+    local probe = GroupedFoldProbe(d, target, aux, inst, pos,
+                                   sel.keys, sel.scale_obj, groups)
+    if probe then
+        Msg('\n  -- pack-grouped folds, SELECTED model, matched seeds --\n')
+        Msg(('    %d packs over %d rows, largest %d rows (%.1f%% of the corpus)\n')
+            :format(probe.diag.n_groups, probe.n_rows or #target,
+                    probe.diag.largest_group,
+                    probe.diag.largest_group / math.max(1, probe.n_rows or #target) * 100))
+        Msg(('    row-level folds leak a pack sibling into training for %.1f%% of rows\n')
+            :format(probe.leak_row * 100))
+        Msg(('    %-10s %10s %10s %12s\n')
+            :format('metric', 'row-level', 'grouped', 'difference'))
+        Msg(('    %-10s %9.2f%% %9.2f%% %+8.2f (sd %.2f)\n')
+            :format('pooled', probe.usable_row * 100, probe.usable_grouped * 100,
+                    probe.usable_delta * 100, probe.usable_delta_sd * 100))
+        Msg(('    %-10s %9.2f%% %9.2f%% %+8.2f (sd %.2f)\n')
+            :format('macro', probe.macro_row * 100, probe.macro_grouped * 100,
+                    probe.macro_delta * 100, probe.macro_delta_sd * 100))
+        Msg(('    %-10s %10.3f %10.3f %+8.3f (sd %.3f)\n')
+            :format('rho', probe.rho_row, probe.rho_grouped,
+                    probe.rho_delta, probe.rho_delta_sd))
+        local thin = {}
+        for s, c in pairs(probe.diag.thin_strata) do
+            thin[#thin + 1] = ('tier %s in %d packs'):format(s, c)
+        end
+        table.sort(thin)
+        if #thin > 0 then
+            Msg(('    NOTE: %s - fewer packs than folds, so that tier cannot reach every\n')
+                :format(table.concat(thin, ', ')))
+            Msg('    fold and its per-tier rate is NOISIER under grouping, not cleaner.\n')
         end
     end
 
