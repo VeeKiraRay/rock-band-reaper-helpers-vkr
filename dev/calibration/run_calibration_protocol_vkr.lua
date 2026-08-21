@@ -34,6 +34,27 @@ dofile(_dir .. 'stats.lua')
 dofile(_dir .. 'weirdly_scored.lua')
 dofile(_dir .. 'protocol.lua')
 
+----------------------------------------------------------------------
+-- Input fingerprints
+----------------------------------------------------------------------
+
+-- The hash itself is Fnv1a64Hex, from protocol.lua - one implementation, because the
+-- partition rule there and the fingerprints here have to agree about what a hash of a
+-- given string is. This file adds only the file-reading half, which protocol.lua stays
+-- clear of by design.
+--
+-- Returns hash, byte count. Read in binary so a CRLF checkout and an LF one are
+-- distinguishable rather than silently equal - the files this fingerprints are mixed
+-- in this repo, and a line-ending conversion is a real change to the bytes a rerun
+-- would read.
+local function FnvFile(path)
+    local f = io.open(path, 'rb')
+    if not f then return nil, nil end
+    local s = f:read('a')
+    f:close()
+    return Fnv1a64Hex(s), #s
+end
+
 -- REAPER's ReaScript console is hard-capped at about 16 KB, and this report passed
 -- that once the fifth and sixth instruments were added: the earlier instruments scroll
 -- off and cannot be recovered, which is exactly the half you need when comparing a new
@@ -41,10 +62,65 @@ dofile(_dir .. 'protocol.lua')
 -- console keeps its role as the quick look.
 --
 -- Overwritten each run rather than appended: it is the report for the CSV sitting
--- beside it, and two runs of different data in one file is worse than none. Not
--- versioned - it is derived from the CSV, which is.
+-- beside it, and two runs of different data in one file is worse than none.
+--
+-- WRITTEN ATOMICALLY, and that is not a nicety. This file IS versioned - the README
+-- calls it the authority, and the coefficients that ship are justified from it - while
+-- the run that produces it holds the interpreter for about three and a half minutes.
+-- The first version opened the authority path with mode 'w' up front and wrote
+-- incrementally, so a killed or overlapping run left a PLAUSIBLE-LOOKING partial file:
+-- correct in its early sections, silently short in its later ones. That is what
+-- happened to the round-23a report, which lost four declared drum candidate rows and
+-- gained a duplicated block in the keys residuals, and was read as authoritative
+-- afterwards because nothing about it looked wrong.
+--
+-- So: write to a sibling .part and rename onto the authority path only after the
+-- completion footer is on disk. A failed run now leaves the previous report intact and
+-- the evidence beside it.
 local _report = _dir .. 'calibration_protocol_report.txt'
-local _rf = io.open(_report, 'w')
+local _part   = _report .. '.part'
+local _lock   = _dir .. 'calibration_protocol_report.lock'
+
+-- Two instances writing one target is the other half of the same failure, and the
+-- rename does not fix it - each would rename its own .part over the other's finished
+-- work. Pure Lua has no lock primitive and no way to stat a file, so the lock carries
+-- its own start time and expires on its own rather than needing a manual cleanup after
+-- every crash.
+--
+-- Ten minutes, against a run that takes about four and a half. Long enough that a live
+-- run is never mistaken for a dead one on a slow machine, short enough that the common
+-- case - kill a run, fix something, start again - waits rather than being stuck. A
+-- killed run leaves the lock behind (there is no handler that could remove it), so the
+-- refusal below names the file to delete for anyone who does not want to wait.
+local LOCK_STALE_S = 600
+
+local function LockAgeOrNil()
+    local f = io.open(_lock, 'r')
+    if not f then return nil end
+    local started = tonumber(f:read('l') or '')
+    f:close()
+    if not started then return LOCK_STALE_S end   -- unreadable: treat as fresh, i.e. held
+    return os.time() - started
+end
+
+local function ReleaseLock() os.remove(_lock) end
+
+local _age = LockAgeOrNil()
+if _age and _age < LOCK_STALE_S then
+    r.ShowConsoleMsg(('A protocol run started %d s ago is still holding %s\n')
+        :format(_age, _lock))
+    r.ShowConsoleMsg('Wait for it to finish, or delete that file if it died.\n')
+    return
+end
+if _age then
+    r.ShowConsoleMsg(('[clearing a stale lock, %d s old]\n'):format(_age))
+end
+do
+    local lf = io.open(_lock, 'w')
+    if lf then lf:write(tostring(os.time()), '\n'); lf:close() end
+end
+
+local _rf = io.open(_part, 'w')
 
 local function Msg(s)
     r.ShowConsoleMsg(s)
@@ -54,10 +130,29 @@ end
 -- Console-only: for the pointer at the end, which would be noise inside the file.
 local function MsgConsole(s) r.ShowConsoleMsg(s) end
 
+-- Give up without touching the authority file. Every early return below goes through
+-- this, so a run that cannot read its inputs leaves the previous report in place.
+local function AbortReport()
+    if _rf then _rf:close(); _rf = nil end
+    os.remove(_part)
+    ReleaseLock()
+end
+
 local function CloseReport()
     if not _rf then return end
+    -- The footer is the whole point of the .part dance: its presence is what says the
+    -- file is complete, and a reader (or CI) can check for it without rerunning.
+    _rf:write('\n[report complete]\n')
     _rf:close()
     _rf = nil
+    os.remove(_report)                       -- Windows os.rename will not overwrite
+    local ok, why = os.rename(_part, _report)
+    ReleaseLock()
+    if not ok then
+        MsgConsole(('\n[could not replace %s: %s]\n'):format(_report, tostring(why)))
+        MsgConsole(('[the finished report is at %s]\n'):format(_part))
+        return
+    end
     MsgConsole(('\n[full report written to %s]\n'):format(_report))
     MsgConsole('The console truncates at ~16 KB; the file does not.\n')
 end
@@ -321,6 +416,7 @@ local csv, err = LoadCsv(_csv)
 if not csv then
     Msg(('\nCould not read the scores CSV.\n  %s\n\nRun run_calibration_vkr.lua first.\n')
         :format(tostring(err)))
+    AbortReport()
     return
 end
 
@@ -332,8 +428,31 @@ if #missing > 0 then
     Msg('\nThis CSV predates the current factor set - missing columns:\n')
     Msg('  ' .. table.concat(missing, ', ') .. '\n\n')
     Msg('Delete corpus_scores.csv and re-run run_calibration_vkr.lua to rescore.\n')
+    AbortReport()
     return
 end
+
+-- Provenance. A report that cannot say which inputs produced it cannot be checked
+-- against a rerun, and this one is the authority for coefficients that ship. Whole
+-- files, not a header line or a row count: a reordered CSV, an edited candidate table
+-- and a changed factor implementation all have to show up here, and only the first of
+-- those changes the row count.
+--
+-- NO WALL-CLOCK TIME, on purpose. Fold assignment is explicitly seeded and both
+-- interpreters are Lua 5.4, so two runs over unchanged inputs produce a byte-identical
+-- file - which is what lets CI diff the tracked report against a fresh run and fail on
+-- any difference. A timestamp would make every run differ and spend that for nothing;
+-- git already dates the file. For the same reason the RUNTIME (REAPER or the offline
+-- driver) is printed to the console only: the two are meant to agree byte for byte,
+-- and writing which one ran would guarantee they never do.
+local _csv_hash, _csv_bytes = FnvFile(_csv)
+Msg(('\ncorpus_scores.csv  %s  %d bytes, %d rows\n')
+    :format(_csv_hash or '(unreadable)', _csv_bytes or -1, #csv.rows))
+Msg(('protocol.lua       %s\n'):format(FnvFile(_dir .. 'protocol.lua') or '(unreadable)'))
+Msg(('factor set         %s  %d columns\n')
+    :format(Fnv1a64Hex(table.concat(SCORE_FACTOR_KEYS, ',')), #SCORE_FACTOR_KEYS))
+Msg(('interpreter        %s\n'):format(_VERSION))
+MsgConsole(('runtime            %s\n'):format(r.GetAppVersion and 'REAPER' or 'offline driver'))
 
 Msg(('\nrows %d   repeats %d   folds %d   seed %d\n')
     :format(#csv.rows, PROTOCOL.N_REPEATS, PROTOCOL.NFOLD, PROTOCOL.SEED))

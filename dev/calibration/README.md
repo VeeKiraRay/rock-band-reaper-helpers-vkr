@@ -74,6 +74,21 @@ The reserved partition should be drawn **by whole pack**, not by random rows: th
 multi-song packs are thematic, so related songs would otherwise leak across the split, and
 a pack-level split doubles as the domain-shift check.
 
+**And it cannot be drawn from these rows at all.** The 2026-08-21 peer review sharpened
+this point past what the paragraph above says: the problem is not merely that a partition
+has not been drawn, it is that every rb3_dlc row is **already spent**. Across 23 rounds
+they informed worst-residual inspection, factor design, scale choices and candidate
+selection, so no current row can supply confirmatory evidence however it is later
+relabelled. Choosing some of them as a "test set" now would produce a number that looks
+confirmatory and is not.
+
+The partition therefore has to come from packs that have never been walked, and the rule
+deciding which ones is committed in `protocol.lua` (`PARTITION`, `PackIsReserved`) as of
+2026-08-21 — **before a single eligible pack exists**, which is the only time such a rule
+can be fixed without being a decision about data already seen. Nothing calls it yet. Read
+its header before touching it; the salt and the 20% share are part of the commitment, and
+a pack already in `corpus_scores.csv` is development permanently whatever its hash says.
+
 ---
 
 ## How to run
@@ -468,6 +483,22 @@ model has to earn its place consistently, not post a higher average once.
    gain, unchanged rho with a big gain, and improved rho with a loss have all happened.
 6. **Judge a factor by the decision view, not the diagnostic view.** See
    `run_calibration_analysis_vkr.lua` above.
+7. **The protocol report is written atomically, and CI checks it.** The run writes to a
+   sibling `.part` and renames onto `calibration_protocol_report.txt` only after a
+   `[report complete]` footer is on disk, so a killed run leaves the previous report
+   intact. This is not defensive habit: the round-23a report was committed in a state
+   where an interrupted run had dropped four declared drum candidate rows and duplicated
+   a block of the keys residuals, and it was read as authoritative afterwards because
+   nothing about it looked wrong. `.github/workflows/calibration.yml` regenerates the
+   report and fails on any byte difference. **Do not add a timestamp to the report** —
+   its byte-determinism is what makes that check possible, and the header explains why
+   the runtime marker goes to the console instead.
+8. **No instrument may be called `validated` until the reserved partition is spent.**
+   Every figure here is development-set repeated CV. Guitar, bass and drum shipped as
+   `validated` until 2026-08-21 on the strength of passing the gate; they are `beta` now.
+   A better number on the current rows cannot earn the word back — only new pack-held-out
+   data can. See `PARTITION` / `PackIsReserved` in `protocol.lua` for the rule that
+   decides which packs those are, committed before any of them exist.
 
 ---
 

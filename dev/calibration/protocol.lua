@@ -80,6 +80,104 @@ PROTOCOL = {
 }
 
 ----------------------------------------------------------------------
+-- FNV-1a 64
+----------------------------------------------------------------------
+
+-- Eight lines of pure Lua because this code has to produce the same number under
+-- REAPER's interpreter and a bare one, and neither ships a hash function. Not
+-- cryptographic and does not need to be: it fingerprints inputs so a report cannot
+-- silently describe a CSV that has moved, and it assigns packs to partitions in a way
+-- nobody can steer after the fact. Lua 5.4 integers are 64-bit and wrap on overflow,
+-- which is the arithmetic FNV specifies. Verified against the published test vectors
+-- ("" -> cbf29ce484222325, "a" -> af63dc4c8601ec8c).
+local FNV_OFFSET, FNV_PRIME = 0xcbf29ce484222325, 0x100000001b3
+
+function Fnv1a64(s)
+    local h, n = FNV_OFFSET, #s
+    local i = 1
+    while i <= n do
+        -- Blocked rather than byte-at-a-time: string.byte returning 4096 values at once
+        -- holds a 1 MB file to about 0.02 s, against several seconds for the naive loop.
+        local j = (i + 4095 < n) and (i + 4095) or n
+        local b = { string.byte(s, i, j) }
+        for k = 1, #b do h = (h ~ b[k]) * FNV_PRIME end
+        i = j + 1
+    end
+    return h
+end
+
+function Fnv1a64Hex(s) return string.format('%016x', Fnv1a64(s)) end
+
+----------------------------------------------------------------------
+-- The reserved test partition
+----------------------------------------------------------------------
+
+-- COMMITTED 2026-08-21, BEFORE A SINGLE ELIGIBLE PACK EXISTS. That timing is the entire
+-- value of this block, and it is worth being blunt about why.
+--
+-- The 2026-08-21 peer review's one Blocker: every figure this project reports is
+-- development-set repeated CV, and no reserved partition has ever been drawn. Worse
+-- than not having drawn one - across 23 rounds every rb3_dlc row has informed worst-
+-- residual inspection, factor design, scale choice and candidate selection, so no
+-- CURRENT row can ever supply confirmatory evidence, whatever it is later renamed to.
+-- Choosing some of them as a "test set" now would produce a number that looks
+-- confirmatory and is not. The README has always said the partition was undrawn; what
+-- it did not say is that the rows to draw it from were already spent.
+--
+-- So the test set can only come from packs that have never been walked. This rule
+-- decides which ones, and it is written now so that it cannot be written later - after
+-- new packs arrive, any rule at all is chosen in the presence of the data it partitions,
+-- and an author who has seen a promising pack cannot un-see it. A rule fixed in advance
+-- is the only kind whose output is not a decision.
+--
+-- THE RULE.
+--
+--   1. A pack that already appears in corpus_scores.csv is DEVELOPMENT, permanently and
+--      regardless of its hash. It has been seen. This is not adjustable.
+--   2. Any other pack is RESERVED if Fnv1a64(SALT .. pack) % 100 < RESERVED_PCT.
+--   3. Whole packs, never rows. The corpus's multi-song packs are thematic, so splitting
+--      one leaks related songs across the boundary; a pack-level split also doubles as
+--      the domain-shift check. See the README on why the reserved partition was always
+--      specified this way.
+--   4. Reserved packs are not scored, not plotted, not residual-inspected and not
+--      mentioned in a round declaration until the partition is spent. Scoring one "just
+--      to see" ends its usefulness silently and permanently - there is no way to tell
+--      afterwards that it happened.
+--   5. Spending it is a one-time event: freeze candidates and gate, refit on development
+--      only, predict the reserved packs once, report whatever comes out. A second look
+--      is a development set with extra steps.
+--
+-- SALT and RESERVED_PCT are part of the commitment. Changing either re-partitions
+-- everything and is indistinguishable from choosing a partition; if it ever has to
+-- change, the old value stays in this comment and the reason goes in the README.
+--
+-- 20% because the gate reads a Wilson lower bound and small partitions produce bounds
+-- too wide to fail anything. At the corpus's current scale 20% of new packs is a few
+-- dozen songs per instrument - enough to move a bound, not enough to be worth
+-- reallocating to training.
+--
+-- NOTHING CALLS THIS YET, and that is the expected state. There are no eligible packs.
+-- It is committed rather than held because a rule produced on the day it is first
+-- applied carries no evidence about when it was chosen, and git's history of this file
+-- is the evidence.
+PARTITION = {
+    SALT         = 'rb3-difficulty-reserved-v1',
+    RESERVED_PCT = 20,
+}
+
+-- Returns true if this pack belongs to the reserved test partition.
+--
+-- `seen_packs` is the set of pack ids already present in corpus_scores.csv, as
+-- { [pack] = true }. Pass it. Omitting it silently turns rule 1 off, which would let an
+-- already-spent development pack be reported as held-out - the one mistake this whole
+-- block exists to prevent.
+function PackIsReserved(pack, seen_packs)
+    if not pack or pack == '' then return false end     -- no pack id: cannot be held out
+    if seen_packs and seen_packs[pack] then return false end
+    return (Fnv1a64(PARTITION.SALT .. pack) % 100) < PARTITION.RESERVED_PCT
+end
+
+----------------------------------------------------------------------
 -- Predeclared candidates
 ----------------------------------------------------------------------
 
@@ -1817,11 +1915,28 @@ SCALES = {
 --
 -- THIS CHANGES NO HEADLINE NUMBER, and the comment says so on purpose so nobody later
 -- mistakes it for an accuracy fix: tier 6 is tier 6 whether the prediction is 943 or
--- 488, so usable% and miss% are untouched, and Spearman is order-preserving, so rho is
--- untouched too. MAE is the only figure that moves. This is about not printing nonsense.
+-- 488, so usable% and miss% are untouched. MAE moves, and rho moves in the fifth
+-- decimal. This is about not printing nonsense.
+--
+-- (An earlier version of this comment said rho was untouched "because Spearman is
+-- order-preserving". That reasoning is wrong and the 2026-08-21 peer review caught it:
+-- clamping is only NON-DECREASING, not strictly increasing. Every prediction above hi
+-- collapses to hi, which creates TIES, and Spearman with ties is not the same
+-- statistic. The review measured the effect on the six selected models at between
+-- -0.000006 and +0.000025 - far too small to move a gate verdict, which is why the
+-- conclusion survives even though the argument for it did not. That magnitude is the
+-- review's measurement and has not been independently re-derived here; the protocol
+-- computes rho on clamped predictions only.)
 --
 -- The bounds come from the observed ranks rather than a constant, because the honest
 -- claim is only ever "within the range of labels the model has seen".
+--
+-- KNOWN, DEFERRED: the bounds are taken over the whole target set - RankRange(d,
+-- target) at the top of RunProtocol - which includes the rows in the fold about to be
+-- predicted. That is label leakage into evaluation, small but real. Deriving them per
+-- fold from training rows only, and grading rho on raw out-of-fold predictions while
+-- clamping for product output alone, is phase 3 work: it changes reported numbers, so
+-- it is a declared experiment rather than a repair.
 function ClampRank(rank, lo, hi)
     if rank < lo then return lo end
     if rank > hi then return hi end

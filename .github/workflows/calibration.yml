@@ -1,0 +1,77 @@
+# .github/workflows/calibration.yml
+#
+# Proves that the tracked calibration_protocol_report.txt is what the tracked inputs
+# actually produce.
+#
+# This is possible only because of how the calibration is built: corpus_scores.csv is
+# versioned, and run_protocol_offline.lua reproduces every headline figure in plain Lua
+# 5.4 with no REAPER, no MIDI and no audio. So CI can re-derive the authority report
+# from scratch and fail if it differs by one byte.
+#
+# What it catches, and the reason it exists: the report is written by a run that holds
+# the interpreter for about four minutes, and the round-23a report was committed in a
+# state where a killed run had dropped four declared drum candidate rows and duplicated
+# a block of the keys residuals. Nothing about the file looked wrong, and it was read as
+# authoritative afterwards. The writer now renames a completed .part into place, so that
+# specific failure cannot recur - this job is what catches every other way the file and
+# its inputs can drift apart, including the ordinary one where someone edits protocol.lua
+# and forgets to rerun.
+#
+# The report deliberately carries no timestamp so this diff is meaningful; see the
+# provenance block in run_calibration_protocol_vkr.lua before adding one.
+
+name: Calibration protocol
+
+on:
+  push:
+    paths:
+      - 'dev/calibration/**'
+      - 'lib/reaper_difficulty_score*.lua'
+      - 'lib/reaper_difficulty_tiers.lua'
+      - '.github/workflows/calibration.yml'
+  pull_request:
+    paths:
+      - 'dev/calibration/**'
+      - 'lib/reaper_difficulty_score*.lua'
+      - 'lib/reaper_difficulty_tiers.lua'
+      - '.github/workflows/calibration.yml'
+  workflow_dispatch:
+
+jobs:
+  reproduce:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 5.4 specifically: REAPER's ReaScript runtime is 5.4, and the protocol's fold
+      # assignment goes through math.random, whose implementation changed between 5.3
+      # and 5.4. A different minor version would disagree on what the seed means and
+      # fail this job for a reason that has nothing to do with the report.
+      - name: Install Lua 5.4
+        run: sudo apt-get update && sudo apt-get install -y lua5.4
+
+      - name: Reproduce the protocol report
+        run: lua5.4 dev/calibration/run_protocol_offline.lua
+
+      - name: Report must be complete
+        run: |
+          tail -1 dev/calibration/calibration_protocol_report.txt | grep -qx '\[report complete\]' \
+            || { echo "The regenerated report has no completion footer - the run died partway."; exit 1; }
+
+      - name: Report must match the tracked one
+        run: |
+          if ! git diff --exit-code -- dev/calibration/calibration_protocol_report.txt; then
+            echo
+            echo "The tracked calibration_protocol_report.txt is not what the tracked"
+            echo "inputs produce. Re-run it locally and commit the result:"
+            echo
+            echo "    lua dev/calibration/run_protocol_offline.lua"
+            echo
+            echo "If the difference is confined to the provenance header, an input file"
+            echo "changed without the report being regenerated. If candidate rows or gate"
+            echo "verdicts moved, that is a new experiment and belongs in its own commit"
+            echo "with the reasoning - see dev/calibration/README.md."
+            exit 1
+          fi

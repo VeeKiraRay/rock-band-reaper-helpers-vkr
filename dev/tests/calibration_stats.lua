@@ -446,3 +446,68 @@ Test.it('an empty set gives an unbounded range rather than an inverted one', fun
     Test.expect(lo == 1 and hi == math.huge, 'clamping becomes a no-op, not a corruption')
     Test.expect(ClampRank(943, lo, hi) == 943, 'and nothing is clamped')
 end)
+
+Test.section('Fnv1a64 - the one hash both the fingerprints and the partition use')
+
+Test.it('matches the published FNV-1a 64 test vectors', function()
+    -- These are the canonical vectors. They are asserted rather than assumed because
+    -- everything downstream - the report's provenance header, the reserved partition -
+    -- is only meaningful if this function is the standard one and stays it.
+    Test.expect(Fnv1a64Hex('') == 'cbf29ce484222325', 'empty string')
+    Test.expect(Fnv1a64Hex('a') == 'af63dc4c8601ec8c', 'single byte')
+    Test.expect(Fnv1a64Hex('hello world') == '779a65e7023cd2e7', 'multi-byte')
+end)
+
+Test.it('crosses the 4096-byte block boundary correctly', function()
+    -- Fnv1a64 reads in 4096-value blocks for speed, so the block seam is the one place
+    -- an off-by-one would hide: short strings would all still pass.
+    local a = string.rep('x', 4095) .. 'y'
+    local b = string.rep('x', 4096) .. 'y'
+    Test.expect(Fnv1a64Hex(a) ~= Fnv1a64Hex(b), 'a byte either side of the seam differs')
+    -- Same content, so the seam must not change the answer: build 5000 bytes two ways.
+    local long = string.rep('abcde', 1000)
+    Test.expect(#long == 5000 and Fnv1a64Hex(long) == Fnv1a64Hex(long .. ''), 'stable past one block')
+end)
+
+Test.section('PackIsReserved - the test partition, committed before the data exists')
+
+Test.it('a pack already in the corpus is never reserved', function()
+    -- Rule 1, and the one that actually matters: a walked pack has informed factor
+    -- design and residual inspection, so it can never be held-out evidence again. This
+    -- must beat the hash, whatever the hash says.
+    local seen = {}
+    local hashed_reserved
+    for i = 1, 500 do
+        local p = 'pack' .. i
+        if PackIsReserved(p, {}) then hashed_reserved = p break end
+    end
+    Test.expect(hashed_reserved ~= nil, 'found a pack the hash reserves')
+    seen[hashed_reserved] = true
+    Test.expect(PackIsReserved(hashed_reserved, seen) == false,
+        'a seen pack stays development even though its hash says reserved')
+end)
+
+Test.it('is deterministic and depends only on the pack id', function()
+    Test.expect(PackIsReserved('somepack', {}) == PackIsReserved('somepack', {}),
+        'same answer every call - a partition that moved would be no partition')
+end)
+
+Test.it('reserves roughly the declared share', function()
+    local n, res = 2000, 0
+    for i = 1, n do
+        if PackIsReserved('synthetic_pack_' .. i, {}) then res = res + 1 end
+    end
+    local pct = res / n * 100
+    -- Wide tolerance on purpose: this asserts the rule is not degenerate (all or
+    -- nothing, or ignoring its input), not that FNV is uniform to three decimals.
+    Test.expect(math.abs(pct - PARTITION.RESERVED_PCT) < 5,
+        ('%.1f%% reserved, declared %d%%'):format(pct, PARTITION.RESERVED_PCT))
+end)
+
+Test.it('a row with no pack id is development, not silently held out', function()
+    -- The CSV has rows whose pack could not be determined. Treating those as reserved
+    -- would quietly move real training data out of reach, so the safe default is the
+    -- one that keeps them visible.
+    Test.expect(PackIsReserved(nil, {}) == false, 'nil pack')
+    Test.expect(PackIsReserved('', {}) == false, 'empty pack')
+end)

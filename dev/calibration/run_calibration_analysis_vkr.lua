@@ -238,8 +238,9 @@ end
 local function CrossValidate(d, target, extra, extra_weight)
     local folds = KFoldIndices(#target, NFOLD)
     local pred, act, order = {}, {}, {}
-    -- Clamped to the observed label range, same as the protocol - see ClampRank. Only
-    -- the printed MAE moves; tier grades and rho do not.
+    -- Clamped to the observed label range, same as the protocol - see ClampRank. Tier
+    -- grades do not move; the printed MAE does, and rho moves in the fifth decimal
+    -- (clamping ties the extremes rather than preserving order - see ClampRank).
     local rank_lo, rank_hi = RankRange(d, target)
 
     for f = 1, #folds do

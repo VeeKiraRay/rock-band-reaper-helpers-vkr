@@ -179,8 +179,27 @@ local SELECTIONS = {
 -- UI does not hardcode a second copy that could disagree with what was actually exported.
 -- These describe validation against noisy official ranks - they are NOT the probability
 -- that a given prediction is right.
+--
+-- NOTHING HERE IS 'validated', AND NOTHING MAY BE UNTIL A TEST SET IS SPENT. Guitar,
+-- bass and drum carried 'validated' until 2026-08-21, on the strength of passing the
+-- release gate. The peer review that day named the contradiction: dev/calibration's own
+-- README says in as many words that these are development-set repeated-CV figures and
+-- must be called "development-gate passes", not validated, because the reserved test
+-- partition has deliberately never been drawn. Every RB3 row has already informed
+-- factor design, residual inspection and candidate selection across 23 rounds, so no
+-- current row can supply confirmatory evidence later, whatever it is renamed to.
+--
+-- They are 'beta' instead - the same word keys carries, which is the honest reading:
+-- the model passed the gate the project can currently evaluate, and that gate is
+-- narrower than the release gate the implementation plan describes. Restoring
+-- 'validated' needs genuinely new pack-held-out data evaluated once, not a better
+-- number on these rows.
+--
+-- 'beta' rather than a new 'development_gate_pass': DIFFICULTY_STATUS_BADGE and
+-- DIFFICULTY_STATUS_NOTE in difficulty_explain.lua know three statuses, and inventing a
+-- fourth is a UI wording decision that belongs with the wider gate, not with this fix.
 local STATUS = {
-    guitar = 'validated', bass = 'validated', drum = 'validated',
+    guitar = 'beta', bass = 'beta', drum = 'beta',
     keys = 'beta', real_keys = 'experimental', vocals = 'experimental',
 }
 

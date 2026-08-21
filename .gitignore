@@ -25,3 +25,35 @@ _raw_assets/*
 _old_stuff/*
 .continue/*
 
+# Calibration run output.
+#
+# corpus_scores.csv and corpus_scores_baseline.csv ARE versioned, deliberately.
+# They hold only derived measurements - shortname, official rank, factor values -
+# with no MIDI and no audio, the same class of metadata as any songs.dta reader
+# produces. Tracking them is what makes the pilot reproducible at all: the
+# reference corpus itself lives in the untracked _external_docs/ and exists on one
+# machine, so if the derived table were untracked too the repo would contain no
+# data whatsoever, and the coefficients that eventually ship in the helper would
+# have no derivation anywhere in it.
+#
+# They keep earning their place after the feature ships: every remaining modelling
+# question (candidate factor sets, ridge strength, per-instrument fits, grouped
+# cross-validation) is answered from the CSV alone, with no REAPER and no corpus.
+# What they cannot survive is a change to the factor SET - a new column means a
+# full rescore - which is why exactly two are tracked (current plus the baseline a
+# change is being measured against) rather than an accumulating archive.
+#
+# The numbered snapshots below are that archive: older factor sets (17/25/29
+# columns), so they can be neither refit nor row-compared against the current one.
+# The design doc tells that history better. Kept locally, not versioned.
+dev/calibration/_[0-9][0-9]_*.csv
+dev/calibration/_[0-9][0-9]_*.txt
+
+# Transient protocol-run state. The report is written to a sibling .part and renamed
+# onto the authority path only once it is complete, so a killed run leaves both of
+# these behind - the .part is the evidence of how far it got, the .lock is what stops a
+# second run writing the same target. Neither is ever committed; the finished report is.
+dev/calibration/calibration_protocol_report.txt.part
+dev/calibration/calibration_protocol_report.lock
+
+*.zip

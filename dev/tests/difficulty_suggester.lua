@@ -400,8 +400,14 @@ Test.it('the selected candidate and scale are the ones the protocol chose', func
 end)
 
 Test.it('maturity badges match the product status table', function()
+    -- No instrument is 'validated', and this test is where that stays true. Guitar,
+    -- bass and drum were 'validated' until 2026-08-21 on the strength of passing the
+    -- release gate; the peer review that day pointed out the README already says these
+    -- are development-set repeated-CV figures and that the reserved test partition has
+    -- never been drawn. Nothing may claim 'validated' until one is spent - see the
+    -- STATUS table in dev/calibration/export_production_models.lua.
     local EXPECTED = {
-        guitar = 'validated', bass = 'validated', drum = 'validated',
+        guitar = 'beta', bass = 'beta', drum = 'beta',
         keys = 'beta', real_keys = 'experimental', vocals = 'experimental',
     }
     for inst, want in pairs(EXPECTED) do
@@ -1416,11 +1422,18 @@ Test.it('carries model maturity as a badge, never as a per-chart warning', funct
     -- shown to authors for the first time. So this asserts the MAPPING rather than the
     -- annotated record: the wording and the status-to-badge table have to stay correct for
     -- the one-line change that turns it back on to be safe.
-    local validated = FakeRec('guitar')
-    DifficultyAnnotate(validated)
-    Test.expect(validated.badge == nil, 'a validated model needs no badge')
+    -- Every model is annotated with no badge, because the feature switches them off -
+    -- not because any of them is mature enough to need none. That distinction used to
+    -- be blurred here by asserting it on guitar under the name `validated`; guitar is
+    -- 'beta' now and no shipped model claims otherwise.
+    local off = FakeRec('guitar')
+    DifficultyAnnotate(off)
+    Test.expect(off.badge == nil, 'badges are switched off, so no record may carry one')
 
-    for inst, badge in pairs({ keys = 'Beta', real_keys = 'Experimental', vocals = 'Experimental' }) do
+    for inst, badge in pairs({
+        guitar = 'Beta', bass = 'Beta', drum = 'Beta',
+        keys = 'Beta', real_keys = 'Experimental', vocals = 'Experimental',
+    }) do
         local status = RB_DIFFICULTY_MODELS[inst].status
         Test.expect(DIFFICULTY_STATUS_BADGE[status] == badge,
             ('%s (%s) maps to %s, expected %s'):format(
