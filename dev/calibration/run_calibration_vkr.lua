@@ -41,18 +41,41 @@ local _root   = _strip(_strip(_dir))                    -- repo root
 -- ADDING A ROOT IS SAFE TO RE-RUN. The resume check is by (shortname, instrument) against
 -- the CSV, so songs already scored are skipped wherever they are found - including the 44
 -- that appear in both roots. A song is never scored twice and never duplicated.
+-- CONSOLIDATED 2026-08-21 into three origin-separated roots. The four older folders
+-- (reference_songs, new_reference_songs, hard_reference_songs, genre_reference_songs)
+-- held overlapping copies in two different layouts; every song they carried now lives
+-- under exactly one of these, verified by hash.
 local _corpora = {
-    _root .. '_external_docs/reference_songs/',
-    _root .. '_external_docs/new_reference_songs/',
-    -- The top-end set, searched per instrument for tier 5+ charts. It fills the band the
-    -- low-end set could not reach: vocals was under-rating all 23 of its hardest charts
-    -- by ~97 rank, and no amount of easy songs addresses that.
-    --
-    -- Its packs are mostly RBN (game_origin ugc_plus), whose dta files the parser does
-    -- not read - deliberately, for now: every RBN rank is exactly a tier floor, so those
-    -- rows are tier labels rather than ranks and cannot be regression targets.
-    _root .. '_external_docs/hard_reference_songs/',
+    -- rb3_dlc only. HOLDS THE RESERVED TEST PARTITION TOO - 258 of its 588 songs have
+    -- never been walked. That is safe only because of the reserved guard below; without
+    -- it, listing this root would score them and nothing about the result would look
+    -- wrong afterwards.
+    _root .. '_external_docs/all_rb3_dlc_reference_songs/',
+    -- lego, rb2, greenday. Always-training at weight 0.30, never predicted.
+    _root .. '_external_docs/aux_reference_songs/',
+    -- RBN (game_origin ugc_plus), whose dta files ParseSongsDta does not read -
+    -- deliberately: every RBN rank is exactly a tier floor, so those rows are tier
+    -- labels rather than ranks and cannot be regression targets. Listed so the walk
+    -- reports them rather than leaving them invisible.
+    _root .. '_external_docs/rbn_reference_songs/',
 }
+
+-- THE RESERVED PARTITION GUARD.
+--
+-- Every rb3_dlc pack that has never been walked is reserved test data (PARTITION /
+-- PackIsReserved in protocol.lua, RESERVED_PCT = 100). The resume check below skips
+-- (shortname, instrument) pairs already in the CSV, which means it skips DEVELOPMENT
+-- songs and happily scores RESERVED ones - the exact opposite of what is wanted, and
+-- silent either way.
+--
+-- So: a song absent from the CSV is refused unless SPEND_RESERVED_PARTITION is set. The
+-- flag is deliberately awkward to reach and is a one-time, irreversible act - scoring a
+-- reserved song ends its usefulness permanently and there is no way to detect afterwards
+-- that it happened.
+--
+-- This only matters once a CSV exists. A first run from an empty CSV has no partition to
+-- protect and scores everything, which is how the development set was built.
+SPEND_RESERVED_PARTITION = false
 local _csv      = _dir .. 'corpus_scores.csv'
 local _manifest = _dir .. 'corpus_scores.manifest.txt'
 
@@ -317,6 +340,43 @@ elseif not schema_ok then
     return
 else
     r.ShowConsoleMsg('Resuming: existing CSV found, completed rows will be skipped.\n')
+end
+
+-- THE RESERVED PARTITION GUARD, applied. See SPEND_RESERVED_PARTITION at the top.
+--
+-- With a CSV in hand, any song it does not mention has never been walked and is reserved
+-- test data. Drop those from the walk before a single MIDI is imported, and say how many
+-- so the split is visible rather than assumed.
+--
+-- Note the direction of the danger: the resume check skips songs that ARE in the CSV,
+-- which is exactly the development set, leaving the reserved ones as the only work left
+-- to do. Without this the most natural possible run - "re-scan the corpus" - would spend
+-- the whole partition.
+if had_csv and not SPEND_RESERVED_PARTITION then
+    -- done keys are shortname .. '\0' .. instrument; take the shortname half. Written as
+    -- an explicit \0 class because %z was removed in Lua 5.2 and would be a malformed
+    -- pattern under REAPER's 5.4.
+    local in_csv = {}
+    for key in pairs(done) do
+        in_csv[key:match('^([^%z\0]*)') or key] = true
+    end
+    local keep, held = {}, 0
+    for _, song in ipairs(songs) do
+        if in_csv[song.shortname] then
+            keep[#keep + 1] = song
+        else
+            held = held + 1
+        end
+    end
+    if held > 0 then
+        r.ShowConsoleMsg(('\nRESERVED PARTITION: holding back %d song(s) absent from the CSV.\n')
+            :format(held))
+        r.ShowConsoleMsg('These have never been walked and are the test set. Scoring one\n')
+        r.ShowConsoleMsg('spends it permanently and undetectably.\n')
+        r.ShowConsoleMsg('To spend the partition deliberately, set SPEND_RESERVED_PARTITION\n')
+        r.ShowConsoleMsg('at the top of this script - and read the README section first.\n')
+        songs = keep
+    end
 end
 
 r.ShowConsoleMsg(('Corpus: %d songs\n\n'):format(#songs))

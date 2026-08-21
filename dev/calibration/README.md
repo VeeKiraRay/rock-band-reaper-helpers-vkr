@@ -102,6 +102,26 @@ land. Two things have to happen first: measurement across at least one corpus ch
 a floor derived for the macro scale instead of inheriting 90%, which was calibrated
 against a different quantity.
 
+**A macro floor cannot be computed with the machinery the gate uses, and that reorders the
+plan.** The gate reads a **Wilson lower bound**, which is a binomial interval on a
+proportion over *n* rows. Macro is not that — it is the mean of seven proportions with
+denominators from 2 to 102, and it has no closed-form interval. So `macro_lower >= X` does
+not exist until the pack bootstrap does. **The macro floor is downstream of phase 4, not
+an independent decision.**
+
+**Which makes the endpoint band the better gate input, and macro the better reporting
+one.** The endpoint rate is a genuine proportion over 75–140 rows, so Wilson applies with
+the code already here; it targets the same blindness (endpoint failure hiding behind a
+middle-heavy pool); and it avoids macro's weighting pathology, where **bass's 4-song tier 6
+carries the same weight as its 89-song tier 1** and one song flipping moves the headline
+3.6 points. Macro keeps its own job — the fixed 3/7 baseline is what makes scores
+comparable between instruments, and pooled never can be.
+
+One caution for whoever sets the number: the macro figures are now published above, so any
+floor chosen from here is chosen in their presence. Pick it from a principle stated
+independently of them — "the 90% promise should hold in every band rather than on average"
+is such a principle — and record that the numbers were visible when it was set.
+
 **Moving the gate to macro would reopen the selection, on the three instruments that
 currently pass.** `SelectCandidate` ranks by *pooled* usable%, so a macro gate would be
 grading on a quantity the selection never read - the fit/grade mismatch this project
@@ -128,6 +148,40 @@ choose: the simplicity rule and the 1-point/70% bar sit between the two, and on 
 pooled leader is not even the selected model. And nothing here is a reason to adopt macro -
 see `MacroUsable` in `protocol.lua` on why adopting it because of which candidate it
 favours would be precisely the forbidden move.
+
+**Run the actual rule against paired macro differences and only DRUMS reselects.** Measured
+2026-08-21, which corrects the impression the table above gives:
+
+| instrument | best macro alternative | macro gain | win share | clears the bar? |
+|---|---|---:|---:|---|
+| guitar | `full@attacks` / rank | +0.98 | 60% | no, fails both |
+| bass | `baseline+ent_rel@attacks` / rank | +0.74 | 60% | no, fails both |
+| drum | `full_drum@noroll` / **rank** | **+1.56** | **90%** | **yes** |
+
+And the bar itself degrades unevenly. Median sd of the **paired** difference, with what one
+percentage point is worth in it:
+
+| instrument | pooled sd | macro sd | 1 pt on pooled | 1 pt on macro |
+|---|---:|---:|---:|---:|
+| guitar | 0.790 | 1.608 | 1.3 sd | **0.6 sd** |
+| bass | 0.433 | 1.679 | 2.3 sd | **0.6 sd** |
+| drum | 0.646 | 1.829 | 1.5 sd | **0.5 sd** |
+| vocals | 0.558 | 0.846 | 1.8 sd | 1.2 sd |
+| keys | 0.663 | 0.808 | 1.5 sd | 1.2 sd |
+| real_keys | 0.600 | 0.728 | 1.7 sd | 1.4 sd |
+
+On exactly the three instruments where the leaders disagree, a 1-point macro difference is
+half a standard deviation. **The point half of the selection rule stops discriminating on
+macro; the win-share half is scale-free and still does** — which is why drums' result
+survives at 90% of repeats despite +1.56 being only 1.1 sd. Any move to macro has to
+re-derive the point bar or drop it, never carry 1.00 across unchanged.
+
+**Pairing helps less than it looks like it should**, and that was a wrong prediction worth
+recording. Paired differences are *larger* than marginal spread, not smaller: guitar's
+marginal macro sd is 1.413 against a paired 1.608, and pooled goes 0.683 → 0.790 the same
+way. Two candidates on identical folds correlate at only about r = 0.5 here, and paired sd
+is `s·sqrt(2−2r)`, so anything below r = 0.5 makes the difference noisier than either
+candidate alone. Pairing removes the fold's shared component and nothing else.
 
 **The compositional trap these exist to catch.** Adding middle-tier songs raises pooled
 without improving the model at all, because the middle is where it already succeeds. Macro
@@ -214,6 +268,56 @@ the middle tiers already run at 96–100%; grade it on macro or report all three
 it is spent, "everything unwalked is reserved" stops being the right policy, and the
 replacement is a new declaration with its own reasoning.
 
+### The 2026-08-21 consolidation
+
+The corpus arrived as `all_rb3_dlc_reference_songs/` — **244 packages, 566 MIDIs, 563
+distinct shortnames**, flat layout. It covered most of what the four older folders held but
+**not all of it**, so nothing was deleted until a hash comparison said what was unique
+where. Absent from it were all **45 lego**, **15 rb2** and **4 greenday** (expected — none
+are RB3 DLC), plus **25 scored `rb3_dlc` songs** including `deathontwolegs`, and ~148
+unscored RBN basenames. **89 of the 394 frozen songs lived only in the older folders.**
+
+237 songs were then copied into three origin-separated roots, preserving each song's
+`<hash>_extracted` pack folder name — that name *is* the CSV's `pack` column, and phase 4's
+pack-grouped CV depends on it surviving. One pack (`644B33E6`) is genuinely mixed-origin,
+holding `ohlove` (`rb3_dlc`) beside three Green Day songs, so it appears under two roots
+with the same name; pack identity is unaffected and only the dta is duplicated.
+
+Verified after the move: **0 of 394 frozen songs missing, 0 in the wrong root, 258 reserved
+(unchanged), and the only thing left behind was `stillofthenight(0)`** — a Windows
+duplicate-rename artifact sitting beside the real `stillofthenight.mid` in the same pack.
+
+`FROZEN_DEVELOPMENT_SET.txt` lives in the rb3 root and records every scored shortname with
+**two** hashes: `scored`, the bytes the corpus was measured from, and `current`, the bytes
+of the surviving copy. They differ on exactly three songs (below). Carrying `scored`
+forward rather than recomputing it is deliberate — overwriting it would erase the only
+evidence the two ever differed.
+
+**Three shortnames name different bytes in the old and new collections. None of the
+differences reaches a scored quantity:**
+
+| song | what differs | scored impact |
+|---|---|---|
+| `wanteddeadoralive2` | EVENTS track, +8 notes (pitch 26, ticks 176640-177480) | none — the scorer reads only the `[coda]` **text** event from EVENTS, never its notes, and neither copy has a coda |
+| `badmedicine` | one Pro Keys lane-shift marker moved tick 0 → 3840 | none — Expert gems byte-identical (1832 both), and `[coda]` sits at tick 314640 in **both**, so the BRE info fields agree |
+| `waitandbleed` | tempo map, 119 vs 148 markers | **a real ritardando in the last four beats** — see below |
+
+`waitandbleed` needed a denser look than four sampled ticks, which is what a first pass used
+and which produced a wrong reading. Scanned beat by beat over all 462 beats:
+
+- **286 beats are exactly equal** and **171 differ by under 0.001%** — sub-millisecond,
+  floating point rather than music. Nothing at all falls between 0.001% and 1%.
+- **Four beats differ by 23-42%**, at ticks 219360-220800 (149.9-150.9 s). The new copy has
+  an ending ritardando the old one does not map. That is inside the playable region: the
+  last Expert gem is at tick 221040.
+- Cumulative offset **at the last Expert gem: +0.4245 s, +0.28%**.
+
+So it is a genuine chart-timing difference, not redundant markers, and the earlier
+"encoding only" reading was wrong. It is still not worth a rescore: 0.28% on `playing_s`
+for **one row of 394**, on standardized factors, sits far below the noise floor the
+protocol reads. Every one of the nine tracks is note-for-note identical in both copies —
+the difference is purely how the final two seconds are timed.
+
 ---
 
 ## How to run
@@ -224,18 +328,35 @@ Order matters: everything downstream reads the CSV the first script writes.
    song's MIDI, scores every instrument, appends a row per (song, instrument) to
    `corpus_scores.csv`, and writes `corpus_scores.manifest.txt`.
 
-   Three roots as of 2026-08: `_external_docs/reference_songs/`,
-   `_external_docs/new_reference_songs/` (a low-end set assembled by searching per
-   instrument, so a pack easy on two instruments appears in two folders), and
-   `_external_docs/hard_reference_songs/` (the top-end set, searched the same way for
-   tier 5+ charts). **Per-root and total song counts are deliberately not quoted here** —
-   `corpus_scores.manifest.txt` carries them and is regenerated by every run, whereas a
-   number written into this paragraph has now gone stale twice. Most of the third root is
-   RBN, whose dta dialect is deliberately not parsed. The song list is
-   pooled and de-duplicated by shortname before
-   anything is imported, and the roots are recorded in the manifest — origin counts alone
-   cannot distinguish a corpus that includes the low-end set from one that does not, since
-   both are `rb3_dlc`.
+   **Three roots, separated by origin since the 2026-08-21 consolidation:**
+
+   | root | holds |
+   |---|---|
+   | `_external_docs/all_rb3_dlc_reference_songs/` | `rb3_dlc` only — **including the reserved test partition** |
+   | `_external_docs/aux_reference_songs/` | lego, rb2, greenday — always-training at weight 0.30, never predicted |
+   | `_external_docs/rbn_reference_songs/` | RBN `ugc_plus` — unscored; every rank is a tier floor |
+
+   They replace `reference_songs/`, `new_reference_songs/` and `hard_reference_songs/`,
+   which held overlapping copies in two different layouts. Every song those carried now
+   lives under exactly one of the three, verified by hash. **Per-root and total song counts
+   are deliberately not quoted here** — `corpus_scores.manifest.txt` carries them and is
+   regenerated by every run, whereas a number written into this paragraph has now gone
+   stale twice. The song list is pooled and de-duplicated by shortname before anything is
+   imported, and the roots are recorded in the manifest.
+
+   **The origin separation is load-bearing, not tidiness.** `FROZEN_DEVELOPMENT_SET.txt`
+   defines the reserved partition *by complement*: any song in the rb3 root not listed
+   there has never been walked. Putting the 148 RBN charts in that root would classify
+   them as reserved `rb3_dlc` test data, and their ranks are tier floors that can never be
+   regression targets.
+
+   **`SPEND_RESERVED_PARTITION` guards the rest.** With a CSV in hand, any song it does
+   not mention is reserved, and the walk drops it before a single MIDI is imported. This
+   matters because the resume check runs the other way round — it skips the songs that
+   *are* in the CSV, i.e. the development set — so without the guard the most natural
+   possible run, "re-scan the corpus", would score the entire test partition and nothing
+   about the result would look wrong afterwards. Setting the flag is a one-time,
+   irreversible act.
 
    The two layouts differ and both are handled: the original nests a pack under
    `Root/songs/<name>/<name>.mid`, the low-end set is flat, with `songs.dta` and every MIDI
@@ -575,8 +696,16 @@ scored, the rest being 45 Lego-era, 15 RB2-era and 4 `greenday`.
 > Confirm either from the CSV itself rather than from the manifest's headline.
 
 The Lego-era songs sit on a rank scale about 45 points below RB3, so they are
-always-training at weight 0.3 and carry an `is_lego` column: they add information without
-steering the model. `PART KEYS` has no Lego rows at all — Lego Rock Band predates the
+always-training at weight 0.3 and carry an `is_lego` column: they are prevented from
+steering the model.
+
+> *Measured 2026-08-21, and the older wording ("they add information without steering the
+> model") was half right.* Ablating all 60 auxiliary rows moves the selected model by
+> **+0.15 / +0.03 / +0.001** on guitar (pooled / macro / rho), **+0.03 / +0.69 / +0.000**
+> on bass, **+0.00 / +0.22 / +0.002** on vocals, and exactly zero on both keyboard parts,
+> which have no auxiliary rows at all. Only **drums** shows anything real — **+0.46 pooled
+> and +1.46 macro**, roughly 1 sd on each. They are kept because removing them would change
+> every published figure for no gain, not because they were shown to help. `PART KEYS` has no Lego rows at all — Lego Rock Band predates the
 keyboard part — and none from RB2 either, so both keyboard parts are 266/266 rb3_dlc and
 neither auxiliary origin contributes a single keys row. The one `greenday` song is scored
 into the CSV but excluded from every fit, so it never appears in a development row count.
@@ -636,7 +765,14 @@ model has to earn its place consistently, not post a higher average once.
    REAPER could never match one regenerated on the CI runner. The check would have failed
    on its first run for a reason with nothing to do with the calibration. Any future
    generated file that joins the check needs the same treatment.
-8. **The protocol decides; the exporter obeys.** `calibration_decision_manifest.lua` is
+8. **`SPEND_RESERVED_PARTITION` stays false.** The rb3 root is in `_corpora` and holds the
+   258-song test partition alongside the development set; the guard in
+   `run_calibration_vkr.lua` is the only thing keeping a routine rescan from scoring it.
+   The resume check skips songs that are *in* the CSV, so the reserved ones are precisely
+   what a re-scan would otherwise pick up. Spending the partition is a deliberate,
+   one-time, irreversible act with its own declaration - never a config edit made in
+   passing, and never a way to "just get more rows".
+9. **The protocol decides; the exporter obeys.** `calibration_decision_manifest.lua` is
    the machine-readable record of what a run selected and what it selected it from.
    `export_production_models.lua` reads it and refuses to write if the CSV, `protocol.lua`
    or the factor list has moved since. Do not "fix" a refusal by editing the manifest —
@@ -644,7 +780,7 @@ model has to earn its place consistently, not post a higher average once.
    protocol. If the selection genuinely changed, update `SELECTIONS` **and the reasoning
    beside it** in the exporter, which is the one edit that makes a reselection visible in
    review rather than arriving as a coefficient diff.
-9. **No instrument may be called `validated` until the reserved partition is spent.**
+10. **No instrument may be called `validated` until the reserved partition is spent.**
    Every figure here is development-set repeated CV. Guitar, bass and drum shipped as
    `validated` until 2026-08-21 on the strength of passing the gate; they are `beta` now.
    A better number on the current rows cannot earn the word back — only new pack-held-out
@@ -1150,6 +1286,22 @@ nothing may be authored during a BRE.
 
 **Use `[coda]` in the EVENTS track, never the lanes.** The lanes are pitch 120-124, but on
 drums that range is also the activation/fill lane. Measured over 394 corpus songs:
+
+> **The 4% is the catalogue, not the sample — measured 2026-08-21, and it closes this
+> thread.** The BRE round was left unfitted because 18 of 394 is a coin toss, with the
+> implicit hope that a bigger corpus would fix it. A census over
+> `all_rb3_dlc_reference_songs` says it will not: **16 of its 305 development songs (5.2%)
+> carry a real BRE, and only 8 of the 258 reserved ones (3.1%)**. Spending the entire test
+> partition would take the total from ~18 to ~26. BREs are simply rare in RB3 DLC, so no
+> amount of RB3 material makes this fittable — the constraint is prevalence, not corpus
+> size. The lane-versus-coda gap holds at the same ratio in the new material too (287 and
+> 249 songs respectively have lanes with no coda), which independently re-confirms that
+> reading the lanes would strip material from the ~95% of songs that have no BRE at all.
+>
+> That census read the EVENTS text of reserved MIDIs and nothing else — no ranks, no
+> factors, no predictions. Recorded here because rule 4 requires reserved-partition
+> contact to be deliberate and visible; a structural census cannot enable overfitting,
+> since reserved rows can never be trained on.
 
 ```
 [coda] in EVENTS        :  18

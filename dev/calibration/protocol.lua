@@ -65,6 +65,34 @@ PROTOCOL = {
     -- cannot be regression targets at all. It starts at the Lego weight because that
     -- number was measured to be insensitive and 13 songs cannot justify tuning a second
     -- one; the analysis report's origin check reports its offset per run.
+    -- WHAT THEY ARE ACTUALLY WORTH, measured 2026-08-21 by ablation: run each
+    -- instrument's selected model on identical folds with and without the 60 auxiliary
+    -- rows, and difference the result.
+    --
+    --   instrument   pooled   macro    rho     (with aux, minus without)
+    --   guitar        +0.15   +0.03   +0.001
+    --   bass          +0.03   +0.69   +0.000
+    --   drum          +0.46   +1.46   +0.002
+    --   vocals        +0.00   +0.22   +0.002
+    --   keys           0.00    0.00    0.000   no auxiliary rows exist
+    --   real_keys      0.00    0.00    0.000   no auxiliary rows exist
+    --
+    -- Against paired sds of 0.43-0.79 (pooled) and 0.73-1.83 (macro), only DRUMS shows
+    -- anything close to a real effect, at roughly 1 sd on both metrics. Guitar, bass and
+    -- vocals gain nothing measurable, and the two keyboard parts cannot gain anything
+    -- because neither Lego Rock Band nor the RB2 export has a keyboard chart.
+    --
+    -- The README used to say these rows "add information without steering the model".
+    -- The second half is supported; the first is now known to be near-empty except
+    -- possibly on drums. Kept anyway - 60 rows that cost nothing and might be worth half
+    -- a point on one instrument are not worth a declared corpus change to remove, and
+    -- removing them would alter every published figure for no gain. Recorded so nobody
+    -- re-derives it, and so the case for dropping them is not overstated in either
+    -- direction.
+    --
+    -- The 4 `greenday` rows are a separate matter: they are scored into the CSV and
+    -- excluded from every fit, so they contribute exactly nothing by construction and
+    -- need no measurement.
     AUX_ORIGINS = {
         { origin = 'lego', flag = 'is_lego', weight = 0.3 },
         { origin = 'rb2',  flag = 'is_rb2',  weight = 0.3 },
@@ -1947,6 +1975,53 @@ SCALES = {
 -- pre-registration exists to prevent. The reason to adopt it has to be the one already
 -- written down - that a constant predictor scores a fixed 3/7 under macro and anywhere
 -- between 45.86% and 77.13% under pooled - and not which candidate it favours.
+--
+-- ----------------------------------------------------------------------------
+-- MEASURED 2026-08-21: WOULD SELECTING ON MACRO ACTUALLY CHANGE ANYTHING?
+--
+-- The report names a pooled leader and a macro leader per instrument, and they differ on
+-- guitar, bass and drum. A leader is not a selection though - the simplicity order and
+-- the ">1 point AND >70% of paired repeats" bar sit in between. Running the rule against
+-- paired MACRO differences instead of paired pooled ones:
+--
+--   guitar   full@attacks / rank            +0.98 macro, wins 60%   -> fails both
+--   bass     baseline+ent_rel@attacks/rank  +0.74 macro, wins 60%   -> fails both
+--            primary+entropy@attacks/log    +0.63 macro, wins 80%   -> fails the point bar
+--   drum     full_drum@noroll / rank        +1.56 macro, wins 90%   -> CLEARS BOTH
+--
+-- So only DRUMS actually reselects, and it does so by changing scale rather than
+-- features: the same 26 columns on `rank` instead of `log(rank)`. That is the expected
+-- direction - log buys proportional accuracy by compressing the top end, which pooled
+-- barely notices and macro weights heavily - and it enters through the equal-complexity
+-- tie-break, which a README finding already warns can carry a gate decision on noise.
+--
+-- THE BAR DEGRADES UNEVENLY, AND THIS IS THE PART TO KEEP. Median sd of the PAIRED
+-- difference, and what 1 percentage point is worth in it:
+--
+--   instrument   pooled sd   macro sd   1pt on pooled   1pt on macro
+--   guitar         0.790       1.608        1.3 sd          0.6 sd
+--   bass           0.433       1.679        2.3 sd          0.6 sd
+--   drum           0.646       1.829        1.5 sd          0.5 sd
+--   vocals         0.558       0.846        1.8 sd          1.2 sd
+--   keys           0.663       0.808        1.5 sd          1.2 sd
+--   real_keys      0.600       0.728        1.7 sd          1.4 sd
+--
+-- On the three instruments where the leaders disagree, a 1-point macro difference is
+-- half a standard deviation - close to a coin flip. The POINT half of the rule stops
+-- discriminating on macro; the WIN-SHARE half is scale-free and still does. Drums clears
+-- on 90% of repeats, which is why its result survives despite +1.56 being only 1.1 sd.
+-- Any move to macro must therefore re-derive the point bar, or drop it and lean on win
+-- share - not carry 1.00 across unchanged.
+--
+-- AND PAIRING HELPS LESS THAN ASSUMED, in both metrics. An earlier note here predicted
+-- paired differences would be substantially tighter than marginal spread, because shared
+-- folds cancel. Measured, they are LARGER: guitar's marginal macro sd is 1.413 against a
+-- paired 1.608, and pooled goes 0.683 -> 0.790 the same way. Two candidates on identical
+-- folds correlate at only about r = 0.5 here, and paired sd is s*sqrt(2-2r), so anything
+-- below r = 0.5 makes the paired difference noisier than either candidate alone. Do not
+-- assume pairing rescues a noisy metric; it removes the fold's shared component and
+-- nothing else.
+-- ----------------------------------------------------------------------------
 function MacroUsable(pred_tiers, act_tiers)
     local n_by, ok_by = {}, {}
     for i = 1, #act_tiers do
