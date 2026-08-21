@@ -1,7 +1,7 @@
 ======  Difficulty calibration - LOCKED PROTOCOL  ======
 
 corpus_scores.csv  07aae114239c9dbb  1140165 bytes, 2101 rows
-protocol.lua       a1e08f2f8a4b3a25
+protocol.lua       c9776efc039bab18
 factor set         73d526ddb35359fe  114 columns
 interpreter        Lua 5.4
 
@@ -15,34 +15,41 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
   disputed held out : 0
   reserved test set : NOT DRAWN - this phase validates the approach, not a release
 
-  candidate                  scale        k  usable (mean)    gate lower bound miss    rho
-  baseline                   rank         2   86.94% [86.5-87.2]   83.57%           0.89%  +0.791
-  baseline                   log(rank)    2   86.36% [85.6-86.9]   82.94%           1.19%  +0.785
-  primary                    rank         6   88.56% [88.3-89.0]   85.35%           0.55%  +0.814
-  primary                    log(rank)    6   88.07% [87.5-88.4]   84.81%           1.04%  +0.809
-  primary+solo               rank         7   90.92% [90.5-91.4]   87.96%           0.15%  +0.840
-  primary+solo               log(rank)    7   90.89% [90.2-91.8]   87.92%           0.73%  +0.835
-  primary+movement           rank         9   88.23% [87.7-89.0]   84.98%           0.98%  +0.807
-  primary+movement           log(rank)    9   88.38% [88.0-89.0]   85.14%           1.25%  +0.804
-  primary+solo+movement      rank        10   90.00% [89.5-90.5]   86.93%           0.31%  +0.837
-  primary+solo+movement      log(rank)   10   90.55% [89.6-91.8]   87.55%           0.64%  +0.830
-  full                       rank        21   91.96% [91.1-93.0]   89.13%           0.00%  +0.852
-  full                       log(rank)   21   93.15% [92.3-94.2]   90.48%           0.31%  +0.854
-  baseline@attacks           rank         2   90.61% [90.2-90.9]   87.62%           0.83%  +0.827
-  baseline@attacks           log(rank)    2   90.98% [90.5-91.4]   88.03%           0.80%  +0.825
-  primary@attacks            rank         6   91.77% [91.4-92.0]   88.92%           0.52%  +0.838
-  primary@attacks            log(rank)    6   91.04% [90.5-91.5]   88.09%           0.73%  +0.833
-  primary+solo@attacks       rank         7   92.91% [92.7-93.3]   90.20%           0.00%  +0.854
-  primary+solo@attacks       log(rank)    7   92.51% [91.9-93.3]   89.75%           0.52%  +0.849
-  primary+both_density       rank         7   91.77% [91.1-92.4]   88.92%           0.43%  +0.840
-  primary+both_density       log(rank)    7   90.64% [89.9-91.1]   87.65%           0.80%  +0.834
-  full@attacks               rank        21   93.79% [93.2-94.5]   91.22%           0.00%  +0.862
-  full@attacks               log(rank)   21   94.16% [93.5-94.8]   91.64%           0.31%  +0.862
+  candidate                  scale        k  usable (mean)    gate lower bound miss    rho     macro
+  baseline                   rank         2   86.94% [86.5-87.2]   83.57%           0.89%  +0.791   79.72%
+  baseline                   log(rank)    2   86.36% [85.6-86.9]   82.94%           1.19%  +0.785   77.76%
+  primary                    rank         6   88.56% [88.3-89.0]   85.35%           0.55%  +0.814   82.66%
+  primary                    log(rank)    6   88.07% [87.5-88.4]   84.81%           1.04%  +0.809   80.61%
+  primary+solo               rank         7   90.92% [90.5-91.4]   87.96%           0.15%  +0.840   85.84%
+  primary+solo               log(rank)    7   90.89% [90.2-91.8]   87.92%           0.73%  +0.835   85.39%
+  primary+movement           rank         9   88.23% [87.7-89.0]   84.98%           0.98%  +0.807   82.65%
+  primary+movement           log(rank)    9   88.38% [88.0-89.0]   85.14%           1.25%  +0.804   80.69%
+  primary+solo+movement      rank        10   90.00% [89.5-90.5]   86.93%           0.31%  +0.837   84.27%
+  primary+solo+movement      log(rank)   10   90.55% [89.6-91.8]   87.55%           0.64%  +0.830   84.53%
+  full                       rank        21   91.96% [91.1-93.0]   89.13%           0.00%  +0.852   90.08%
+  full                       log(rank)   21   93.15% [92.3-94.2]   90.48%           0.31%  +0.854   90.12%
+  baseline@attacks           rank         2   90.61% [90.2-90.9]   87.62%           0.83%  +0.827   85.52%
+  baseline@attacks           log(rank)    2   90.98% [90.5-91.4]   88.03%           0.80%  +0.825   85.05%
+  primary@attacks            rank         6   91.77% [91.4-92.0]   88.92%           0.52%  +0.838   86.72%
+  primary@attacks            log(rank)    6   91.04% [90.5-91.5]   88.09%           0.73%  +0.833   85.15%
+  primary+solo@attacks       rank         7   92.91% [92.7-93.3]   90.20%           0.00%  +0.854   87.59%
+  primary+solo@attacks       log(rank)    7   92.51% [91.9-93.3]   89.75%           0.52%  +0.849   86.51%
+  primary+both_density       rank         7   91.77% [91.1-92.4]   88.92%           0.43%  +0.840   86.60%
+  primary+both_density       log(rank)    7   90.64% [89.9-91.1]   87.65%           0.80%  +0.834   84.51%
+  full@attacks               rank        21   93.79% [93.2-94.5]   91.22%           0.00%  +0.862   91.77%
+  full@attacks               log(rank)   21   94.16% [93.5-94.8]   91.64%           0.31%  +0.862   90.80%
 
   usable (mean) is the average across repeats; [lo-hi] beside it is the 10th-90th
   percentile ACROSS REPEATS, i.e. split noise only. The gate lower bound is the
   one-sided 95% Wilson bound on the row count, which is the dominant uncertainty
   at this sample size and is what the gate actually reads.
+
+  macro weights every occupied tier equally instead of every row. It is
+  measured for every candidate but NOT selected on - the selection rule still
+  reads pooled usable%.
+    pooled leader : full@attacks / log(rank)  (94.16% pooled, 90.80% macro)
+    macro leader  : full@attacks / rank  (93.79% pooled, 91.77% macro)
+    THEY DISAGREE - moving the gate to macro would reopen this selection.
 
   ridge chosen inside training folds: 1e-006 x574 (52%), 0.001 x104 (9%), 0.01 x314 (29%), 0.1 x108 (10%)
 
@@ -87,6 +94,34 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
     iwantitall2              rank 351  predicted  263  said tier 3, actual 5  (2 off)
     happyxmas                rank 150  predicted  228  said tier 3, actual 1  (2 off)
 
+  -- per tier, SELECTED model, same cross-validated predictions --
+    tier     n    share   usable   signed bias   predicted n
+     0      13     4.0%    76.9%       +0.92             6
+     1      39    11.9%    87.2%       +0.74            25
+     2      83    25.4%    98.8%       +0.18           106
+     3      75    22.9%    98.7%       -0.25            91
+     4      56    17.1%    98.2%       -0.36            58
+     5      36    11.0%    91.7%       -0.61            27
+     6      25     7.6%    84.0%       -0.72            14
+    pooled    94.50%   what the gate reads - an adversarially curated mix
+    macro     90.78%   equal weight per occupied tier (-3.72 vs pooled)
+    ends      86.73%   tiers 0-1 and 5-6 pooled, 113 rows (35% of corpus)
+
+    confusion (row = official tier, col = predicted)
+           0    1    2    3    4    5    6
+      0    4    6    3    .    .    .    .
+      1    2   11   21    5    .    .    .
+      2    .    7   55   20    1    .    .
+      3    .    1   26   39    9    .    .
+      4    .    .    1   23   27    5    .
+      5    .    .    .    3   18   13    2
+      6    .    .    .    1    3    9   12
+
+  -- naive baselines, same folds and seeds, fitted out of fold --
+    modal tier    pooled  60.24%   macro  42.86%
+    median rank   pooled  65.44%   macro  42.86%
+    SELECTED over the better baseline: +29.05 pooled, +47.92 macro
+
   -- release gate --
     usable lower bound :  91.64%   (floor 90%, one-sided 95% Wilson)
     miss upper bound   :   1.36%   (ceiling 5%, one-sided 95% Wilson)
@@ -99,36 +134,43 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
   disputed held out : 0
   reserved test set : NOT DRAWN - this phase validates the approach, not a release
 
-  candidate                  scale        k  usable (mean)    gate lower bound miss    rho
-  baseline                   rank         2   92.70% [92.1-93.4]   89.98%           1.18%  +0.771
-  baseline                   log(rank)    2   91.52% [91.2-91.8]   88.64%           1.24%  +0.768
-  primary                    rank         6   92.30% [92.0-92.8]   89.53%           1.12%  +0.766
-  primary                    log(rank)    6   91.70% [91.2-92.1]   88.85%           0.82%  +0.767
-  primary+solo               rank         7   92.36% [91.8-92.8]   89.60%           1.09%  +0.766
-  primary+solo               log(rank)    7   91.61% [90.9-92.4]   88.74%           0.70%  +0.767
-  primary+movement           rank         9   91.55% [90.9-92.5]   88.68%           0.76%  +0.779
-  primary+movement           log(rank)    9   91.94% [91.5-92.4]   89.12%           0.61%  +0.782
-  primary+solo+movement      rank        10   91.64% [90.9-92.2]   88.78%           0.76%  +0.778
-  primary+solo+movement      log(rank)   10   91.91% [91.2-92.4]   89.09%           0.61%  +0.781
-  full                       rank        21   91.88% [91.2-92.5]   89.05%           0.67%  +0.772
-  full                       log(rank)   21   91.67% [90.9-92.8]   88.81%           0.48%  +0.773
-  baseline+entropy           rank         3   93.12% [93.0-93.3]   90.46%           0.30%  +0.802
-  baseline+entropy           log(rank)    3   94.18% [93.9-94.3]   91.68%           0.30%  +0.802
-  baseline+entropy_rel       rank         3   92.73% [92.4-93.1]   90.01%           0.27%  +0.801
-  baseline+entropy_rel       log(rank)    3   93.55% [93.3-93.7]   90.95%           0.06%  +0.800
-  primary+entropy            rank         7   92.79% [92.1-93.9]   90.08%           0.33%  +0.797
-  primary+entropy            log(rank)    7   93.48% [93.0-93.9]   90.88%           0.18%  +0.800
-  primary+entropy_rel        rank         7   92.18% [91.5-92.8]   89.39%           0.27%  +0.796
-  primary+entropy_rel        log(rank)    7   92.79% [92.4-93.1]   90.08%           0.09%  +0.797
-  baseline+ent_rel@attacks   rank         3   93.27% [93.0-93.6]   90.63%           0.33%  +0.807
-  baseline+ent_rel@attacks   log(rank)    3   93.73% [93.3-94.2]   91.16%           0.30%  +0.806
-  primary+entropy@attacks    rank         7   93.42% [93.0-93.7]   90.81%           0.33%  +0.806
-  primary+entropy@attacks    log(rank)    7   94.48% [94.2-94.8]   92.03%           0.18%  +0.809
+  candidate                  scale        k  usable (mean)    gate lower bound miss    rho     macro
+  baseline                   rank         2   92.70% [92.1-93.4]   89.98%           1.18%  +0.771   84.30%
+  baseline                   log(rank)    2   91.52% [91.2-91.8]   88.64%           1.24%  +0.768   82.81%
+  primary                    rank         6   92.30% [92.0-92.8]   89.53%           1.12%  +0.766   84.18%
+  primary                    log(rank)    6   91.70% [91.2-92.1]   88.85%           0.82%  +0.767   82.85%
+  primary+solo               rank         7   92.36% [91.8-92.8]   89.60%           1.09%  +0.766   84.47%
+  primary+solo               log(rank)    7   91.61% [90.9-92.4]   88.74%           0.70%  +0.767   82.65%
+  primary+movement           rank         9   91.55% [90.9-92.5]   88.68%           0.76%  +0.779   83.00%
+  primary+movement           log(rank)    9   91.94% [91.5-92.4]   89.12%           0.61%  +0.782   83.37%
+  primary+solo+movement      rank        10   91.64% [90.9-92.2]   88.78%           0.76%  +0.778   82.94%
+  primary+solo+movement      log(rank)   10   91.91% [91.2-92.4]   89.09%           0.61%  +0.781   83.04%
+  full                       rank        21   91.88% [91.2-92.5]   89.05%           0.67%  +0.772   83.98%
+  full                       log(rank)   21   91.67% [90.9-92.8]   88.81%           0.48%  +0.773   83.05%
+  baseline+entropy           rank         3   93.12% [93.0-93.3]   90.46%           0.30%  +0.802   85.66%
+  baseline+entropy           log(rank)    3   94.18% [93.9-94.3]   91.68%           0.30%  +0.802   88.58%
+  baseline+entropy_rel       rank         3   92.73% [92.4-93.1]   90.01%           0.27%  +0.801   85.36%
+  baseline+entropy_rel       log(rank)    3   93.55% [93.3-93.7]   90.95%           0.06%  +0.800   88.22%
+  primary+entropy            rank         7   92.79% [92.1-93.9]   90.08%           0.33%  +0.797   86.59%
+  primary+entropy            log(rank)    7   93.48% [93.0-93.9]   90.88%           0.18%  +0.800   87.47%
+  primary+entropy_rel        rank         7   92.18% [91.5-92.8]   89.39%           0.27%  +0.796   85.43%
+  primary+entropy_rel        log(rank)    7   92.79% [92.4-93.1]   90.08%           0.09%  +0.797   86.97%
+  baseline+ent_rel@attacks   rank         3   93.27% [93.0-93.6]   90.63%           0.33%  +0.807   89.32%
+  baseline+ent_rel@attacks   log(rank)    3   93.73% [93.3-94.2]   91.16%           0.30%  +0.806   88.69%
+  primary+entropy@attacks    rank         7   93.42% [93.0-93.7]   90.81%           0.33%  +0.806   89.19%
+  primary+entropy@attacks    log(rank)    7   94.48% [94.2-94.8]   92.03%           0.18%  +0.809   89.21%
 
   usable (mean) is the average across repeats; [lo-hi] beside it is the 10th-90th
   percentile ACROSS REPEATS, i.e. split noise only. The gate lower bound is the
   one-sided 95% Wilson bound on the row count, which is the dominant uncertainty
   at this sample size and is what the gate actually reads.
+
+  macro weights every occupied tier equally instead of every row. It is
+  measured for every candidate but NOT selected on - the selection rule still
+  reads pooled usable%.
+    pooled leader : primary+entropy@attacks / log(rank)  (94.48% pooled, 89.21% macro)
+    macro leader  : baseline+ent_rel@attacks / rank  (93.27% pooled, 89.32% macro)
+    THEY DISAGREE - moving the gate to macro would reopen this selection.
 
   ridge chosen inside training folds: 1e-006 x492 (41%), 0.001 x61 (5%), 0.01 x433 (36%), 0.1 x214 (18%)
 
@@ -189,6 +231,34 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
     theprisoner              rank 380  predicted  277  said tier 3, actual 5  (2 off)
     somuchtosay              rank 300  predicted  201  said tier 2, actual 4  (2 off)
 
+  -- per tier, SELECTED model, same cross-validated predictions --
+    tier     n    share   usable   signed bias   predicted n
+     0      23     7.0%   100.0%       +0.78             6
+     1      89    27.0%    95.5%       +0.61            77
+     2      85    25.8%   100.0%       -0.07           137
+     3      72    21.8%    97.2%       -0.44            77
+     4      33    10.0%    78.8%       -0.88            17
+     5      24     7.3%    79.2%       -0.67            10
+     6       4     1.2%    75.0%       -1.00             6
+    pooled    94.24%   what the gate reads - an adversarially curated mix
+    macro     89.38%   equal weight per occupied tier (-4.86 vs pooled)
+    ends      92.86%   tiers 0-1 and 5-6 pooled, 140 rows (42% of corpus)
+
+    confusion (row = official tier, col = predicted)
+           0    1    2    3    4    5    6
+      0    5   18    .    .    .    .    .
+      1    1   37   47    4    .    .    .
+      2    .   20   51   14    .    .    .
+      3    .    1   35   32    3    1    .
+      4    .    1    4   22    4    .    2
+      5    .    .    .    5    9    7    3
+      6    .    .    .    .    1    2    1
+
+  -- naive baselines, same folds and seeds, fitted out of fold --
+    modal tier    pooled  59.70%   macro  42.86%
+    median rank   pooled  74.55%   macro  42.86%
+    SELECTED over the better baseline: +19.70 pooled, +46.53 macro
+
   -- release gate --
     usable lower bound :  91.68%   (floor 90%, one-sided 95% Wilson)
     miss upper bound   :   1.35%   (ceiling 5%, one-sided 95% Wilson)
@@ -201,48 +271,55 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
   disputed held out : 0
   reserved test set : NOT DRAWN - this phase validates the approach, not a release
 
-  candidate                  scale        k  usable (mean)    gate lower bound miss    rho
-  baseline                   rank         2   92.13% [91.8-92.4]   89.33%           1.22%  +0.830
-  baseline                   log(rank)    2   92.62% [92.3-93.3]   89.88%           1.49%  +0.831
-  primary                    rank         6   93.81% [93.3-94.3]   91.24%           0.95%  +0.859
-  primary                    log(rank)    6   93.38% [93.0-93.9]   90.75%           0.67%  +0.859
-  baseline@attacks           rank         2   90.79% [90.2-91.5]   87.82%           1.28%  +0.805
-  baseline@attacks           log(rank)    2   90.24% [89.6-90.9]   87.21%           1.19%  +0.809
-  primary@attacks            rank         6   90.49% [89.9-91.5]   87.48%           1.71%  +0.818
-  primary@attacks            log(rank)    6   90.88% [90.2-91.5]   87.92%           1.34%  +0.813
-  primary+kick               rank         7   93.75% [93.3-94.2]   91.17%           0.70%  +0.863
-  primary+kick               log(rank)    7   93.87% [93.3-94.2]   91.31%           0.34%  +0.864
-  primary+limbs              rank         7   93.23% [92.7-93.9]   90.58%           0.70%  +0.851
-  primary+limbs              log(rank)    7   93.60% [93.3-93.9]   91.00%           0.30%  +0.849
-  primary+offbeat            rank         7   93.60% [93.3-94.2]   91.00%           0.98%  +0.858
-  primary+offbeat            log(rank)    7   93.26% [92.7-93.9]   90.61%           0.67%  +0.857
-  primary+entropy            rank         7   94.30% [93.6-94.8]   91.81%           0.40%  +0.882
-  primary+entropy            log(rank)    7   93.57% [93.0-93.9]   90.96%           0.30%  +0.883
-  primary+entropy_rel        rank         7   93.93% [93.6-94.2]   91.38%           0.58%  +0.881
-  primary+entropy_rel        log(rank)    7   93.57% [93.0-94.3]   90.96%           0.30%  +0.881
-  primary+limbs+ent+offbeat  rank         9   93.90% [93.0-94.5]   91.35%           0.49%  +0.868
-  primary+limbs+ent+offbeat  log(rank)    9   94.48% [94.2-94.8]   92.02%           0.52%  +0.872
-  primary+stations@pro       rank         7   93.81% [92.9-94.6]   91.24%           0.91%  +0.864
-  primary+stations@pro       log(rank)    7   93.75% [93.3-94.5]   91.17%           0.64%  +0.863
-  primary+limbs+stations     rank         8   93.20% [92.9-93.6]   90.54%           0.64%  +0.852
-  primary+limbs+stations     log(rank)    8   94.12% [93.9-94.5]   91.60%           0.52%  +0.851
-  primary@pro                rank         6   93.81% [93.3-94.3]   91.24%           0.95%  +0.859
-  primary@pro                log(rank)    6   93.38% [93.0-93.9]   90.75%           0.67%  +0.859
-  full_drum                  rank        26   95.61% [95.4-96.0]   93.35%           0.49%  +0.885
-  full_drum                  log(rank)   26   95.64% [94.8-96.6]   93.38%           0.34%  +0.888
-  full_drum@noroll           rank        26   95.88% [95.4-96.3]   93.67%           0.34%  +0.891
-  full_drum@noroll           log(rank)   26   96.46% [95.7-97.0]   94.37%           0.30%  +0.894
-  full_drum@noroll_density   rank        26   95.30% [94.8-95.7]   92.99%           0.34%  +0.889
-  full_drum@noroll_density   log(rank)   26   96.04% [95.4-96.7]   93.86%           0.30%  +0.892
-  full_drum@noroll+complex   rank        27   95.79% [95.4-96.1]   93.56%           0.30%  +0.893
-  full_drum@noroll+complex   log(rank)   27   96.46% [96.0-97.0]   94.37%           0.30%  +0.896
-  full_drum@noroll@complex   rank        26   95.76% [95.6-96.1]   93.53%           0.30%  +0.892
-  full_drum@noroll@complex   log(rank)   26   96.34% [96.0-96.7]   94.22%           0.30%  +0.894
+  candidate                  scale        k  usable (mean)    gate lower bound miss    rho     macro
+  baseline                   rank         2   92.13% [91.8-92.4]   89.33%           1.22%  +0.830   82.70%
+  baseline                   log(rank)    2   92.62% [92.3-93.3]   89.88%           1.49%  +0.831   81.49%
+  primary                    rank         6   93.81% [93.3-94.3]   91.24%           0.95%  +0.859   85.87%
+  primary                    log(rank)    6   93.38% [93.0-93.9]   90.75%           0.67%  +0.859   81.75%
+  baseline@attacks           rank         2   90.79% [90.2-91.5]   87.82%           1.28%  +0.805   79.43%
+  baseline@attacks           log(rank)    2   90.24% [89.6-90.9]   87.21%           1.19%  +0.809   76.33%
+  primary@attacks            rank         6   90.49% [89.9-91.5]   87.48%           1.71%  +0.818   77.57%
+  primary@attacks            log(rank)    6   90.88% [90.2-91.5]   87.92%           1.34%  +0.813   76.16%
+  primary+kick               rank         7   93.75% [93.3-94.2]   91.17%           0.70%  +0.863   86.04%
+  primary+kick               log(rank)    7   93.87% [93.3-94.2]   91.31%           0.34%  +0.864   83.24%
+  primary+limbs              rank         7   93.23% [92.7-93.9]   90.58%           0.70%  +0.851   85.41%
+  primary+limbs              log(rank)    7   93.60% [93.3-93.9]   91.00%           0.30%  +0.849   82.73%
+  primary+offbeat            rank         7   93.60% [93.3-94.2]   91.00%           0.98%  +0.858   86.46%
+  primary+offbeat            log(rank)    7   93.26% [92.7-93.9]   90.61%           0.67%  +0.857   81.27%
+  primary+entropy            rank         7   94.30% [93.6-94.8]   91.81%           0.40%  +0.882   87.07%
+  primary+entropy            log(rank)    7   93.57% [93.0-93.9]   90.96%           0.30%  +0.883   82.76%
+  primary+entropy_rel        rank         7   93.93% [93.6-94.2]   91.38%           0.58%  +0.881   87.21%
+  primary+entropy_rel        log(rank)    7   93.57% [93.0-94.3]   90.96%           0.30%  +0.881   82.89%
+  primary+limbs+ent+offbeat  rank         9   93.90% [93.0-94.5]   91.35%           0.49%  +0.868   87.26%
+  primary+limbs+ent+offbeat  log(rank)    9   94.48% [94.2-94.8]   92.02%           0.52%  +0.872   86.94%
+  primary+stations@pro       rank         7   93.81% [92.9-94.6]   91.24%           0.91%  +0.864   85.68%
+  primary+stations@pro       log(rank)    7   93.75% [93.3-94.5]   91.17%           0.64%  +0.863   83.06%
+  primary+limbs+stations     rank         8   93.20% [92.9-93.6]   90.54%           0.64%  +0.852   84.61%
+  primary+limbs+stations     log(rank)    8   94.12% [93.9-94.5]   91.60%           0.52%  +0.851   84.62%
+  primary@pro                rank         6   93.81% [93.3-94.3]   91.24%           0.95%  +0.859   85.87%
+  primary@pro                log(rank)    6   93.38% [93.0-93.9]   90.75%           0.67%  +0.859   81.75%
+  full_drum                  rank        26   95.61% [95.4-96.0]   93.35%           0.49%  +0.885   91.94%
+  full_drum                  log(rank)   26   95.64% [94.8-96.6]   93.38%           0.34%  +0.888   89.37%
+  full_drum@noroll           rank        26   95.88% [95.4-96.3]   93.67%           0.34%  +0.891   92.45%
+  full_drum@noroll           log(rank)   26   96.46% [95.7-97.0]   94.37%           0.30%  +0.894   90.89%
+  full_drum@noroll_density   rank        26   95.30% [94.8-95.7]   92.99%           0.34%  +0.889   91.81%
+  full_drum@noroll_density   log(rank)   26   96.04% [95.4-96.7]   93.86%           0.30%  +0.892   90.31%
+  full_drum@noroll+complex   rank        27   95.79% [95.4-96.1]   93.56%           0.30%  +0.893   92.40%
+  full_drum@noroll+complex   log(rank)   27   96.46% [96.0-97.0]   94.37%           0.30%  +0.896   90.73%
+  full_drum@noroll@complex   rank        26   95.76% [95.6-96.1]   93.53%           0.30%  +0.892   92.35%
+  full_drum@noroll@complex   log(rank)   26   96.34% [96.0-96.7]   94.22%           0.30%  +0.894   90.46%
 
   usable (mean) is the average across repeats; [lo-hi] beside it is the 10th-90th
   percentile ACROSS REPEATS, i.e. split noise only. The gate lower bound is the
   one-sided 95% Wilson bound on the row count, which is the dominant uncertainty
   at this sample size and is what the gate actually reads.
+
+  macro weights every occupied tier equally instead of every row. It is
+  measured for every candidate but NOT selected on - the selection rule still
+  reads pooled usable%.
+    pooled leader : full_drum@noroll / log(rank)  (96.46% pooled, 90.89% macro)
+    macro leader  : full_drum@noroll / rank  (95.88% pooled, 92.45% macro)
+    THEY DISAGREE - moving the gate to macro would reopen this selection.
 
   ridge chosen inside training folds: 1e-006 x533 (30%), 0.001 x117 (6%), 0.01 x598 (33%), 0.1 x552 (31%)
 
@@ -301,6 +378,34 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
     urgent                   rank 107  predicted  154  said tier 2, actual 0  (2 off)
     wewerentborn             rank 133  predicted  180  said tier 3, actual 1  (2 off)
 
+  -- per tier, SELECTED model, same cross-validated predictions --
+    tier     n    share   usable   signed bias   predicted n
+     0      10     3.0%    70.0%       +1.10             5
+     1      26     7.9%    84.6%       +0.77            19
+     2      55    16.8%    98.2%       +0.47            43
+     3     100    30.5%    98.0%       +0.01           126
+     4      83    25.3%   100.0%       -0.20            98
+     5      42    12.8%   100.0%       -0.29            26
+     6      12     3.7%    83.3%       -0.67            11
+    pooled    96.34%   what the gate reads - an adversarially curated mix
+    macro     90.59%   equal weight per occupied tier (-5.75 vs pooled)
+    ends      90.00%   tiers 0-1 and 5-6 pooled, 90 rows (27% of corpus)
+
+    confusion (row = official tier, col = predicted)
+           0    1    2    3    4    5    6
+      0    3    4    2    1    .    .    .
+      1    2    6   14    4    .    .    .
+      2    .    7   16   31    1    .    .
+      3    .    2   11   71   16    .    .
+      4    .    .    .   19   62    2    .
+      5    .    .    .    .   17   20    5
+      6    .    .    .    .    2    4    6
+
+  -- naive baselines, same folds and seeds, fitted out of fold --
+    modal tier    pooled  72.56%   macro  42.86%
+    median rank   pooled  72.56%   macro  42.86%
+    SELECTED over the better baseline: +23.78 pooled, +47.73 macro
+
   -- release gate --
     usable lower bound :  94.37%   (floor 90%, one-sided 95% Wilson)
     miss upper bound   :   1.35%   (ceiling 5%, one-sided 95% Wilson)
@@ -313,100 +418,105 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
   disputed held out : 0
   reserved test set : NOT DRAWN - this phase validates the approach, not a release
 
-  candidate                  scale        k  usable (mean)    gate lower bound miss    rho
-  baseline                   rank         2   76.77% [76.5-77.2]   72.72%           6.52%  +0.287
-  baseline                   log(rank)    2   77.44% [76.8-78.1]   73.43%           6.86%  +0.286
-  primary_vocal              rank         6   79.48% [78.8-80.2]   75.58%           3.14%  +0.437
-  primary_vocal              log(rank)    6   79.54% [78.9-80.2]   75.64%           3.54%  +0.436
-  primary+phrase             rank         8   79.63% [78.9-80.2]   75.74%           3.20%  +0.434
-  primary+phrase             log(rank)    8   79.36% [78.9-79.9]   75.45%           3.54%  +0.432
-  primary+entropy_rel        rank         7   82.20% [81.3-83.2]   78.46%           2.77%  +0.549
-  primary+entropy_rel        log(rank)    7   83.51% [82.9-84.2]   79.86%           3.23%  +0.550
-  primary+markers            rank         8   81.49% [80.7-82.3]   77.71%           2.74%  +0.481
-  primary+markers            log(rank)    8   83.78% [82.9-84.8]   80.16%           3.11%  +0.483
-  primary+length_joint       rank         7   80.79% [79.8-81.8]   76.97%           3.20%  +0.463
-  primary+length_joint       log(rank)    7   81.46% [80.8-82.0]   77.68%           3.26%  +0.462
-  primary+length_separate    rank         8   78.23% [77.1-79.0]   74.26%           2.90%  +0.425
-  primary+length_separate    log(rank)    8   79.66% [78.9-80.5]   75.77%           3.63%  +0.429
-  primary_vocal@semitone     rank         6   79.12% [78.6-79.4]   75.19%           2.59%  +0.452
-  primary_vocal@semitone     log(rank)    6   79.27% [78.7-80.2]   75.35%           3.11%  +0.451
-  primary_vocal@tubes        rank         6   80.18% [79.5-80.6]   76.32%           3.05%  +0.467
-  primary_vocal@tubes        log(rank)    6   82.50% [82.3-82.9]   78.79%           3.29%  +0.467
-  full_vocal                 rank        18   84.24% [83.5-84.8]   80.65%           2.04%  +0.563
-  full_vocal                 log(rank)   18   84.30% [83.5-84.8]   80.72%           2.32%  +0.567
-  full_vocal@tubes           rank        18   83.96% [83.4-84.8]   80.35%           2.07%  +0.561
-  full_vocal@tubes           log(rank)   18   84.30% [83.5-85.1]   80.72%           2.38%  +0.566
-  primary_vocal@pitched      rank         6   76.92% [76.5-77.7]   72.88%           3.72%  +0.368
-  primary_vocal@pitched      log(rank)    6   77.38% [76.8-78.1]   73.36%           4.54%  +0.364
-  primary+range              rank         9   83.23% [82.5-83.9]   79.57%           1.07%  +0.559
-  primary+range              log(rank)    9   83.66% [82.9-84.5]   80.03%           2.13%  +0.568
-  primary@pitched+range      rank         9   82.10% [81.6-82.6]   78.36%           1.25%  +0.534
-  primary@pitched+range      log(rank)    9   82.07% [81.7-82.4]   78.33%           2.68%  +0.545
-  primary@pitched+entropy_p  rank         7   82.41% [81.7-83.2]   78.69%           2.93%  +0.529
-  primary@pitched+entropy_p  log(rank)    7   82.77% [82.0-83.2]   79.08%           3.23%  +0.530
-  full_vocal@pitched         rank        22   85.61% [85.0-86.3]   82.13%           1.77%  +0.599
-  full_vocal@pitched         log(rank)   22   86.16% [85.3-86.9]   82.72%           1.95%  +0.612
-  primary+range+breath       rank        12   83.02% [82.0-84.1]   79.34%           1.28%  +0.558
-  primary+range+breath       log(rank)   12   83.38% [82.9-84.1]   79.73%           2.23%  +0.571
-  primary+range+tess         rank        11   85.27% [85.0-85.7]   81.77%           1.10%  +0.607
-  primary+range+tess         log(rank)   11   87.23% [86.8-87.8]   83.89%           1.49%  +0.609
-  primary+range+tess@70      rank        11   84.94% [84.1-85.4]   81.41%           1.86%  +0.609
-  primary+range+tess@70      log(rank)   11   85.27% [84.5-86.3]   81.77%           2.47%  +0.612
-  primary+range+breath+tess  rank        14   85.03% [84.5-85.4]   81.50%           1.01%  +0.604
-  primary+range+breath+tess  log(rank)   14   86.46% [85.9-86.9]   83.06%           1.62%  +0.609
-  primary+range+breath+tess@70 rank        14   85.21% [84.6-86.0]   81.70%           1.62%  +0.612
-  primary+range+breath+tess@70 log(rank)   14   84.73% [84.4-85.1]   81.17%           2.32%  +0.618
-  full_vocal+all             rank        27   86.25% [85.6-86.9]   82.82%           1.62%  +0.653
-  full_vocal+all             log(rank)   27   86.59% [85.9-87.2]   83.19%           1.71%  +0.659
-  primary+range+parts        rank        10   83.81% [83.5-84.5]   80.19%           1.74%  +0.608
-  primary+range+parts        log(rank)   10   86.22% [85.3-87.2]   82.79%           1.83%  +0.617
-  primary+range+highhold     rank        13   84.79% [84.1-85.4]   81.24%           1.59%  +0.585
-  primary+range+highhold     log(rank)   13   85.24% [84.7-85.7]   81.73%           2.93%  +0.594
-  primary+range+parts+highhold rank        14   85.49% [84.7-86.3]   82.00%           1.62%  +0.630
-  primary+range+parts+highhold log(rank)   14   86.59% [86.0-86.9]   83.19%           2.35%  +0.638
-  primary+range+phrase_tail  rank        11   83.29% [82.6-83.9]   79.63%           1.86%  +0.560
-  primary+range+phrase_tail  log(rank)   11   83.87% [83.5-84.2]   80.26%           2.35%  +0.567
-  parts+tess                 rank        11   85.58% [85.3-86.0]   82.10%           1.77%  +0.644
-  parts+tess                 log(rank)   11   86.49% [85.9-86.9]   83.09%           2.20%  +0.647
-  parts+tess+ceiling         rank        12   85.40% [84.8-85.7]   81.90%           1.83%  +0.648
-  parts+tess+ceiling         log(rank)   12   86.25% [85.9-86.6]   82.82%           2.62%  +0.652
-  parts+tess+move            rank        12   87.07% [86.6-87.5]   83.72%           1.92%  +0.665
-  parts+tess+move            log(rank)   12   88.35% [87.4-89.0]   85.12%           2.29%  +0.668
-  parts+tess+reentry         rank        12   85.88% [85.1-86.6]   82.43%           1.77%  +0.642
-  parts+tess+reentry         log(rank)   12   86.92% [86.3-87.5]   83.55%           2.20%  +0.646
-  parts+tess+move+travel     rank        13   87.16% [86.6-87.8]   83.82%           2.07%  +0.664
-  parts+tess+move+travel     log(rank)   13   88.38% [87.5-89.0]   85.15%           2.29%  +0.667
-  parts+tess+move+span       rank        13   87.38% [86.9-87.8]   84.05%           1.92%  +0.661
-  parts+tess+move+span       log(rank)   13   88.38% [87.8-89.0]   85.15%           2.20%  +0.666
-  parts+tess+move+phrase_pitch rank        14   87.50% [87.2-87.8]   84.19%           1.92%  +0.660
-  parts+tess+move+phrase_pitch log(rank)   14   88.48% [87.7-89.0]   85.26%           2.16%  +0.665
-  parts+tess+move+phrase_pitch@mean rank        14   86.80% [86.3-87.5]   83.42%           1.95%  +0.659
-  parts+tess+move+phrase_pitch@mean log(rank)   14   88.41% [88.0-89.0]   85.19%           2.26%  +0.665
-  parts+tess+move@phrasespan rank        12   87.41% [86.9-87.8]   84.09%           1.65%  +0.655
-  parts+tess+move@phrasespan log(rank)   12   87.90% [87.2-88.4]   84.62%           2.47%  +0.661
-  parts+tess+move@parts_step3 rank        12   87.50% [86.9-88.1]   84.19%           1.98%  +0.671
-  parts+tess+move@parts_step3 log(rank)   12   88.63% [88.4-89.0]   85.42%           2.47%  +0.674
-  parts+tess+move@parts_log  rank        12   86.98% [86.5-87.5]   83.62%           1.92%  +0.659
-  parts+tess+move@parts_log  log(rank)   12   88.14% [87.4-88.7]   84.89%           2.20%  +0.663
-  parts+tess+move@parts_free rank        13   87.44% [87.2-88.1]   84.12%           1.98%  +0.669
-  parts+tess+move@parts_free log(rank)   13   88.63% [88.0-89.3]   85.42%           2.44%  +0.671
-  parts+tess+move+breath     rank        13   87.10% [86.6-87.8]   83.75%           1.49%  +0.672
-  parts+tess+move+breath     log(rank)   13   87.96% [87.1-88.7]   84.69%           2.01%  +0.676
-  parts+tess+move+breath@100 rank        13   87.01% [86.6-87.5]   83.65%           1.65%  +0.673
-  parts+tess+move+breath@100 log(rank)   13   87.71% [86.9-88.4]   84.42%           2.07%  +0.678
-  parts+tess+move+breath@mean50 rank        13   87.53% [86.9-88.1]   84.22%           2.13%  +0.674
-  parts+tess+move+breath@mean50 log(rank)   13   89.02% [88.7-89.3]   85.86%           2.32%  +0.678
-  parts+tess+move+breathmove rank        13   86.01% [85.6-86.9]   82.56%           1.86%  +0.664
-  parts+tess+move+breathmove log(rank)   13   87.44% [86.6-88.4]   84.12%           2.01%  +0.668
-  parts+tess+move+breathmove@mean rank        13   86.95% [86.6-87.6]   83.59%           1.92%  +0.659
-  parts+tess+move+breathmove@mean log(rank)   13   88.23% [87.2-88.8]   84.99%           2.23%  +0.664
-  parts+tess+move+breath_both rank        14   85.73% [85.2-86.0]   82.26%           1.22%  +0.671
-  parts+tess+move+breath_both log(rank)   14   87.20% [86.6-88.1]   83.85%           2.04%  +0.676
+  candidate                  scale        k  usable (mean)    gate lower bound miss    rho     macro
+  baseline                   rank         2   76.77% [76.5-77.2]   72.72%           6.52%  +0.287   45.29%
+  baseline                   log(rank)    2   77.44% [76.8-78.1]   73.43%           6.86%  +0.286   45.68%
+  primary_vocal              rank         6   79.48% [78.8-80.2]   75.58%           3.14%  +0.437   60.51%
+  primary_vocal              log(rank)    6   79.54% [78.9-80.2]   75.64%           3.54%  +0.436   59.16%
+  primary+phrase             rank         8   79.63% [78.9-80.2]   75.74%           3.20%  +0.434   60.79%
+  primary+phrase             log(rank)    8   79.36% [78.9-79.9]   75.45%           3.54%  +0.432   58.76%
+  primary+entropy_rel        rank         7   82.20% [81.3-83.2]   78.46%           2.77%  +0.549   72.97%
+  primary+entropy_rel        log(rank)    7   83.51% [82.9-84.2]   79.86%           3.23%  +0.550   72.23%
+  primary+markers            rank         8   81.49% [80.7-82.3]   77.71%           2.74%  +0.481   67.14%
+  primary+markers            log(rank)    8   83.78% [82.9-84.8]   80.16%           3.11%  +0.483   68.94%
+  primary+length_joint       rank         7   80.79% [79.8-81.8]   76.97%           3.20%  +0.463   63.42%
+  primary+length_joint       log(rank)    7   81.46% [80.8-82.0]   77.68%           3.26%  +0.462   63.44%
+  primary+length_separate    rank         8   78.23% [77.1-79.0]   74.26%           2.90%  +0.425   59.75%
+  primary+length_separate    log(rank)    8   79.66% [78.9-80.5]   75.77%           3.63%  +0.429   59.15%
+  primary_vocal@semitone     rank         6   79.12% [78.6-79.4]   75.19%           2.59%  +0.452   61.22%
+  primary_vocal@semitone     log(rank)    6   79.27% [78.7-80.2]   75.35%           3.11%  +0.451   60.54%
+  primary_vocal@tubes        rank         6   80.18% [79.5-80.6]   76.32%           3.05%  +0.467   61.86%
+  primary_vocal@tubes        log(rank)    6   82.50% [82.3-82.9]   78.79%           3.29%  +0.467   63.84%
+  full_vocal                 rank        18   84.24% [83.5-84.8]   80.65%           2.04%  +0.563   75.32%
+  full_vocal                 log(rank)   18   84.30% [83.5-84.8]   80.72%           2.32%  +0.567   74.57%
+  full_vocal@tubes           rank        18   83.96% [83.4-84.8]   80.35%           2.07%  +0.561   75.17%
+  full_vocal@tubes           log(rank)   18   84.30% [83.5-85.1]   80.72%           2.38%  +0.566   74.78%
+  primary_vocal@pitched      rank         6   76.92% [76.5-77.7]   72.88%           3.72%  +0.368   56.58%
+  primary_vocal@pitched      log(rank)    6   77.38% [76.8-78.1]   73.36%           4.54%  +0.364   55.00%
+  primary+range              rank         9   83.23% [82.5-83.9]   79.57%           1.07%  +0.559   73.41%
+  primary+range              log(rank)    9   83.66% [82.9-84.5]   80.03%           2.13%  +0.568   73.07%
+  primary@pitched+range      rank         9   82.10% [81.6-82.6]   78.36%           1.25%  +0.534   71.24%
+  primary@pitched+range      log(rank)    9   82.07% [81.7-82.4]   78.33%           2.68%  +0.545   70.57%
+  primary@pitched+entropy_p  rank         7   82.41% [81.7-83.2]   78.69%           2.93%  +0.529   71.67%
+  primary@pitched+entropy_p  log(rank)    7   82.77% [82.0-83.2]   79.08%           3.23%  +0.530   70.12%
+  full_vocal@pitched         rank        22   85.61% [85.0-86.3]   82.13%           1.77%  +0.599   77.56%
+  full_vocal@pitched         log(rank)   22   86.16% [85.3-86.9]   82.72%           1.95%  +0.612   76.97%
+  primary+range+breath       rank        12   83.02% [82.0-84.1]   79.34%           1.28%  +0.558   72.81%
+  primary+range+breath       log(rank)   12   83.38% [82.9-84.1]   79.73%           2.23%  +0.571   72.34%
+  primary+range+tess         rank        11   85.27% [85.0-85.7]   81.77%           1.10%  +0.607   77.47%
+  primary+range+tess         log(rank)   11   87.23% [86.8-87.8]   83.89%           1.49%  +0.609   78.66%
+  primary+range+tess@70      rank        11   84.94% [84.1-85.4]   81.41%           1.86%  +0.609   76.38%
+  primary+range+tess@70      log(rank)   11   85.27% [84.5-86.3]   81.77%           2.47%  +0.612   76.03%
+  primary+range+breath+tess  rank        14   85.03% [84.5-85.4]   81.50%           1.01%  +0.604   77.17%
+  primary+range+breath+tess  log(rank)   14   86.46% [85.9-86.9]   83.06%           1.62%  +0.609   77.48%
+  primary+range+breath+tess@70 rank        14   85.21% [84.6-86.0]   81.70%           1.62%  +0.612   76.37%
+  primary+range+breath+tess@70 log(rank)   14   84.73% [84.4-85.1]   81.17%           2.32%  +0.618   74.93%
+  full_vocal+all             rank        27   86.25% [85.6-86.9]   82.82%           1.62%  +0.653   78.74%
+  full_vocal+all             log(rank)   27   86.59% [85.9-87.2]   83.19%           1.71%  +0.659   78.06%
+  primary+range+parts        rank        10   83.81% [83.5-84.5]   80.19%           1.74%  +0.608   75.86%
+  primary+range+parts        log(rank)   10   86.22% [85.3-87.2]   82.79%           1.83%  +0.617   76.99%
+  primary+range+highhold     rank        13   84.79% [84.1-85.4]   81.24%           1.59%  +0.585   75.36%
+  primary+range+highhold     log(rank)   13   85.24% [84.7-85.7]   81.73%           2.93%  +0.594   75.19%
+  primary+range+parts+highhold rank        14   85.49% [84.7-86.3]   82.00%           1.62%  +0.630   77.36%
+  primary+range+parts+highhold log(rank)   14   86.59% [86.0-86.9]   83.19%           2.35%  +0.638   77.35%
+  primary+range+phrase_tail  rank        11   83.29% [82.6-83.9]   79.63%           1.86%  +0.560   73.56%
+  primary+range+phrase_tail  log(rank)   11   83.87% [83.5-84.2]   80.26%           2.35%  +0.567   73.51%
+  parts+tess                 rank        11   85.58% [85.3-86.0]   82.10%           1.77%  +0.644   77.42%
+  parts+tess                 log(rank)   11   86.49% [85.9-86.9]   83.09%           2.20%  +0.647   77.74%
+  parts+tess+ceiling         rank        12   85.40% [84.8-85.7]   81.90%           1.83%  +0.648   77.33%
+  parts+tess+ceiling         log(rank)   12   86.25% [85.9-86.6]   82.82%           2.62%  +0.652   77.52%
+  parts+tess+move            rank        12   87.07% [86.6-87.5]   83.72%           1.92%  +0.665   79.82%
+  parts+tess+move            log(rank)   12   88.35% [87.4-89.0]   85.12%           2.29%  +0.668   80.27%
+  parts+tess+reentry         rank        12   85.88% [85.1-86.6]   82.43%           1.77%  +0.642   77.98%
+  parts+tess+reentry         log(rank)   12   86.92% [86.3-87.5]   83.55%           2.20%  +0.646   78.09%
+  parts+tess+move+travel     rank        13   87.16% [86.6-87.8]   83.82%           2.07%  +0.664   79.79%
+  parts+tess+move+travel     log(rank)   13   88.38% [87.5-89.0]   85.15%           2.29%  +0.667   80.15%
+  parts+tess+move+span       rank        13   87.38% [86.9-87.8]   84.05%           1.92%  +0.661   80.33%
+  parts+tess+move+span       log(rank)   13   88.38% [87.8-89.0]   85.15%           2.20%  +0.666   80.35%
+  parts+tess+move+phrase_pitch rank        14   87.50% [87.2-87.8]   84.19%           1.92%  +0.660   80.28%
+  parts+tess+move+phrase_pitch log(rank)   14   88.48% [87.7-89.0]   85.26%           2.16%  +0.665   80.33%
+  parts+tess+move+phrase_pitch@mean rank        14   86.80% [86.3-87.5]   83.42%           1.95%  +0.659   79.61%
+  parts+tess+move+phrase_pitch@mean log(rank)   14   88.41% [88.0-89.0]   85.19%           2.26%  +0.665   80.07%
+  parts+tess+move@phrasespan rank        12   87.41% [86.9-87.8]   84.09%           1.65%  +0.655   79.89%
+  parts+tess+move@phrasespan log(rank)   12   87.90% [87.2-88.4]   84.62%           2.47%  +0.661   80.12%
+  parts+tess+move@parts_step3 rank        12   87.50% [86.9-88.1]   84.19%           1.98%  +0.671   80.50%
+  parts+tess+move@parts_step3 log(rank)   12   88.63% [88.4-89.0]   85.42%           2.47%  +0.674   80.98%
+  parts+tess+move@parts_log  rank        12   86.98% [86.5-87.5]   83.62%           1.92%  +0.659   79.59%
+  parts+tess+move@parts_log  log(rank)   12   88.14% [87.4-88.7]   84.89%           2.20%  +0.663   79.74%
+  parts+tess+move@parts_free rank        13   87.44% [87.2-88.1]   84.12%           1.98%  +0.669   80.56%
+  parts+tess+move@parts_free log(rank)   13   88.63% [88.0-89.3]   85.42%           2.44%  +0.671   81.11%
+  parts+tess+move+breath     rank        13   87.10% [86.6-87.8]   83.75%           1.49%  +0.672   79.92%
+  parts+tess+move+breath     log(rank)   13   87.96% [87.1-88.7]   84.69%           2.01%  +0.676   80.25%
+  parts+tess+move+breath@100 rank        13   87.01% [86.6-87.5]   83.65%           1.65%  +0.673   79.67%
+  parts+tess+move+breath@100 log(rank)   13   87.71% [86.9-88.4]   84.42%           2.07%  +0.678   79.78%
+  parts+tess+move+breath@mean50 rank        13   87.53% [86.9-88.1]   84.22%           2.13%  +0.674   80.76%
+  parts+tess+move+breath@mean50 log(rank)   13   89.02% [88.7-89.3]   85.86%           2.32%  +0.678   81.17%
+  parts+tess+move+breathmove rank        13   86.01% [85.6-86.9]   82.56%           1.86%  +0.664   78.60%
+  parts+tess+move+breathmove log(rank)   13   87.44% [86.6-88.4]   84.12%           2.01%  +0.668   79.42%
+  parts+tess+move+breathmove@mean rank        13   86.95% [86.6-87.6]   83.59%           1.92%  +0.659   79.54%
+  parts+tess+move+breathmove@mean log(rank)   13   88.23% [87.2-88.8]   84.99%           2.23%  +0.664   80.08%
+  parts+tess+move+breath_both rank        14   85.73% [85.2-86.0]   82.26%           1.22%  +0.671   78.25%
+  parts+tess+move+breath_both log(rank)   14   87.20% [86.6-88.1]   83.85%           2.04%  +0.676   79.25%
 
   usable (mean) is the average across repeats; [lo-hi] beside it is the 10th-90th
   percentile ACROSS REPEATS, i.e. split noise only. The gate lower bound is the
   one-sided 95% Wilson bound on the row count, which is the dominant uncertainty
   at this sample size and is what the gate actually reads.
+
+  macro weights every occupied tier equally instead of every row. It is
+  measured for every candidate but NOT selected on - the selection rule still
+  reads pooled usable%.
+    the same candidate leads on both: parts+tess+move+breath@mean50 / log(rank)
 
   ridge chosen inside training folds: 1e-006 x190 (4%), 0.001 x43 (1%), 0.01 x586 (13%), 0.1 x3581 (81%)
 
@@ -531,6 +641,34 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
     dontstopmenow            rank 457  predicted  280  said tier 4, actual 6  (2 off)
     spoonman2                rank 437  predicted  286  said tier 4, actual 6  (2 off)
 
+  -- per tier, SELECTED model, same cross-validated predictions --
+    tier     n    share   usable   signed bias   predicted n
+     0       2     0.6%   100.0%       +0.00             4
+     1      25     7.6%    80.0%       +0.80            10
+     2      95    29.0%    96.8%       +0.62            66
+     3     102    31.1%    96.1%       +0.07           157
+     4      56    17.1%    96.4%       -0.46            80
+     5      28     8.5%    78.6%       -1.18            10
+     6      20     6.1%    20.0%       -2.15             1
+    pooled    89.02%   what the gate reads - an adversarially curated mix
+    macro     81.13%   equal weight per occupied tier (-7.89 vs pooled)
+    ends      64.00%   tiers 0-1 and 5-6 pooled, 75 rows (23% of corpus)
+
+    confusion (row = official tier, col = predicted)
+           0    1    2    3    4    5    6
+      0    2    .    .    .    .    .    .
+      1    2    6   12    5    .    .    .
+      2    .    2   35   55    3    .    .
+      3    .    2   15   61   22    2    .
+      4    .    .    2   25   26    3    .
+      5    .    .    1    5   20    2    .
+      6    .    .    1    6    9    3    1
+
+  -- naive baselines, same folds and seeds, fitted out of fold --
+    modal tier    pooled  77.13%   macro  42.86%
+    median rank   pooled  77.13%   macro  42.86%
+    SELECTED over the better baseline: +11.89 pooled, +38.27 macro
+
   -- release gate --
     usable lower bound :  85.42%   (floor 90%, one-sided 95% Wilson)
     miss upper bound   :   4.32%   (ceiling 5%, one-sided 95% Wilson)
@@ -545,44 +683,49 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
   disputed held out : 0
   reserved test set : NOT DRAWN - this phase validates the approach, not a release
 
-  candidate                  scale        k  usable (mean)    gate lower bound miss    rho
-  baseline                   rank         2   88.83% [88.3-89.1]   85.26%           1.47%  +0.835
-  baseline                   log(rank)    2   89.29% [89.1-89.5]   85.76%           2.18%  +0.831
-  primary                    rank         6   88.98% [88.3-89.5]   85.43%           1.13%  +0.836
-  primary                    log(rank)    6   89.59% [89.0-89.9]   86.10%           1.88%  +0.838
-  primary+solo               rank         7   89.81% [89.4-90.2]   86.35%           1.24%  +0.841
-  primary+solo               log(rank)    7   89.70% [89.1-90.3]   86.22%           2.11%  +0.842
-  primary+movement           rank         9   88.50% [87.9-89.1]   84.88%           1.09%  +0.832
-  primary+movement           log(rank)    9   88.68% [87.6-89.9]   85.09%           1.95%  +0.833
-  primary+entropy            rank         7   89.96% [89.5-90.3]   86.52%           1.35%  +0.850
-  primary+entropy            log(rank)    7   90.60% [90.2-91.4]   87.24%           1.09%  +0.851
-  primary+entropy_rel        rank         7   89.14% [88.3-89.9]   85.59%           1.54%  +0.846
-  primary+entropy_rel        log(rank)    7   90.08% [89.4-90.6]   86.64%           1.35%  +0.847
-  primary+solo+entropy_rel   rank         8   90.08% [89.4-90.6]   86.64%           1.58%  +0.850
-  primary+solo+entropy_rel   log(rank)    8   90.75% [90.2-91.1]   87.41%           1.39%  +0.851
-  primary+ent_rel@attacks    rank         7   92.22% [91.3-92.9]   89.07%           0.75%  +0.872
-  primary+ent_rel@attacks    log(rank)    7   92.18% [91.7-92.6]   89.03%           0.68%  +0.873
-  full_keys                  rank        20   89.81% [89.4-90.3]   86.35%           1.80%  +0.843
-  full_keys                  log(rank)   20   90.56% [89.8-91.4]   87.19%           2.14%  +0.841
-  primary+entropy_rel+complex_peak rank         8   92.03% [91.4-92.5]   88.86%           0.49%  +0.863
-  primary+entropy_rel+complex_peak log(rank)    8   91.65% [90.9-92.5]   88.43%           0.75%  +0.864
-  primary+ent_rel+complex@attacks rank         8   92.97% [92.3-93.6]   89.94%           0.04%  +0.879
-  primary+ent_rel+complex@attacks log(rank)    8   92.41% [91.4-92.9]   89.29%           0.68%  +0.881
-  primary+ent_rel+complex-chord rank         7   92.33% [91.4-92.9]   89.20%           0.60%  +0.862
-  primary+ent_rel+complex-chord log(rank)    7   91.47% [90.6-92.1]   88.21%           0.75%  +0.864
-  primary+ent_rel+complex@attacks-chord rank         7   92.97% [92.7-93.6]   89.94%           0.04%  +0.878
-  primary+ent_rel+complex@attacks-chord log(rank)    7   92.37% [91.7-92.9]   89.24%           0.68%  +0.879
-  r16+chord_change           rank         8   93.20% [92.4-93.6]   90.20%           0.00%  +0.879
-  r16+chord_change           log(rank)    8   92.59% [92.1-92.9]   89.50%           0.45%  +0.880
-  r16+chord_span             rank         8   92.93% [92.7-93.6]   89.89%           0.19%  +0.876
-  r16+chord_span             log(rank)    8   92.37% [92.0-92.9]   89.24%           0.64%  +0.876
-  r16+chord_change+span      rank         9   93.16% [92.7-93.6]   90.15%           0.08%  +0.877
-  r16+chord_change+span      log(rank)    9   92.48% [92.4-92.9]   89.37%           0.60%  +0.878
+  candidate                  scale        k  usable (mean)    gate lower bound miss    rho     macro
+  baseline                   rank         2   88.83% [88.3-89.1]   85.26%           1.47%  +0.835   86.40%
+  baseline                   log(rank)    2   89.29% [89.1-89.5]   85.76%           2.18%  +0.831   85.89%
+  primary                    rank         6   88.98% [88.3-89.5]   85.43%           1.13%  +0.836   86.73%
+  primary                    log(rank)    6   89.59% [89.0-89.9]   86.10%           1.88%  +0.838   85.83%
+  primary+solo               rank         7   89.81% [89.4-90.2]   86.35%           1.24%  +0.841   87.74%
+  primary+solo               log(rank)    7   89.70% [89.1-90.3]   86.22%           2.11%  +0.842   86.01%
+  primary+movement           rank         9   88.50% [87.9-89.1]   84.88%           1.09%  +0.832   86.07%
+  primary+movement           log(rank)    9   88.68% [87.6-89.9]   85.09%           1.95%  +0.833   84.56%
+  primary+entropy            rank         7   89.96% [89.5-90.3]   86.52%           1.35%  +0.850   87.98%
+  primary+entropy            log(rank)    7   90.60% [90.2-91.4]   87.24%           1.09%  +0.851   87.34%
+  primary+entropy_rel        rank         7   89.14% [88.3-89.9]   85.59%           1.54%  +0.846   87.34%
+  primary+entropy_rel        log(rank)    7   90.08% [89.4-90.6]   86.64%           1.35%  +0.847   87.10%
+  primary+solo+entropy_rel   rank         8   90.08% [89.4-90.6]   86.64%           1.58%  +0.850   88.58%
+  primary+solo+entropy_rel   log(rank)    8   90.75% [90.2-91.1]   87.41%           1.39%  +0.851   88.01%
+  primary+ent_rel@attacks    rank         7   92.22% [91.3-92.9]   89.07%           0.75%  +0.872   90.52%
+  primary+ent_rel@attacks    log(rank)    7   92.18% [91.7-92.6]   89.03%           0.68%  +0.873   89.07%
+  full_keys                  rank        20   89.81% [89.4-90.3]   86.35%           1.80%  +0.843   88.03%
+  full_keys                  log(rank)   20   90.56% [89.8-91.4]   87.19%           2.14%  +0.841   87.71%
+  primary+entropy_rel+complex_peak rank         8   92.03% [91.4-92.5]   88.86%           0.49%  +0.863   90.54%
+  primary+entropy_rel+complex_peak log(rank)    8   91.65% [90.9-92.5]   88.43%           0.75%  +0.864   89.41%
+  primary+ent_rel+complex@attacks rank         8   92.97% [92.3-93.6]   89.94%           0.04%  +0.879   91.24%
+  primary+ent_rel+complex@attacks log(rank)    8   92.41% [91.4-92.9]   89.29%           0.68%  +0.881   89.72%
+  primary+ent_rel+complex-chord rank         7   92.33% [91.4-92.9]   89.20%           0.60%  +0.862   90.89%
+  primary+ent_rel+complex-chord log(rank)    7   91.47% [90.6-92.1]   88.21%           0.75%  +0.864   89.18%
+  primary+ent_rel+complex@attacks-chord rank         7   92.97% [92.7-93.6]   89.94%           0.04%  +0.878   91.30%
+  primary+ent_rel+complex@attacks-chord log(rank)    7   92.37% [91.7-92.9]   89.24%           0.68%  +0.879   89.77%
+  r16+chord_change           rank         8   93.20% [92.4-93.6]   90.20%           0.00%  +0.879   91.44%
+  r16+chord_change           log(rank)    8   92.59% [92.1-92.9]   89.50%           0.45%  +0.880   90.19%
+  r16+chord_span             rank         8   92.93% [92.7-93.6]   89.89%           0.19%  +0.876   91.26%
+  r16+chord_span             log(rank)    8   92.37% [92.0-92.9]   89.24%           0.64%  +0.876   89.78%
+  r16+chord_change+span      rank         9   93.16% [92.7-93.6]   90.15%           0.08%  +0.877   91.41%
+  r16+chord_change+span      log(rank)    9   92.48% [92.4-92.9]   89.37%           0.60%  +0.878   89.93%
 
   usable (mean) is the average across repeats; [lo-hi] beside it is the 10th-90th
   percentile ACROSS REPEATS, i.e. split noise only. The gate lower bound is the
   one-sided 95% Wilson bound on the row count, which is the dominant uncertainty
   at this sample size and is what the gate actually reads.
+
+  macro weights every occupied tier equally instead of every row. It is
+  measured for every candidate but NOT selected on - the selection rule still
+  reads pooled usable%.
+    the same candidate leads on both: r16+chord_change / rank
 
   ridge chosen inside training folds: 1e-006 x262 (16%), 0.001 x29 (2%), 0.01 x317 (20%), 0.1 x973 (61%), 1 x19 (1%)
 
@@ -651,6 +794,34 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
     bluemonday               rank 180  predicted  274  said tier 3, actual 1  (2 off)
     wedidntstartthefire      rank 199  predicted  292  said tier 3, actual 1  (2 off)
 
+  -- per tier, SELECTED model, same cross-validated predictions --
+    tier     n    share   usable   signed bias   predicted n
+     0      20     7.5%    85.0%       +0.75            12
+     1      64    24.1%    90.6%       +0.50            46
+     2      45    16.9%   100.0%       +0.13            63
+     3      49    18.4%    98.0%       -0.04            75
+     4      43    16.2%    97.7%       -0.51            37
+     5      22     8.3%    95.5%       -0.50            23
+     6      23     8.6%    73.9%       -0.83            10
+    pooled    93.23%   what the gate reads - an adversarially curated mix
+    macro     91.52%   equal weight per occupied tier (-1.72 vs pooled)
+    ends      87.60%   tiers 0-1 and 5-6 pooled, 129 rows (48% of corpus)
+
+    confusion (row = official tier, col = predicted)
+           0    1    2    3    4    5    6
+      0    8    9    3    .    .    .    .
+      1    4   30   24    6    .    .    .
+      2    .    7   25   13    .    .    .
+      3    .    .   10   32    6    1    .
+      4    .    .    1   23   16    3    .
+      5    .    .    .    1    9   12    .
+      6    .    .    .    .    6    7   10
+
+  -- naive baselines, same folds and seeds, fitted out of fold --
+    modal tier    pooled  48.50%   macro  42.86%
+    median rank   pooled  51.50%   macro  42.86%
+    SELECTED over the better baseline: +41.73 pooled, +48.66 macro
+
   -- release gate --
     usable lower bound :  89.94%   (floor 90%, one-sided 95% Wilson)
     miss upper bound   :   1.08%   (ceiling 5%, one-sided 95% Wilson)
@@ -664,42 +835,47 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
   disputed held out : 0
   reserved test set : NOT DRAWN - this phase validates the approach, not a release
 
-  candidate                  scale        k  usable (mean)    gate lower bound miss    rho
-  baseline                   rank         2   85.49% [85.0-85.7]   81.58%           2.29%  +0.819
-  baseline                   log(rank)    2   82.93% [82.7-83.5]   78.81%           2.71%  +0.814
-  primary                    rank         6   86.05% [85.3-86.8]   82.19%           2.07%  +0.821
-  primary                    log(rank)    6   83.23% [83.0-83.5]   79.13%           2.41%  +0.821
-  primary+solo               rank         7   85.45% [84.5-86.2]   81.54%           2.18%  +0.815
-  primary+solo               log(rank)    7   83.01% [82.6-83.5]   78.89%           2.82%  +0.815
-  primary+movement           rank         9   84.29% [83.5-85.0]   80.27%           1.84%  +0.819
-  primary+movement           log(rank)    9   82.74% [81.6-83.5]   78.61%           2.56%  +0.819
-  primary+entropy            rank         7   85.30% [84.5-86.1]   81.37%           2.11%  +0.834
-  primary+entropy            log(rank)    7   86.28% [85.3-86.9]   82.44%           2.52%  +0.837
-  primary+entropy_rel        rank         7   85.56% [84.9-86.1]   81.66%           1.69%  +0.835
-  primary+entropy_rel        log(rank)    7   84.89% [84.5-85.4]   80.92%           2.18%  +0.836
-  primary+solo+entropy_rel   rank         8   85.34% [85.0-85.8]   81.41%           2.03%  +0.827
-  primary+solo+entropy_rel   log(rank)    8   85.08% [84.5-85.8]   81.13%           2.63%  +0.829
-  primary+ent_rel@attacks    rank         7   89.40% [89.1-89.8]   85.89%           0.60%  +0.861
-  primary+ent_rel@attacks    log(rank)    7   89.02% [88.3-89.5]   85.47%           1.05%  +0.860
-  full_keys                  rank        20   85.30% [84.5-85.8]   81.37%           2.14%  +0.821
-  full_keys                  log(rank)   20   85.60% [84.6-86.5]   81.70%           2.41%  +0.822
-  primary+shift              rank         9   86.50% [85.7-87.2]   82.69%           1.99%  +0.835
-  primary+shift              log(rank)    9   85.71% [85.3-86.1]   81.82%           1.99%  +0.835
-  primary+shift_rate         rank         8   86.50% [86.1-86.9]   82.69%           1.92%  +0.836
-  primary+shift_rate         log(rank)    8   85.83% [85.3-86.2]   81.95%           1.95%  +0.837
-  full_real_keys             rank        23   85.38% [84.5-86.1]   81.46%           2.48%  +0.819
-  full_real_keys             log(rank)   23   86.50% [85.7-87.3]   82.69%           2.26%  +0.821
-  primary+ent_rel+fingers    rank        10   89.47% [88.6-90.2]   85.97%           0.79%  +0.857
-  primary+ent_rel+fingers    log(rank)   10   88.16% [87.6-88.7]   84.51%           1.58%  +0.856
-  primary+ent_rel+fingers+held rank        11   89.36% [88.3-89.9]   85.84%           0.83%  +0.857
-  primary+ent_rel+fingers+held log(rank)   11   88.27% [86.8-89.1]   84.63%           1.65%  +0.856
-  primary+ent_rel@attacks+complex_peak rank         8   89.32% [88.6-89.9]   85.80%           1.24%  +0.866
-  primary+ent_rel@attacks+complex_peak log(rank)    8   89.36% [89.1-89.5]   85.84%           1.35%  +0.866
+  candidate                  scale        k  usable (mean)    gate lower bound miss    rho     macro
+  baseline                   rank         2   85.49% [85.0-85.7]   81.58%           2.29%  +0.819   83.16%
+  baseline                   log(rank)    2   82.93% [82.7-83.5]   78.81%           2.71%  +0.814   80.29%
+  primary                    rank         6   86.05% [85.3-86.8]   82.19%           2.07%  +0.821   83.94%
+  primary                    log(rank)    6   83.23% [83.0-83.5]   79.13%           2.41%  +0.821   80.11%
+  primary+solo               rank         7   85.45% [84.5-86.2]   81.54%           2.18%  +0.815   83.34%
+  primary+solo               log(rank)    7   83.01% [82.6-83.5]   78.89%           2.82%  +0.815   79.75%
+  primary+movement           rank         9   84.29% [83.5-85.0]   80.27%           1.84%  +0.819   81.37%
+  primary+movement           log(rank)    9   82.74% [81.6-83.5]   78.61%           2.56%  +0.819   78.79%
+  primary+entropy            rank         7   85.30% [84.5-86.1]   81.37%           2.11%  +0.834   83.99%
+  primary+entropy            log(rank)    7   86.28% [85.3-86.9]   82.44%           2.52%  +0.837   84.26%
+  primary+entropy_rel        rank         7   85.56% [84.9-86.1]   81.66%           1.69%  +0.835   84.56%
+  primary+entropy_rel        log(rank)    7   84.89% [84.5-85.4]   80.92%           2.18%  +0.836   82.92%
+  primary+solo+entropy_rel   rank         8   85.34% [85.0-85.8]   81.41%           2.03%  +0.827   84.29%
+  primary+solo+entropy_rel   log(rank)    8   85.08% [84.5-85.8]   81.13%           2.63%  +0.829   83.11%
+  primary+ent_rel@attacks    rank         7   89.40% [89.1-89.8]   85.89%           0.60%  +0.861   88.63%
+  primary+ent_rel@attacks    log(rank)    7   89.02% [88.3-89.5]   85.47%           1.05%  +0.860   87.61%
+  full_keys                  rank        20   85.30% [84.5-85.8]   81.37%           2.14%  +0.821   83.93%
+  full_keys                  log(rank)   20   85.60% [84.6-86.5]   81.70%           2.41%  +0.822   83.83%
+  primary+shift              rank         9   86.50% [85.7-87.2]   82.69%           1.99%  +0.835   85.34%
+  primary+shift              log(rank)    9   85.71% [85.3-86.1]   81.82%           1.99%  +0.835   84.06%
+  primary+shift_rate         rank         8   86.50% [86.1-86.9]   82.69%           1.92%  +0.836   85.35%
+  primary+shift_rate         log(rank)    8   85.83% [85.3-86.2]   81.95%           1.95%  +0.837   84.08%
+  full_real_keys             rank        23   85.38% [84.5-86.1]   81.46%           2.48%  +0.819   84.05%
+  full_real_keys             log(rank)   23   86.50% [85.7-87.3]   82.69%           2.26%  +0.821   84.62%
+  primary+ent_rel+fingers    rank        10   89.47% [88.6-90.2]   85.97%           0.79%  +0.857   88.65%
+  primary+ent_rel+fingers    log(rank)   10   88.16% [87.6-88.7]   84.51%           1.58%  +0.856   86.37%
+  primary+ent_rel+fingers+held rank        11   89.36% [88.3-89.9]   85.84%           0.83%  +0.857   88.29%
+  primary+ent_rel+fingers+held log(rank)   11   88.27% [86.8-89.1]   84.63%           1.65%  +0.856   86.39%
+  primary+ent_rel@attacks+complex_peak rank         8   89.32% [88.6-89.9]   85.80%           1.24%  +0.866   88.40%
+  primary+ent_rel@attacks+complex_peak log(rank)    8   89.36% [89.1-89.5]   85.84%           1.35%  +0.866   87.46%
 
   usable (mean) is the average across repeats; [lo-hi] beside it is the 10th-90th
   percentile ACROSS REPEATS, i.e. split noise only. The gate lower bound is the
   one-sided 95% Wilson bound on the row count, which is the dominant uncertainty
   at this sample size and is what the gate actually reads.
+
+  macro weights every occupied tier equally instead of every row. It is
+  measured for every candidate but NOT selected on - the selection rule still
+  reads pooled usable%.
+    the same candidate leads on both: primary+ent_rel+fingers / rank
 
   ridge chosen inside training folds: 1e-006 x448 (30%), 0.001 x64 (4%), 0.01 x395 (26%), 0.1 x570 (38%), 1 x23 (2%)
 
@@ -765,6 +941,34 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
     bicyclerace              rank 456  predicted  338  said tier 4, actual 6  (2 off)
     ghostofperdition         rank 421  predicted  304  said tier 3, actual 5  (2 off)
     captainjack              rank 324  predicted  438  said tier 5, actual 3  (2 off)
+
+  -- per tier, SELECTED model, same cross-validated predictions --
+    tier     n    share   usable   signed bias   predicted n
+     0      14     5.3%    92.9%       +0.79            12
+     1      61    22.9%    85.2%       +0.56            39
+     2      47    17.7%    97.9%       +0.36            46
+     3      46    17.3%    95.7%       +0.07            86
+     4      41    15.4%    95.1%       -0.49            50
+     5      27    10.2%    77.8%       -0.89            18
+     6      30    11.3%    76.7%       -0.80            15
+    pooled    89.47%   what the gate reads - an adversarially curated mix
+    macro     88.74%   equal weight per occupied tier (-0.73 vs pooled)
+    ends      82.58%   tiers 0-1 and 5-6 pooled, 132 rows (50% of corpus)
+
+    confusion (row = official tier, col = predicted)
+           0    1    2    3    4    5    6
+      0    5    8    .    1    .    .    .
+      1    7   22   23    9    .    .    .
+      2    .    8   15   23    1    .    .
+      3    .    1    6   29    9    1    .
+      4    .    .    2   18   19    2    .
+      5    .    .    .    6   14    5    2
+      6    .    .    .    .    7   10   13
+
+  -- naive baselines, same folds and seeds, fitted out of fold --
+    modal tier    pooled  45.86%   macro  42.86%
+    median rank   pooled  50.38%   macro  42.86%
+    SELECTED over the better baseline: +39.10 pooled, +45.88 macro
 
   -- release gate --
     usable lower bound :  85.89%   (floor 90%, one-sided 95% Wilson)

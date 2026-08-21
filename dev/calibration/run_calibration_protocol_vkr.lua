@@ -225,7 +225,12 @@ end
 
 local function ReportResults(results)
     Msg(('\n  %-26s %-10s %3s  %-16s %-16s %s\n')
-        :format('candidate', 'scale', 'k', 'usable (mean)', 'gate lower bound', 'miss    rho'))
+        :format('candidate', 'scale', 'k', 'usable (mean)', 'gate lower bound',
+                'miss    rho     macro'))
+    -- Track whichever candidate leads on each quantity, so the two can be compared
+    -- without reading forty rows by eye. This is the answer to "would a different model
+    -- win if the gate moved to macro?".
+    local best_p, best_m
     for _, rc in ipairs(results) do
         if not rc.ok then
             Msg(('  %-26s %-10s %3d  (names a factor the CSV does not carry)\n')
@@ -234,18 +239,43 @@ local function ReportResults(results)
             Msg(('  %-26s %-10s %3d  fit failed in every repeat\n')
                 :format(rc.candidate, rc.scale, rc.n_features))
         else
-            Msg(('  %-26s %-10s %3d  %6.2f%% [%.1f-%.1f]  %6.2f%%          %5.2f%%  %+.3f\n')
+            Msg(('  %-26s %-10s %3d  %6.2f%% [%.1f-%.1f]  %6.2f%%          %5.2f%%  %+.3f  %6.2f%%\n')
                 :format(rc.candidate, rc.scale, rc.n_features,
                         rc.usable_mean * 100,
                         rc.usable_lo_split * 100, rc.usable_hi_split * 100,
                         rc.usable_lower * 100,
-                        rc.miss_mean * 100, rc.rho_mean))
+                        rc.miss_mean * 100, rc.rho_mean,
+                        (rc.macro_mean or 0) * 100))
+            if not best_p or rc.usable_mean > best_p.usable_mean then best_p = rc end
+            if not best_m or (rc.macro_mean or 0) > (best_m.macro_mean or 0) then best_m = rc end
         end
     end
     Msg('\n  usable (mean) is the average across repeats; [lo-hi] beside it is the 10th-90th\n')
     Msg('  percentile ACROSS REPEATS, i.e. split noise only. The gate lower bound is the\n')
     Msg('  one-sided 95% Wilson bound on the row count, which is the dominant uncertainty\n')
     Msg('  at this sample size and is what the gate actually reads.\n')
+
+    -- macro is REPORTED ONLY. SelectCandidate ranks by pooled usable%, and continues to
+    -- until the gate is actually moved - see MacroUsable in protocol.lua for why this is
+    -- measured now and why adopting macro because of what it favours would be the wrong
+    -- reason.
+    if best_p and best_m then
+        Msg('\n  macro weights every occupied tier equally instead of every row. It is\n')
+        Msg('  measured for every candidate but NOT selected on - the selection rule still\n')
+        Msg('  reads pooled usable%.\n')
+        if best_p == best_m then
+            Msg(('    the same candidate leads on both: %s / %s\n')
+                :format(best_p.candidate, best_p.scale))
+        else
+            Msg(('    pooled leader : %s / %s  (%.2f%% pooled, %.2f%% macro)\n')
+                :format(best_p.candidate, best_p.scale,
+                        best_p.usable_mean * 100, (best_p.macro_mean or 0) * 100))
+            Msg(('    macro leader  : %s / %s  (%.2f%% pooled, %.2f%% macro)\n')
+                :format(best_m.candidate, best_m.scale,
+                        best_m.usable_mean * 100, (best_m.macro_mean or 0) * 100))
+            Msg('    THEY DISAGREE - moving the gate to macro would reopen this selection.\n')
+        end
+    end
 end
 
 local function ReportRidges(results)
@@ -391,6 +421,65 @@ local function AnalyseInstrument(csv, inst)
                 Msg(('    %-24s rank %3d  predicted %4.0f  said tier %d, actual %d  (%d off)\n')
                     :format(x.name, x.rank, x.pred, x.tier_pred, x.tier_act, x.dist))
             end
+        end
+    end
+
+    -- Per-tier view of the SAME predictions the headline figures come from. Added
+    -- 2026-08-21 after the peer review pointed out that a pooled percentage over a
+    -- deliberately enriched corpus has no stable meaning, and that the pooled figure
+    -- hides a uniform compression toward the middle. See TierDiagnostics in protocol.lua
+    -- for the declared estimand and the pre-registered intent to move the gate to macro.
+    local diag = resid and TierDiagnostics(resid)
+    if diag then
+        Msg('\n  -- per tier, SELECTED model, same cross-validated predictions --\n')
+        Msg('    tier     n    share   usable   signed bias   predicted n\n')
+        for _, t in ipairs(diag.tiers) do
+            Msg(('     %d    %4d   %5.1f%%  %6.1f%%       %+5.2f          %4d\n')
+                :format(t.tier, t.n, t.share * 100, t.usable * 100, t.bias, t.n_pred))
+        end
+        Msg(('    pooled   %6.2f%%   what the gate reads - an adversarially curated mix\n')
+            :format(diag.pooled * 100))
+        if diag.macro then
+            Msg(('    macro    %6.2f%%   equal weight per occupied tier (%+.2f vs pooled)\n')
+                :format(diag.macro * 100, (diag.macro - diag.pooled) * 100))
+        end
+        if diag.endpoint then
+            Msg(('    ends     %6.2f%%   tiers 0-1 and 5-6 pooled, %d rows (%.0f%% of corpus)\n')
+                :format(diag.endpoint * 100, diag.ep_n, diag.ep_n / diag.n * 100))
+        end
+
+        -- The confusion matrix the pooled figure summarises away. Rows are the official
+        -- tier, columns the predicted one, so the diagonal is exact agreement and the
+        -- two neighbouring diagonals are the rest of "usable".
+        Msg('\n    confusion (row = official tier, col = predicted)\n')
+        Msg('           0    1    2    3    4    5    6\n')
+        for _, t in ipairs(diag.tiers) do
+            local cells = {}
+            for p = 0, 6 do
+                local c = (diag.matrix[t.tier] or {})[p] or 0
+                cells[#cells + 1] = (c > 0) and ('%4d'):format(c) or '   .'
+            end
+            Msg(('      %d %s\n'):format(t.tier, table.concat(cells, ' ')))
+        end
+    end
+
+    -- What constant guessing scores on the same folds. Without this, "94% within one
+    -- tier" cannot be read as good or bad.
+    local base = NaiveBaselines(d, target, inst)
+    if base and base.modal_tier and base.median_rank then
+        Msg('\n  -- naive baselines, same folds and seeds, fitted out of fold --\n')
+        Msg(('    modal tier    pooled %6.2f%%   macro %6.2f%%\n')
+            :format(base.modal_tier.pooled * 100,
+                    (base.modal_tier.macro or 0) * 100))
+        Msg(('    median rank   pooled %6.2f%%   macro %6.2f%%\n')
+            :format(base.median_rank.pooled * 100,
+                    (base.median_rank.macro or 0) * 100))
+        if diag then
+            Msg(('    SELECTED over the better baseline: %+.2f pooled, %+.2f macro\n')
+                :format((diag.pooled - math.max(base.modal_tier.pooled,
+                                                base.median_rank.pooled)) * 100,
+                        ((diag.macro or 0) - math.max(base.modal_tier.macro or 0,
+                                                      base.median_rank.macro or 0)) * 100))
         end
     end
 

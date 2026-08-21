@@ -55,8 +55,114 @@ actually get; a middle-heavy corpus flatters a model that hedges toward the midd
 charts were added specifically to close it - and it now misses by **0.06** at n=266. The
 larger n was exactly cancelled by a lower mean, because the added charts were deliberately
 drawn from tier 4, the model's weakest bracket. Adding songs the model already handles
-would have passed the gate and taught nothing. Read this as evidence that keys has a real
-accuracy ceiling rather than a sample-size shortfall.
+would have passed the gate and taught nothing.
+
+> *Corrected 2026-08-21.* This paragraph used to end "read this as evidence that keys has
+> a real accuracy ceiling rather than a sample-size shortfall", and the peer review was
+> right that the claim outruns the evidence. What two collection rounds established is
+> that a **pooled, adversarially curated** bound did not move. That is not an intrinsic
+> ceiling, and it cannot separate model limitation from label noise or from a changed tier
+> mixture. Measured since: **keys' corpus is about 48% endpoint tiers**, and under equal
+> weight per tier keys reads **91.52%** against guitar's **90.78%** - i.e. better than the
+> instrument that passes. Its pooled shortfall is substantially a consequence of having
+> been enriched precisely where every model is weakest. See "What the number estimates".
+
+### What the number estimates
+
+Declared 2026-08-21, because the peer review showed the question had never been answered
+and the answer changes which instruments pass.
+
+**The pooled figure is what a deliberately adversarial sample gets. It is not what a
+random song gets, and nothing here may describe it that way.** The corpus was enriched
+three times on purpose - low end, top end, then keys' weak tier 4 - so it is excellent
+stress testing and is not a probability sample of the catalogue.
+
+The report now prints three numbers per instrument, from the same cross-validated
+predictions:
+
+| instrument | pooled | macro (equal tier) | endpoints (0-1, 5-6) |
+|---|---:|---:|---:|
+| guitar | 94.50% | 90.78% | 86.73% |
+| bass | 94.24% | **89.38%** | 92.86% |
+| drum | 96.34% | 90.59% | 90.00% |
+| keys | 93.23% | **91.52%** | 87.60% |
+| real_keys | 89.47% | 88.74% | 82.58% |
+| vocals | 89.02% | 81.13% | **64.00%** |
+
+Macro is lower on **all six**, by 0.73 to 7.89 points, and it inverts two verdicts: bass
+falls below a 90% floor while keys rises above it. The mechanism is uniform - signed tier
+bias is positive at the bottom and negative at the top on every instrument - and pooled
+hides it because the middle tiers run at 96-100% and hold most of the rows. Vocals is the
+extreme case: 20 charts are officially tier 6 and the model puts **one** there.
+
+**The gate still reads pooled, and that is an interim decision rather than a claim that
+pooled is the right quantity.** Macro is the **pre-registered** successor, declared before
+the corpus changes so that adopting it later cannot be a reaction to where the numbers
+land. Two things have to happen first: measurement across at least one corpus change, and
+a floor derived for the macro scale instead of inheriting 90%, which was calibrated
+against a different quantity.
+
+**Moving the gate to macro would reopen the selection, on the three instruments that
+currently pass.** `SelectCandidate` ranks by *pooled* usable%, so a macro gate would be
+grading on a quantity the selection never read - the fit/grade mismatch this project
+already has a finding about, reintroduced through the back door. Macro is therefore
+measured for **every** declared candidate, and the report names both leaders:
+
+| instrument | pooled leader | macro leader | macro gain |
+|---|---|---|---:|
+| guitar | `full@attacks` / log(rank) | `full@attacks` / **rank** | +0.97 |
+| bass | `primary+entropy@attacks` / log(rank) | `baseline+ent_rel@attacks` / rank | +0.11 |
+| drum | `full_drum@noroll` / log(rank) | `full_drum@noroll` / **rank** | +1.56 |
+| keys | `r16+chord_change` / rank | same | — |
+| real_keys | `primary+ent_rel+fingers` / rank | same | — |
+| vocals | `parts+tess+move+breath@mean50` / log(rank) | same | — |
+
+On guitar and drums it is the **same feature set on a different scale**, and the direction
+is mechanistically expected rather than noise: `log(rank)` buys proportional accuracy by
+compressing the top end, which pooled barely notices and macro weights heavily. Note that
+this enters through the equal-complexity tie-break, which a finding below already warns can
+flip a release gate on noise - drums' +1.56 clears a 1-point bar, guitar's +0.97 does not.
+
+Two things this table is **not**. These are *leaders*, not what `SelectCandidate` would
+choose: the simplicity rule and the 1-point/70% bar sit between the two, and on bass the
+pooled leader is not even the selected model. And nothing here is a reason to adopt macro -
+see `MacroUsable` in `protocol.lua` on why adopting it because of which candidate it
+favours would be precisely the forbidden move.
+
+**The compositional trap these exist to catch.** Adding middle-tier songs raises pooled
+without improving the model at all, because the middle is where it already succeeds. Macro
+and the endpoint rate are tier-weighted and nearly invariant to that. So if a rescore moves
+pooled and leaves macro flat, the movement is **compositional, not an improvement**. Read
+them together or not at all.
+
+The report also prints two **naive baselines** on the same folds - modal tier and median
+rank, both fitted out of fold. "94% within one tier" is not interpretable without knowing
+what constant guessing scores on a middle-heavy corpus.
+
+**The baselines produced the strongest argument for macro, and it was not anticipated.**
+Under macro a constant predictor scores exactly **3/7 = 42.86%** for every instrument and
+every corpus - one guessed tier is within one of exactly three of the seven bands, which
+is arithmetic rather than a measurement. Under pooled the same baseline ranges from
+**45.86%** (real_keys) to **77.13%** (vocals), depending only on how middle-heavy that
+instrument's corpus is.
+
+So pooled scores are **not comparable between instruments**. Vocals' 89.02% sits against a
+77.13% baseline; real_keys' 89.47% sits against 45.86%. The same headline hides a fourfold
+difference in what was actually achieved:
+
+| instrument | vs better baseline, pooled | vs better baseline, macro |
+|---|---:|---:|
+| guitar | +29.05 | +47.92 |
+| bass | +19.70 | +46.53 |
+| drum | +23.78 | +47.73 |
+| keys | +41.73 | +48.66 |
+| real_keys | +39.10 | +45.88 |
+| vocals | **+11.89** | +38.27 |
+
+Vocals is the one to sit with: on the metric the gate actually reads, it beats guessing
+the modal tier by under twelve points. Keys and Pro Keys, which fail the gate, add the
+*most* over baseline of any instrument - because their corpora are the least middle-heavy,
+which is the same enrichment that depresses their pooled figures.
 
 **Two things this table is not.**
 
@@ -85,9 +191,28 @@ confirmatory and is not.
 The partition therefore has to come from packs that have never been walked, and the rule
 deciding which ones is committed in `protocol.lua` (`PARTITION`, `PackIsReserved`) as of
 2026-08-21 — **before a single eligible pack exists**, which is the only time such a rule
-can be fixed without being a decision about data already seen. Nothing calls it yet. Read
-its header before touching it; the salt and the 20% share are part of the commitment, and
-a pack already in `corpus_scores.csv` is development permanently whatever its hash says.
+can be fixed without being a decision about data already seen. Read its header before
+touching it: a pack already in `corpus_scores.csv` is development permanently, whatever
+its hash says.
+
+**Every unwalked pack is reserved.** `RESERVED_PCT` was 20 when the rule was first
+committed and is now 100, changed the same day and recorded in the rule's own header as it
+requires. The reason is arithmetic rather than preference. About 600–700 rb3_dlc songs are
+available against the 330 walked; to certify the 90% floor the Wilson lower bound must
+clear 90%, which at an observed 94% needs n ≈ 200. Twenty per cent of ~300 new songs is
+n ≈ 60, whose lower bound at 94% is **86.8%** — a partition that can falsify a collapse and
+can never confirm the gate, which is its only job.
+
+Raising the share after seeing the batch is not the move the pre-commitment forbids:
+reserving more data shrinks training *and* enlarges the sample that could contradict the
+published figures, so there is no version of it that flatters the model. Lowering it would
+be the forbidden direction.
+
+Two things to hold onto when the partition is spent. The new material is **mostly middle**
+— the extremes are exhausted — so grading it on pooled would flatter, for the same reason
+the middle tiers already run at 96–100%; grade it on macro or report all three. And once
+it is spent, "everything unwalked is reserved" stops being the right policy, and the
+replacement is a new declaration with its own reasoning.
 
 ---
 

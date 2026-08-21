@@ -492,16 +492,31 @@ Test.it('is deterministic and depends only on the pack id', function()
         'same answer every call - a partition that moved would be no partition')
 end)
 
-Test.it('reserves roughly the declared share', function()
+Test.it('reserves the declared share', function()
     local n, res = 2000, 0
     for i = 1, n do
         if PackIsReserved('synthetic_pack_' .. i, {}) then res = res + 1 end
     end
     local pct = res / n * 100
-    -- Wide tolerance on purpose: this asserts the rule is not degenerate (all or
-    -- nothing, or ignoring its input), not that FNV is uniform to three decimals.
-    Test.expect(math.abs(pct - PARTITION.RESERVED_PCT) < 5,
-        ('%.1f%% reserved, declared %d%%'):format(pct, PARTITION.RESERVED_PCT))
+    -- Tolerance is one-sided at 100: an exact share is only expected in the degenerate
+    -- case. Below 100 this asserts the hash is not lopsided; at 100 it asserts every
+    -- unwalked pack is held out, which is the current epoch's whole policy.
+    if PARTITION.RESERVED_PCT >= 100 then
+        Test.expect(res == n,
+            ('%d of %d reserved, expected all of them'):format(res, n))
+    else
+        Test.expect(math.abs(pct - PARTITION.RESERVED_PCT) < 5,
+            ('%.1f%% reserved, declared %d%%'):format(pct, PARTITION.RESERVED_PCT))
+    end
+end)
+
+Test.it('the walked-already rule still beats a 100% reserve', function()
+    -- At RESERVED_PCT = 100 the hash reserves everything, so rule 1 is the only thing
+    -- keeping the 330 development songs out of the test partition. If it ever stopped
+    -- winning, every already-spent row would be reported as held-out evidence - the
+    -- single worst failure this file can have.
+    Test.expect(PackIsReserved('somepack', { somepack = true }) == false,
+        'a walked pack is development even when the share is 100%')
 end)
 
 Test.it('a row with no pack id is development, not silently held out', function()
@@ -510,4 +525,84 @@ Test.it('a row with no pack id is development, not silently held out', function(
     -- one that keeps them visible.
     Test.expect(PackIsReserved(nil, {}) == false, 'nil pack')
     Test.expect(PackIsReserved('', {}) == false, 'empty pack')
+end)
+
+Test.section('TierDiagnostics - the per-tier slicing the pooled figure hides')
+
+-- Minimal residual rows: TierDiagnostics only reads tier_act, tier_pred and dist.
+local function Resid(spec)
+    local out = {}
+    for _, s in ipairs(spec) do
+        for _ = 1, s[3] do
+            out[#out + 1] = { tier_act = s[1], tier_pred = s[2],
+                              dist = math.abs(s[2] - s[1]) }
+        end
+    end
+    return out
+end
+
+Test.it('pooled and macro diverge exactly when tier sizes differ', function()
+    -- 90 rows in tier 3, all correct. 10 rows in tier 6, all two tiers out.
+    -- Pooled = 90/100. Macro = mean(1.00, 0.00) = 0.50.
+    local d = TierDiagnostics(Resid({ { 3, 3, 90 }, { 6, 4, 10 } }))
+    Test.expect(math.abs(d.pooled - 0.90) < 1e-9, ('pooled %.4f'):format(d.pooled))
+    Test.expect(math.abs(d.macro - 0.50) < 1e-9, ('macro %.4f'):format(d.macro))
+end)
+
+Test.it('they agree when every occupied tier is the same size', function()
+    -- With equal n per tier, equal weighting IS the pooled weighting.
+    local d = TierDiagnostics(Resid({ { 1, 1, 20 }, { 2, 2, 20 }, { 3, 4, 20 } }))
+    Test.expect(math.abs(d.pooled - d.macro) < 1e-9,
+        ('pooled %.4f vs macro %.4f'):format(d.pooled, d.macro))
+end)
+
+Test.it('a one-tier miss still counts as usable, two does not', function()
+    local d = TierDiagnostics(Resid({ { 3, 4, 5 }, { 3, 5, 5 } }))
+    Test.expect(math.abs(d.pooled - 0.50) < 1e-9,
+        'within-one is usable, within-two is not')
+end)
+
+Test.it('signed bias keeps its direction rather than being absolute', function()
+    -- The whole point of reporting bias separately from distance: over- and
+    -- under-prediction cancel in the mean, and that cancellation is what made the
+    -- overall bias look like absence of bias.
+    local d = TierDiagnostics(Resid({ { 1, 2, 10 }, { 5, 4, 10 } }))
+    local by = {}
+    for _, t in ipairs(d.tiers) do by[t.tier] = t.bias end
+    Test.expect(math.abs(by[1] - 1.0) < 1e-9, ('low tier bias %.2f, expected +1'):format(by[1]))
+    Test.expect(math.abs(by[5] + 1.0) < 1e-9, ('high tier bias %.2f, expected -1'):format(by[5]))
+end)
+
+Test.it('the endpoint band pools tiers 0-1 and 5-6 and skips the middle', function()
+    -- 10 rows at tier 0 all correct, 10 at tier 6 all wrong, 100 in the middle correct.
+    local d = TierDiagnostics(Resid({ { 0, 0, 10 }, { 6, 3, 10 }, { 3, 3, 100 } }))
+    Test.expect(d.ep_n == 20, ('endpoint n %d, expected 20'):format(d.ep_n))
+    Test.expect(math.abs(d.endpoint - 0.50) < 1e-9,
+        ('endpoint %.4f, expected 0.50'):format(d.endpoint))
+    Test.expect(d.n == 120, 'total still counts every row')
+end)
+
+Test.it('the confusion matrix counts every row exactly once', function()
+    local d = TierDiagnostics(Resid({ { 2, 2, 7 }, { 2, 3, 3 }, { 5, 4, 4 } }))
+    local total = 0
+    for _, row in pairs(d.matrix) do
+        for _, c in pairs(row) do total = total + c end
+    end
+    Test.expect(total == 14, ('matrix holds %d rows, expected 14'):format(total))
+    Test.expect(d.matrix[2][2] == 7 and d.matrix[2][3] == 3, 'cells land where expected')
+end)
+
+Test.it('predicted counts expose compression toward the middle', function()
+    -- Ten charts are officially tier 6; the model puts one there. That asymmetry is
+    -- invisible in usable% and is the reason n_pred is reported at all.
+    local d = TierDiagnostics(Resid({ { 6, 6, 1 }, { 6, 5, 9 }, { 3, 3, 20 } }))
+    local by = {}
+    for _, t in ipairs(d.tiers) do by[t.tier] = t end
+    Test.expect(by[6].n == 10, 'ten official tier-6 rows')
+    Test.expect(by[6].n_pred == 1, ('predicted tier 6 %d times, expected 1'):format(by[6].n_pred))
+end)
+
+Test.it('an empty or absent residual list returns nil rather than dividing by zero', function()
+    Test.expect(TierDiagnostics(nil) == nil, 'nil in, nil out')
+    Test.expect(TierDiagnostics({}) == nil, 'empty in, nil out')
 end)

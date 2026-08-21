@@ -151,18 +151,39 @@ function Fnv1a64Hex(s) return string.format('%016x', Fnv1a64(s)) end
 -- everything and is indistinguishable from choosing a partition; if it ever has to
 -- change, the old value stays in this comment and the reason goes in the README.
 --
--- 20% because the gate reads a Wilson lower bound and small partitions produce bounds
--- too wide to fail anything. At the corpus's current scale 20% of new packs is a few
--- dozen songs per instrument - enough to move a bound, not enough to be worth
--- reallocating to training.
+-- RESERVED_PCT WAS 20 WHEN THIS WAS COMMITTED EARLIER ON 2026-08-21. IT IS NOW 100.
+-- Recording the change here because the paragraph above says to.
 --
--- NOTHING CALLS THIS YET, and that is the expected state. There are no eligible packs.
--- It is committed rather than held because a rule produced on the day it is first
--- applied carries no evidence about when it was chosen, and git's history of this file
--- is the evidence.
+-- The original 20% assumed packs arriving a few at a time, where holding back a fifth
+-- leaves most of the new material usable for training. What actually turned up the same
+-- day was a single batch: roughly 600-700 rb3_dlc songs available against the 330 already
+-- walked. At that shape the sizing calculation decides it, and the answer is not close.
+--
+--   To certify the 90% floor the Wilson lower bound must clear 90%. At an observed 94%
+--   that needs n ~ 200; at 96%, n ~ 100. Twenty per cent of ~300 new songs is n ~ 60,
+--   whose lower bound at 94% is 86.8%. A partition that size can FALSIFY a collapse and
+--   can never CONFIRM the gate - which is the one job it exists for.
+--
+-- So every unwalked pack is reserved, and the development corpus stays at 330. That is
+-- also the peer review's own step 4: refit on the existing development corpus and
+-- evaluate once on the new packs.
+--
+-- WHY CHANGING THIS AFTER SEEING THE BATCH IS NOT THE THING THE RULE FORBIDS. The hazard
+-- a pre-committed partition guards against is choosing a split that flatters the model.
+-- Reserving MORE data is self-penalising in every direction: it shrinks training, and it
+-- enlarges the sample that could contradict the published figures. There is no version of
+-- this change that makes the results look better. Lowering the percentage after seeing
+-- the data would be the forbidden move; raising it is not.
+--
+-- The hash is kept rather than replaced by a plain "is it walked" test. At 100 every pack
+-- passes the threshold, so the mechanism is inert but intact, and a future epoch that
+-- needs a real split gets the same salt and the same arithmetic instead of a rule rebuilt
+-- from memory. ALLOCATING A LATER BATCH IS A NEW DECLARATION - once this partition has
+-- been spent, "everything unwalked is reserved" stops being the right policy, and the
+-- replacement belongs in this comment with its own reasoning.
 PARTITION = {
     SALT         = 'rb3-difficulty-reserved-v1',
-    RESERVED_PCT = 20,
+    RESERVED_PCT = 100,   -- was 20 until 2026-08-21; see above
 }
 
 -- Returns true if this pack belongs to the reserved test partition.
@@ -1904,6 +1925,43 @@ SCALES = {
 }
 
 ----------------------------------------------------------------------
+-- Equal-tier-weighted usable rate
+----------------------------------------------------------------------
+
+-- Within-one-tier accuracy with every OCCUPIED tier weighted equally, rather than every
+-- row. Takes parallel arrays of predicted and actual tiers, the same ones TierDistance
+-- reads, so it costs a second pass over data already in hand and no extra fitting.
+--
+-- WHY EVERY CANDIDATE GETS THIS AND NOT JUST THE SELECTED ONE. The gate is pre-registered
+-- to move from pooled to macro (see TierDiagnostics). SelectCandidate ranks by pooled
+-- usable%, so moving the gate without knowing what macro would have chosen means
+-- selecting on one quantity and grading on another - the fit/grade mismatch this project
+-- already has a finding about, reintroduced through the back door. Measuring it for every
+-- declared candidate turns "would a different model win?" into a question with an answer
+-- in the report.
+--
+-- IT IS REPORTED AND NEVER SELECTED ON. SelectCandidate still reads usable_mean, and must
+-- keep doing so until the gate actually moves, because switching the selection rule is a
+-- new experiment in its own right. The honest hazard to name: once macro is visible for
+-- every candidate, adopting it BECAUSE it makes something pass is exactly the move the
+-- pre-registration exists to prevent. The reason to adopt it has to be the one already
+-- written down - that a constant predictor scores a fixed 3/7 under macro and anywhere
+-- between 45.86% and 77.13% under pooled - and not which candidate it favours.
+function MacroUsable(pred_tiers, act_tiers)
+    local n_by, ok_by = {}, {}
+    for i = 1, #act_tiers do
+        local t = act_tiers[i]
+        n_by[t]  = (n_by[t] or 0) + 1
+        ok_by[t] = (ok_by[t] or 0) + ((math.abs(pred_tiers[i] - t) <= 1) and 1 or 0)
+    end
+    local sum, k = 0, 0
+    for t, n in pairs(n_by) do
+        if n > 0 then sum, k = sum + ok_by[t] / n, k + 1 end
+    end
+    return (k > 0) and (sum / k) or 0
+end
+
+----------------------------------------------------------------------
 -- Never report a rank outside the observed label range
 ----------------------------------------------------------------------
 
@@ -2138,6 +2196,7 @@ function RunProtocol(d, target, extra, inst, factor_pos)
         for _, scale in ipairs(SCALES) do
             local rec = { candidate = cand.name, scale = scale.name,
                           n_features = #cand.keys, usable = {}, miss = {}, rho = {},
+                          macro = {},
                           ridges = {}, ok = ok, per_row = nil,
                           keys = cand.keys, scale_obj = scale }
             if ok then
@@ -2156,6 +2215,7 @@ function RunProtocol(d, target, extra, inst, factor_pos)
                         rec.usable[#rec.usable + 1] = dist.usable / dist.n
                         rec.miss[#rec.miss + 1]     = dist.miss / dist.n
                         rec.rho[#rec.rho + 1]       = Spearman(pred, act) or 0
+                        rec.macro[#rec.macro + 1]   = MacroUsable(pt, at)
                         rec.n_rows = dist.n
                         for _, rg in ipairs(ridges) do
                             rec.ridges[#rec.ridges + 1] = rg
@@ -2186,6 +2246,11 @@ function RunProtocol(d, target, extra, inst, factor_pos)
                 -- gated on the mean and the report says so plainly.
                 rec.rho_lo_split    = Quantile(rec.rho, 0.10)
                 rec.rho_hi_split    = Quantile(rec.rho, 0.90)
+                -- Measured for EVERY candidate, not just the selected one, so the
+                -- question "would a different model win under macro?" has an answer
+                -- before the gate is moved rather than after. Reported, never selected
+                -- on - SelectCandidate still reads usable_mean. See MacroUsable.
+                rec.macro_mean      = MeanOf(rec.macro)
                 -- The gate's interval: binomial on the row count, the dominant term.
                 rec.usable_lower = WilsonLower(rec.usable_mean, rec.n_rows, PROTOCOL.Z)
                 rec.miss_upper   = WilsonUpper(rec.miss_mean,   rec.n_rows, PROTOCOL.Z)
@@ -2273,8 +2338,38 @@ function SelectCandidate(results, inst)
     return leader, leader, 0, 0
 end
 
--- Gate verdict on the SELECTED candidate, read from the pessimistic end of each
--- interval. Returns passed, an array of reason strings.
+-- Gate verdict on the SELECTED candidate. Returns passed, an array of reason strings.
+--
+-- WHAT THIS CHECKS, AND WHAT IT DELIBERATELY DOES NOT.
+--
+-- Three things: the pooled usable rate against its Wilson LOWER bound, the pooled miss
+-- rate against its UPPER bound, and rho against its MEAN. Two of the three are read from
+-- the pessimistic end; rho is not, because ten correlated reruns over the same songs have
+-- no honest interval and inventing one would be worse than saying so. The report prints
+-- rho's split range and labels it as spread rather than uncertainty.
+--
+-- THE IMPLEMENTATION PLAN'S RELEASE GATE IS WIDER THAN THIS, and the 2026-08-21 peer
+-- review was right to flag the gap. That gate also requires per-tier accuracy, a
+-- macro-average, signed tier bias, no severe per-tier failure, and no systematic
+-- over/under-rating. None of those can currently fail a verdict here.
+--
+-- That gap is now a DECLARED DIVERGENCE rather than an unmet requirement, decided
+-- 2026-08-21. All five quantities are measured and printed for every instrument - see
+-- TierDiagnostics - and none of them gates. The reasoning:
+--
+--   * The per-tier figures were never measured before. Promoting an unmeasured quantity
+--     straight to a gate input sets a threshold with no idea what passes, which is how
+--     you get a floor that either fails everything or nothing.
+--   * On the current corpus, macro would flip bass from passing to failing and keys from
+--     failing to passing. A gate change that reorders verdicts on its first run needs to
+--     be a declared experiment with a pre-registered threshold, not a repair bundled into
+--     a reporting change - see README rule 1.
+--   * The 90% floor was calibrated against the pooled quantity. Carrying it over to macro
+--     unchanged would be applying a threshold to a number it was never derived for.
+--
+-- The intent to move to macro is pre-registered in the TierDiagnostics header, written
+-- before the corpus grows. Until that happens this function is the whole gate, and no
+-- document may describe the release gate as including the per-tier checks.
 function GateVerdict(rec)
     local reasons, passed = {}, true
     if not rec or not rec.usable_mean then
@@ -2296,6 +2391,216 @@ function GateVerdict(rec)
             :format(rec.rho_mean, PROTOCOL.RHO_FLOOR)
     end
     return passed, reasons
+end
+
+----------------------------------------------------------------------
+-- Per-tier diagnostics, and what the headline number estimates
+----------------------------------------------------------------------
+
+-- WHAT THE POOLED USABLE% IS AN ESTIMATE OF. Declared here because the 2026-08-21 peer
+-- review showed the question had never been answered, and the answer changes which
+-- instruments pass.
+--
+-- The corpus was deliberately enriched: first at the low end, then at the top end, then
+-- specifically in keys' weak tier 4. That is good stress testing and bad sampling. It is
+-- NOT a probability sample of the RB3 catalogue, so the pooled percentage estimates an
+-- unspecified mixture whose weights change every time songs are added. Keys and Pro Keys
+-- currently carry about HALF their rows in the endpoint tiers (0-1, 5-6).
+--
+-- THE DECLARED ESTIMAND, as of 2026-08-21: the pooled figure is "what a deliberately
+-- adversarial sample gets". It is NOT "what a random song gets" and no document may
+-- describe it that way. The gate continues to read it, and that is an interim decision
+-- rather than a claim that pooled is the right quantity.
+--
+-- PRE-REGISTERED INTENT: macro (equal weight per occupied tier) is the intended
+-- successor as the gate's input. It is declared now, BEFORE the corpus changes and
+-- before the numbers move, precisely so that adopting it later cannot be a reaction to
+-- which side of the floor something landed on. What has to happen first is measurement -
+-- these diagnostics - across at least one corpus change, plus a floor derived for the
+-- macro scale rather than inherited from pooled, since 90% was calibrated against a
+-- different quantity.
+--
+-- WHY THIS MATTERS MORE THAN IT SOUNDS. On the current corpus, moving pooled -> macro
+-- moves every instrument DOWN, by 0.73 (real_keys) to 7.89 (vocals) points, and inverts
+-- two verdicts: bass falls from 94.24% to 89.38% and keys rises from a failing pooled
+-- lower bound to 91.52%. The mechanism is uniform - signed tier bias is positive at the
+-- bottom and negative at the top on all six instruments - and the pooled number hides it
+-- because the middle tiers run at 96-100% and hold most of the rows.
+--
+-- THE COMPOSITIONAL TRAP THESE EXIST TO CATCH. Adding middle-tier songs raises pooled
+-- without improving the model at all, because the middle is where it already succeeds.
+-- Macro and the endpoint rate are weighted by tier and are therefore near-invariant to
+-- that mix change. So when a rescore moves pooled and leaves macro flat, the movement is
+-- COMPOSITIONAL and not an improvement. Read them together or not at all.
+--
+-- AN ARGUMENT FOR MACRO THAT ONLY APPEARED ONCE THE BASELINES WERE BUILT, and it is the
+-- strongest one available: under macro, a constant predictor scores exactly 3/7 =
+-- 42.86%, for EVERY instrument and every corpus. A single guessed tier is within one of
+-- exactly three of the seven bands, and equal tier weighting makes that arithmetic and
+-- not empirical. Under pooled the same baseline ranges from 45.86% (real_keys) to 77.13%
+-- (vocals), because it depends entirely on how middle-heavy that instrument's corpus is.
+--
+-- Two consequences. Pooled scores are NOT comparable between instruments - vocals' 89.02%
+-- sits against a 77.13% baseline while real_keys' 89.47% sits against 45.86%, so the same
+-- headline hides a fourfold difference in what was achieved. And a macro floor, unlike
+-- the pooled 90%, can be reasoned about from a fixed reference point rather than
+-- calibrated by eye.
+--
+-- The gap over the better baseline, measured 2026-08-21:
+--   guitar +29.05 pooled / +47.92 macro      keys      +41.73 / +48.66
+--   bass   +19.70 pooled / +46.53 macro      real_keys +39.10 / +45.88
+--   drum   +23.78 pooled / +47.73 macro      vocals    +11.89 / +38.27
+-- Vocals is the finding to sit with: on the metric the gate actually reads, it beats
+-- guessing the modal tier by under twelve points.
+
+-- Naive baselines, graded exactly like a candidate.
+--
+-- WHY. "94% within one tier" reads as a strong result and is not interpretable without
+-- knowing what constant guessing scores. Tier distance is a forgiving metric on a
+-- middle-heavy corpus: predicting the modal tier for every chart already lands within
+-- one tier of everything in the three central bands. The implementation plan required
+-- these from the start and they were never built; the peer review asked for them again.
+--
+-- Both are fitted OUT OF FOLD, on the same stratified splits and the same seeds as every
+-- candidate, so the comparison is like for like. A baseline computed over all rows would
+-- be optimistic in exactly the way the protocol exists to prevent.
+--
+--   median-rank  predict the training folds' median rank for every validation row.
+--                The intercept-only model, in effect.
+--   modal-tier   predict the training folds' most common tier, mapped back to that
+--                tier's midpoint rank. Strictly stronger than median-rank whenever the
+--                rank distribution is skewed inside the modal band.
+--
+-- Returns { median_rank = diag, modal_tier = diag }, each a TierDiagnostics table.
+function NaiveBaselines(d, target, inst)
+    if #target < PROTOCOL.NFOLD then return nil end
+
+    local strata = {}
+    for n, ti in ipairs(target) do
+        strata[n] = tostring(TierForRank(inst, d.ranks[ti]))
+    end
+
+    local med_resid, mod_resid = {}, {}
+    for rep = 1, PROTOCOL.N_REPEATS do
+        local folds = ShuffledStratifiedFolds(strata, PROTOCOL.NFOLD, PROTOCOL.SEED + rep)
+        for f = 1, #folds do
+            -- Training half of this split.
+            local train_ranks, tier_count = {}, {}
+            for g = 1, #folds do
+                if g ~= f then
+                    for _, ti in ipairs(folds[g]) do
+                        local rank = d.ranks[target[ti]]
+                        train_ranks[#train_ranks + 1] = rank
+                        local t = TierForRank(inst, rank)
+                        tier_count[t] = (tier_count[t] or 0) + 1
+                    end
+                end
+            end
+            if #train_ranks > 0 then
+                table.sort(train_ranks)
+                local median = train_ranks[math.ceil(#train_ranks / 2)]
+
+                local modal, modal_n = nil, -1
+                for t, c in pairs(tier_count) do
+                    -- Ties to the LOWER tier, deterministically: pairs() order is not
+                    -- stable across Lua builds, so an arbitrary tie-break would make this
+                    -- baseline differ between REAPER and the offline runner and break the
+                    -- byte-identical report.
+                    if c > modal_n or (c == modal_n and t < modal) then
+                        modal, modal_n = t, c
+                    end
+                end
+                -- Represent the modal tier by the median rank of its own training rows,
+                -- so it is a rank this baseline could actually have observed.
+                local in_modal = {}
+                for _, rank in ipairs(train_ranks) do
+                    if TierForRank(inst, rank) == modal then in_modal[#in_modal + 1] = rank end
+                end
+                local modal_rank = median
+                if #in_modal > 0 then
+                    modal_rank = in_modal[math.ceil(#in_modal / 2)]
+                end
+
+                for _, ti in ipairs(folds[f]) do
+                    local act = d.ranks[target[ti]]
+                    local ta  = TierForRank(inst, act)
+                    local tm  = TierForRank(inst, median)
+                    local tmo = TierForRank(inst, modal_rank)
+                    med_resid[#med_resid + 1] = { tier_act = ta, tier_pred = tm,
+                                                  dist = math.abs(tm - ta) }
+                    mod_resid[#mod_resid + 1] = { tier_act = ta, tier_pred = tmo,
+                                                  dist = math.abs(tmo - ta) }
+                end
+            end
+        end
+    end
+
+    return {
+        median_rank = TierDiagnostics(med_resid),
+        modal_tier  = TierDiagnostics(mod_resid),
+    }
+end
+
+-- Per-tier breakdown of one model's cross-validated predictions.
+--
+-- Takes the output of CandidateResiduals - the same predictions the headline figures are
+-- computed from, so this is a different slicing of one measurement and never a second
+-- fit. Returns:
+--   tiers    array of { tier, n, share, usable, bias, n_pred } for occupied tiers
+--   pooled   share of all rows within one tier
+--   macro    unweighted mean of the per-tier usable rates
+--   endpoint share of rows in tiers 0-1 and 5-6 that are within one tier
+--   ep_n     how many rows that endpoint figure rests on
+--   matrix   [actual][predicted] = count, for the confusion matrix
+function TierDiagnostics(resid)
+    if not resid or #resid == 0 then return nil end
+
+    local n_by, ok_by, bias_by, pred_n = {}, {}, {}, {}
+    local matrix = {}
+    local pooled_ok, total = 0, 0
+    for _, x in ipairs(resid) do
+        local t = x.tier_act
+        n_by[t]    = (n_by[t] or 0) + 1
+        ok_by[t]   = (ok_by[t] or 0) + ((x.dist <= 1) and 1 or 0)
+        bias_by[t] = (bias_by[t] or 0) + (x.tier_pred - x.tier_act)
+        pred_n[x.tier_pred] = (pred_n[x.tier_pred] or 0) + 1
+        matrix[t] = matrix[t] or {}
+        matrix[t][x.tier_pred] = (matrix[t][x.tier_pred] or 0) + 1
+        total = total + 1
+        if x.dist <= 1 then pooled_ok = pooled_ok + 1 end
+    end
+
+    local tiers, macro_sum, macro_n = {}, 0, 0
+    for t = 0, 6 do
+        local n = n_by[t]
+        if n and n > 0 then
+            local u = ok_by[t] / n
+            macro_sum, macro_n = macro_sum + u, macro_n + 1
+            tiers[#tiers + 1] = {
+                tier = t, n = n, share = n / total, usable = u,
+                bias = bias_by[t] / n, n_pred = pred_n[t] or 0,
+            }
+        end
+    end
+
+    -- Endpoints pooled as one band. Whole tiers here hold 2-4 songs (bass Impossible has
+    -- 4, vocals Warmup has 2), so a per-tier rate at the extremes is one or two songs
+    -- wide and moves on noise. Combining 0-1 and 5-6 gives a band worth reading, which is
+    -- the review's own suggestion for handling sparse tiers.
+    local ep_ok, ep_n = 0, 0
+    for _, t in ipairs({ 0, 1, 5, 6 }) do
+        if n_by[t] then ep_ok, ep_n = ep_ok + ok_by[t], ep_n + n_by[t] end
+    end
+
+    return {
+        tiers    = tiers,
+        pooled   = pooled_ok / total,
+        macro    = (macro_n > 0) and (macro_sum / macro_n) or nil,
+        endpoint = (ep_n > 0) and (ep_ok / ep_n) or nil,
+        ep_n     = ep_n,
+        n        = total,
+        matrix   = matrix,
+    }
 end
 
 ----------------------------------------------------------------------
