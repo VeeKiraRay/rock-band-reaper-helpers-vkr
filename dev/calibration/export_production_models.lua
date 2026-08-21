@@ -23,7 +23,13 @@
 --      xoshiro256**). REAPER and this offline runner therefore disagree on what
 --      SEED = 20260812 means, so a fold-dependent choice made here would not be the one
 --      made there. This file carries its own arithmetic LCG instead - no bitwise ops, no
---      library RNG - so the same CSV produces the same artifact on any Lua.
+--      library RNG - so the same CSV produces the same CONTENT on any Lua.
+--
+--      Content, not bytes: the artifact is written in text mode, so its line endings
+--      follow the platform (CRLF as committed, from Windows). That is fine while nothing
+--      diffs it mechanically. If it ever joins the report and the manifest in the CI
+--      check, switch this writer to 'wb' as they use - and expect a one-time whole-file
+--      diff when the endings normalise.
 --
 --   2. A MODAL VOTE IS KNIFE-EDGE. Guitar's recorded ridge histogram is 0.01 at 36% and
 --      0.1 at 31%; ~40 folds separate them out of 1100. Picking the modal winner would
@@ -36,8 +42,13 @@
 --
 -- This is the exporter's own reproducibility rule. It does NOT re-run, re-open or
 -- second-guess the protocol's SELECTION - the six candidate names below are the
--- protocol's output, copied verbatim, and their factor lists are read out of protocol.lua
--- rather than retyped.
+-- protocol's output, and their factor lists are read out of protocol.lua rather than
+-- retyped.
+--
+-- Since 2026-08-21 those names are no longer merely "copied verbatim" and trusted: the
+-- protocol writes calibration_decision_manifest.lua, this reads it, and a disagreement
+-- with the table below is a hard failure. See the manifest block further down for why
+-- copying-and-trusting was not safe.
 -- ---------------------------------------------------------------------------
 
 local _script = (arg and arg[0]) or 'dev/calibration/export_production_models.lua'
@@ -56,7 +67,12 @@ local _out = _root .. 'lib/reaper_difficulty_models.lua'
 -- 3: more than one trailing origin flag. `keys` used to end with exactly is_lego; it now
 --    ends with one is_<origin> per PROTOCOL.AUX_ORIGINS entry (is_lego, is_rb2), so a
 --    consumer counting back from the end must not assume a single flag.
-local SCHEMA = 3
+-- 4: `n_lego` renamed to `n_aux`. It stopped meaning "Lego rows" when the RB2 disc export
+--    was added as a second auxiliary origin - it has counted Lego PLUS RB2 since schema 3
+--    while still being named for one of them, which the 2026-08-21 peer review flagged as
+--    a provenance field that misreports its own contents. Renamed rather than split
+--    because no consumer needs the breakdown; the report and manifest carry it per origin.
+local SCHEMA = 4
 
 dofile(_dir .. 'difficulty_score.lua')          -- SCORE_FACTOR_KEYS
 dofile(_dir .. 'difficulty_score_vocals.lua')   -- appends the vocal columns to it
@@ -655,7 +671,122 @@ end
 
 io.write(('CSV     : %s\n'):format(_csv))
 io.write(('rows    : %d   factor columns: %d\n'):format(#csv.rows, #SCORE_FACTOR_KEYS))
-io.write(('header  : fingerprint %d\n\n'):format(Fingerprint(csv.header_line)))
+io.write(('header  : fingerprint %d\n'):format(Fingerprint(csv.header_line)))
+
+----------------------------------------------------------------------
+-- The decision manifest, and why this file no longer decides anything
+----------------------------------------------------------------------
+
+-- Until 2026-08-21 the SELECTIONS table above WAS the decision: whatever it named got
+-- refitted and shipped. Nothing could detect it being wrong. The unit tests refit the
+-- model this file names and compare coefficients, so they pass whenever this file is
+-- self-consistent - including when the protocol has since selected something else
+-- entirely. The peer review put it plainly: "tests can pass while the protocol report
+-- has reselected a different model." Drums makes that concrete rather than theoretical -
+-- it has re-selected on four of the last four rescores, three of them on margins just
+-- under the bar.
+--
+-- The protocol now emits calibration_decision_manifest.lua, and that is the authority.
+-- SELECTIONS stays because the rounds and reasoning documented against each entry are
+-- worth keeping in the file that acts on them - but it is now an ASSERTION. If it and
+-- the manifest disagree, this exits rather than picking one, because either could be the
+-- stale half and guessing is how a wrong model ships quietly.
+--
+-- The manifest also carries fingerprints of the inputs the protocol read. If any no
+-- longer matches, the selection was made against data that has since moved and this
+-- refuses to export. That is a stricter check than the header fingerprint above, which
+-- only ever noticed a changed COLUMN SET - a rescore that kept the columns and changed
+-- every value passed it cleanly.
+local _manifest_path = _dir .. 'calibration_decision_manifest.lua'
+
+local function ReadAll(path)
+    local f = io.open(path, 'rb')
+    if not f then return nil end
+    local s = f:read('a')
+    f:close()
+    return s
+end
+
+do
+    local chunk = loadfile(_manifest_path)
+    if not chunk then
+        io.write(('\nNo decision manifest at %s\n'):format(_manifest_path))
+        io.write('Run the protocol first:  lua dev/calibration/run_protocol_offline.lua\n')
+        os.exit(1)
+    end
+    chunk()
+
+    local M = CALIBRATION_MANIFEST
+    if type(M) ~= 'table' or M.schema ~= 1 then
+        Fail('manifest schema is %s, expected 1', tostring(M and M.schema))
+    elseif not M.complete then
+        -- A manifest is only written after every instrument is analysed, so this should
+        -- be unreachable - but an incomplete one describes selections that were never
+        -- finished being made, and exporting from it would be worse than not exporting.
+        Fail('manifest says the protocol run did not complete')
+    else
+        -- Inputs. Recomputed here rather than trusted, which is the entire point.
+        local csv_now  = Fnv1a64Hex(ReadAll(_csv) or '')
+        local prot_now = Fnv1a64Hex(ReadAll(_dir .. 'protocol.lua') or '')
+        local fact_now = Fnv1a64Hex(table.concat(SCORE_FACTOR_KEYS, ','))
+        if M.inputs.csv_hash ~= csv_now then
+            Fail('corpus_scores.csv has changed since the protocol ran (%s -> %s)',
+                M.inputs.csv_hash, csv_now)
+        end
+        if M.inputs.protocol_hash ~= prot_now then
+            Fail('protocol.lua has changed since the protocol ran (%s -> %s)',
+                M.inputs.protocol_hash, prot_now)
+        end
+        if M.inputs.factors_hash ~= fact_now then
+            Fail('the factor set has changed since the protocol ran (%s -> %s)',
+                M.inputs.factors_hash, fact_now)
+        end
+
+        -- Selections, both directions: a manifest entry this file does not expect is as
+        -- much a disagreement as an expectation the manifest does not carry.
+        local expect = {}
+        for _, s in ipairs(SELECTIONS) do expect[s.inst] = s end
+        local seen = {}
+        for _, s in ipairs(M.selections) do
+            seen[s.inst] = true
+            local e = expect[s.inst]
+            if not e then
+                Fail('manifest selects %s, which SELECTIONS does not mention', s.inst)
+            elseif e.candidate ~= s.candidate or e.scale ~= s.scale then
+                Fail('%s: SELECTIONS says %s / %s, the protocol selected %s / %s'
+                    .. ' - update SELECTIONS (and its reasoning) or rerun the protocol',
+                    s.inst, e.candidate, e.scale, s.candidate, s.scale)
+            end
+        end
+        for _, s in ipairs(SELECTIONS) do
+            if not seen[s.inst] then
+                Fail('SELECTIONS expects %s, which the manifest does not select', s.inst)
+            end
+        end
+
+        -- STATUS is a PRODUCT judgment and deliberately not derived from gate_passed: all
+        -- six ship, including three that fail, to get author feedback on the weak ones. So
+        -- this reports the pairing rather than enforcing it - but an instrument with no
+        -- status at all is a real omission.
+        for _, s in ipairs(M.selections) do
+            if not STATUS[s.inst] then Fail('%s has no entry in STATUS', s.inst) end
+        end
+
+        if _errors > 0 then
+            io.write('\nRefusing to export. See dev/calibration/README.md.\n')
+            os.exit(1)
+        end
+
+        io.write(('manifest: %d selections, inputs verified\n'):format(#M.selections))
+        for _, s in ipairs(M.selections) do
+            io.write(('          %-10s %-40s %-10s gate %s / status %s\n'):format(
+                s.inst, s.candidate, s.scale,
+                s.gate_passed and 'PASS' or 'fail', STATUS[s.inst]))
+        end
+    end
+end
+
+io.write('\n')
 
 local models = {}
 
@@ -757,7 +888,7 @@ for _, sel in ipairs(SELECTIONS) do
                     conc      = ConcentrationThresholds(d, target, pos),
                     corr      = FactorCorrelations(d, target, cand.keys, pos),
                     n_target  = #target,
-                    n_lego    = #extra,
+                    n_aux     = #extra,
                 }
 
                 -- Self-check: the artifact, applied through the shipped predictor, must
@@ -840,6 +971,10 @@ W([[
 --               '|'; readers must try both orderings.
 --   status      model maturity for the UI badge. Describes validation against noisy
 --               official ranks, NOT the probability that a prediction is correct.
+--   n_target    rb3_dlc rows this model was fitted on - the development set.
+--   n_aux       auxiliary-origin rows (Lego plus the RB2 disc export) that always train
+--               at their declared weight and are never predicted. Called n_lego before
+--               schema 4, by which point it had counted two origins for a while.
 ]])
 
 W(('\nRB_DIFFICULTY_MODELS_SCHEMA = %d\n'):format(SCHEMA))
@@ -858,7 +993,7 @@ for _, m in ipairs(models) do
     W(('    rank_hi   = %s,\n'):format(Num(m.rank_hi)))
     W(('    intercept = %s,\n'):format(Num(m.intercept)))
     W(('    n_target  = %d,\n'):format(m.n_target))
-    W(('    n_lego    = %d,\n'):format(m.n_lego))
+    W(('    n_aux     = %d,\n'):format(m.n_aux))
 
     W('    keys = {\n')
     for _, k in ipairs(m.keys) do W(('        %s,\n'):format(Quote(k))) end

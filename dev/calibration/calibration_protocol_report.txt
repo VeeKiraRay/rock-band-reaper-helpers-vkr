@@ -1,7 +1,7 @@
 ======  Difficulty calibration - LOCKED PROTOCOL  ======
 
 corpus_scores.csv  07aae114239c9dbb  1140165 bytes, 2101 rows
-protocol.lua       3a49e41238c465e7
+protocol.lua       a1e08f2f8a4b3a25
 factor set         73d526ddb35359fe  114 columns
 interpreter        Lua 5.4
 
@@ -87,10 +87,10 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
     iwantitall2              rank 351  predicted  263  said tier 3, actual 5  (2 off)
     happyxmas                rank 150  predicted  228  said tier 3, actual 1  (2 off)
 
-  -- release gate, read from the pessimistic end of each interval --
-    usable lower bound :  91.64%   (floor 90%)
-    miss upper bound   :   1.36%   (ceiling 5%)
-    rho (mean)         : +0.862   (floor 0.70)
+  -- release gate --
+    usable lower bound :  91.64%   (floor 90%, one-sided 95% Wilson)
+    miss upper bound   :   1.36%   (ceiling 5%, one-sided 95% Wilson)
+    rho (MEAN, not a bound): +0.862   (floor 0.70)  split range [+0.860, +0.864]
     -> PASSES the gate on the development set.
 
 ==================  BASS  ==================
@@ -189,10 +189,10 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
     theprisoner              rank 380  predicted  277  said tier 3, actual 5  (2 off)
     somuchtosay              rank 300  predicted  201  said tier 2, actual 4  (2 off)
 
-  -- release gate, read from the pessimistic end of each interval --
-    usable lower bound :  91.68%   (floor 90%)
-    miss upper bound   :   1.35%   (ceiling 5%)
-    rho (mean)         : +0.802   (floor 0.70)
+  -- release gate --
+    usable lower bound :  91.68%   (floor 90%, one-sided 95% Wilson)
+    miss upper bound   :   1.35%   (ceiling 5%, one-sided 95% Wilson)
+    rho (MEAN, not a bound): +0.802   (floor 0.70)  split range [+0.799, +0.804]
     -> PASSES the gate on the development set.
 
 ==================  DRUM  ==================
@@ -301,10 +301,10 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
     urgent                   rank 107  predicted  154  said tier 2, actual 0  (2 off)
     wewerentborn             rank 133  predicted  180  said tier 3, actual 1  (2 off)
 
-  -- release gate, read from the pessimistic end of each interval --
-    usable lower bound :  94.37%   (floor 90%)
-    miss upper bound   :   1.35%   (ceiling 5%)
-    rho (mean)         : +0.894   (floor 0.70)
+  -- release gate --
+    usable lower bound :  94.37%   (floor 90%, one-sided 95% Wilson)
+    miss upper bound   :   1.35%   (ceiling 5%, one-sided 95% Wilson)
+    rho (MEAN, not a bound): +0.894   (floor 0.70)  split range [+0.892, +0.896]
     -> PASSES the gate on the development set.
 
 ==================  VOCALS  ==================
@@ -531,10 +531,10 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
     dontstopmenow            rank 457  predicted  280  said tier 4, actual 6  (2 off)
     spoonman2                rank 437  predicted  286  said tier 4, actual 6  (2 off)
 
-  -- release gate, read from the pessimistic end of each interval --
-    usable lower bound :  85.42%   (floor 90%)
-    miss upper bound   :   4.32%   (ceiling 5%)
-    rho (mean)         : +0.674   (floor 0.70)
+  -- release gate --
+    usable lower bound :  85.42%   (floor 90%, one-sided 95% Wilson)
+    miss upper bound   :   4.32%   (ceiling 5%, one-sided 95% Wilson)
+    rho (MEAN, not a bound): +0.674   (floor 0.70)  split range [+0.664, +0.685]
     -> DOES NOT PASS:
        - usable lower bound 85.4% is below the 90% floor
        - rho 0.674 is below the 0.70 floor
@@ -651,10 +651,10 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
     bluemonday               rank 180  predicted  274  said tier 3, actual 1  (2 off)
     wedidntstartthefire      rank 199  predicted  292  said tier 3, actual 1  (2 off)
 
-  -- release gate, read from the pessimistic end of each interval --
-    usable lower bound :  89.94%   (floor 90%)
-    miss upper bound   :   1.08%   (ceiling 5%)
-    rho (mean)         : +0.878   (floor 0.70)
+  -- release gate --
+    usable lower bound :  89.94%   (floor 90%, one-sided 95% Wilson)
+    miss upper bound   :   1.08%   (ceiling 5%, one-sided 95% Wilson)
+    rho (MEAN, not a bound): +0.878   (floor 0.70)  split range [+0.874, +0.882]
     -> DOES NOT PASS:
        - usable lower bound 89.9% is below the 90% floor
 
@@ -766,10 +766,10 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
     ghostofperdition         rank 421  predicted  304  said tier 3, actual 5  (2 off)
     captainjack              rank 324  predicted  438  said tier 5, actual 3  (2 off)
 
-  -- release gate, read from the pessimistic end of each interval --
-    usable lower bound :  85.89%   (floor 90%)
-    miss upper bound   :   2.02%   (ceiling 5%)
-    rho (mean)         : +0.861   (floor 0.70)
+  -- release gate --
+    usable lower bound :  85.89%   (floor 90%, one-sided 95% Wilson)
+    miss upper bound   :   2.02%   (ceiling 5%, one-sided 95% Wilson)
+    rho (MEAN, not a bound): +0.861   (floor 0.70)  split range [+0.858, +0.863]
     -> DOES NOT PASS:
        - usable lower bound 85.9% is below the 90% floor
 
@@ -777,10 +777,20 @@ Reading this report:
   * The SELECTED line is the model this protocol chooses. It is not necessarily
     the highest mean - a bigger model has to beat a simpler one across repeats,
     not just on average once.
-  * The gate reads interval LOWER bounds, so a pass here is harder than the
-    point estimates the earlier rounds reported. A point estimate above 90% with
-    a lower bound below it means the corpus is too small to prove the claim yet,
-    not that the model got worse.
+  * The usable and miss gates read interval bounds at the pessimistic end, so a
+    pass on them is harder than the point estimates the earlier rounds reported.
+    A point estimate above 90% with a lower bound below it means the corpus is too
+    small to prove the claim yet, not that the model got worse.
+  * RHO IS GATED ON ITS MEAN, not on a bound - the one figure here that is not
+    read pessimistically. Its printed split range is repeat-to-repeat spread, not
+    a confidence interval: the ten repeats reuse the same songs, so they are
+    correlated reruns and their spread understates real uncertainty. A defensible
+    lower bound for rho needs packs as the resampling unit.
+  * These are DEVELOPMENT-SET figures and the Wilson bounds are not confirmatory
+    intervals. The same repeated-CV results both choose the candidate and report
+    its quality, so the bound on the selected model is optimistic by an unmeasured
+    amount. No reserved test partition has been drawn, and none can be drawn from
+    these rows - see PackIsReserved in protocol.lua.
   * MAE is deliberately absent: it is not comparable between the rank and
     log(rank) scales, and comparing it across them would pick the wrong model.
 

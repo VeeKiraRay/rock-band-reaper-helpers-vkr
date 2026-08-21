@@ -315,7 +315,7 @@ Test.it('loads, declares a schema this build understands, and covers six instrum
     -- 2 added `corr`; 3 allows more than one trailing origin flag. Bumping this
     -- deliberately is the point of the field: a stale artifact should fail loudly here
     -- rather than be read as a plausible but wrong model.
-    Test.expect(RB_DIFFICULTY_MODELS_SCHEMA == 3,
+    Test.expect(RB_DIFFICULTY_MODELS_SCHEMA == 4,
         'unexpected artifact schema ' .. tostring(RB_DIFFICULTY_MODELS_SCHEMA))
     Test.expect(#RB_DIFFICULTY_MODEL_ORDER == 6,
         'expected 6 models, got ' .. #RB_DIFFICULTY_MODEL_ORDER)
@@ -448,7 +448,7 @@ local function Rebuild(inst)
         or  function(v) return v end
 
     local X, ys, ws, rows = {}, {}, {}, {}
-    local n_target, n_lego = 0, 0
+    local n_target, n_aux = 0, 0
     local rank_lo, rank_hi = math.huge, -math.huge
 
     for _, row in ipairs(_csv.rows) do
@@ -485,12 +485,12 @@ local function Rebuild(inst)
                     if rank > rank_hi then rank_hi = rank end
                     rows[#rows + 1] = { factors = vals, rank = rank }
                 else
-                    n_lego = n_lego + 1
+                    n_aux = n_aux + 1
                 end
             end
         end
     end
-    return m, X, ys, ws, rows, n_target, n_lego, rank_lo, rank_hi
+    return m, X, ys, ws, rows, n_target, n_aux, rank_lo, rank_hi
 end
 
 Test.it('training row counts match the protocol report', function()
@@ -504,12 +504,12 @@ Test.it('training row counts match the protocol report', function()
         vocals = { 328, 60 }, keys = { 266, 0 },  real_keys = { 266, 0 },
     }
     for inst, want in pairs(EXPECTED) do
-        local m, _, _, _, _, n_target, n_lego = Rebuild(inst)
+        local m, _, _, _, _, n_target, n_aux = Rebuild(inst)
         Test.expect(n_target == want[1],
             ('%s: %d development rows, expected %d'):format(inst, n_target, want[1]))
-        Test.expect(n_lego == want[2],
-            ('%s: %d lego rows, expected %d'):format(inst, n_lego, want[2]))
-        Test.expect(m.n_target == want[1] and m.n_lego == want[2],
+        Test.expect(n_aux == want[2],
+            ('%s: %d auxiliary rows, expected %d'):format(inst, n_aux, want[2]))
+        Test.expect(m.n_target == want[1] and m.n_aux == want[2],
             inst .. ': the artifact records different row counts than the CSV holds')
     end
 end)

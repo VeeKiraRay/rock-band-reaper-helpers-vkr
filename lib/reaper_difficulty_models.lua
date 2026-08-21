@@ -32,8 +32,12 @@
 --               '|'; readers must try both orderings.
 --   status      model maturity for the UI badge. Describes validation against noisy
 --               official ranks, NOT the probability that a prediction is correct.
+--   n_target    rb3_dlc rows this model was fitted on - the development set.
+--   n_aux       auxiliary-origin rows (Lego plus the RB2 disc export) that always train
+--               at their declared weight and are never predicted. Called n_lego before
+--               schema 4, by which point it had counted two origins for a while.
 
-RB_DIFFICULTY_MODELS_SCHEMA = 3
+RB_DIFFICULTY_MODELS_SCHEMA = 4
 RB_DIFFICULTY_MODELS_CSV_FINGERPRINT = 864960590
 
 RB_DIFFICULTY_MODEL_ORDER = {
@@ -56,7 +60,7 @@ RB_DIFFICULTY_MODELS = {
     rank_hi   = 605,
     intercept = 5.4827260558871345,
     n_target  = 327,
-    n_lego    = 60,
+    n_aux     = 60,
     keys = {
         "playing_s",
         "attack_density_avg",
@@ -158,7 +162,7 @@ RB_DIFFICULTY_MODELS = {
     rank_hi   = 480,
     intercept = 5.365619867489438,
     n_target  = 330,
-    n_lego    = 60,
+    n_aux     = 60,
     keys = {
         "total_changes",
         "density_peak",
@@ -200,7 +204,7 @@ RB_DIFFICULTY_MODELS = {
     rank_hi   = 550,
     intercept = 5.437034571602421,
     n_target  = 328,
-    n_lego    = 60,
+    n_aux     = 60,
     keys = {
         "playing_s",
         "density_avg",
@@ -329,7 +333,7 @@ RB_DIFFICULTY_MODELS = {
     rank_hi   = 495,
     intercept = 281.015037593985,
     n_target  = 266,
-    n_lego    = 0,
+    n_aux     = 0,
     keys = {
         "total_changes",
         "attack_density_peak",
@@ -382,7 +386,7 @@ RB_DIFFICULTY_MODELS = {
     rank_hi   = 505,
     intercept = 293.70300751879694,
     n_target  = 266,
-    n_lego    = 0,
+    n_aux     = 0,
     keys = {
         "total_changes",
         "attack_density_peak",
@@ -434,7 +438,7 @@ RB_DIFFICULTY_MODELS = {
     rank_hi   = 495,
     intercept = 5.502131002931569,
     n_target  = 328,
-    n_lego    = 60,
+    n_aux     = 60,
     keys = {
         "syl_density_avg",
         "syl_density_peak",

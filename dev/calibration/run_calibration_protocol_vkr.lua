@@ -120,7 +120,12 @@ do
     if lf then lf:write(tostring(os.time()), '\n'); lf:close() end
 end
 
-local _rf = io.open(_part, 'w')
+-- BINARY MODE, and the CI check depends on it. Lua's text mode translates '\n' to the
+-- platform's line ending, so the same run writes CRLF under REAPER on Windows and LF on
+-- a Linux runner. The tracked report would then differ from a regenerated one on every
+-- CI run, for a reason that has nothing to do with the calibration. 'wb' makes the file
+-- byte-identical everywhere, which is the property the whole check rests on.
+local _rf = io.open(_part, 'wb')
 
 local function Msg(s)
     r.ShowConsoleMsg(s)
@@ -308,7 +313,7 @@ local function AnalyseInstrument(csv, inst)
     Msg(('  reserved test set : NOT DRAWN - this phase validates the approach, not a release\n'))
     if #target < 40 then
         Msg('  too few development rows for this protocol\n')
-        return
+        return nil
     end
 
     local pos = {}
@@ -321,7 +326,7 @@ local function AnalyseInstrument(csv, inst)
     local sel, leader, gain, win_share = SelectCandidate(results, inst)
     if not sel then
         Msg('\n  no candidate produced a result\n')
-        return
+        return nil
     end
 
     Msg('\n  -- selection --\n')
@@ -390,19 +395,43 @@ local function AnalyseInstrument(csv, inst)
     end
 
     local passed, reasons = GateVerdict(sel)
-    Msg('\n  -- release gate, read from the pessimistic end of each interval --\n')
-    Msg(('    usable lower bound : %6.2f%%   (floor %.0f%%)\n')
+    Msg('\n  -- release gate --\n')
+    Msg(('    usable lower bound : %6.2f%%   (floor %.0f%%, one-sided 95%% Wilson)\n')
         :format(sel.usable_lower * 100, PROTOCOL.USABLE_FLOOR * 100))
-    Msg(('    miss upper bound   : %6.2f%%   (ceiling %.0f%%)\n')
+    Msg(('    miss upper bound   : %6.2f%%   (ceiling %.0f%%, one-sided 95%% Wilson)\n')
         :format(sel.miss_upper * 100, PROTOCOL.MISS_CEILING * 100))
-    Msg(('    rho (mean)         : %+6.3f   (floor %.2f)\n')
-        :format(sel.rho_mean, PROTOCOL.RHO_FLOOR))
+    -- rho is gated on the MEAN, unlike the two above. Printed with its across-repeat
+    -- spread so that asymmetry is visible rather than implied away by the section
+    -- heading, which used to claim every figure here was a pessimistic bound.
+    Msg(('    rho (MEAN, not a bound): %+.3f   (floor %.2f)  split range [%+.3f, %+.3f]\n')
+        :format(sel.rho_mean, PROTOCOL.RHO_FLOOR,
+                sel.rho_lo_split or sel.rho_mean, sel.rho_hi_split or sel.rho_mean))
     if passed then
         Msg('    -> PASSES the gate on the development set.\n')
     else
         Msg('    -> DOES NOT PASS:\n')
         for _, why in ipairs(reasons) do Msg('       - ' .. why .. '\n') end
     end
+
+    -- The decision, as data. Everything the exporter needs in order to stop taking this
+    -- script's word for it via a hand-copied table - see the manifest block in Main.
+    return {
+        inst         = inst,
+        candidate    = sel.candidate,
+        scale        = sel.scale,
+        n_features   = sel.n_features,
+        n_target     = #target,
+        n_aux        = #aux,
+        n_weird      = #weird,
+        n_rows       = sel.n_rows,
+        usable_mean  = sel.usable_mean,
+        usable_lower = sel.usable_lower,
+        miss_upper   = sel.miss_upper,
+        rho_mean     = sel.rho_mean,
+        rho_lo_split = sel.rho_lo_split,
+        rho_hi_split = sel.rho_hi_split,
+        gate_passed  = passed,
+    }
 end
 
 ----------------------------------------------------------------------
@@ -445,12 +474,18 @@ end
 -- git already dates the file. For the same reason the RUNTIME (REAPER or the offline
 -- driver) is printed to the console only: the two are meant to agree byte for byte,
 -- and writing which one ran would guarantee they never do.
+-- Held in locals rather than inlined: the decision manifest at the end of this run
+-- records the same three values, and computing them twice is how the report and the
+-- manifest would eventually come to describe different inputs.
 local _csv_hash, _csv_bytes = FnvFile(_csv)
+local _protocol_hash        = FnvFile(_dir .. 'protocol.lua')
+local _factors_hash         = Fnv1a64Hex(table.concat(SCORE_FACTOR_KEYS, ','))
+
 Msg(('\ncorpus_scores.csv  %s  %d bytes, %d rows\n')
     :format(_csv_hash or '(unreadable)', _csv_bytes or -1, #csv.rows))
-Msg(('protocol.lua       %s\n'):format(FnvFile(_dir .. 'protocol.lua') or '(unreadable)'))
+Msg(('protocol.lua       %s\n'):format(_protocol_hash or '(unreadable)'))
 Msg(('factor set         %s  %d columns\n')
-    :format(Fnv1a64Hex(table.concat(SCORE_FACTOR_KEYS, ',')), #SCORE_FACTOR_KEYS))
+    :format(_factors_hash, #SCORE_FACTOR_KEYS))
 Msg(('interpreter        %s\n'):format(_VERSION))
 MsgConsole(('runtime            %s\n'):format(r.GetAppVersion and 'REAPER' or 'offline driver'))
 
@@ -468,18 +503,121 @@ for _, row in ipairs(csv.rows) do
     end
 end
 
-for _, inst in ipairs(order) do AnalyseInstrument(csv, inst) end
+local decisions = {}
+for _, inst in ipairs(order) do
+    local dec = AnalyseInstrument(csv, inst)
+    if dec then decisions[#decisions + 1] = dec end
+end
 
 Msg('\n')
 Msg('Reading this report:\n')
 Msg('  * The SELECTED line is the model this protocol chooses. It is not necessarily\n')
 Msg('    the highest mean - a bigger model has to beat a simpler one across repeats,\n')
 Msg('    not just on average once.\n')
-Msg('  * The gate reads interval LOWER bounds, so a pass here is harder than the\n')
-Msg('    point estimates the earlier rounds reported. A point estimate above 90% with\n')
-Msg('    a lower bound below it means the corpus is too small to prove the claim yet,\n')
-Msg('    not that the model got worse.\n')
+Msg('  * The usable and miss gates read interval bounds at the pessimistic end, so a\n')
+Msg('    pass on them is harder than the point estimates the earlier rounds reported.\n')
+Msg('    A point estimate above 90% with a lower bound below it means the corpus is too\n')
+Msg('    small to prove the claim yet, not that the model got worse.\n')
+Msg('  * RHO IS GATED ON ITS MEAN, not on a bound - the one figure here that is not\n')
+Msg('    read pessimistically. Its printed split range is repeat-to-repeat spread, not\n')
+Msg('    a confidence interval: the ten repeats reuse the same songs, so they are\n')
+Msg('    correlated reruns and their spread understates real uncertainty. A defensible\n')
+Msg('    lower bound for rho needs packs as the resampling unit.\n')
+Msg('  * These are DEVELOPMENT-SET figures and the Wilson bounds are not confirmatory\n')
+Msg('    intervals. The same repeated-CV results both choose the candidate and report\n')
+Msg('    its quality, so the bound on the selected model is optimistic by an unmeasured\n')
+Msg('    amount. No reserved test partition has been drawn, and none can be drawn from\n')
+Msg('    these rows - see PackIsReserved in protocol.lua.\n')
 Msg('  * MAE is deliberately absent: it is not comparable between the rank and\n')
 Msg('    log(rank) scales, and comparing it across them would pick the wrong model.\n')
+
+----------------------------------------------------------------------
+-- The decision manifest
+----------------------------------------------------------------------
+
+-- Machine-readable output of everything this run DECIDED, plus fingerprints of what it
+-- decided it from.
+--
+-- WHY IT EXISTS. export_production_models.lua turns a selection into the coefficients
+-- that ship, and until now it learned that selection from a table typed by hand into its
+-- own source. That table cannot be wrong in a way anything detects: the unit tests refit
+-- the model the exporter names and compare coefficients, so they pass whenever the
+-- exporter is self-consistent - including when the protocol has since selected something
+-- else. The 2026-08-21 peer review named this exactly: "tests can pass while the protocol
+-- report has reselected a different model."
+--
+-- So the protocol now writes down what it chose, and the exporter reads it and refuses to
+-- run against inputs that have moved. The exporter still carries its documented
+-- expectation of each selection - the rounds and reasoning are worth keeping in the file
+-- that acts on them - but that table is now an ASSERTION checked against this manifest
+-- rather than the source of truth.
+--
+-- Written last, and only on a completed run, so a killed run cannot leave a manifest
+-- describing selections it never finished making. Same reasoning as the report's .part.
+--
+-- A Lua table rather than a text format: the only consumer is a Lua script, dofile is the
+-- whole parser, and it stays diff-readable in review.
+local _manifest = _dir .. 'calibration_decision_manifest.lua'
+do
+    -- 'wb' for the same reason as the report - see the _rf comment.
+    local mf, mferr = io.open(_manifest, 'wb')
+    if not mf then
+        MsgConsole(('\n[could not write %s: %s]\n'):format(_manifest, tostring(mferr)))
+    else
+        local function Q(s) return ('%q'):format(s) end
+        mf:write('-- GENERATED by run_calibration_protocol_vkr.lua. Do not hand-edit.\n')
+        mf:write('--\n')
+        mf:write("-- The protocol's decisions, and fingerprints of the inputs they were made\n")
+        mf:write('-- from. export_production_models.lua reads this and refuses to export if any\n')
+        mf:write('-- fingerprint no longer matches the file it describes.\n')
+        mf:write('--\n')
+        mf:write('-- Regenerate with:  lua dev/calibration/run_protocol_offline.lua\n\n')
+        mf:write('CALIBRATION_MANIFEST = {\n')
+        mf:write('    schema   = 1,\n')
+        -- Only reached after every instrument has been analysed, so this flag being true
+        -- is a statement about the whole file and not just its header.
+        mf:write('    complete = true,\n')
+        mf:write('    inputs = {\n')
+        mf:write(('        csv_hash      = %s,\n'):format(Q(_csv_hash or '')))
+        mf:write(('        csv_bytes     = %d,\n'):format(_csv_bytes or -1))
+        mf:write(('        csv_rows      = %d,\n'):format(#csv.rows))
+        mf:write(('        protocol_hash = %s,\n'):format(Q(_protocol_hash or '')))
+        mf:write(('        factors_hash  = %s,\n'):format(Q(_factors_hash or '')))
+        mf:write(('        factors_n     = %d,\n'):format(#SCORE_FACTOR_KEYS))
+        mf:write(('        lua           = %s,\n'):format(Q(_VERSION)))
+        mf:write('    },\n')
+        -- The thresholds in force when these verdicts were reached. A gate edited after
+        -- the fact would otherwise leave the verdicts below looking as though they had
+        -- been graded against the new numbers.
+        mf:write('    protocol = {\n')
+        mf:write(('        n_repeats     = %d,\n'):format(PROTOCOL.N_REPEATS))
+        mf:write(('        nfold         = %d,\n'):format(PROTOCOL.NFOLD))
+        mf:write(('        inner_fold    = %d,\n'):format(PROTOCOL.INNER_FOLD))
+        mf:write(('        seed          = %d,\n'):format(PROTOCOL.SEED))
+        mf:write(('        usable_floor  = %.4f,\n'):format(PROTOCOL.USABLE_FLOOR))
+        mf:write(('        miss_ceiling  = %.4f,\n'):format(PROTOCOL.MISS_CEILING))
+        mf:write(('        rho_floor     = %.4f,\n'):format(PROTOCOL.RHO_FLOOR))
+        mf:write('    },\n')
+        mf:write('    selections = {\n')
+        for _, dc in ipairs(decisions) do
+            mf:write('        {\n')
+            mf:write(('            inst = %s, candidate = %s, scale = %s,\n')
+                :format(Q(dc.inst), Q(dc.candidate), Q(dc.scale)))
+            mf:write(('            n_features = %d, n_target = %d, n_aux = %d, n_weird = %d,\n')
+                :format(dc.n_features, dc.n_target, dc.n_aux, dc.n_weird))
+            mf:write(('            usable_mean = %.6f, usable_lower = %.6f, miss_upper = %.6f,\n')
+                :format(dc.usable_mean, dc.usable_lower, dc.miss_upper))
+            mf:write(('            rho_mean = %.6f, rho_lo_split = %.6f, rho_hi_split = %.6f,\n')
+                :format(dc.rho_mean, dc.rho_lo_split or dc.rho_mean,
+                        dc.rho_hi_split or dc.rho_mean))
+            mf:write(('            gate_passed = %s,\n'):format(tostring(dc.gate_passed)))
+            mf:write('        },\n')
+        end
+        mf:write('    },\n')
+        mf:write('}\n')
+        mf:close()
+        MsgConsole(('\n[decision manifest written to %s]\n'):format(_manifest))
+    end
+end
 
 CloseReport()

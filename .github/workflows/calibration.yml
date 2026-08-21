@@ -60,6 +60,20 @@ jobs:
           tail -1 dev/calibration/calibration_protocol_report.txt | grep -qx '\[report complete\]' \
             || { echo "The regenerated report has no completion footer - the run died partway."; exit 1; }
 
+      # The manifest is what export_production_models.lua reads to decide which model to
+      # freeze, so a stale one is how a superseded selection reaches lib/. It is written
+      # by the same run and checked the same way.
+      - name: Decision manifest must match the tracked one
+        run: |
+          if ! git diff --exit-code -- dev/calibration/calibration_decision_manifest.lua; then
+            echo
+            echo "The tracked decision manifest is not what the protocol now decides."
+            echo "If a selection changed, the exporter will refuse until SELECTIONS in"
+            echo "export_production_models.lua is updated with the reasoning, and"
+            echo "lib/reaper_difficulty_models.lua is regenerated."
+            exit 1
+          fi
+
       - name: Report must match the tracked one
         run: |
           if ! git diff --exit-code -- dev/calibration/calibration_protocol_report.txt; then

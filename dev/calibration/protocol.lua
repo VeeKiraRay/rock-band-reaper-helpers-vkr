@@ -2171,6 +2171,21 @@ function RunProtocol(d, target, extra, inst, factor_pos)
                 -- changes. Reported, but NOT the gate's interval - see WilsonBounds.
                 rec.usable_lo_split = Quantile(rec.usable, 0.10)
                 rec.usable_hi_split = Quantile(rec.usable, 0.90)
+                -- The same for rho, and it is reported for a specific reason: the gate
+                -- reads rho's MEAN while reading the pessimistic end of everything else,
+                -- and the report used to describe itself as reading lower bounds
+                -- throughout. The 2026-08-21 peer review caught that. Showing the spread
+                -- makes the asymmetry visible instead of hidden behind one number.
+                --
+                -- This is a SPLIT range, not a confidence interval, and the difference
+                -- matters more here than for usable%. usable% has an honest binomial
+                -- interval on the row count (Wilson, below); rho has no such closed form,
+                -- and these ten repeats are correlated reruns over the same songs, so
+                -- their spread understates real uncertainty. A defensible lower bound for
+                -- rho needs the pack bootstrap - phase 4 - and until that exists rho is
+                -- gated on the mean and the report says so plainly.
+                rec.rho_lo_split    = Quantile(rec.rho, 0.10)
+                rec.rho_hi_split    = Quantile(rec.rho, 0.90)
                 -- The gate's interval: binomial on the row count, the dominant term.
                 rec.usable_lower = WilsonLower(rec.usable_mean, rec.n_rows, PROTOCOL.Z)
                 rec.miss_upper   = WilsonUpper(rec.miss_mean,   rec.n_rows, PROTOCOL.Z)
