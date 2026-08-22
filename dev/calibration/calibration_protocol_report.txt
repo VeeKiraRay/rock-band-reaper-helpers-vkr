@@ -1,7 +1,7 @@
 ======  Difficulty calibration - LOCKED PROTOCOL  ======
 
 corpus_scores.csv  07aae114239c9dbb  1140165 bytes, 2101 rows
-protocol.lua       c60fe760e765a315
+protocol.lua       15465f539c7c1020
 factor set         73d526ddb35359fe  114 columns
 interpreter        Lua 5.4
 
@@ -130,8 +130,8 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
     rho           0.865    0.019    0.830    0.892
 
     clustering cost, against the binomial sd Wilson assumes:
-      pooled   bootstrap sd 0.0125 vs binomial 0.0119  ->  design 1.05, effective n 299 of 327
-      endpoint bootstrap sd 0.0302 vs binomial 0.0176  ->  design 1.71, effective n 112 of 327
+      pooled   bootstrap sd 0.0125 vs binomial 0.0119 over 327 rows  ->  design 1.05, effective n 299
+      endpoint bootstrap sd 0.0302 vs binomial 0.0300 over 113 rows  ->  design 1.00, effective n 112
 
   -- pack-grouped folds, SELECTED model, matched seeds --
     170 packs over 327 rows, largest 15 rows (4.6% of the corpus)
@@ -146,6 +146,10 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
     miss upper bound   :   1.36%   (ceiling 5%, one-sided 95% Wilson)
     rho lower bound    : +0.830   (floor 0.70, pack bootstrap p05)
        mean +0.862, split range [+0.859, +0.866] - split noise, not uncertainty
+    endpoint band      :  83.17%   (floor 80%, pack bootstrap p05, tiers 0-1 + 5-6)
+       point 88.50% over 113 rows; design effect 1.00, so a binomial bound
+       would land in much the same place - the bootstrap is preferred for
+       assuming nothing, not because Wilson fails on this band.
     -> PASSES the gate on the development set.
 
 ==================  BASS  ==================
@@ -227,12 +231,12 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
 
   -- worst 10 by tier distance, SELECTED model, averaged over repeats --
     wanteddeadoralive2       rank 315  predicted  179  said tier 1, actual 4  (3 off)
-    dreampolice              rank 299  predicted  480  said tier 6, actual 4  (2 off)
+    dreampolice              rank 299  predicted  471  said tier 6, actual 4  (2 off)
     bluemonday               rank 230  predicted  397  said tier 5, actual 3  (2 off)
     dameaire2                rank 333  predicted  195  said tier 2, actual 4  (2 off)
     welcometothefamily       rank 379  predicted  251  said tier 3, actual 5  (2 off)
     spoonman2                rank 400  predicted  274  said tier 3, actual 5  (2 off)
-    pulseofthemaggots        rank 340  predicted  460  said tier 6, actual 4  (2 off)
+    pulseofthemaggots        rank 340  predicted  450  said tier 6, actual 4  (2 off)
     5minutesalone            rank 439  predicted  330  said tier 4, actual 6  (2 off)
     theprisoner              rank 380  predicted  271  said tier 3, actual 5  (2 off)
     iveseenallgoodpeople     rank 365  predicted  258  said tier 3, actual 5  (2 off)
@@ -240,10 +244,10 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
   -- worst 10 by tier distance, MEAN LEADER, averaged over repeats --
     wanteddeadoralive2       rank 315  predicted  179  said tier 1, actual 4  (3 off)
     bluemonday               rank 230  predicted  384  said tier 5, actual 3  (2 off)
-    pulseofthemaggots        rank 340  predicted  480  said tier 6, actual 4  (2 off)
     dameaire2                rank 333  predicted  205  said tier 2, actual 4  (2 off)
     spoonman2                rank 400  predicted  274  said tier 3, actual 5  (2 off)
     welcometothefamily       rank 379  predicted  256  said tier 3, actual 5  (2 off)
+    pulseofthemaggots        rank 340  predicted  463  said tier 6, actual 4  (2 off)
     iveseenallgoodpeople     rank 365  predicted  256  said tier 3, actual 5  (2 off)
     5minutesalone            rank 439  predicted  332  said tier 4, actual 6  (2 off)
     theprisoner              rank 380  predicted  277  said tier 3, actual 5  (2 off)
@@ -256,8 +260,8 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
      2      85    25.8%   100.0%       -0.07           137
      3      72    21.8%    97.2%       -0.44            77
      4      33    10.0%    78.8%       -0.88            17
-     5      24     7.3%    79.2%       -0.67            10
-     6       4     1.2%    75.0%       -1.00             6
+     5      24     7.3%    79.2%       -0.71            11
+     6       4     1.2%    75.0%       -1.00             5
     pooled    94.24%   what the gate reads - an adversarially curated mix
     macro     89.38%   equal weight per occupied tier (-4.86 vs pooled)
     ends      92.86%   tiers 0-1 and 5-6 pooled, 140 rows (42% of corpus)
@@ -269,7 +273,7 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
       2    .   20   51   14    .    .    .
       3    .    1   35   32    3    1    .
       4    .    1    4   22    4    .    2
-      5    .    .    .    5    9    7    3
+      5    .    .    .    5    9    8    2
       6    .    .    .    .    1    2    1
 
   -- naive baselines, same folds and seeds, fitted out of fold --
@@ -285,8 +289,8 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
     rho           0.802    0.031    0.746    0.849
 
     clustering cost, against the binomial sd Wilson assumes:
-      pooled   bootstrap sd 0.0122 vs binomial 0.0128  ->  design 0.95, effective n 368 of 330
-      endpoint bootstrap sd 0.0219 vs binomial 0.0142  ->  design 1.55, effective n 138 of 330
+      pooled   bootstrap sd 0.0122 vs binomial 0.0128 over 330 rows  ->  design 0.95, effective n 368
+      endpoint bootstrap sd 0.0219 vs binomial 0.0218 over 140 rows  ->  design 1.01, effective n 138
     NOTE: 4.7% of resamples miss a tier entirely, so their macro is a
     mean over fewer bands - that widens the macro interval beyond pack
     sampling alone. See PackBootstrap.
@@ -306,6 +310,10 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
     miss upper bound   :   1.35%   (ceiling 5%, one-sided 95% Wilson)
     rho lower bound    : +0.746   (floor 0.70, pack bootstrap p05)
        mean +0.802, split range [+0.799, +0.804] - split noise, not uncertainty
+    endpoint band      :  89.03%   (floor 80%, pack bootstrap p05, tiers 0-1 + 5-6)
+       point 92.86% over 140 rows; design effect 1.01, so a binomial bound
+       would land in much the same place - the bootstrap is preferred for
+       assuming nothing, not because Wilson fails on this band.
     -> PASSES the gate on the development set.
 
 ==================  DRUM  ==================
@@ -349,7 +357,7 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
   full_drum@noroll_density   log(rank)   26   95.98% [95.4-96.6]   93.78%           0.30%  +0.892   90.14%
   full_drum@noroll+complex   rank        27   95.82% [95.7-96.1]   93.60%           0.30%  +0.893   92.31%
   full_drum@noroll+complex   log(rank)   27   96.28% [95.7-97.0]   94.15%           0.30%  +0.895   90.10%
-  full_drum@noroll@complex   rank        26   95.70% [95.1-96.1]   93.45%           0.30%  +0.892   92.22%
+  full_drum@noroll@complex   rank        26   95.70% [95.1-96.1]   93.45%           0.30%  +0.891   92.22%
   full_drum@noroll@complex   log(rank)   26   96.28% [96.0-97.0]   94.15%           0.30%  +0.894   90.15%
 
   usable (mean) is the average across repeats; [lo-hi] beside it is the 10th-90th
@@ -457,8 +465,8 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
     rho           0.895    0.014    0.869    0.915
 
     clustering cost, against the binomial sd Wilson assumes:
-      pooled   bootstrap sd 0.0104 vs binomial 0.0104  ->  design 1.00, effective n 325 of 328
-      endpoint bootstrap sd 0.0320 vs binomial 0.0166  ->  design 1.93, effective n 88 of 328
+      pooled   bootstrap sd 0.0104 vs binomial 0.0104 over 328 rows  ->  design 1.00, effective n 325
+      endpoint bootstrap sd 0.0320 vs binomial 0.0316 over 90 rows  ->  design 1.01, effective n 88
     NOTE: 0.1% of resamples miss a tier entirely, so their macro is a
     mean over fewer bands - that widens the macro interval beyond pack
     sampling alone. See PackBootstrap.
@@ -476,6 +484,10 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
     miss upper bound   :   1.35%   (ceiling 5%, one-sided 95% Wilson)
     rho lower bound    : +0.869   (floor 0.70, pack bootstrap p05)
        mean +0.894, split range [+0.891, +0.896] - split noise, not uncertainty
+    endpoint band      :  84.34%   (floor 80%, pack bootstrap p05, tiers 0-1 + 5-6)
+       point 90.00% over 90 rows; design effect 1.01, so a binomial bound
+       would land in much the same place - the bootstrap is preferred for
+       assuming nothing, not because Wilson fails on this band.
     -> PASSES the gate on the development set.
 
 ==================  VOCALS  ==================
@@ -743,8 +755,8 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
     rho           0.676    0.039    0.606    0.738
 
     clustering cost, against the binomial sd Wilson assumes:
-      pooled   bootstrap sd 0.0210 vs binomial 0.0173  ->  design 1.22, effective n 221 of 328
-      endpoint bootstrap sd 0.0641 vs binomial 0.0265  ->  design 2.42, effective n 56 of 328
+      pooled   bootstrap sd 0.0210 vs binomial 0.0173 over 328 rows  ->  design 1.22, effective n 221
+      endpoint bootstrap sd 0.0641 vs binomial 0.0554 over 75 rows  ->  design 1.16, effective n 56
     NOTE: 13.7% of resamples miss a tier entirely, so their macro is a
     mean over fewer bands - that widens the macro interval beyond pack
     sampling alone. See PackBootstrap.
@@ -764,9 +776,14 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
     miss upper bound   :   4.28%   (ceiling 5%, one-sided 95% Wilson)
     rho lower bound    : +0.606   (floor 0.70, pack bootstrap p05)
        mean +0.674, split range [+0.666, +0.685] - split noise, not uncertainty
+    endpoint band      :  53.53%   (floor 80%, pack bootstrap p05, tiers 0-1 + 5-6)
+       point 64.00% over 75 rows; design effect 1.16, so a binomial bound
+       would land in much the same place - the bootstrap is preferred for
+       assuming nothing, not because Wilson fails on this band.
     -> DOES NOT PASS:
        - usable lower bound 85.4% is below the 90% floor
        - rho lower bound 0.606 is below the 0.70 floor
+       - endpoint band lower bound 53.5% is below the 80% floor (tiers 0-1, 5-6)
 
 ==================  KEYS  ==================
   development rows : 266 rb3_dlc
@@ -782,7 +799,7 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
   primary+solo               rank         7   89.81% [89.4-90.2]   86.35%           1.24%  +0.841   87.74%
   primary+solo               log(rank)    7   89.70% [89.1-90.3]   86.22%           2.11%  +0.842   86.01%
   primary+movement           rank         9   88.50% [87.9-89.1]   84.88%           1.09%  +0.832   86.07%
-  primary+movement           log(rank)    9   88.68% [87.6-89.9]   85.09%           1.95%  +0.833   84.56%
+  primary+movement           log(rank)    9   88.68% [87.6-89.9]   85.09%           1.95%  +0.832   84.56%
   primary+entropy            rank         7   89.96% [89.5-90.3]   86.52%           1.35%  +0.850   87.98%
   primary+entropy            log(rank)    7   90.60% [90.2-91.4]   87.24%           1.09%  +0.851   87.34%
   primary+entropy_rel        rank         7   89.14% [88.3-89.9]   85.59%           1.54%  +0.846   87.34%
@@ -921,8 +938,8 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
     rho           0.877    0.021    0.837    0.904
 
     clustering cost, against the binomial sd Wilson assumes:
-      pooled   bootstrap sd 0.0181 vs binomial 0.0154  ->  design 1.18, effective n 192 of 266
-      endpoint bootstrap sd 0.0328 vs binomial 0.0202  ->  design 1.62, effective n 101 of 266
+      pooled   bootstrap sd 0.0181 vs binomial 0.0154 over 266 rows  ->  design 1.18, effective n 192
+      endpoint bootstrap sd 0.0328 vs binomial 0.0290 over 129 rows  ->  design 1.13, effective n 101
 
   -- pack-grouped folds, SELECTED model, matched seeds --
     140 packs over 266 rows, largest 12 rows (4.5% of the corpus)
@@ -937,6 +954,10 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
     miss upper bound   :   1.08%   (ceiling 5%, one-sided 95% Wilson)
     rho lower bound    : +0.837   (floor 0.70, pack bootstrap p05)
        mean +0.878, split range [+0.874, +0.882] - split noise, not uncertainty
+    endpoint band      :  82.09%   (floor 80%, pack bootstrap p05, tiers 0-1 + 5-6)
+       point 87.60% over 129 rows; design effect 1.13, so a binomial bound
+       would land in much the same place - the bootstrap is preferred for
+       assuming nothing, not because Wilson fails on this band.
     -> DOES NOT PASS:
        - usable lower bound 89.9% is below the 90% floor
 
@@ -952,7 +973,7 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
   primary                    rank         6   86.05% [85.3-86.8]   82.19%           2.07%  +0.821   83.94%
   primary                    log(rank)    6   83.23% [83.0-83.5]   79.13%           2.41%  +0.821   80.11%
   primary+solo               rank         7   85.45% [84.5-86.2]   81.54%           2.18%  +0.815   83.34%
-  primary+solo               log(rank)    7   83.01% [82.6-83.5]   78.89%           2.82%  +0.815   79.75%
+  primary+solo               log(rank)    7   83.01% [82.6-83.5]   78.89%           2.82%  +0.816   79.75%
   primary+movement           rank         9   84.29% [83.5-85.0]   80.27%           1.84%  +0.819   81.37%
   primary+movement           log(rank)    9   82.74% [81.6-83.5]   78.61%           2.56%  +0.819   78.79%
   primary+entropy            rank         7   85.30% [84.5-86.1]   81.37%           2.11%  +0.834   83.99%
@@ -966,10 +987,10 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
   full_keys                  rank        20   85.30% [84.5-85.8]   81.37%           2.14%  +0.821   83.93%
   full_keys                  log(rank)   20   85.60% [84.6-86.5]   81.70%           2.41%  +0.822   83.83%
   primary+shift              rank         9   86.50% [85.7-87.2]   82.69%           1.99%  +0.835   85.34%
-  primary+shift              log(rank)    9   85.71% [85.3-86.1]   81.82%           1.99%  +0.835   84.06%
+  primary+shift              log(rank)    9   85.71% [85.3-86.1]   81.82%           1.99%  +0.836   84.06%
   primary+shift_rate         rank         8   86.50% [86.1-86.9]   82.69%           1.92%  +0.836   85.35%
   primary+shift_rate         log(rank)    8   85.83% [85.3-86.2]   81.95%           1.95%  +0.837   84.08%
-  full_real_keys             rank        23   85.38% [84.5-86.1]   81.46%           2.48%  +0.819   84.05%
+  full_real_keys             rank        23   85.38% [84.5-86.1]   81.46%           2.48%  +0.818   84.05%
   full_real_keys             log(rank)   23   86.50% [85.7-87.3]   82.69%           2.26%  +0.821   84.62%
   primary+ent_rel+fingers    rank        10   89.47% [88.6-90.2]   85.97%           0.79%  +0.857   88.65%
   primary+ent_rel+fingers    log(rank)   10   88.16% [87.6-88.7]   84.51%           1.58%  +0.856   86.37%
@@ -1089,8 +1110,8 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
     rho           0.862    0.021    0.824    0.892
 
     clustering cost, against the binomial sd Wilson assumes:
-      pooled   bootstrap sd 0.0208 vs binomial 0.0188  ->  design 1.11, effective n 217 of 266
-      endpoint bootstrap sd 0.0368 vs binomial 0.0233  ->  design 1.58, effective n 106 of 266
+      pooled   bootstrap sd 0.0208 vs binomial 0.0188 over 266 rows  ->  design 1.11, effective n 217
+      endpoint bootstrap sd 0.0368 vs binomial 0.0330 over 132 rows  ->  design 1.12, effective n 106
 
   -- pack-grouped folds, SELECTED model, matched seeds --
     140 packs over 266 rows, largest 12 rows (4.5% of the corpus)
@@ -1105,8 +1126,13 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
     miss upper bound   :   2.02%   (ceiling 5%, one-sided 95% Wilson)
     rho lower bound    : +0.824   (floor 0.70, pack bootstrap p05)
        mean +0.861, split range [+0.858, +0.863] - split noise, not uncertainty
+    endpoint band      :  76.38%   (floor 80%, pack bootstrap p05, tiers 0-1 + 5-6)
+       point 82.58% over 132 rows; design effect 1.12, so a binomial bound
+       would land in much the same place - the bootstrap is preferred for
+       assuming nothing, not because Wilson fails on this band.
     -> DOES NOT PASS:
        - usable lower bound 85.9% is below the 90% floor
+       - endpoint band lower bound 76.4% is below the 80% floor (tiers 0-1, 5-6)
 
 Reading this report:
   * The SELECTED line is the model this protocol chooses. It is not necessarily

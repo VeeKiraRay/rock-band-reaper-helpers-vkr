@@ -515,9 +515,11 @@ local function AnalyseInstrument(csv, inst)
         for _, key in ipairs({ 'pooled', 'endpoint' }) do
             local s = boot.stat[key]
             if s and s.design then
-                Msg(('      %-8s bootstrap sd %.4f vs binomial %.4f  ->  design %.2f, '
-                     .. 'effective n %.0f of %d\n')
-                    :format(key, s.sd, s.binom_sd, s.design, s.n_eff, boot.n))
+                -- ref_n is that metric's OWN denominator: all rows for pooled, endpoint
+                -- rows for the endpoint band. See PackBootstrap.
+                Msg(('      %-8s bootstrap sd %.4f vs binomial %.4f over %d rows  ->  '
+                     .. 'design %.2f, effective n %.0f\n')
+                    :format(key, s.sd, s.binom_sd, s.ref_n, s.design, s.n_eff))
             end
         end
         if boot.macro_short_frac > 0 then
@@ -589,12 +591,23 @@ local function AnalyseInstrument(csv, inst)
             :format(sel.rho_mean, PROTOCOL.RHO_FLOOR,
                     sel.rho_lo_split or sel.rho_mean, sel.rho_hi_split or sel.rho_mean))
     end
+    -- The extremes bar. Bootstrap p05, never Wilson - see the ENDPOINT FLOOR block in
+    -- protocol.lua for why this band in particular cannot use a binomial interval.
+    local ep_boot = boot and boot.stat and boot.stat.endpoint
+    if ep_boot then
+        Msg(('    endpoint band      : %6.2f%%   (floor %.0f%%, pack bootstrap p05, tiers 0-1 + 5-6)\n')
+            :format(ep_boot.lo * 100, PROTOCOL.ENDPOINT_FLOOR * 100))
+        Msg(('       point %.2f%% over %d rows; design effect %.2f, so a binomial bound\n')
+            :format(ep_boot.point * 100, boot.ep_n or 0, ep_boot.design or 1))
+        Msg('       would land in much the same place - the bootstrap is preferred for\n')
+        Msg('       assuming nothing, not because Wilson fails on this band.\n')
+    end
     if passed then
         Msg('    -> PASSES the gate on the development set.\n')
     else
         Msg('    -> DOES NOT PASS:\n')
-        for _, why in ipairs(reasons) do Msg('       - ' .. why .. '\n') end
     end
+    for _, why in ipairs(reasons) do Msg('       - ' .. why .. '\n') end
 
     -- The decision, as data. Everything the exporter needs in order to stop taking this
     -- script's word for it via a hand-copied table - see the manifest block in Main.
@@ -618,6 +631,11 @@ local function AnalyseInstrument(csv, inst)
         -- the decision it is supposed to be the record of. nil if no bootstrap ran, which
         -- is also the signal that the mean was used instead.
         rho_lower    = rho_boot and rho_boot.lo or nil,
+        -- The extremes bar's input, schema 3. Recorded for the same reason as rho_lower:
+        -- a manifest that does not carry every quantity the gate read is not a record of
+        -- the decision.
+        endpoint_lower = ep_boot and ep_boot.lo or nil,
+        endpoint_n     = boot and boot.ep_n or nil,
         gate_passed  = passed,
     }
 end
@@ -761,11 +779,12 @@ do
         mf:write('--\n')
         mf:write('-- Regenerate with:  lua dev/calibration/run_protocol_offline.lua\n\n')
         mf:write('CALIBRATION_MANIFEST = {\n')
-        -- SCHEMA 2 as of 2026-08-22: rho_lower joins each selection, and the gate now
-        -- reads it instead of rho_mean. Bumped rather than added silently because the
-        -- change is to what the manifest MEANS - a consumer reading rho_mean from a
-        -- schema 1 file is reading the gate input, and from a schema 2 file it is not.
-        mf:write('    schema   = 2,\n')
+        -- SCHEMA 3 as of 2026-08-22. Bumped twice in one day, both times because what the
+        -- manifest MEANS changed rather than merely what it carries:
+        --   2  rho_lower added; the gate reads it instead of rho_mean.
+        --   3  endpoint_lower added; the gate gained a fourth input, so a schema 2 file
+        --      records a verdict reached WITHOUT the extremes bar.
+        mf:write('    schema   = 3,\n')
         -- Only reached after every instrument has been analysed, so this flag being true
         -- is a statement about the whole file and not just its header.
         mf:write('    complete = true,\n')
@@ -789,6 +808,7 @@ do
         mf:write(('        usable_floor  = %.4f,\n'):format(PROTOCOL.USABLE_FLOOR))
         mf:write(('        miss_ceiling  = %.4f,\n'):format(PROTOCOL.MISS_CEILING))
         mf:write(('        rho_floor     = %.4f,\n'):format(PROTOCOL.RHO_FLOOR))
+        mf:write(('        endpoint_floor = %.4f,\n'):format(PROTOCOL.ENDPOINT_FLOOR))
         mf:write('    },\n')
         mf:write('    selections = {\n')
         for _, dc in ipairs(decisions) do
@@ -806,6 +826,9 @@ do
             -- is the signal that rho_mean was used instead.
             mf:write(('            rho_lower = %s,\n')
                 :format(dc.rho_lower and ('%.6f'):format(dc.rho_lower) or 'nil'))
+            mf:write(('            endpoint_lower = %s, endpoint_n = %s,\n')
+                :format(dc.endpoint_lower and ('%.6f'):format(dc.endpoint_lower) or 'nil',
+                        dc.endpoint_n and ('%d'):format(dc.endpoint_n) or 'nil'))
             mf:write(('            gate_passed = %s,\n'):format(tostring(dc.gate_passed)))
             mf:write('        },\n')
         end

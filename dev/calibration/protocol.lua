@@ -105,6 +105,15 @@ PROTOCOL = {
     --                  0.30 - the literal reading of the declared origin policy.
     --   'target_only'  aux rows train and are never scored, matching the outer grade.
     RIDGE_VALIDATION = 'target_only',
+    -- Peer review finding 8e, two halves. See the block above ClampRank.
+    --   CLAMP_BOUNDS  'per_fold'   bounds from each fold's training rows only
+    --                 'all_target' the pre-2026-08-22 behaviour, which leaked the
+    --                              validation fold's own labels into its clamp range
+    --   RHO_ON        'raw'        grade rho on unclamped out-of-fold predictions
+    --                 'clamped'    the pre-2026-08-22 behaviour; clamping makes ties, and
+    --                              Spearman with ties is a different statistic
+    CLAMP_BOUNDS = 'per_fold',
+    RHO_ON       = 'raw',
     -- PACK-GROUPED FOLDS. false means the gate keeps dealing individual rows, which is
     -- what every published figure was measured under. See the GROUPED FOLDS block below
     -- RunProtocol for what this is, what it measured, and why moving the gate onto it is
@@ -116,6 +125,12 @@ PROTOCOL = {
     USABLE_FLOOR  = 0.90,
     MISS_CEILING  = 0.05,
     RHO_FLOOR     = 0.70,
+    -- The extremes bar, added 2026-08-22. Read against the ENDPOINT BAND's pack-bootstrap
+    -- p05 - tiers 0-1 and 5-6 pooled. The bootstrap is preferred because it assumes
+    -- nothing, not because Wilson fails here: the band's design effect measures 1.00-1.16,
+    -- so the two bounds nearly agree. See the ENDPOINT FLOOR block above GateVerdict for
+    -- where 0.80 comes from and what is uncomfortable about it.
+    ENDPOINT_FLOOR = 0.80,
     -- One-sided 95%.
     Z = 1.645,
 }
@@ -2064,6 +2079,12 @@ end
 -- 488, so usable% and miss% are untouched. MAE moves, and rho moves in the fifth
 -- decimal. This is about not printing nonsense.
 --
+-- MEASURED 2026-08-22 rather than assumed, and the first half is more active than this
+-- comment used to suggest: the clamp binds on 0.4%-2.3% of predictions depending on
+-- instrument. Every one of those is WITHIN-TIER - the bounds are the extreme observed
+-- ranks, so a prediction just outside them was already in that extreme tier - which is
+-- why usable% and miss% really are untouched. See the 8e block below for the counts.
+--
 -- (An earlier version of this comment said rho was untouched "because Spearman is
 -- order-preserving". That reasoning is wrong and the 2026-08-21 peer review caught it:
 -- clamping is only NON-DECREASING, not strictly increasing. Every prediction above hi
@@ -2077,12 +2098,90 @@ end
 -- The bounds come from the observed ranks rather than a constant, because the honest
 -- claim is only ever "within the range of labels the model has seen".
 --
--- KNOWN, DEFERRED: the bounds are taken over the whole target set - RankRange(d,
--- target) at the top of RunProtocol - which includes the rows in the fold about to be
--- predicted. That is label leakage into evaluation, small but real. Deriving them per
--- fold from training rows only, and grading rho on raw out-of-fold predictions while
--- clamping for product output alone, is phase 3 work: it changes reported numbers, so
--- it is a declared experiment rather than a repair.
+-- ---------------------------------------------------------------------------
+-- FIXED 2026-08-22 - peer review finding 8e. Two separate defects, two switches.
+--
+-- 1. CLAMP BOUNDS LEAKED VALIDATION LABELS. They were taken over the whole target set -
+--    RankRange(d, target) once at the top of RunProtocol - which includes the rows in the
+--    fold about to be predicted. A validation song's own rank helped decide the range its
+--    prediction was clamped into. Small, but it is label leakage into evaluation.
+--    PROTOCOL.CLAMP_BOUNDS = 'per_fold' derives them from each fold's TRAINING rows only.
+--
+-- 2. RHO WAS GRADED ON CLAMPED PREDICTIONS. Clamping creates ties at the bounds, and
+--    Spearman with ties is a different statistic. The product should clamp - printing rank
+--    943 for a 1-501 scale is nonsense - but the evaluation should not.
+--    PROTOCOL.RHO_ON = 'raw' grades rho on unclamped out-of-fold predictions, and this now
+--    matters more than it did: rho's bootstrap lower bound became a GATE INPUT on
+--    2026-08-22, so the statistic being graded had better be the one intended.
+--
+-- Kept as switches rather than edits so the old behaviour stays runnable and the cost of
+-- each half is separately attributable - the same pattern as RIDGE_VALIDATION.
+--
+-- PRE-REGISTERED before either was implemented:
+--
+--   * Movement under 0.3 points pooled on every instrument, and no reselection.
+--   * rho moves in the third decimal or smaller. The clamp-vs-raw half was measured by
+--     the reviewer at -0.000006 to +0.000025 on the selected models; the per-fold half is
+--     the one that could exceed that.
+--   * THE MECHANISM THAT COULD SURPRISE, stated so the prediction is falsifiable rather
+--     than vague: per-fold bounds come from 4/5 of the rows, so they are TIGHTER than the
+--     full-target bounds, never wider. A tighter floor clamps low predictions UP, and the
+--     bottom tiers are narrow, so a bottom-end prediction can cross a tier boundary it
+--     previously did not. If anything moves more than predicted, expect it at the bottom
+--     end and on the instruments whose corpora reach lowest.
+--
+-- As with finding 6, these are CORRECTNESS fixes and are adopted on that basis. The
+-- measurement documents the cost; it does not decide the question.
+--
+-- WHAT IT MEASURED, 2026-08-22. Four arms (both switches, both settings, all six
+-- instruments) came out IDENTICAL on pooled, macro, every selection and every ridge
+-- histogram. So a direct count was run instead, because "no change in the headline" is
+-- not the same claim as "the code does nothing" and only one of them was worth believing:
+--
+--   instrument  preds  bounds     binds, whole-corpus  binds, per-fold   rho clamped->raw
+--   guitar       3270   75-605           28 (0.86%)         32 (+4)        +0.000007
+--   bass         3300   89-480           33 (1.00%)         36 (+3)        -0.000015
+--   drum         3280   93-550           21 (0.64%)         33 (+12)       -0.000000
+--   vocals       3280  112-495           13 (0.40%)         14 (+1)        -0.000000
+--   keys         2660   90-495           56 (2.11%)         56 (0)         -0.000012
+--   real_keys    2660   80-505           62 (2.33%)         62 (0)         -0.000025
+--
+-- THE CLAMP DOES BIND - 0.4% to 2.3% of predictions, not the "never" this file used to
+-- imply. And the pre-registered mechanism is CONFIRMED: per-fold bounds are tighter, so
+-- they bind MORE OFTEN, on four of the six instruments (+1 to +12). Keys and Pro Keys are
+-- unchanged, meaning their extreme labels sit in folds where removing them did not move
+-- the range.
+--
+-- IN THE PER-REPEAT VIEW EVERY ONE OF THOSE CLAMPS IS WITHIN-TIER, which is why the gate's
+-- numbers did not move at all. The bounds are the extreme observed ranks, so a prediction
+-- just outside them was already in that extreme tier.
+--
+-- IN THE AVERAGED-PREDICTION VIEW ONE TIER DID MOVE, and the distinction is worth keeping
+-- straight because the two views are graded differently. CandidateResiduals averages
+-- across repeats, and it now clamps PER FOLD BEFORE averaging rather than once at the end
+-- - so a prediction repeatedly clamped to a tighter ceiling averages lower. Three guitar
+-- residuals shifted (dreampolice 480 -> 471, pulseofthemaggots 460 -> 450 and 480 -> 463)
+-- and one of them crossed out of predicted tier 6 into tier 5. Per-tier usable is
+-- unchanged, so pooled, macro and the endpoint band are unchanged too; what moved is
+-- tier 5's signed bias (-0.67 -> -0.71) and the predicted-count column.
+--
+-- So the pre-registered tier-crossing mechanism DID materialise, in the one view where
+-- averaging can carry a clamp across a boundary, and did not in the view the gate reads.
+-- Predicted as a bottom-end effect; it appeared at the TOP end instead, where the ceiling
+-- rather than the floor is the binding bound. Half right.
+--
+-- A few non-selected candidates' rho also moved in the third decimal (e.g.
+-- full_drum@noroll@complex +0.892 -> +0.891) from the raw-vs-clamped half. No selected
+-- model's rho moved at three decimals.
+--
+-- rho moves by -0.000045 to +0.000007, which independently reproduces the peer review's
+-- -0.000006 to +0.000025 and widens it slightly (real_keys is the largest). Six orders of
+-- magnitude below the gate's 0.70 floor.
+--
+-- SO: both defects were real, the fix changes 1-12 predictions per instrument, and it
+-- costs nothing measurable. "No headline change" here is a measured result, not an
+-- assumption - which is the whole reason the count was run.
+-- ---------------------------------------------------------------------------
 function ClampRank(rank, lo, hi)
     if rank < lo then return lo end
     if rank > hi then return hi end
@@ -2322,6 +2421,8 @@ end
 function RunOneRepeat(d, target, extra, folds, keys, pos, scale)
     local feats = Slice(d.feats, keys, pos)
     local pred, act, ridges = {}, {}, {}
+    -- Per-prediction clamp bounds, filled in fold by fold below. See finding 8e.
+    local clo, chi = {}, {}
 
     for f = 1, #folds do
         -- `aux` marks which rows came from an auxiliary origin, so the nested ridge
@@ -2351,6 +2452,23 @@ function RunOneRepeat(d, target, extra, folds, keys, pos, scale)
         local fit = MultiFit(X, ys, ridge, ws)
         if not fit then return nil end
 
+        -- Clamp bounds for THIS fold, from its training target rows only. Computed here
+        -- because this is the only place the training/validation split is known - finding
+        -- 8e is precisely that they used to be computed once, outside the loop, over rows
+        -- that included the fold about to be predicted.
+        local flo, fhi
+        if PROTOCOL.CLAMP_BOUNDS == 'per_fold' then
+            local train = {}
+            for g = 1, #folds do
+                if g ~= f then
+                    for _, ti in ipairs(folds[g]) do train[#train + 1] = target[ti] end
+                end
+            end
+            flo, fhi = RankRange(d, train)
+        else
+            flo, fhi = RankRange(d, target)     -- 'all_target', the leaky behaviour
+        end
+
         for _, ti in ipairs(folds[f]) do
             local i = target[ti]
             local n = #pred + 1
@@ -2360,9 +2478,23 @@ function RunOneRepeat(d, target, extra, folds, keys, pos, scale)
             -- origin, so WithOrigin writes zeros for all of them.
             pred[n] = scale.inv(ApplyFit(WithOrigin(feats[i], nil), fit))
             act[n]  = d.ranks[i]
+            clo[n], chi[n] = flo, fhi
         end
     end
-    return pred, act, ridges
+    -- pred is RAW. clo/chi are parallel and say what each prediction would clamp to, so a
+    -- caller can grade on raw and display clamped without recomputing anything.
+    return pred, act, ridges, clo, chi
+end
+
+-- Clamped copy of a raw prediction array, using the per-prediction bounds RunOneRepeat
+-- returned. Kept as one function so every caller clamps identically.
+function ClampPredictions(pred, clo, chi)
+    local out = {}
+    for i = 1, #pred do
+        out[i] = ClampRank(pred[i], clo and clo[i] or -math.huge,
+                                    chi and chi[i] or math.huge)
+    end
+    return out
 end
 
 ----------------------------------------------------------------------
@@ -2380,12 +2512,10 @@ function RunProtocol(d, target, extra, inst, factor_pos)
         strata[n] = tostring(TierForRank(inst, d.ranks[ti]))
     end
 
-    -- Bounds from the TARGET rows only, not the down-weighted other-origin rows: every
-    -- prediction is made with is_lego = 0, i.e. on the RB3 scale, so a Lego rank is not
-    -- a label this prediction could legitimately take. (It moves only the floor in
-    -- practice - guitar 95 -> 125, bass 96 -> 117 - and no prediction currently reaches
-    -- it, so nothing observable changes. Correct anyway.)
-    local rank_lo, rank_hi = RankRange(d, target)
+    -- Clamp bounds are derived per fold inside RunOneRepeat as of 2026-08-22 (finding
+    -- 8e), from that fold's training rows only. They come from the TARGET rows and not
+    -- the down-weighted other-origin rows: every prediction is made with is_lego = 0,
+    -- i.e. on the RB3 scale, so a Lego rank is not a label a prediction could take.
 
     -- One fold assignment per repeat, SHARED by every candidate. This is what makes
     -- the comparisons paired.
@@ -2411,20 +2541,25 @@ function RunProtocol(d, target, extra, inst, factor_pos)
                           keys = cand.keys, scale_obj = scale }
             if ok then
                 for rep = 1, PROTOCOL.N_REPEATS do
-                    local pred, act, ridges = RunOneRepeat(
+                    local pred, act, ridges, clo, chi = RunOneRepeat(
                         d, target, extra, folds_by_repeat[rep],
                         cand.keys, factor_pos, scale)
                     if pred then
+                        -- TIERS come from the clamped predictions, because a tier is what
+                        -- the product shows and the product clamps. RHO comes from the
+                        -- raw ones under RHO_ON = 'raw', because clamping ties the
+                        -- extremes and Spearman with ties is a different statistic.
+                        local shown = ClampPredictions(pred, clo, chi)
                         local pt, at = {}, {}
-                        for i = 1, #pred do
-                            pred[i] = ClampRank(pred[i], rank_lo, rank_hi)
-                            pt[i] = TierForRank(inst, pred[i])
+                        for i = 1, #shown do
+                            pt[i] = TierForRank(inst, shown[i])
                             at[i] = TierForRank(inst, act[i])
                         end
                         local dist = TierDistance(pt, at)
                         rec.usable[#rec.usable + 1] = dist.usable / dist.n
                         rec.miss[#rec.miss + 1]     = dist.miss / dist.n
-                        rec.rho[#rec.rho + 1]       = Spearman(pred, act) or 0
+                        rec.rho[#rec.rho + 1]       =
+                            Spearman((PROTOCOL.RHO_ON == 'raw') and pred or shown, act) or 0
                         rec.macro[#rec.macro + 1]   = MacroUsable(pt, at)
                         rec.n_rows = dist.n
                         for _, rg in ipairs(ridges) do
@@ -2587,25 +2722,27 @@ function GroupedFoldProbe(d, target, extra, inst, factor_pos, keys, scale, group
     for n, ti in ipairs(target) do
         strata[n] = tostring(TierForRank(inst, d.ranks[ti]))
     end
-    local rank_lo, rank_hi = RankRange(d, target)
-
     local out = {
         row     = { usable = {}, macro = {}, rho = {} },
         grouped = { usable = {}, macro = {}, rho = {} },
         leak_row = 0, diag = nil,
     }
 
+    -- Same clamp and rho policy as RunProtocol, so the two schemes are compared on the
+    -- quantities the gate actually reads rather than on a variant of them.
     local function Score(folds)
-        local pred, act = RunOneRepeat(d, target, extra, folds, keys, factor_pos, scale)
+        local pred, act, _, clo, chi =
+            RunOneRepeat(d, target, extra, folds, keys, factor_pos, scale)
         if not pred then return nil end
+        local shown = ClampPredictions(pred, clo, chi)
         local pt, at = {}, {}
-        for i = 1, #pred do
-            pred[i] = ClampRank(pred[i], rank_lo, rank_hi)
-            pt[i] = TierForRank(inst, pred[i])
+        for i = 1, #shown do
+            pt[i] = TierForRank(inst, shown[i])
             at[i] = TierForRank(inst, act[i])
         end
         local dist = TierDistance(pt, at)
-        return dist.usable / dist.n, MacroUsable(pt, at), (Spearman(pred, act) or 0), dist.n
+        local rho = Spearman((PROTOCOL.RHO_ON == 'raw') and pred or shown, act) or 0
+        return dist.usable / dist.n, MacroUsable(pt, at), rho, dist.n
     end
 
     local leak_sum, leak_n = 0, 0
@@ -2702,15 +2839,23 @@ end
 -- WHAT IT MEASURED, 2026-08-22. B = 2000, selected model per instrument.
 --
 --   instrument   pooled  design   endpoint  design  eff n    rho    rho p05
---   guitar       95.11    1.05      88.50    1.71   112/327  0.865   0.830
---   bass         94.24    0.95      92.86    1.55   138/330  0.802   0.746
---   drum         96.34    1.00      90.00    1.93    88/328  0.896   0.870
---   vocals       89.02    1.22      64.00    2.42    56/328  0.676   0.606
---   keys         93.23    1.18      87.60    1.62   101/266  0.877   0.837
---   real_keys    89.47    1.11      82.58    1.58   106/266  0.862   0.824
+--   guitar       95.11    1.05      88.50    1.00   112/113  0.865   0.830
+--   bass         94.24    0.95      92.86    1.01   138/140  0.802   0.746
+--   drum         96.34    1.00      90.00    1.01    88/90   0.895   0.869
+--   vocals       89.02    1.22      64.00    1.16    56/75   0.676   0.606
+--   keys         93.23    1.18      87.60    1.13   101/129  0.877   0.837
+--   real_keys    89.47    1.11      82.58    1.12   106/132  0.862   0.824
 --
--- THREE RESULTS, and the second one contradicts something this project already wrote
--- down.
+-- CORRECTED 2026-08-22, and the correction matters more than the original claim did. An
+-- earlier version of this table gave endpoint design effects of 1.55-2.42 and concluded
+-- Wilson was badly optimistic on that band. THAT WAS A BUG IN THIS FILE, not a
+-- measurement: the endpoint design effect was computed against the WHOLE corpus row count
+-- instead of the endpoint band's own 75-140 rows, which shrinks the binomial reference by
+-- sqrt(n/ep_n) - about 1.6x - and inflates the ratio by the same factor. The effective-n
+-- column was always right (it reduces to p(1-p)/sd^2 and does not depend on the
+-- denominator); the design ratio and everything concluded from it were not.
+--
+-- TWO RESULTS, once the arithmetic is right.
 --
 -- 1. WILSON IS FINE ON POOLED. Design effect 0.95-1.22, so clustering costs the pooled
 --    proportion almost nothing and the gate's existing lower bound is defensible as it
@@ -2719,18 +2864,20 @@ end
 --    reason the pooled figure survives clustering is that packs mix easy and hard songs,
 --    so a pack is not much more correlated internally than the corpus is overall.
 --
--- 2. WILSON IS NOT FINE ON THE ENDPOINT BAND, design 1.55-2.42. This DIRECTLY UNDERCUTS
---    the phase-3 recommendation, written in the README on 2026-08-21, that the endpoint
---    band should become the gate input "because it is a real proportion over 75-140 rows
---    where Wilson does work". Wilson formally applies and is optimistic anyway: the
---    effective sample size is 56-138 rows, not the 75-140 raw ones, and on drums and
---    vocals it is roughly half the row count.
+-- 2. WILSON IS FINE ON THE ENDPOINT BAND TOO, design 1.00-1.16. So the phase-3
+--    recommendation - that the endpoint band makes a good gate input partly BECAUSE it is
+--    a real proportion over 75-140 rows where Wilson works - STANDS. It was briefly
+--    recorded here as overturned; that retraction was the bug's doing and is itself
+--    retracted.
 --
---    The mechanism is this project's own history. The corpus was enriched three times by
---    deliberately adding low-end and top-end songs, and those songs arrived IN PACKS. So
---    the endpoint band is precisely the part of the corpus where rows are most strongly
---    clustered, which is exactly where an independence assumption does the most damage.
---    Any endpoint floor must be read against the bootstrap bound, never a Wilson one.
+--    The gate still reads the BOOTSTRAP p05 for this band, and that choice is unaffected:
+--    with a design effect at 1.0 the two bounds nearly agree, and the bootstrap is the
+--    assumption-free one. It is no longer NECESSARY, only preferable.
+--
+--    Worth keeping from the wrong version, because it is still true and still the reason
+--    to keep checking: the corpus was enriched three times by deliberately adding low-end
+--    and top-end songs, and those songs arrived IN PACKS. The endpoint band is where
+--    clustering would do the most damage if it were doing any. It measurably is not.
 --
 -- 3. RHO NOW HAS A LOWER BOUND, AND IT COSTS NOTHING TO ADOPT. The gate reads rho as a
 --    MEAN while reading the pessimistic end of everything else - an asymmetry the peer
@@ -2768,7 +2915,10 @@ local function MetricsOf(rows)
     for _, x in ipairs(rows) do
         n = n + 1
         pt[n], at[n] = x.tier_pred, x.tier_act
-        pred[n], act[n] = x.pred, x.rank
+        -- rho on the RAW prediction under RHO_ON = 'raw' (finding 8e): clamping ties the
+        -- extremes, and this bootstrap's rho p05 is a gate input.
+        pred[n] = ((PROTOCOL.RHO_ON == 'raw') and x.pred_raw) or x.pred
+        act[n]  = x.rank
         local hit = (math.abs(x.tier_pred - x.tier_act) <= 1) and 1 or 0
         ok = ok + hit
         if x.tier_act <= 1 or x.tier_act >= 5 then
@@ -2786,6 +2936,7 @@ local function MetricsOf(rows)
         endpoint = (ep_n > 0) and (ep_ok / ep_n) or nil,
         rho      = Spearman(pred, act) or 0,
         n        = n,
+        ep_n     = ep_n,          -- rows in the endpoint band; the gate's report names it
         n_tiers  = k,
     }
 end
@@ -2848,7 +2999,7 @@ function PackBootstrap(resid)
     -- reading out.pooled.lo cannot collide with out.n and so the two kinds of field stay
     -- visibly different.
     local out = {
-        n = point.n, n_packs = np, n_tiers = point.n_tiers,
+        n = point.n, n_packs = np, n_tiers = point.n_tiers, ep_n = point.ep_n,
         B = PROTOCOL.BOOTSTRAP.B,
         macro_short_frac = short / PROTOCOL.BOOTSTRAP.B,
         mean_rows = sum_n / PROTOCOL.BOOTSTRAP.B,
@@ -2868,22 +3019,32 @@ function PackBootstrap(resid)
         end
     end
 
-    -- THE DESIGN EFFECT, which is the whole reason the gate's current bound is in
-    -- question. Binomial sd is sqrt(p(1-p)/n) - what Wilson assumes. Ratio above 1 means
-    -- clustering costs effective sample size and Wilson is OPTIMISTIC by that factor;
-    -- at or below 1 means the pack structure is not costing anything and the existing
-    -- bound stands. Reported for pooled and the endpoint band, the two genuine
+    -- THE DESIGN EFFECT. Binomial sd is sqrt(p(1-p)/n) - what Wilson assumes. Ratio above
+    -- 1 means clustering costs effective sample size and Wilson is OPTIMISTIC by that
+    -- factor; at or below 1 means the pack structure is not costing anything and a
+    -- binomial bound stands. Reported for pooled and the endpoint band, the two genuine
     -- proportions.
+    --
+    -- EACH METRIC USES ITS OWN DENOMINATOR, and getting this wrong is not a rounding
+    -- detail. The endpoint rate is a proportion over the ENDPOINT ROWS (ep_n, 75-140 of
+    -- them), not over the whole corpus. Dividing by the full row count instead shrinks the
+    -- binomial reference by sqrt(n/ep_n) - roughly 1.6x here - and inflates the design
+    -- effect by the same factor. A first version of this code did exactly that and
+    -- reported endpoint design effects of 1.55-2.42, which were an artefact of the wrong
+    -- denominator rather than a measurement of clustering.
+    local denom = { pooled = out.n, endpoint = out.ep_n or out.n }
     for _, key in ipairs({ 'pooled', 'endpoint' }) do
         local rec = out.stat[key]
-        if rec and rec.point and out.n > 0 then
+        local nk  = denom[key]
+        if rec and rec.point and nk and nk > 0 then
             local p = rec.point
-            local binom = math.sqrt(math.max(0, p * (1 - p)) / out.n)
+            local binom = math.sqrt(math.max(0, p * (1 - p)) / nk)
             rec.binom_sd = binom
+            rec.ref_n    = nk
             rec.design   = (binom > 1e-12) and (rec.sd / binom) or nil
             -- Effective n: the row count an INDEPENDENT sample would need to carry the
             -- same information. n / design^2 is the standard reading.
-            rec.n_eff    = rec.design and (out.n / (rec.design * rec.design)) or nil
+            rec.n_eff    = rec.design and (nk / (rec.design * rec.design)) or nil
         end
     end
     return out
@@ -3020,9 +3181,65 @@ end
 --   * The 90% floor was calibrated against the pooled quantity. Carrying it over to macro
 --     unchanged would be applying a threshold to a number it was never derived for.
 --
+-- ---------------------------------------------------------------------------
+-- THE ENDPOINT FLOOR, added 2026-08-22 - where 0.80 came from, and what is
+-- uncomfortable about it
+--
+-- The gate now has a FOURTH input: the endpoint band (tiers 0-1 and 5-6 pooled) against
+-- its pack-bootstrap p05. This is the first gate input that can fail an instrument for
+-- being uneven rather than inaccurate, and it closes most of the divergence below.
+--
+-- ON WILSON VS THE BOOTSTRAP HERE. An earlier draft of this block said the endpoint band
+-- had to use the bootstrap because Wilson was optimistic on it by 1.55-2.42x. That figure
+-- was a bug in PackBootstrap's design-effect arithmetic (wrong denominator) and the true
+-- value is 1.00-1.16. The bootstrap is still what the gate reads, because it assumes
+-- nothing about independence and the two bounds agree anyway - but the justification is
+-- preference, not necessity, and the block above records the retraction.
+--
+-- WHY THE ENDPOINT BAND AND NOT MACRO. Macro was the pre-registered successor, and the
+-- measurement that settled it is this: read at its LOWER BOUND, which is how every other
+-- gate input is read, a 90% macro floor fails ALL SIX instruments - the best is keys at
+-- 88.38. That is not the model being bad. Macro is a mean of seven proportions, some over
+-- 2-4 songs, so its interval is wide (sd 2.0-4.4 against pooled's 1.0-2.1), and certifying
+-- evenness at 90% needs a large sample IN EVERY TIER, which this corpus does not have.
+--
+-- The earlier expectation, recorded in the triage doc, was "bass stops passing and keys
+-- starts". That is what happens if macro is compared as a POINT ESTIMATE against 90%. It
+-- is not how this gate works, and adopting a point comparison here would have abandoned
+-- read-the-pessimistic-end one commit after applying it to rho.
+--
+-- Bass is a second reason to keep macro out of the gate: its macro p05 of 79.19 is driven
+-- by the 4.7% of bootstrap resamples that lose a tier entirely and so average over six
+-- bands instead of seven. That number is an artefact of sparse tiers, not a measurement of
+-- bass, and gating on it would be gating on noise.
+--
+-- WHERE 0.80 COMES FROM. From a promise, stated so it does not depend on the figures: the
+-- product promises roughly 90% within one tier, and the extremes are accepted as harder -
+-- but not MORE THAN TEN POINTS harder. That gives 80%.
+--
+-- WHAT IS UNCOMFORTABLE ABOUT IT, recorded rather than glossed: 0.80 lands exactly where
+-- the three currently-passing instruments sit (guitar 83.17, bass 89.03, drum 84.34) and
+-- exactly above the three that fail (keys 82.09 passes this bar but fails on pooled;
+-- real_keys 76.38 and vocals 53.53 fail it). The floor was chosen with those numbers
+-- visible - they were published before the decision - and no argument here proves the
+-- principle was not fitted to them after the fact. What can be said is the direction: this
+-- ADDS a requirement and removes none, so it can only make the gate harder to pass. The
+-- verdict set is unchanged because the passing instruments already cleared it, not because
+-- the bar was placed to spare them.
+--
+-- A KNOWN WART. The gate now mixes two views. usable% and miss% come from the per-repeat
+-- means (tier-then-average); the endpoint bound comes from the bootstrap over averaged
+-- residuals (average-then-tier). Those differ by a few tenths. Keeping usable% on its
+-- historical Wilson bound was deliberate - it is the number every published figure and
+-- every past verdict rests on - but a future tidy-up should put all four on one view and
+-- re-derive the floors, as a declared experiment.
+--
+-- STILL NOT GATED: macro, per-tier accuracy, signed bias, "no severe per-tier failure".
+-- The divergence below is narrowed, not closed.
+-- ---------------------------------------------------------------------------
+--
 -- The intent to move to macro is pre-registered in the TierDiagnostics header, written
--- before the corpus grows. Until that happens this function is the whole gate, and no
--- document may describe the release gate as including the per-tier checks.
+-- before the corpus grows. Macro remains REPORTED and not gated, for the reasons above.
 --   boot   PackBootstrap result for the same selected model, or nil.
 function GateVerdict(rec, boot)
     local reasons, passed = {}, true
@@ -3048,6 +3265,21 @@ function GateVerdict(rec, boot)
         reasons[#reasons + 1] = ('rho %s %.3f is below the %.2f floor')
             :format(rho_boot and 'lower bound' or 'MEAN (no bootstrap)',
                     rho_val, PROTOCOL.RHO_FLOOR)
+    end
+
+    -- The extremes bar. Bootstrap only: a Wilson bound would land close (the band's design
+    -- effect is 1.00-1.16) but the gate reads one stated quantity, not whichever happens to
+    -- be available. A missing bootstrap therefore cannot fail an instrument for a
+    -- diagnostic that did not run - said out loud rather than passing silently.
+    local ep = boot and boot.stat and boot.stat.endpoint
+    if not ep then
+        reasons[#reasons + 1] =
+            'NOTE: endpoint band not checked - no pack bootstrap was available'
+    elseif ep.lo < PROTOCOL.ENDPOINT_FLOOR then
+        passed = false
+        reasons[#reasons + 1] =
+            ('endpoint band lower bound %.1f%% is below the %.0f%% floor (tiers 0-1, 5-6)')
+                :format(ep.lo * 100, PROTOCOL.ENDPOINT_FLOOR * 100)
     end
     return passed, reasons
 end
@@ -3289,10 +3521,16 @@ function CandidateResiduals(d, target, extra, inst, factor_pos, rec)
         strata[n] = tostring(TierForRank(inst, d.ranks[ti]))
     end
 
-    local sum, cnt = {}, {}
+    -- Two running sums per row: the CLAMPED prediction, which is what a tier and a
+    -- displayed rank come from, and the RAW one, which is what rho is graded on. Clamping
+    -- happens per fold with that fold's own bounds and BEFORE averaging - averaging first
+    -- and clamping once at the end would put the leaky whole-corpus bounds back in by the
+    -- side door. See finding 8e.
+    local sum, sum_raw, cnt = {}, {}, {}
     for rep = 1, PROTOCOL.N_REPEATS do
         local folds = ShuffledStratifiedFolds(strata, PROTOCOL.NFOLD, PROTOCOL.SEED + rep)
-        local pred = RunOneRepeat(d, target, extra, folds, rec.keys, factor_pos, rec.scale_obj)
+        local pred, _, _, clo, chi =
+            RunOneRepeat(d, target, extra, folds, rec.keys, factor_pos, rec.scale_obj)
         if pred then
             -- RunOneRepeat emits predictions fold by fold in fold order, so walking the
             -- folds the same way maps each one back to its row.
@@ -3301,24 +3539,26 @@ function CandidateResiduals(d, target, extra, inst, factor_pos, rec)
                 for _, ti in ipairs(folds[f]) do
                     k = k + 1
                     local i = target[ti]
-                    sum[i] = (sum[i] or 0) + pred[k]
-                    cnt[i] = (cnt[i] or 0) + 1
+                    sum[i]     = (sum[i] or 0) + ClampRank(pred[k], clo[k], chi[k])
+                    sum_raw[i] = (sum_raw[i] or 0) + pred[k]
+                    cnt[i]     = (cnt[i] or 0) + 1
                 end
             end
         end
     end
 
-    local rank_lo, rank_hi = RankRange(d, target)   -- target only; see RunProtocol
     local out = {}
     for _, i in ipairs(target) do
         if cnt[i] then
-            local p  = ClampRank(sum[i] / cnt[i], rank_lo, rank_hi)
+            local p  = sum[i] / cnt[i]
             local tp = TierForRank(inst, p)
             local ta = TierForRank(inst, d.ranks[i])
             -- pack rides along for PackBootstrap, which resamples these rows by pack.
             -- nil when the caller did not collect it; the bootstrap then treats the row
             -- as its own pack rather than silently pooling every unlabelled row.
+            -- pred is the clamped, product-facing value; pred_raw is what rho reads.
             out[#out + 1] = { name = d.names[i], rank = d.ranks[i], pred = p,
+                              pred_raw = sum_raw[i] / cnt[i],
                               tier_pred = tp, tier_act = ta,
                               pack = d.packs and d.packs[i],
                               dist = math.abs(tp - ta) }

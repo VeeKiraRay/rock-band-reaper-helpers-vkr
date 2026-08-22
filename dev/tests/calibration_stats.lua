@@ -580,6 +580,55 @@ Test.it('the shipped mode is target_only', function()
 end)
 
 ----------------------------------------------------------------------
+Test.section('ClampPredictions and the 8e switches')
+
+Test.it('clamps each prediction with its own per-fold bounds', function()
+    -- The point of finding 8e: bounds vary BY FOLD, so one global pair cannot express
+    -- them. Row 1 and row 3 here carry different bounds on purpose.
+    local pred = { 50, 300, 900 }
+    local clo  = { 120, 120, 200 }
+    local chi  = { 500, 500, 700 }
+    local out  = ClampPredictions(pred, clo, chi)
+    Test.expect(out[1] == 120, 'below its floor, got ' .. tostring(out[1]))
+    Test.expect(out[2] == 300, 'inside its range, got ' .. tostring(out[2]))
+    Test.expect(out[3] == 700, 'above ITS ceiling, not row 1s, got ' .. tostring(out[3]))
+end)
+
+Test.it('leaves the input array untouched', function()
+    -- RunProtocol grades rho on the raw array after building the clamped one, so
+    -- clamping in place would silently make RHO_ON = 'raw' a lie.
+    local pred = { 50, 900 }
+    ClampPredictions(pred, { 120, 120 }, { 500, 500 })
+    Test.expect(pred[1] == 50 and pred[2] == 900, 'ClampPredictions must not mutate')
+end)
+
+Test.it('treats missing bounds as unbounded rather than erroring', function()
+    local out = ClampPredictions({ 7, -3 }, nil, nil)
+    Test.expect(out[1] == 7 and out[2] == -3, 'no bounds means no clamping')
+end)
+
+Test.it('the shipped 8e settings are per_fold and raw', function()
+    -- Both move every published number, and RHO_ON feeds a gate input, so neither
+    -- should be changeable without a test noticing.
+    Test.expect(PROTOCOL.CLAMP_BOUNDS == 'per_fold',
+        'expected per_fold, got ' .. tostring(PROTOCOL.CLAMP_BOUNDS))
+    Test.expect(PROTOCOL.RHO_ON == 'raw',
+        'expected raw, got ' .. tostring(PROTOCOL.RHO_ON))
+end)
+
+Test.it('per-fold bounds are never wider than whole-corpus bounds', function()
+    -- The mechanism named in the pre-registration: training rows are a subset, so their
+    -- range can only shrink. A tighter floor clamps low predictions UP.
+    local d = { ranks = { 100, 200, 300, 400, 500 } }
+    local all_lo, all_hi = RankRange(d, { 1, 2, 3, 4, 5 })
+    local tr_lo, tr_hi   = RankRange(d, { 2, 3, 4 })
+    Test.expect(tr_lo >= all_lo and tr_hi <= all_hi,
+        ('training range [%s,%s] must sit inside [%s,%s]')
+            :format(tr_lo, tr_hi, all_lo, all_hi))
+    Test.expect(tr_lo == 200 and tr_hi == 400, 'expected 200..400')
+end)
+
+----------------------------------------------------------------------
 Test.section('GateVerdict - every input read from its pessimistic end')
 
 -- A record that passes everything, so each case below turns exactly one thing bad.
@@ -589,13 +638,41 @@ local function GateRec(over)
     for k, v in pairs(over or {}) do rec[k] = v end
     return rec
 end
-local function GateBoot(rho_lo)
-    return { stat = { rho = { lo = rho_lo, point = rho_lo + 0.03 } } }
+-- ep_lo defaults to a comfortably passing endpoint band, so a case that means to test rho
+-- is not silently also testing the extremes bar.
+local function GateBoot(rho_lo, ep_lo)
+    return { ep_n = 100, stat = {
+        rho      = { lo = rho_lo, point = rho_lo + 0.03 },
+        endpoint = { lo = ep_lo or 0.90, point = (ep_lo or 0.90) + 0.03, design = 1.0 },
+    } }
 end
 
 Test.it('passes when every bound clears its threshold', function()
     local ok, why = GateVerdict(GateRec(), GateBoot(0.80))
     Test.expect(ok, 'should pass; reasons: ' .. table.concat(why, '; '))
+end)
+
+Test.it('fails an instrument whose extremes band is below the floor', function()
+    -- The 2026-08-22 addition: the first gate input that can fail an instrument for being
+    -- uneven rather than inaccurate. Everything else here clears comfortably.
+    local ok, why = GateVerdict(GateRec(), GateBoot(0.80, 0.70))
+    Test.expect(not ok, 'a 70% endpoint band must fail the 80% floor')
+    Test.expect(table.concat(why, ' '):find('endpoint', 1, true) ~= nil,
+        'the reason must name the endpoint band; got: ' .. table.concat(why, '; '))
+end)
+
+Test.it('does not fail an instrument when no bootstrap ran, but says so', function()
+    -- A missing diagnostic must not read as a failed one.
+    local ok, why = GateVerdict(GateRec(), nil)
+    Test.expect(ok, 'no bootstrap must not fail the extremes bar')
+    Test.expect(table.concat(why, ' '):find('endpoint band not checked', 1, true) ~= nil,
+        'the omission must be disclosed; got: ' .. table.concat(why, '; '))
+end)
+
+Test.it('the endpoint floor is 0.80', function()
+    -- Pins the decision. Moving it changes which instruments may ship.
+    Test.expect(PROTOCOL.ENDPOINT_FLOOR == 0.80,
+        'expected 0.80, got ' .. tostring(PROTOCOL.ENDPOINT_FLOOR))
 end)
 
 Test.it('reads the bootstrap bound for rho, not the mean', function()

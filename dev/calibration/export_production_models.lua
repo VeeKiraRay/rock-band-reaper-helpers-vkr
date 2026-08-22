@@ -727,11 +727,12 @@ do
     chunk()
 
     local M = CALIBRATION_MANIFEST
-    -- Schema 2 since 2026-08-22 (rho_lower added; the gate reads it instead of rho_mean).
-    -- Pinned exactly rather than accepted as ">= 1": this file's job is to refuse inputs
-    -- it does not understand, and a schema it has never seen is exactly that.
-    if type(M) ~= 'table' or M.schema ~= 2 then
-        Fail('manifest schema is %s, expected 2', tostring(M and M.schema))
+    -- Schema 3 since 2026-08-22 (rho_lower at 2, endpoint_lower at 3 - the gate gained an
+    -- extremes bar, so a schema 2 file records verdicts reached without it). Pinned
+    -- exactly rather than accepted as ">= 1": this file's job is to refuse inputs it does
+    -- not understand, and a schema it has never seen is exactly that.
+    if type(M) ~= 'table' or M.schema ~= 3 then
+        Fail('manifest schema is %s, expected 3', tostring(M and M.schema))
     elseif not M.complete then
         -- A manifest is only written after every instrument is analysed, so this should
         -- be unreachable - but an incomplete one describes selections that were never

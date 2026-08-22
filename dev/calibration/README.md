@@ -41,8 +41,9 @@ Guitar, bass, keys and Pro Keys are unchanged **to the decimal**, which is what 
 the eighteen new columns did not leak into the four instruments they were not for.
 
 "usable" is within-one-tier accuracy, averaged across repeats. **Every bound in that table
-is the pessimistic end of an interval, and all three are what the gate reads** (floors:
-usable >= 90%, miss <= 5%, rho >= 0.70). The usable and miss bounds are Wilson; **rho's is
+is the pessimistic end of an interval, and all of them are what the gate reads** (floors:
+usable >= 90%, miss <= 5%, rho >= 0.70, **endpoint band >= 80%** as of 2026-08-22 — see
+"The gate gained an extremes bar" below; vocals and Pro Keys now fail on it too). The usable and miss bounds are Wilson; **rho's is
 the pack bootstrap's 5th percentile, adopted 2026-08-22** — until then rho was gated on its
 mean, which was the last asymmetry in the gate. It changed no verdict: all three passing
 instruments clear 0.70 on the bound as they did on the mean. Keys and Pro Keys fail on the
@@ -123,14 +124,16 @@ carries the same weight as its 89-song tier 1** and one song flipping moves the 
 3.6 points. Macro keeps its own job — the fixed 3/7 baseline is what makes scores
 comparable between instruments, and pooled never can be.
 
-> **Corrected 2026-08-22 — the "so Wilson applies" half of that paragraph is wrong.**
-> The pack bootstrap measures a design effect of **1.55–2.42** on the endpoint band, so
-> Wilson formally applies and is optimistic anyway: effective n is **56–138 rows, not the
-> 75–140 raw ones**. The mechanism is this project's own enrichment history — the extreme
-> songs were added deliberately and arrived *in packs*, so the endpoint band is the most
-> strongly clustered part of the corpus. The endpoint band may still be the better gate
-> input for the reasons above, but its floor must be read against the **bootstrap** bound,
-> never a Wilson one. See "The pack bootstrap" below.
+> **This paragraph was briefly retracted on 2026-08-22 and the retraction was wrong.** A
+> first version of the pack bootstrap reported an endpoint design effect of 1.55–2.42 and
+> I concluded Wilson was badly optimistic there. That figure was a **bug in
+> `PackBootstrap`** — the endpoint design effect was computed against the whole corpus row
+> count instead of the band's own 75–140 rows, inflating the ratio by about 1.6×. The true
+> value is **1.00–1.16**, so the "Wilson applies here" reasoning above **stands**.
+>
+> The gate reads the bootstrap p05 for this band anyway, because it assumes nothing and
+> the two bounds agree — preference, not necessity. Effective n (56–138) was correct
+> throughout; it does not depend on the denominator.
 
 One caution for whoever sets the number: the macro figures are now published above, so any
 floor chosen from here is chosen in their presence. Pick it from a principle stated
@@ -283,6 +286,94 @@ the middle tiers already run at 96–100%; grade it on macro or report all three
 it is spent, "everything unwalked is reserved" stops being the right policy, and the
 replacement is a new declaration with its own reasoning.
 
+### The gate gained an extremes bar
+
+Decided 2026-08-22, closing most of finding 2's divergence. `GateVerdict` now has a fourth
+input: the **endpoint band** (tiers 0–1 and 5–6 pooled) against its pack-bootstrap p05,
+floor **80%**. It is the first gate input that can fail an instrument for being *uneven*
+rather than *inaccurate*.
+
+**Why the endpoint band and not macro**, which was the pre-registered successor. Read at
+its lower bound — how every other gate input is read — **a 90% macro floor fails all six
+instruments**, the best being keys at 88.38. That is not the model being bad: macro is a
+mean of seven proportions, some over 2–4 songs, so its interval is wide (sd 2.0–4.4 against
+pooled's 1.0–2.1), and certifying evenness at 90% needs a large sample *in every tier*,
+which this corpus does not have.
+
+The older expectation — "bass stops passing, keys starts" — is what happens if macro is
+compared as a **point estimate** against 90%. That isn't how this gate works, and adopting
+a point comparison would have abandoned read-the-pessimistic-end one commit after applying
+it to rho.
+
+Bass is a second reason to keep macro out: its macro p05 of 79.19 is driven by the 4.7% of
+resamples that lose a tier and average over six bands. That's an artefact of sparse tiers,
+not a measurement of bass.
+
+**Where 80% comes from:** a promise stated independently of the figures — the product
+promises roughly 90% within one tier, and the extremes are accepted as harder, *but not
+more than ten points harder*.
+
+**What's uncomfortable about it**, recorded rather than glossed: 80% lands exactly where
+the three passing instruments sit (guitar 83.17, bass 89.03, drum 84.34). The floor was
+chosen with those numbers visible, and nothing here proves the principle wasn't fitted to
+them afterwards. What *can* be said is the direction — this **adds** a requirement and
+removes none, so it can only make the gate harder to pass. The verdict set is unchanged
+because the passers already cleared it, not because the bar was placed to spare them.
+
+**A known wart.** The gate now mixes two views: usable% and miss% come from per-repeat
+means (tier-then-average), the endpoint bound from the bootstrap over averaged residuals
+(average-then-tier). They differ by a few tenths. Keeping usable% on its historical Wilson
+bound was deliberate — every published figure and past verdict rests on it — but a future
+tidy-up should put all four on one view and re-derive the floors, as a declared experiment.
+
+Still **not** gated: macro, per-tier accuracy, signed bias, "no severe per-tier failure".
+The divergence is narrowed, not closed.
+
+### Clamp bounds and rho's input
+
+Peer review finding 8e, fixed 2026-08-22 — two defects, two switches, so each half's cost
+is separately attributable.
+
+**`CLAMP_BOUNDS = 'per_fold'`.** Bounds were computed once over *all* target rows, so a
+validation song's own rank helped set the range its own prediction was clamped into. They
+now come from each fold's training rows only.
+
+**`RHO_ON = 'raw'`.** rho was graded on clamped predictions; clamping ties the extremes and
+Spearman with ties is a different statistic. The product should clamp — rank 943 on a 1–501
+scale is nonsense — the evaluation should not. This matters more since rho's bootstrap p05
+became a gate input.
+
+All four arms came out identical on pooled, macro, every selection and every ridge
+histogram. So a **direct count** was run instead, because "no change in the headline" and
+"the code does nothing" are different claims:
+
+| instrument | preds | bounds | binds, whole-corpus | binds, per-fold | rho clamped → raw |
+|---|---:|---:|---:|---:|---:|
+| guitar | 3270 | 75–605 | 28 (0.86%) | 32 (+4) | +0.000007 |
+| bass | 3300 | 89–480 | 33 (1.00%) | 36 (+3) | −0.000015 |
+| drum | 3280 | 93–550 | 21 (0.64%) | 33 (+12) | −0.000000 |
+| vocals | 3280 | 112–495 | 13 (0.40%) | 14 (+1) | −0.000000 |
+| keys | 2660 | 90–495 | 56 (2.11%) | 56 (0) | −0.000012 |
+| real_keys | 2660 | 80–505 | 62 (2.33%) | 62 (0) | −0.000025 |
+
+**The clamp does bind** — 0.4% to 2.3% of predictions, not the "never" this project used to
+assume. And the pre-registered mechanism is confirmed: per-fold bounds are tighter, so they
+bind **more often**, on four of six instruments.
+
+**The gate's numbers did not move at all**, because in the per-repeat view every clamp is
+within-tier: the bounds are the extreme observed ranks, so a prediction just outside them
+was already in that extreme tier.
+
+**One tier did move, in the averaged view.** `CandidateResiduals` now clamps per fold
+*before* averaging, so a prediction repeatedly clamped to a tighter ceiling averages lower.
+Three guitar residuals shifted and one crossed out of predicted tier 6 into tier 5. Per-tier
+usable is unchanged, so pooled, macro and the endpoint band are unchanged; tier 5's signed
+bias moved −0.67 → −0.71. The pre-registered tier-crossing risk therefore **did** appear —
+at the top end, where the ceiling binds, having been predicted at the bottom. Half right.
+
+rho moved by −0.000045 to +0.000007, independently reproducing the review's −0.000006 to
++0.000025 and widening it slightly. Six orders of magnitude below the 0.70 floor.
+
 ### The ridge search now honours the origin policy
 
 Peer review finding 6, fixed 2026-08-22. Auxiliary rows train at weight 0.30, but the
@@ -349,20 +440,26 @@ average-then-tier). The report prints both and names which is which.
 
 | instrument | pooled | design | endpoints | design | effective n | rho | rho p05 |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| guitar | 95.11 | 1.05 | 88.50 | 1.71 | 112 / 327 | 0.865 | 0.830 |
-| bass | 94.24 | 0.95 | 92.86 | 1.55 | 138 / 330 | 0.802 | 0.746 |
-| drum | 96.34 | 1.00 | 90.00 | 1.93 | 88 / 328 | 0.896 | 0.870 |
-| vocals | 89.02 | 1.22 | 64.00 | 2.42 | 56 / 328 | 0.676 | 0.606 |
-| keys | 93.23 | 1.18 | 87.60 | 1.62 | 101 / 266 | 0.877 | 0.837 |
-| real_keys | 89.47 | 1.11 | 82.58 | 1.58 | 106 / 266 | 0.862 | 0.824 |
+| guitar | 95.11 | 1.05 | 88.50 | 1.00 | 112 / 113 | 0.865 | 0.830 |
+| bass | 94.24 | 0.95 | 92.86 | 1.01 | 138 / 140 | 0.802 | 0.746 |
+| drum | 96.34 | 1.00 | 90.00 | 1.01 | 88 / 90 | 0.895 | 0.869 |
+| vocals | 89.02 | 1.22 | 64.00 | 1.16 | 56 / 75 | 0.676 | 0.606 |
+| keys | 93.23 | 1.18 | 87.60 | 1.13 | 101 / 129 | 0.877 | 0.837 |
+| real_keys | 89.47 | 1.11 | 82.58 | 1.12 | 106 / 132 | 0.862 | 0.824 |
 
-**Wilson is fine on pooled.** Design effect 0.95–1.22 — clustering costs the pooled
-proportion almost nothing, and the gate's existing lower bound stands. Packs mix easy and
-hard songs, so a pack is not much more correlated internally than the corpus is overall.
-Worth checking rather than assuming, and it came out in the gate's favour.
+> **Design-effect figures corrected 2026-08-22.** The endpoint column first read 1.55–2.42
+> because `PackBootstrap` divided by the whole corpus row count instead of the endpoint
+> band's own — inflating the ratio by roughly 1.6×. Effective n was right all along (it
+> reduces to `p(1-p)/sd²`, independent of the denominator); the ratio and the conclusion
+> drawn from it were not.
 
-**Wilson is not fine on the endpoint band**, design 1.55–2.42, which corrects the phase-3
-recommendation quoted above. See the note there.
+**Wilson is fine on pooled** (design 0.95–1.22) **and on the endpoint band** (1.00–1.16).
+Clustering costs these proportions almost nothing, because packs mix easy and hard songs —
+a pack is not much more correlated internally than the corpus is overall. Worth checking
+rather than assuming, and it came out in the gate's favour on both counts.
+
+The gate reads the **bootstrap** p05 for the endpoint band regardless, because it assumes
+nothing about independence and the two bounds agree anyway.
 
 **Rho now has a lower bound, and the gate reads it as of 2026-08-22.** It used to read
 rho's *mean* while reading the pessimistic end of everything else — the asymmetry the peer
@@ -852,7 +949,7 @@ Parameters (`PROTOCOL`):
 N_REPEATS  10        NFOLD  5        SEED  20260812        INNER_FOLD  3
 RIDGE_GRID  1e-6, 1e-3, 1e-2, 1e-1, 1.0, 10.0
 LEGO_WEIGHT  0.3     Z  1.645  (one-sided 95%)
-USABLE_FLOOR  0.90   MISS_CEILING  0.05   RHO_FLOOR  0.70
+USABLE_FLOOR  0.90   MISS_CEILING  0.05   RHO_FLOOR  0.70   ENDPOINT_FLOOR  0.80
 ```
 
 Folds are stratified by **actual tier**, because whole tiers hold 2-3 songs and an
