@@ -398,6 +398,133 @@ Test.it('PackLeakageRate is zero for grouped folds and positive for row-level', 
 end)
 
 ----------------------------------------------------------------------
+Test.section('PackBootstrap - the interval Wilson cannot produce')
+
+-- Residual rows as CandidateResiduals emits them: pack, pred, rank, and the two tiers.
+local function BootRows(spec)
+    local out = {}
+    for _, s in ipairs(spec) do
+        for i = 1, s.n do
+            out[#out + 1] = {
+                name = s.pack .. '_' .. i, pack = s.pack,
+                rank = s.rank + i, pred = s.rank + i + (s.err or 0),
+                tier_act = s.tier, tier_pred = s.tier + (s.off or 0),
+                dist = math.abs(s.off or 0),
+            }
+        end
+    end
+    return out
+end
+
+Test.it('the point estimate matches a hand count', function()
+    -- 8 rows, 2 of them two tiers out, so pooled usable is 6/8.
+    local rows = BootRows({
+        { pack = 'a', n = 3, rank = 100, tier = 3, off = 0 },
+        { pack = 'b', n = 3, rank = 200, tier = 4, off = 1 },
+        { pack = 'c', n = 2, rank = 300, tier = 5, off = 2 },
+    })
+    local b = PackBootstrap(rows)
+    Test.expect(b ~= nil, 'bootstrap returned nil')
+    Test.expect(math.abs(b.stat.pooled.point - 6 / 8) < 1e-9,
+        'pooled point should be 0.75, got ' .. tostring(b.stat.pooled.point))
+    Test.expect(b.n == 8 and b.n_packs == 3,
+        ('expected 8 rows in 3 packs, got %d in %d'):format(b.n, b.n_packs))
+end)
+
+Test.it('is reproducible - a quoted bound has to be recheckable', function()
+    local rows = BootRows({
+        { pack = 'a', n = 4, rank = 100, tier = 2, off = 0 },
+        { pack = 'b', n = 4, rank = 200, tier = 3, off = 1 },
+        { pack = 'c', n = 4, rank = 300, tier = 4, off = 0 },
+        { pack = 'd', n = 4, rank = 400, tier = 5, off = 2 },
+    })
+    local a, b = PackBootstrap(rows), PackBootstrap(rows)
+    Test.expect(a.stat.pooled.lo == b.stat.pooled.lo
+            and a.stat.macro.lo == b.stat.macro.lo,
+        'two runs on the same rows must give the same bounds')
+end)
+
+Test.it('the lower bound sits below the point estimate and inside [0,1]', function()
+    local rows = BootRows({
+        { pack = 'a', n = 6, rank = 100, tier = 2, off = 0 },
+        { pack = 'b', n = 6, rank = 200, tier = 3, off = 0 },
+        { pack = 'c', n = 6, rank = 300, tier = 4, off = 1 },
+        { pack = 'd', n = 6, rank = 400, tier = 5, off = 2 },
+    })
+    local b = PackBootstrap(rows)
+    for _, k in ipairs({ 'pooled', 'macro' }) do
+        local s = b.stat[k]
+        Test.expect(s.lo <= s.point + 1e-9,
+            k .. ' lower bound must not exceed the point estimate')
+        Test.expect(s.lo >= 0 and s.p95 <= 1,
+            k .. ' bounds must stay inside [0,1]')
+    end
+end)
+
+Test.it('clustering widens the interval - the whole reason for resampling packs', function()
+    -- Same 40 rows and the same pooled rate twice. In `clustered` a whole pack of 20 is
+    -- wrong together, so a resample either draws it or does not and the rate swings; in
+    -- `spread` the same 20 failures sit in 20 separate packs and average out. If the
+    -- bootstrap did not respect packs these two would come out the same.
+    local clustered = BootRows({
+        { pack = 'good', n = 20, rank = 100, tier = 3, off = 0 },
+        { pack = 'bad',  n = 20, rank = 200, tier = 3, off = 2 },
+    })
+    local spec = {}
+    for i = 1, 20 do
+        spec[#spec + 1] = { pack = 'g' .. i, n = 1, rank = 100 + i, tier = 3, off = 0 }
+        spec[#spec + 1] = { pack = 'b' .. i, n = 1, rank = 200 + i, tier = 3, off = 2 }
+    end
+    local spread = BootRows(spec)
+    local bc, bs = PackBootstrap(clustered), PackBootstrap(spread)
+    Test.expect(math.abs(bc.stat.pooled.point - bs.stat.pooled.point) < 1e-9,
+        'the two fixtures must share a point estimate, or the comparison means nothing')
+    Test.expect(bc.stat.pooled.sd > bs.stat.pooled.sd * 2,
+        ('clustered sd %.4f should dwarf spread sd %.4f')
+            :format(bc.stat.pooled.sd, bs.stat.pooled.sd))
+end)
+
+Test.it('reports the design effect against the binomial sd', function()
+    local clustered = BootRows({
+        { pack = 'good', n = 20, rank = 100, tier = 3, off = 0 },
+        { pack = 'bad',  n = 20, rank = 200, tier = 3, off = 2 },
+    })
+    local b = PackBootstrap(clustered)
+    Test.expect(b.stat.pooled.design and b.stat.pooled.design > 1,
+        'two packs of 20 must show a design effect above 1')
+    Test.expect(b.stat.pooled.n_eff and b.stat.pooled.n_eff < b.n,
+        'effective n must fall below the row count when rows are clustered')
+end)
+
+Test.it('a row without a pack is its own group, not one shared bucket', function()
+    -- Pooling every unlabelled row would invent clustering that is not there and
+    -- silently widen the interval.
+    local rows = BootRows({ { pack = 'x', n = 12, rank = 100, tier = 3, off = 0 } })
+    for _, x in ipairs(rows) do x.pack = nil end
+    local b = PackBootstrap(rows)
+    Test.expect(b.n_packs == 12, 'expected 12 singleton groups, got ' .. tostring(b.n_packs))
+end)
+
+Test.it('counts resamples that lose a tier instead of hiding them', function()
+    -- One tier held by a single pack: some resamples miss it, and macro then averages
+    -- over fewer bands - a different estimand, so the rate has to be visible.
+    local rows = BootRows({
+        { pack = 'a', n = 20, rank = 100, tier = 2, off = 0 },
+        { pack = 'b', n = 20, rank = 200, tier = 3, off = 0 },
+        { pack = 'rare', n = 1, rank = 400, tier = 6, off = 0 },
+    })
+    local b = PackBootstrap(rows)
+    Test.expect(b.macro_short_frac > 0.1,
+        'a 1-pack tier out of 3 packs should vanish often; got '
+        .. tostring(b.macro_short_frac))
+end)
+
+Test.it('returns nil rather than dividing by nothing', function()
+    Test.expect(PackBootstrap({}) == nil, 'empty input')
+    Test.expect(PackBootstrap(nil) == nil, 'nil input')
+end)
+
+----------------------------------------------------------------------
 Test.section('SampleSd')
 
 Test.it('matches a hand-computed n-1 standard deviation', function()

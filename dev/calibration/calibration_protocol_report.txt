@@ -1,7 +1,7 @@
 ======  Difficulty calibration - LOCKED PROTOCOL  ======
 
 corpus_scores.csv  07aae114239c9dbb  1140165 bytes, 2101 rows
-protocol.lua       0b4a64b14b9ffea6
+protocol.lua       968f3b75699fc8cc
 factor set         73d526ddb35359fe  114 columns
 interpreter        Lua 5.4
 
@@ -121,6 +121,17 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
     modal tier    pooled  60.24%   macro  42.86%
     median rank   pooled  65.44%   macro  42.86%
     SELECTED over the better baseline: +29.05 pooled, +47.92 macro
+
+  -- pack bootstrap, 2000 resamples of 170 packs --
+    metric        point       sd   p05 (lo)        p95
+    pooled        94.50     1.30    92.24    96.50
+    macro         90.78     2.36    86.56    94.27
+    ends          86.73     3.09    81.45    91.54
+    rho           0.864    0.019    0.830    0.892
+
+    clustering cost, against the binomial sd Wilson assumes:
+      pooled   bootstrap sd 0.0130 vs binomial 0.0126  ->  design 1.03, effective n 307 of 327
+      endpoint bootstrap sd 0.0309 vs binomial 0.0188  ->  design 1.65, effective n 120 of 327
 
   -- pack-grouped folds, SELECTED model, matched seeds --
     170 packs over 327 rows, largest 15 rows (4.6% of the corpus)
@@ -266,6 +277,20 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
     modal tier    pooled  59.70%   macro  42.86%
     median rank   pooled  74.55%   macro  42.86%
     SELECTED over the better baseline: +19.70 pooled, +46.53 macro
+
+  -- pack bootstrap, 2000 resamples of 172 packs --
+    metric        point       sd   p05 (lo)        p95
+    pooled        94.24     1.22    92.16    96.22
+    macro         89.38     4.37    79.19    94.39
+    ends          92.86     2.19    89.03    96.24
+    rho           0.802    0.031    0.746    0.850
+
+    clustering cost, against the binomial sd Wilson assumes:
+      pooled   bootstrap sd 0.0122 vs binomial 0.0128  ->  design 0.95, effective n 368 of 330
+      endpoint bootstrap sd 0.0219 vs binomial 0.0142  ->  design 1.55, effective n 138 of 330
+    NOTE: 4.7% of resamples miss a tier entirely, so their macro is a
+    mean over fewer bands - that widens the macro interval beyond pack
+    sampling alone. See PackBootstrap.
 
   -- pack-grouped folds, SELECTED model, matched seeds --
     172 packs over 330 rows, largest 15 rows (4.5% of the corpus)
@@ -423,6 +448,20 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
     modal tier    pooled  72.56%   macro  42.86%
     median rank   pooled  72.56%   macro  42.86%
     SELECTED over the better baseline: +23.78 pooled, +47.73 macro
+
+  -- pack bootstrap, 2000 resamples of 172 packs --
+    metric        point       sd   p05 (lo)        p95
+    pooled        96.34     1.04    94.50    98.01
+    macro         90.59     2.80    85.75    94.90
+    ends          90.00     3.20    84.34    95.00
+    rho           0.896    0.014    0.870    0.915
+
+    clustering cost, against the binomial sd Wilson assumes:
+      pooled   bootstrap sd 0.0104 vs binomial 0.0104  ->  design 1.00, effective n 325 of 328
+      endpoint bootstrap sd 0.0320 vs binomial 0.0166  ->  design 1.93, effective n 88 of 328
+    NOTE: 0.1% of resamples miss a tier entirely, so their macro is a
+    mean over fewer bands - that widens the macro interval beyond pack
+    sampling alone. See PackBootstrap.
 
   -- pack-grouped folds, SELECTED model, matched seeds --
     172 packs over 328 rows, largest 15 rows (4.6% of the corpus)
@@ -695,6 +734,20 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
     median rank   pooled  77.13%   macro  42.86%
     SELECTED over the better baseline: +11.89 pooled, +38.27 macro
 
+  -- pack bootstrap, 2000 resamples of 170 packs --
+    metric        point       sd   p05 (lo)        p95
+    pooled        89.02     2.10    85.44    92.42
+    macro         81.13     2.67    76.21    85.01
+    ends          64.00     6.41    53.53    75.34
+    rho           0.676    0.039    0.606    0.737
+
+    clustering cost, against the binomial sd Wilson assumes:
+      pooled   bootstrap sd 0.0210 vs binomial 0.0173  ->  design 1.22, effective n 221 of 328
+      endpoint bootstrap sd 0.0641 vs binomial 0.0265  ->  design 2.42, effective n 56 of 328
+    NOTE: 13.7% of resamples miss a tier entirely, so their macro is a
+    mean over fewer bands - that widens the macro interval beyond pack
+    sampling alone. See PackBootstrap.
+
   -- pack-grouped folds, SELECTED model, matched seeds --
     170 packs over 328 rows, largest 15 rows (4.6% of the corpus)
     row-level folds leak a pack sibling into training for 61.1% of rows
@@ -858,6 +911,17 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
     median rank   pooled  51.50%   macro  42.86%
     SELECTED over the better baseline: +41.73 pooled, +48.66 macro
 
+  -- pack bootstrap, 2000 resamples of 140 packs --
+    metric        point       sd   p05 (lo)        p95
+    pooled        93.23     1.81    90.19    96.12
+    macro         91.52     2.01    88.38    94.94
+    ends          87.60     3.28    82.09    92.74
+    rho           0.877    0.021    0.837    0.904
+
+    clustering cost, against the binomial sd Wilson assumes:
+      pooled   bootstrap sd 0.0181 vs binomial 0.0154  ->  design 1.18, effective n 192 of 266
+      endpoint bootstrap sd 0.0328 vs binomial 0.0202  ->  design 1.62, effective n 101 of 266
+
   -- pack-grouped folds, SELECTED model, matched seeds --
     140 packs over 266 rows, largest 12 rows (4.5% of the corpus)
     row-level folds leak a pack sibling into training for 59.7% of rows
@@ -1013,6 +1077,17 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
     modal tier    pooled  45.86%   macro  42.86%
     median rank   pooled  50.38%   macro  42.86%
     SELECTED over the better baseline: +39.10 pooled, +45.88 macro
+
+  -- pack bootstrap, 2000 resamples of 140 packs --
+    metric        point       sd   p05 (lo)        p95
+    pooled        89.47     2.08    85.93    92.83
+    macro         88.74     2.25    84.78    92.20
+    ends          82.58     3.68    76.38    88.49
+    rho           0.862    0.021    0.824    0.892
+
+    clustering cost, against the binomial sd Wilson assumes:
+      pooled   bootstrap sd 0.0208 vs binomial 0.0188  ->  design 1.11, effective n 217 of 266
+      endpoint bootstrap sd 0.0368 vs binomial 0.0233  ->  design 1.58, effective n 106 of 266
 
   -- pack-grouped folds, SELECTED model, matched seeds --
     140 packs over 266 rows, largest 12 rows (4.5% of the corpus)

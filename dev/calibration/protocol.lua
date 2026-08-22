@@ -2517,6 +2517,244 @@ function GroupedFoldProbe(d, target, extra, inst, factor_pos, keys, scale, group
 end
 
 ----------------------------------------------------------------------
+-- THE PACK BOOTSTRAP - an interval for the quantities Wilson cannot reach
+----------------------------------------------------------------------
+
+-- WHY THIS EXISTS. The gate reads a Wilson lower bound, which is a binomial interval on
+-- a proportion over n rows. Two things are wrong with that here, and the bootstrap fixes
+-- both:
+--
+--   1. MACRO HAS NO CLOSED-FORM INTERVAL. It is the mean of up to seven proportions with
+--      denominators from 2 to 102. `macro_lower >= X` simply does not exist analytically,
+--      so the pre-registered move of the gate to macro has been blocked on this function
+--      rather than on a decision. Same for rho, which the gate currently reads as a MEAN
+--      while reading the pessimistic end of everything else - an asymmetry the report has
+--      had to admit to in words.
+--   2. WILSON ASSUMES INDEPENDENT ROWS, and these rows are clustered in packs. Songs from
+--      one pack share an author and an era, so the corpus carries less information than
+--      its row count suggests and Wilson is optimistic by an unknown amount. Resampling
+--      PACKS instead of rows measures that amount instead of assuming it away.
+--
+-- WHAT IS RESAMPLED, AND WHAT THAT BUYS. Packs are drawn WITH REPLACEMENT from the
+-- observed packs, and each drawn pack contributes all of its rows. So a bootstrap sample
+-- has a variable row count, which is correct: it is the honest reflection of having
+-- sampled a different set of packs.
+--
+-- WHAT IT DOES NOT CAPTURE, stated plainly because the interval will be quoted. The
+-- predictions are held FIXED at the out-of-fold values the real run produced. This is an
+-- interval for "what would this measured accuracy be on a different sample of packs",
+-- which is exactly the question a release floor asks. It is NOT an interval for "what if
+-- the model had been refitted and reselected on different data" - that needs the fitting
+-- inside the bootstrap loop, at roughly 2000x the current four-minute runtime, and is not
+-- affordable. The CV repeats already absorb part of the refit variability, so the two
+-- together are not as far apart as the omission sounds, but the gap is real and this
+-- interval must never be described as covering it.
+--
+-- WHICH FIGURES IT BOUNDS. The residual rows, i.e. predictions averaged over repeats and
+-- then tiered - the same rows TierDiagnostics reads. Those pooled figures differ from the
+-- per-repeat mean the gate quotes by a few tenths of a point (tier-then-average is not
+-- average-then-tier). The report prints both and names which is which; do not mix them.
+--
+-- MACRO'S EMPTY-TIER PROBLEM, which is a real limitation and not a rounding detail. A
+-- resample can miss a sparse tier entirely - bass tier 6 is 4 songs in 3 packs, so about
+-- 3% of resamples contain none of it. MacroUsable averages over OCCUPIED tiers, so those
+-- resamples compute a mean over six tiers rather than seven. That is a slightly different
+-- estimand, and mixing the two inflates the spread. The rate is measured and reported
+-- (`macro_short_frac`) rather than hidden; when it is more than a few per cent the macro
+-- interval is wider than the sampling of packs alone justifies.
+--
+-- ---------------------------------------------------------------------------
+-- WHAT IT MEASURED, 2026-08-22. B = 2000, selected model per instrument.
+--
+--   instrument   pooled  design   endpoint  design  eff n    rho    rho p05
+--   guitar       94.50    1.03      86.73    1.65   120/327  0.864   0.830
+--   bass         94.24    0.95      92.86    1.55   138/330  0.802   0.746
+--   drum         96.34    1.00      90.00    1.93    88/328  0.896   0.870
+--   vocals       89.02    1.22      64.00    2.42    56/328  0.676   0.606
+--   keys         93.23    1.18      87.60    1.62   101/266  0.877   0.837
+--   real_keys    89.47    1.11      82.58    1.58   106/266  0.862   0.824
+--
+-- THREE RESULTS, and the second one contradicts something this project already wrote
+-- down.
+--
+-- 1. WILSON IS FINE ON POOLED. Design effect 0.95-1.22, so clustering costs the pooled
+--    proportion almost nothing and the gate's existing lower bound is defensible as it
+--    stands. (A design effect slightly below 1, as on bass, is resampling noise; it
+--    cannot really be below 1.) This was worth checking rather than assuming - the
+--    reason the pooled figure survives clustering is that packs mix easy and hard songs,
+--    so a pack is not much more correlated internally than the corpus is overall.
+--
+-- 2. WILSON IS NOT FINE ON THE ENDPOINT BAND, design 1.55-2.42. This DIRECTLY UNDERCUTS
+--    the phase-3 recommendation, written in the README on 2026-08-21, that the endpoint
+--    band should become the gate input "because it is a real proportion over 75-140 rows
+--    where Wilson does work". Wilson formally applies and is optimistic anyway: the
+--    effective sample size is 56-138 rows, not the 75-140 raw ones, and on drums and
+--    vocals it is roughly half the row count.
+--
+--    The mechanism is this project's own history. The corpus was enriched three times by
+--    deliberately adding low-end and top-end songs, and those songs arrived IN PACKS. So
+--    the endpoint band is precisely the part of the corpus where rows are most strongly
+--    clustered, which is exactly where an independence assumption does the most damage.
+--    Any endpoint floor must be read against the bootstrap bound, never a Wilson one.
+--
+-- 3. RHO NOW HAS A LOWER BOUND, AND IT COSTS NOTHING TO ADOPT. The gate reads rho as a
+--    MEAN while reading the pessimistic end of everything else - an asymmetry the peer
+--    review caught and the report has had to admit to in words. The bootstrap p05 is a
+--    real one-sided 95% bound, and against the 0.70 floor: guitar 0.830, bass 0.746,
+--    drum 0.870 all still clear it. So the asymmetry can be repaired without changing a
+--    single verdict. That is a decision to declare, not to slip in - see rule 1 - but it
+--    is the cheapest honest improvement now available to the gate.
+--
+-- AND ONE CAUTION ABOUT MACRO, which this was built to unblock. A macro floor is now
+-- computable, but bass's interval is not clean: sd 4.37 and a p05 of 79.19, driven by the
+-- 4.7% of resamples that lose a tier (vocals 13.7%). That is macro's weighting pathology
+-- showing up quantitatively - bass's 4-song tier 6 carries the same weight as its 89-song
+-- tier 1, so whether those 4 songs are drawn moves the headline by several points. The
+-- bootstrap does not fix that; it measures it. Any macro floor has to be set knowing the
+-- interval on one instrument is dominated by whether three packs got drawn.
+-- ---------------------------------------------------------------------------
+PROTOCOL.BOOTSTRAP = {
+    -- 2000 resamples: the 5th percentile is stable to well under a tenth of a point at
+    -- this size, and the whole loop costs a couple of seconds because nothing is refitted.
+    B    = 2000,
+    -- Offset from PROTOCOL.SEED so the bootstrap draw cannot accidentally reuse a fold
+    -- shuffle's stream, and so it is reproducible on its own terms.
+    SEED = 909,
+}
+
+-- One metric set over a list of residual rows. Kept separate so the bootstrap loop and
+-- the point estimate go through identical code - an interval whose centre is computed a
+-- different way from its endpoints is a bug waiting to be argued about.
+local function MetricsOf(rows)
+    if #rows == 0 then return nil end
+    local pt, at, pred, act = {}, {}, {}, {}
+    local ok, n = 0, 0
+    local ep_ok, ep_n = 0, 0
+    for _, x in ipairs(rows) do
+        n = n + 1
+        pt[n], at[n] = x.tier_pred, x.tier_act
+        pred[n], act[n] = x.pred, x.rank
+        local hit = (math.abs(x.tier_pred - x.tier_act) <= 1) and 1 or 0
+        ok = ok + hit
+        if x.tier_act <= 1 or x.tier_act >= 5 then
+            ep_n, ep_ok = ep_n + 1, ep_ok + hit
+        end
+    end
+    -- Occupied tiers, so the caller can tell a six-tier macro from a seven-tier one.
+    local occ = {}
+    for i = 1, n do occ[at[i]] = true end
+    local k = 0
+    for _ in pairs(occ) do k = k + 1 end
+    return {
+        pooled   = ok / n,
+        macro    = MacroUsable(pt, at),
+        endpoint = (ep_n > 0) and (ep_ok / ep_n) or nil,
+        rho      = Spearman(pred, act) or 0,
+        n        = n,
+        n_tiers  = k,
+    }
+end
+
+-- Percentile bootstrap over packs.
+--
+-- Percentile rather than BCa: BCa needs a jackknife over packs plus a bias-correction
+-- term, and with 140-172 packs the acceleration estimate is itself noisy. The percentile
+-- interval is what the literature calls adequate for a smooth statistic at this B, and
+-- being able to say exactly what the number is beats a sharper number nobody can check.
+--
+--   resid   residual rows from CandidateResiduals (need pack, tier_pred, tier_act,
+--           pred, rank).
+--
+-- Returns nil when there is nothing to resample, else a record carrying, per metric, the
+-- point estimate, the bootstrap mean, sd, and the one-sided lower bound at PROTOCOL.Z's
+-- confidence (5th percentile for the 95% the gate uses), plus a two-sided 90% band.
+function PackBootstrap(resid)
+    if not resid or #resid == 0 then return nil end
+
+    -- Group rows by pack. A row with no pack becomes its own group, never a shared
+    -- unlabelled bucket - same rule as StratifiedGroupFolds, for the same reason.
+    local by, keys = {}, {}
+    for idx, x in ipairs(resid) do
+        local p = x.pack
+        if p == nil or p == '' then p = '\0row' .. idx end
+        p = tostring(p)
+        if not by[p] then by[p] = {}; keys[#keys + 1] = p end
+        table.insert(by[p], x)
+    end
+    table.sort(keys)                      -- seed alone decides the draw, not table order
+
+    local point = MetricsOf(resid)
+    if not point then return nil end
+
+    local np = #keys
+    math.randomseed(PROTOCOL.SEED + PROTOCOL.BOOTSTRAP.SEED)
+
+    local draws = { pooled = {}, macro = {}, endpoint = {}, rho = {} }
+    local short = 0                       -- resamples missing at least one occupied tier
+    local sum_n = 0
+    for _ = 1, PROTOCOL.BOOTSTRAP.B do
+        local rows = {}
+        for _ = 1, np do
+            local g = by[keys[math.random(np)]]
+            for _, x in ipairs(g) do rows[#rows + 1] = x end
+        end
+        local m = MetricsOf(rows)
+        if m then
+            sum_n = sum_n + m.n
+            if m.n_tiers < point.n_tiers then short = short + 1 end
+            draws.pooled[#draws.pooled + 1] = m.pooled
+            draws.macro[#draws.macro + 1]   = m.macro
+            draws.rho[#draws.rho + 1]       = m.rho
+            if m.endpoint then draws.endpoint[#draws.endpoint + 1] = m.endpoint end
+        end
+    end
+
+    -- Per-metric records live under `stat` rather than beside the scalars, so a caller
+    -- reading out.pooled.lo cannot collide with out.n and so the two kinds of field stay
+    -- visibly different.
+    local out = {
+        n = point.n, n_packs = np, n_tiers = point.n_tiers,
+        B = PROTOCOL.BOOTSTRAP.B,
+        macro_short_frac = short / PROTOCOL.BOOTSTRAP.B,
+        mean_rows = sum_n / PROTOCOL.BOOTSTRAP.B,
+        stat = {},
+    }
+    for _, key in ipairs({ 'pooled', 'macro', 'endpoint', 'rho' }) do
+        local t = draws[key]
+        if #t > 0 then
+            out.stat[key] = {
+                point = point[key],
+                mean  = MeanOf(t),
+                sd    = SampleSd(t),
+                lo    = Quantile(t, 0.05),    -- one-sided 95%, what a floor reads
+                p05   = Quantile(t, 0.05),
+                p95   = Quantile(t, 0.95),
+            }
+        end
+    end
+
+    -- THE DESIGN EFFECT, which is the whole reason the gate's current bound is in
+    -- question. Binomial sd is sqrt(p(1-p)/n) - what Wilson assumes. Ratio above 1 means
+    -- clustering costs effective sample size and Wilson is OPTIMISTIC by that factor;
+    -- at or below 1 means the pack structure is not costing anything and the existing
+    -- bound stands. Reported for pooled and the endpoint band, the two genuine
+    -- proportions.
+    for _, key in ipairs({ 'pooled', 'endpoint' }) do
+        local rec = out.stat[key]
+        if rec and rec.point and out.n > 0 then
+            local p = rec.point
+            local binom = math.sqrt(math.max(0, p * (1 - p)) / out.n)
+            rec.binom_sd = binom
+            rec.design   = (binom > 1e-12) and (rec.sd / binom) or nil
+            -- Effective n: the row count an INDEPENDENT sample would need to carry the
+            -- same information. n / design^2 is the standard reading.
+            rec.n_eff    = rec.design and (out.n / (rec.design * rec.design)) or nil
+        end
+    end
+    return out
+end
+
+----------------------------------------------------------------------
 -- Paired comparison and the selection rule
 ----------------------------------------------------------------------
 
@@ -2911,8 +3149,12 @@ function CandidateResiduals(d, target, extra, inst, factor_pos, rec)
             local p  = ClampRank(sum[i] / cnt[i], rank_lo, rank_hi)
             local tp = TierForRank(inst, p)
             local ta = TierForRank(inst, d.ranks[i])
+            -- pack rides along for PackBootstrap, which resamples these rows by pack.
+            -- nil when the caller did not collect it; the bootstrap then treats the row
+            -- as its own pack rather than silently pooling every unlabelled row.
             out[#out + 1] = { name = d.names[i], rank = d.ranks[i], pred = p,
                               tier_pred = tp, tier_act = ta,
+                              pack = d.packs and d.packs[i],
                               dist = math.abs(tp - ta) }
         end
     end

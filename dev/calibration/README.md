@@ -117,6 +117,15 @@ carries the same weight as its 89-song tier 1** and one song flipping moves the 
 3.6 points. Macro keeps its own job — the fixed 3/7 baseline is what makes scores
 comparable between instruments, and pooled never can be.
 
+> **Corrected 2026-08-22 — the "so Wilson applies" half of that paragraph is wrong.**
+> The pack bootstrap measures a design effect of **1.55–2.42** on the endpoint band, so
+> Wilson formally applies and is optimistic anyway: effective n is **56–138 rows, not the
+> 75–140 raw ones**. The mechanism is this project's own enrichment history — the extreme
+> songs were added deliberately and arrived *in packs*, so the endpoint band is the most
+> strongly clustered part of the corpus. The endpoint band may still be the better gate
+> input for the reasons above, but its floor must be read against the **bootstrap** bound,
+> never a Wilson one. See "The pack bootstrap" below.
+
 One caution for whoever sets the number: the macro figures are now published above, so any
 floor chosen from here is chosen in their presence. Pick it from a principle stated
 independently of them — "the 90% promise should hold in every band rather than on average"
@@ -267,6 +276,55 @@ Two things to hold onto when the partition is spent. The new material is **mostl
 the middle tiers already run at 96–100%; grade it on macro or report all three. And once
 it is spent, "everything unwalked is reserved" stops being the right policy, and the
 replacement is a new declaration with its own reasoning.
+
+### The pack bootstrap
+
+Built 2026-08-22. It answers two questions the Wilson bound cannot: what interval belongs
+to **macro** and **rho**, and whether Wilson itself is honest on rows that come in packs.
+
+It resamples **packs** with replacement (B = 2000) from the out-of-fold residual rows and
+recomputes every metric. What it does **not** do is refit the model inside the loop — that
+is 2000× a four-minute run. So this is an interval for *"what would this measured accuracy
+be on a different sample of packs"*, which is the question a release floor asks, and it is
+**not** an interval for *"what if the model had been refitted and reselected"*. Never quote
+it as the second.
+
+It bounds the **averaged-prediction** figures from the per-tier block, which sit a few
+tenths from the per-repeat means the gate quotes (tier-then-average is not
+average-then-tier). The report prints both and names which is which.
+
+| instrument | pooled | design | endpoints | design | effective n | rho | rho p05 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| guitar | 94.50 | 1.03 | 86.73 | 1.65 | 120 / 327 | 0.864 | 0.830 |
+| bass | 94.24 | 0.95 | 92.86 | 1.55 | 138 / 330 | 0.802 | 0.746 |
+| drum | 96.34 | 1.00 | 90.00 | 1.93 | 88 / 328 | 0.896 | 0.870 |
+| vocals | 89.02 | 1.22 | 64.00 | 2.42 | 56 / 328 | 0.676 | 0.606 |
+| keys | 93.23 | 1.18 | 87.60 | 1.62 | 101 / 266 | 0.877 | 0.837 |
+| real_keys | 89.47 | 1.11 | 82.58 | 1.58 | 106 / 266 | 0.862 | 0.824 |
+
+**Wilson is fine on pooled.** Design effect 0.95–1.22 — clustering costs the pooled
+proportion almost nothing, and the gate's existing lower bound stands. Packs mix easy and
+hard songs, so a pack is not much more correlated internally than the corpus is overall.
+Worth checking rather than assuming, and it came out in the gate's favour.
+
+**Wilson is not fine on the endpoint band**, design 1.55–2.42, which corrects the phase-3
+recommendation quoted above. See the note there.
+
+**Rho now has a lower bound, and adopting it costs nothing.** The gate reads rho as a
+*mean* while reading the pessimistic end of everything else — the asymmetry the peer review
+caught. Against the 0.70 floor the bootstrap p05 gives guitar 0.830, bass 0.746, drum
+0.870: **all three still pass**. The asymmetry can be repaired without moving a single
+verdict, which makes it the cheapest honest improvement available to the gate. It is still
+a gate change and so a declared decision under rule 1, not something to slip in.
+
+**A caution about macro, which this was built to unblock.** A macro floor is now
+computable, but bass's interval is not clean — sd 4.37 and p05 79.19, driven by the **4.7%
+of resamples that lose a tier entirely** (vocals 13.7%). `MacroUsable` averages over
+*occupied* tiers, so those resamples measure a slightly different quantity over six bands
+instead of seven. That is macro's weighting pathology made quantitative: whether three
+packs get drawn moves bass's headline several points. The bootstrap measures this rather
+than fixing it, and the report prints the rate. Any macro floor must be set knowing one
+instrument's interval is dominated by a coin flip over three packs.
 
 ### Pack leakage in the CV folds, measured
 

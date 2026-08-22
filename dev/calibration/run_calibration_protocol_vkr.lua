@@ -487,6 +487,47 @@ local function AnalyseInstrument(csv, inst)
         end
     end
 
+    -- An interval for the quantities Wilson cannot reach - macro, rho - and a direct test
+    -- of whether Wilson is optimistic on the ones it can. Resamples PACKS, not rows.
+    -- Bounds the averaged-prediction figures printed in the per-tier block just above,
+    -- which are NOT the per-repeat means the gate quotes; see PackBootstrap.
+    local boot = resid and PackBootstrap(resid)
+    if boot then
+        Msg(('\n  -- pack bootstrap, %d resamples of %d packs --\n')
+            :format(boot.B, boot.n_packs))
+        Msg(('    %-10s %8s %8s %10s %10s\n')
+            :format('metric', 'point', 'sd', 'p05 (lo)', 'p95'))
+        local function Row(key, label, scale, fmt)
+            local s = boot.stat[key]
+            if not s then return end
+            Msg(('    %-10s ' .. fmt .. ' ' .. fmt .. ' ' .. fmt .. ' ' .. fmt .. '\n')
+                :format(label, s.point * scale, s.sd * scale,
+                        s.lo * scale, s.p95 * scale))
+        end
+        Row('pooled',   'pooled',   100, '%8.2f')
+        Row('macro',    'macro',    100, '%8.2f')
+        Row('endpoint', 'ends',     100, '%8.2f')
+        Row('rho',      'rho',        1, '%8.3f')
+
+        -- The design effect is the point of the exercise: it says in one number whether
+        -- the gate's Wilson bound is defensible on clustered rows.
+        Msg('\n    clustering cost, against the binomial sd Wilson assumes:\n')
+        for _, key in ipairs({ 'pooled', 'endpoint' }) do
+            local s = boot.stat[key]
+            if s and s.design then
+                Msg(('      %-8s bootstrap sd %.4f vs binomial %.4f  ->  design %.2f, '
+                     .. 'effective n %.0f of %d\n')
+                    :format(key, s.sd, s.binom_sd, s.design, s.n_eff, boot.n))
+            end
+        end
+        if boot.macro_short_frac > 0 then
+            Msg(('    NOTE: %.1f%% of resamples miss a tier entirely, so their macro is a\n')
+                :format(boot.macro_short_frac * 100))
+            Msg('    mean over fewer bands - that widens the macro interval beyond pack\n')
+            Msg('    sampling alone. See PackBootstrap.\n')
+        end
+    end
+
     -- How much of the score survives when whole DLC PACKS are held out instead of
     -- individual songs. Peer review finding 7: `pack` is CSV column 3 and the fold
     -- assignment never read it, so a song could be graded while a pack sibling sat in
