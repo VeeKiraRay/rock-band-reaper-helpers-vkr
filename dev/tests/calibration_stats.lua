@@ -525,6 +525,61 @@ Test.it('returns nil rather than dividing by nothing', function()
 end)
 
 ----------------------------------------------------------------------
+Test.section('InnerScoreWeight - the ridge search must honour the origin policy')
+
+-- Peer review finding 6. The three arms are pinned here because the protocol and the
+-- exporter both call this one function, and a silent change to it would move every
+-- published coefficient without moving a single test that names ridge.
+local function WithMode(mode, fn)
+    local prev = PROTOCOL.RIDGE_VALIDATION
+    PROTOCOL.RIDGE_VALIDATION = mode
+    local ok, err = pcall(fn)
+    PROTOCOL.RIDGE_VALIDATION = prev
+    if not ok then error(err, 0) end
+end
+
+Test.it('target_only scores target rows and ignores auxiliary ones', function()
+    WithMode('target_only', function()
+        Test.expect(InnerScoreWeight(false, 1.0) == 1, 'a target row must count fully')
+        Test.expect(InnerScoreWeight(true, 0.3) == 0, 'an aux row must not be scored')
+        -- The weight is irrelevant in this mode - origin decides, not the number.
+        Test.expect(InnerScoreWeight(true, 1.0) == 0,
+            'an aux row at weight 1.0 is still an aux row')
+    end)
+end)
+
+Test.it('weighted scores every row at its training weight', function()
+    WithMode('weighted', function()
+        Test.expect(InnerScoreWeight(false, 1.0) == 1.0, 'target row')
+        Test.expect(InnerScoreWeight(true, 0.3) == 0.3, 'aux row counts 0.30')
+    end)
+end)
+
+Test.it('unweighted reproduces the pre-2026-08-22 defect exactly', function()
+    -- Kept runnable so the cost of the fix stays measurable. If this ever stops
+    -- returning 1 for an aux row it is no longer the arm it claims to be, and the
+    -- documented A/B becomes unreproducible.
+    WithMode('unweighted', function()
+        Test.expect(InnerScoreWeight(false, 1.0) == 1, 'target row')
+        Test.expect(InnerScoreWeight(true, 0.3) == 1,
+            'the defect counted an aux row as a full row')
+    end)
+end)
+
+Test.it('an unknown mode falls back to unweighted rather than erroring mid-run', function()
+    WithMode('nonsense', function()
+        Test.expect(InnerScoreWeight(true, 0.3) == 1, 'unknown mode behaves as unweighted')
+    end)
+end)
+
+Test.it('the shipped mode is target_only', function()
+    -- Pins the decision itself. Changing PROTOCOL.RIDGE_VALIDATION moves every
+    -- coefficient in the artifact, so it should not be possible to do quietly.
+    Test.expect(PROTOCOL.RIDGE_VALIDATION == 'target_only',
+        'expected target_only, got ' .. tostring(PROTOCOL.RIDGE_VALIDATION))
+end)
+
+----------------------------------------------------------------------
 Test.section('GateVerdict - every input read from its pessimistic end')
 
 -- A record that passes everything, so each case below turns exactly one thing bad.

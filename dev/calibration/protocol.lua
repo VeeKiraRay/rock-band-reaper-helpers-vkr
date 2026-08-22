@@ -97,6 +97,14 @@ PROTOCOL = {
         { origin = 'lego', flag = 'is_lego', weight = 0.3 },
         { origin = 'rb2',  flag = 'is_rb2',  weight = 0.3 },
     },
+    -- HOW THE NESTED RIDGE SEARCH SCORES ITS INNER HOLDOUTS. See the RIDGE VALIDATION
+    -- block above ChooseRidge for the pre-registration, the arms, and the result.
+    --   'unweighted'   every inner row counts 1, whatever origin it came from. What the
+    --                  code did until 2026-08-22, and what peer review finding 6 is about.
+    --   'weighted'     each inner row counts its training weight, so an aux row counts
+    --                  0.30 - the literal reading of the declared origin policy.
+    --   'target_only'  aux rows train and are never scored, matching the outer grade.
+    RIDGE_VALIDATION = 'target_only',
     -- PACK-GROUPED FOLDS. false means the gate keeps dealing individual rows, which is
     -- what every published figure was measured under. See the GROUPED FOLDS block below
     -- RunProtocol for what this is, what it measured, and why moving the gate onto it is
@@ -2152,10 +2160,121 @@ function AuxIndices(origins)
     return out
 end
 
+-- ---------------------------------------------------------------------------
+-- RIDGE VALIDATION - peer review finding 6, and its pre-registration
+--
+-- THE DEFECT. Auxiliary rows train at weight 0.30 (AUX_ORIGINS), because 60 Lego-era and
+-- RB2 rows should inform the fit without steering it. But the nested ridge search below
+-- used to accumulate `err + |e|` and `cnt + 1` over its inner holdouts, ignoring the `ws`
+-- array sitting right beside it. So in the one decision that picks the regularisation
+-- strength, an auxiliary row counted as much as an RB3 target row.
+--
+-- HOW BIG THE MISWEIGHTING IS. Inner training rows are roughly 264 target + 60 aux, so aux
+-- carried about 18.5% of the vote on ridge instead of the ~6.4% the declared 0.30 policy
+-- implies, or the 0% that matches how the model is actually graded. Keys and Pro Keys have
+-- NO auxiliary rows at all - neither Lego Rock Band nor the RB2 export has a keyboard part
+-- - so they are unaffected by construction, which makes them a free control.
+--
+-- THREE ARMS, and the switch is PROTOCOL.RIDGE_VALIDATION:
+--   'unweighted'   the defect, kept runnable so the cost of the fix is measurable
+--   'weighted'     inner rows count their training weight; the literal reading of "aux
+--                  rows are worth 0.30"
+--   'target_only'  aux rows train and are never scored; matches the OUTER grade, which
+--                  is computed on target rows only with every origin indicator at zero
+--
+-- PRE-REGISTERED 2026-08-22, before any arm was run. Unlike the grouped-fold prediction,
+-- nothing here had been measured when this was written.
+--
+--   * Keys and real_keys must be BYTE-IDENTICAL across all three arms. They have no aux
+--     rows, so any movement there is a bug in the implementation, not a finding. This is
+--     the hard falsifiable check.
+--   * No instrument's selected CANDIDATE changes.
+--   * Metric movement stays under one paired sd (so under about 0.8 points pooled).
+--   * Weak directional guess: target_only >= weighted >= unweighted on the target
+--     metrics, because tuning against the objective you are graded on should help. Held
+--     weakly - the ridge grid is six coarse log-spaced values, so many folds will pick the
+--     same value regardless.
+--
+-- THE DECISION RULE, AND IT IS NOT "WHICHEVER SCORES BEST". This is a CORRECTNESS fix, so
+-- the arm is chosen on what it implements, not on what it measures. Choosing by score is
+-- exactly the selection inflation this whole file exists to prevent, and with 6 grid
+-- values on 4 instruments something would "win" by noise every time.
+--
+-- `target_only` is adopted because it matches the estimand: the outer CV grades target
+-- rows only, so the inner search should minimise error on target rows only. `weighted` is
+-- measured alongside because it is the reviewer's suggestion and the literal reading of
+-- the 0.30 policy; if the two disagree by less than a paired sd, target_only still wins on
+-- the argument above rather than on the number.
+--
+-- The A/B exists to DOCUMENT THE COST and to CATCH A RESELECTION, not to pick a winner.
+--
+-- WHAT IT MEASURED, 2026-08-22. Paired by repeat, against the unweighted defect:
+--
+--   instrument   weighted            target_only         candidate change
+--                pooled   macro      pooled   macro
+--   guitar       +0.00    +0.17      +0.06    +0.41      none
+--   bass         +0.00    +0.00      +0.00    +0.00      none
+--   drum         +0.00    +0.00      -0.12    -0.31      none
+--   vocals       +0.09    +0.02      +0.00    -0.20      none
+--   keys          identical           identical          none  (no aux rows)
+--   real_keys     identical           identical          none  (no aux rows)
+--
+-- SCORING THE PRE-REGISTRATION, point by point:
+--
+--   * CONTROL HELD. keys and real_keys are identical across all three arms - not merely
+--     to the reported decimals but in their whole ridge histograms. That is the check
+--     that says this is measuring the aux rows and not an implementation slip.
+--   * NO RESELECTION on any instrument, as predicted.
+--   * MOVEMENT UNDER ONE PAIRED SD, as predicted, and with room to spare: the largest
+--     move is 0.12 points pooled against paired sds of 0.43-0.79, and 0.41 macro against
+--     0.73-1.83.
+--   * THE DIRECTIONAL GUESS IS NOT SUPPORTED. Guitar moved the way it predicted, drum
+--     moved against it, vocals split by metric, bass did not move at all. Two of the four
+--     instruments with aux rows went each way and every magnitude sits inside noise, so
+--     the direction is unresolvable at this corpus size rather than refuted. Recorded as
+--     unsupported; the guess was held weakly and should have been.
+--
+-- THE SUBSTANTIVE RESULT IS IN THE RIDGE HISTOGRAM, NOT THE ACCURACY. The chosen ridge
+-- moves a lot. Guitar under the defect picked 0.1 on 35 of 50 fold-repeats; under
+-- target_only that falls to 24, with weight shifting to weaker values. Vocals goes the
+-- other way, 32 -> 44 at 0.1. Drum starts picking 1.0. So the auxiliary rows genuinely
+-- WERE steering regularisation strength, exactly as the review said - and the model turns
+-- out to be insensitive to ridge across that range, which is why the accuracy barely
+-- moves. "No measurable cost" is the finding; "no effect" would be the wrong reading.
+--
+-- IT DID CHANGE THE SHIPPED ARTIFACT. VOCALS' production ridge moved 0.01 -> 0.1 and its
+-- 14 coefficients with it. No gate verdict changed on any instrument (vocals fails either
+-- way), and guitar's usable lower bound moved 91.64 -> 91.71 while drum's moved
+-- 94.37 -> 94.22 - both still passing.
+-- ---------------------------------------------------------------------------
+
+-- Weight each inner-holdout row carries when scoring a ridge value, under the mode in
+-- force. Returns 0 for a row that must not be scored at all.
+--
+-- GLOBAL ON PURPOSE. export_production_models.lua runs the same nested search to pick the
+-- production ridge, and finding 6 is precisely that the two searches implemented different
+-- policies. One function, called from both, is what makes them unable to drift again.
+--
+--   is_aux   true when the row comes from an auxiliary origin.
+--   w        the row's training weight.
+function InnerScoreWeight(is_aux, w)
+    local mode = PROTOCOL.RIDGE_VALIDATION
+    if mode == 'target_only' then
+        return is_aux and 0 or 1
+    elseif mode == 'weighted' then
+        return w or 1
+    end
+    return 1                                  -- 'unweighted', the pre-2026-08-22 behaviour
+end
+
 -- Nested ridge search. Splits the TRAINING rows again, scores each ridge value on the
 -- inner holdouts, and returns the best. The training rows here never include the outer
 -- fold being predicted, so nothing the model is graded on informs its ridge.
-local function ChooseRidge(X, ys, ws)
+--
+--   aux    parallel array of booleans, true where X[i] came from an auxiliary origin.
+--         Passed explicitly rather than inferred from ws, because inferring "weight 0.30
+--         means auxiliary" would silently break the day an aux origin is given weight 1.
+local function ChooseRidge(X, ys, ws, aux)
     local n = #X
     if n < PROTOCOL.INNER_FOLD * 2 then return PROTOCOL.RIDGE_GRID[1] end
     local folds = KFoldIndices(n, PROTOCOL.INNER_FOLD)
@@ -2174,8 +2293,14 @@ local function ChooseRidge(X, ys, ws)
             local fit = MultiFit(tx, ty, ridge, tw)
             if fit then
                 for _, i in ipairs(folds[f]) do
-                    err = err + math.abs(ApplyFit(X[i], fit) - ys[i])
-                    cnt = cnt + 1
+                    -- Training weight and SCORING weight are separate: an aux row can
+                    -- still train the inner fit (tw above) while contributing nothing to
+                    -- the error that picks the ridge.
+                    local sw = InnerScoreWeight(aux and aux[i], ws[i])
+                    if sw > 0 then
+                        err = err + sw * math.abs(ApplyFit(X[i], fit) - ys[i])
+                        cnt = cnt + sw
+                    end
                 end
             end
         end
@@ -2199,7 +2324,10 @@ function RunOneRepeat(d, target, extra, folds, keys, pos, scale)
     local pred, act, ridges = {}, {}, {}
 
     for f = 1, #folds do
-        local X, ys, ws = {}, {}, {}
+        -- `aux` marks which rows came from an auxiliary origin, so the nested ridge
+        -- search can score them differently from how it trains on them. See the RIDGE
+        -- VALIDATION block above ChooseRidge.
+        local X, ys, ws, aux = {}, {}, {}, {}
         for g = 1, #folds do
             if g ~= f then
                 for _, ti in ipairs(folds[g]) do
@@ -2207,6 +2335,7 @@ function RunOneRepeat(d, target, extra, folds, keys, pos, scale)
                     X[#X + 1]   = WithOrigin(feats[i], d.origins[i])
                     ys[#ys + 1] = scale.fwd(d.ranks[i])
                     ws[#ws + 1] = 1.0
+                    aux[#aux + 1] = false
                 end
             end
         end
@@ -2214,9 +2343,10 @@ function RunOneRepeat(d, target, extra, folds, keys, pos, scale)
             X[#X + 1]   = WithOrigin(feats[i], d.origins[i])
             ys[#ys + 1] = scale.fwd(d.ranks[i])
             ws[#ws + 1] = AuxWeight(d.origins[i]) or PROTOCOL.LEGO_WEIGHT
+            aux[#aux + 1] = true
         end
 
-        local ridge = ChooseRidge(X, ys, ws)
+        local ridge = ChooseRidge(X, ys, ws, aux)
         ridges[#ridges + 1] = ridge
         local fit = MultiFit(X, ys, ridge, ws)
         if not fit then return nil end
@@ -2375,17 +2505,22 @@ end
 -- WHAT IT MEASURED, 2026-08-22, selected model per instrument, matched seeds, 10 repeats
 -- (grouped minus row-level; sd is of the paired per-repeat difference):
 --
+-- (Refreshed 2026-08-22 after the ridge-validation fix; conclusion unchanged, and the rho
+-- sign pattern still holds six of six despite the underlying models having moved.)
+--
 --   instrument   pooled          macro           rho       leak% under row folds
---   guitar       -0.31 (sd 1.08) -0.60 (sd 1.82) -0.004        61.0
+--   guitar       -0.21 (sd 0.85) -0.14 (sd 1.67) -0.003        61.0
 --   bass         +0.00 (sd 0.29) -1.21 (sd 2.19) -0.004        60.5
---   drum         -0.24 (sd 0.40) -0.30 (sd 1.17) -0.005        59.8
---   vocals       -0.03 (sd 0.51) +0.22 (sd 0.69) -0.008        61.1
+--   drum         -0.09 (sd 0.52) +0.19 (sd 1.31) -0.004        59.8
+--   vocals       +0.03 (sd 0.70) +0.27 (sd 1.21) -0.009        61.1
 --   keys         -0.53 (sd 0.73) -0.40 (sd 0.70) -0.004        59.7
 --   real_keys    +0.19 (sd 0.44) +0.06 (sd 0.75) -0.004        59.6
 --
--- SCORING THE PREDICTION. Direction: right on rho, where all six instruments moved down,
--- and only 4 of 6 on pooled. Size: WRONG, and wrong in the pessimistic direction - the
--- predicted 0.5-2 point pooled drop did not appear on any instrument. Every pooled and
+-- SCORING THE PREDICTION (against the figures as first measured, before the ridge fix
+-- refreshed them: guitar -0.31, bass +0.00, drum -0.24, vocals -0.03, keys -0.53,
+-- real_keys +0.19 on pooled). Direction: right on rho, where all six instruments moved
+-- down, and only 4 of 6 on pooled. Size: WRONG, and wrong in the pessimistic direction -
+-- the predicted 0.5-2 point pooled drop did not appear on any instrument. Every pooled and
 -- macro delta is smaller than the spread of the difference that produced it, so on those
 -- two metrics grouping is not distinguishable from noise on this corpus.
 --
@@ -2567,7 +2702,7 @@ end
 -- WHAT IT MEASURED, 2026-08-22. B = 2000, selected model per instrument.
 --
 --   instrument   pooled  design   endpoint  design  eff n    rho    rho p05
---   guitar       94.50    1.03      86.73    1.65   120/327  0.864   0.830
+--   guitar       95.11    1.05      88.50    1.71   112/327  0.865   0.830
 --   bass         94.24    0.95      92.86    1.55   138/330  0.802   0.746
 --   drum         96.34    1.00      90.00    1.93    88/328  0.896   0.870
 --   vocals       89.02    1.22      64.00    2.42    56/328  0.676   0.606

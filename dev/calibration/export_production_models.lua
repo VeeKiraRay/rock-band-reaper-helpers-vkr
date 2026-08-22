@@ -376,7 +376,10 @@ end
 -- The row's ORIGIN drives the flags rather than a caller-supplied value, and the weight
 -- comes from the same table, so the design matrix here cannot disagree with the one the
 -- protocol measured - which is the whole reason the exported coefficients mean anything.
-local function BuildRows(d, idx, keys, pos, scale, X, ys, ws)
+-- `aux` is optional and parallel to X: true where the row came from an auxiliary origin.
+-- ChooseRidgePooled needs it to apply PROTOCOL.RIDGE_VALIDATION, which must match the
+-- protocol's policy exactly - the two searches disagreeing is peer review finding 6.
+local function BuildRows(d, idx, keys, pos, scale, X, ys, ws, aux)
     for _, i in ipairs(idx) do
         local row = {}
         for j, k in ipairs(keys) do row[j] = d.feats[i][pos[k]] end
@@ -386,6 +389,7 @@ local function BuildRows(d, idx, keys, pos, scale, X, ys, ws)
         X[#X + 1]  = row
         ys[#ys + 1] = scale.fwd(d.ranks[i])
         ws[#ws + 1] = AuxWeight(d.origins[i]) or 1.0
+        if aux then aux[#aux + 1] = (AuxWeight(d.origins[i]) ~= nil) end
     end
 end
 
@@ -405,15 +409,15 @@ local function ChooseRidgePooled(d, target, extra, inst, keys, pos, scale)
         local folds = StratifiedFolds(strata, PROTOCOL.NFOLD, rng)
         for f = 1, #folds do
             -- Training rows for this outer fold, exactly as the protocol builds them.
-            local X, ys, ws = {}, {}, {}
+            local X, ys, ws, aux = {}, {}, {}, {}
             for g = 1, #folds do
                 if g ~= f then
                     local rows = {}
                     for _, ti in ipairs(folds[g]) do rows[#rows + 1] = target[ti] end
-                    BuildRows(d, rows, keys, pos, scale, X, ys, ws)
+                    BuildRows(d, rows, keys, pos, scale, X, ys, ws, aux)
                 end
             end
-            BuildRows(d, extra, keys, pos, scale, X, ys, ws)
+            BuildRows(d, extra, keys, pos, scale, X, ys, ws, aux)
 
             -- The protocol's own nested search, but scoring every grid value instead of
             -- keeping only the winner. KFoldIndices is deterministic round-robin, so the
@@ -433,8 +437,14 @@ local function ChooseRidgePooled(d, target, extra, inst, keys, pos, scale)
                         local fit = MultiFit(tx, ty, ridge, tw)
                         if fit then
                             for _, i in ipairs(inner[a]) do
-                                err[ridge] = err[ridge] + math.abs(ApplyFit(X[i], fit) - ys[i])
-                                cnt[ridge] = cnt[ridge] + 1
+                                -- Same scoring policy as the protocol's ChooseRidge. The
+                                -- two drifting apart is exactly finding 6.
+                                local sw = InnerScoreWeight(aux[i], ws[i])
+                                if sw > 0 then
+                                    err[ridge] = err[ridge]
+                                        + sw * math.abs(ApplyFit(X[i], fit) - ys[i])
+                                    cnt[ridge] = cnt[ridge] + sw
+                                end
                             end
                         end
                     end

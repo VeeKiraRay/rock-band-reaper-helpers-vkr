@@ -23,14 +23,17 @@ Selected model per instrument, as of round 22 (2026-08-18), on the 394-song corp
 factor columns. Reproduced from `calibration_protocol_report.txt`, which is regenerated on
 every protocol run and is the authority if these disagree.
 
+Figures refreshed 2026-08-22 after the ridge-validation fix below. Guitar and drum moved a
+tenth of a point in opposite directions; no selection and no verdict changed.
+
 | instrument | selected candidate | scale | k | usable | usable lower bound | miss upper bound | rho | rho lower bound | |
 |---|---|---|---:|---:|---:|---:|---:|---:|---|
-| guitar | `full@attacks` | log(rank) | 21 | 94.16% | **91.64%** | 1.36% | +0.862 | **+0.830** | **passes** |
+| guitar | `full@attacks` | log(rank) | 21 | 94.22% | **91.71%** | 1.36% | +0.862 | **+0.830** | **passes** |
 | bass | `baseline+entropy` | log(rank) | 3 | 94.18% | **91.68%** | 1.35% | +0.802 | **+0.746** | **passes** |
-| drum | `full_drum@noroll` | log(rank) | 26 | 96.46% | **94.37%** | 1.35% | +0.894 | **+0.870** | **passes** |
+| drum | `full_drum@noroll` | log(rank) | 26 | 96.34% | **94.22%** | 1.35% | +0.894 | **+0.869** | **passes** |
 | keys | `primary+ent_rel+complex@attacks-chord` | rank | 7 | 92.97% | 89.94% | 1.08% | +0.878 | +0.837 | fails by 0.06 |
 | real_keys | `primary+ent_rel@attacks` | rank | 7 | 89.40% | 85.89% | 2.02% | +0.861 | +0.824 | fails |
-| vocals | `parts+tess+move@parts_step3` | log(rank) | 12 | 88.63% | 85.42% | 4.32% | +0.674 | +0.606 | fails |
+| vocals | `parts+tess+move@parts_step3` | log(rank) | 12 | 88.63% | 85.42% | 4.28% | +0.674 | +0.606 | fails |
 
 Rounds 19-22 changed two of the six. Drums took the roll-lane peak twins (+0.99 on the
 lower bound) and vocals took the harmony count as a step instead of a number (+0.30).
@@ -280,6 +283,54 @@ the middle tiers already run at 96–100%; grade it on macro or report all three
 it is spent, "everything unwalked is reserved" stops being the right policy, and the
 replacement is a new declaration with its own reasoning.
 
+### The ridge search now honours the origin policy
+
+Peer review finding 6, fixed 2026-08-22. Auxiliary rows train at weight 0.30, but the
+nested ridge search accumulated `err + |e|` and `cnt + 1` over its inner holdouts,
+ignoring the weight array beside it. So in the one decision that sets regularisation
+strength, an auxiliary row counted as much as an RB3 target row — about **18.5% of the
+vote** instead of the ~6.4% the 0.30 policy implies, or the 0% that matches how the model
+is graded.
+
+`PROTOCOL.RIDGE_VALIDATION` selects the policy, and `InnerScoreWeight` is **global and
+called from both** `protocol.lua` and `export_production_models.lua` — the finding is
+fundamentally that two copies of the same search disagreed, so one shared function is what
+stops them drifting again.
+
+**`target_only` is shipped**: aux rows train and are never scored. Chosen because it
+matches the estimand — the outer CV grades target rows only, so the inner search should
+minimise error on target rows only. **Not chosen because it scored best.** With six grid
+values across four instruments something wins on noise every time, and picking by score is
+the selection inflation the protocol exists to prevent.
+
+Measured against the defect, paired by repeat:
+
+| instrument | weighted (pooled / macro) | target_only (pooled / macro) | reselect? |
+|---|---:|---:|---|
+| guitar | +0.00 / +0.17 | +0.06 / +0.41 | no |
+| bass | +0.00 / +0.00 | +0.00 / +0.00 | no |
+| drum | +0.00 / +0.00 | −0.12 / −0.31 | no |
+| vocals | +0.09 / +0.02 | +0.00 / −0.20 | no |
+| keys, real_keys | identical | identical | no aux rows exist |
+
+Keys and Pro Keys are a **free control** — neither Lego Rock Band nor the RB2 export has a
+keyboard part, so they have no auxiliary rows and must not move. They don't, right down to
+their ridge histograms.
+
+**The result is in the ridge histogram, not the accuracy.** Guitar under the defect picked
+ridge 0.1 on 35 of 50 fold-repeats; under `target_only` that falls to 24, with weight
+shifting to weaker values. Vocals goes the other way (32 → 44). Drum starts picking 1.0.
+So the auxiliary rows genuinely **were** steering regularisation — and the model is simply
+insensitive to ridge across that range. "No measurable cost" is the finding; "no effect"
+would be the wrong reading.
+
+**It did change the shipped artifact**: vocals' production ridge moved 0.01 → 0.1 and its
+14 coefficients with it. No verdict changed anywhere — guitar's usable lower bound went
+91.64 → 91.71 and drum's 94.37 → 94.22, both still passing; vocals fails either way.
+
+A directional guess was pre-registered (`target_only ≥ weighted ≥ unweighted`) and is **not
+supported** — two of the four instruments with aux rows moved each way, all inside noise.
+
 ### The pack bootstrap
 
 Built 2026-08-22. It answers two questions the Wilson bound cannot: what interval belongs
@@ -298,7 +349,7 @@ average-then-tier). The report prints both and names which is which.
 
 | instrument | pooled | design | endpoints | design | effective n | rho | rho p05 |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| guitar | 94.50 | 1.03 | 86.73 | 1.65 | 120 / 327 | 0.864 | 0.830 |
+| guitar | 95.11 | 1.05 | 88.50 | 1.71 | 112 / 327 | 0.865 | 0.830 |
 | bass | 94.24 | 0.95 | 92.86 | 1.55 | 138 / 330 | 0.802 | 0.746 |
 | drum | 96.34 | 1.00 | 90.00 | 1.93 | 88 / 328 | 0.896 | 0.870 |
 | vocals | 89.02 | 1.22 | 64.00 | 2.42 | 56 / 328 | 0.676 | 0.606 |
@@ -355,18 +406,22 @@ the report now prints the selected model under both schemes on matched seeds. Me
 
 | instrument | pooled | macro | rho |
 |---|---:|---:|---:|
-| guitar | −0.31 (sd 1.08) | −0.60 (sd 1.82) | −0.004 |
+| guitar | −0.21 (sd 0.85) | −0.14 (sd 1.67) | −0.003 |
 | bass | +0.00 (sd 0.29) | −1.21 (sd 2.19) | −0.004 |
-| drum | −0.24 (sd 0.40) | −0.30 (sd 1.17) | −0.005 |
-| vocals | −0.03 (sd 0.51) | +0.22 (sd 0.69) | −0.008 |
+| drum | −0.09 (sd 0.52) | +0.19 (sd 1.31) | −0.004 |
+| vocals | +0.03 (sd 0.70) | +0.27 (sd 1.21) | −0.009 |
 | keys | −0.53 (sd 0.73) | −0.40 (sd 0.70) | −0.004 |
 | real_keys | +0.19 (sd 0.44) | +0.06 (sd 0.75) | −0.004 |
 
 **Leakage is real and negligible.** Every pooled and macro delta is smaller than the
 spread of the difference that produced it, so on those metrics grouping is indistinguishable
-from noise here. Rho is where it shows: **all six instruments moved down**, by 0.004–0.008,
+from noise here. Rho is where it shows: **all six instruments moved down**, by 0.003–0.009,
 and six of six in one direction is about a 1-in-32 coincidence. So the effect exists, and
 it is worth roughly five thousandths of rho.
+
+(Figures refreshed 2026-08-22 after the ridge-validation fix. The conclusion is unchanged
+and the rho sign pattern still holds six of six — which is itself a small robustness check
+on it, since the underlying models moved slightly.)
 
 The reason it is this small despite 60% exposure is that a pack sibling is a weak hint —
 packs routinely mix an easy song with a hard one, so a neighbour's rank barely narrows the
