@@ -2836,10 +2836,35 @@ end
 -- WHAT THIS CHECKS, AND WHAT IT DELIBERATELY DOES NOT.
 --
 -- Three things: the pooled usable rate against its Wilson LOWER bound, the pooled miss
--- rate against its UPPER bound, and rho against its MEAN. Two of the three are read from
--- the pessimistic end; rho is not, because ten correlated reruns over the same songs have
--- no honest interval and inventing one would be worse than saying so. The report prints
--- rho's split range and labels it as spread rather than uncertainty.
+-- rate against its UPPER bound, and rho against its BOOTSTRAP LOWER BOUND. All three are
+-- now read from the pessimistic end.
+--
+-- RHO USED TO BE READ AS A MEAN, and that was the honest option at the time: ten
+-- correlated reruns over the same songs have no interval, and inventing one would have
+-- been worse than admitting the asymmetry. The 2026-08-21 peer review flagged it, the
+-- report printed rho's split range labelled as spread rather than uncertainty, and it
+-- stayed a mean until an actual interval existed.
+--
+-- CHANGED 2026-08-22, once PackBootstrap produced one. The pack bootstrap's 5th percentile
+-- is a genuine one-sided 95% lower bound on rho, from resampling the unit the corpus
+-- actually grows in. So the gate now reads it, and the last asymmetry in this function is
+-- gone.
+--
+-- THE NUMBERS WERE VISIBLE WHEN THIS WAS DECIDED, and that has to be recorded rather than
+-- presented as a blind pre-registration. The bootstrap was built and reported first, so
+-- guitar 0.830, bass 0.746 and drum 0.870 against the 0.70 floor were all on the table
+-- before the switch was made. What makes it defensible anyway is the DIRECTION: this
+-- replaces a point estimate with a strictly lower number, so it can only ever make the
+-- gate harder to pass. There is no version of this change that flatters the model, which
+-- is the same test the README applies to raising RESERVED_PCT after seeing the batch.
+-- Moving rho the other way - from a bound to a mean - would be the forbidden direction.
+--
+-- IT CHANGES NO VERDICT TODAY. All three passing instruments clear the floor on the bound
+-- as they did on the mean, and vocals fails on rho either way (mean 0.676, bound 0.606).
+-- The value is that the next corpus cannot quietly pass on a lucky point estimate.
+--
+-- FALLBACK. When no bootstrap is available the mean is used and the reason string says so,
+-- rather than failing the instrument for a missing diagnostic.
 --
 -- THE IMPLEMENTATION PLAN'S RELEASE GATE IS WIDER THAN THIS, and the 2026-08-21 peer
 -- review was right to flag the gap. That gate also requires per-tier accuracy, a
@@ -2863,7 +2888,8 @@ end
 -- The intent to move to macro is pre-registered in the TierDiagnostics header, written
 -- before the corpus grows. Until that happens this function is the whole gate, and no
 -- document may describe the release gate as including the per-tier checks.
-function GateVerdict(rec)
+--   boot   PackBootstrap result for the same selected model, or nil.
+function GateVerdict(rec, boot)
     local reasons, passed = {}, true
     if not rec or not rec.usable_mean then
         return false, { 'no result to grade' }
@@ -2878,10 +2904,15 @@ function GateVerdict(rec)
         reasons[#reasons + 1] = ('miss upper bound %.1f%% exceeds the %.0f%% ceiling')
             :format(rec.miss_upper * 100, PROTOCOL.MISS_CEILING * 100)
     end
-    if rec.rho_mean < PROTOCOL.RHO_FLOOR then
+    -- The bootstrap bound when there is one, the mean when there is not. Both branches
+    -- name which they used, so a verdict never leaves it ambiguous.
+    local rho_boot = boot and boot.stat and boot.stat.rho
+    local rho_val  = rho_boot and rho_boot.lo or rec.rho_mean
+    if rho_val < PROTOCOL.RHO_FLOOR then
         passed = false
-        reasons[#reasons + 1] = ('rho %.3f is below the %.2f floor')
-            :format(rec.rho_mean, PROTOCOL.RHO_FLOOR)
+        reasons[#reasons + 1] = ('rho %s %.3f is below the %.2f floor')
+            :format(rho_boot and 'lower bound' or 'MEAN (no bootstrap)',
+                    rho_val, PROTOCOL.RHO_FLOOR)
     end
     return passed, reasons
 end

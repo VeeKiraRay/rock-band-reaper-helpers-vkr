@@ -525,6 +525,62 @@ Test.it('returns nil rather than dividing by nothing', function()
 end)
 
 ----------------------------------------------------------------------
+Test.section('GateVerdict - every input read from its pessimistic end')
+
+-- A record that passes everything, so each case below turns exactly one thing bad.
+local function GateRec(over)
+    local rec = { usable_mean = 0.94, usable_lower = 0.92, miss_upper = 0.02,
+                  rho_mean = 0.85 }
+    for k, v in pairs(over or {}) do rec[k] = v end
+    return rec
+end
+local function GateBoot(rho_lo)
+    return { stat = { rho = { lo = rho_lo, point = rho_lo + 0.03 } } }
+end
+
+Test.it('passes when every bound clears its threshold', function()
+    local ok, why = GateVerdict(GateRec(), GateBoot(0.80))
+    Test.expect(ok, 'should pass; reasons: ' .. table.concat(why, '; '))
+end)
+
+Test.it('reads the bootstrap bound for rho, not the mean', function()
+    -- The change of 2026-08-22. A healthy mean must not rescue a bound below the floor,
+    -- which is the whole point of moving off the mean.
+    local ok, why = GateVerdict(GateRec({ rho_mean = 0.85 }), GateBoot(0.61))
+    Test.expect(not ok, 'a 0.61 lower bound must fail even with a 0.85 mean')
+    Test.expect(table.concat(why, ' '):find('lower bound', 1, true) ~= nil,
+        'the reason must say which quantity was read; got: ' .. table.concat(why, '; '))
+end)
+
+Test.it('a mean below the floor cannot fail an instrument whose bound clears', function()
+    -- The converse, which cannot arise with a real bootstrap (the bound is below the
+    -- point) but pins that the mean is genuinely no longer consulted.
+    local ok = GateVerdict(GateRec({ rho_mean = 0.10 }), GateBoot(0.80))
+    Test.expect(ok, 'rho_mean must not be read once a bootstrap bound exists')
+end)
+
+Test.it('falls back to the mean when no bootstrap ran, and says so', function()
+    local ok, why = GateVerdict(GateRec({ rho_mean = 0.50 }), nil)
+    Test.expect(not ok, 'a 0.50 mean is below the 0.70 floor')
+    Test.expect(table.concat(why, ' '):find('no bootstrap', 1, true) ~= nil,
+        'the reason must disclose the fallback; got: ' .. table.concat(why, '; '))
+    Test.expect(GateVerdict(GateRec({ rho_mean = 0.85 }), nil),
+        'a healthy mean still passes when there is no bootstrap')
+end)
+
+Test.it('still fails on the usable floor and the miss ceiling', function()
+    Test.expect(not GateVerdict(GateRec({ usable_lower = 0.88 }), GateBoot(0.80)),
+        'usable lower bound below 90% must fail')
+    Test.expect(not GateVerdict(GateRec({ miss_upper = 0.09 }), GateBoot(0.80)),
+        'miss upper bound above 5% must fail')
+end)
+
+Test.it('refuses to grade a record with no result', function()
+    local ok, why = GateVerdict(nil, nil)
+    Test.expect(not ok and #why == 1, 'nil record must fail with one reason')
+end)
+
+----------------------------------------------------------------------
 Test.section('SampleSd')
 
 Test.it('matches a hand-computed n-1 standard deviation', function()

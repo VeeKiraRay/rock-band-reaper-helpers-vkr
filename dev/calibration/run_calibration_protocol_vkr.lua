@@ -568,18 +568,27 @@ local function AnalyseInstrument(csv, inst)
         end
     end
 
-    local passed, reasons = GateVerdict(sel)
+    local passed, reasons = GateVerdict(sel, boot)
     Msg('\n  -- release gate --\n')
     Msg(('    usable lower bound : %6.2f%%   (floor %.0f%%, one-sided 95%% Wilson)\n')
         :format(sel.usable_lower * 100, PROTOCOL.USABLE_FLOOR * 100))
     Msg(('    miss upper bound   : %6.2f%%   (ceiling %.0f%%, one-sided 95%% Wilson)\n')
         :format(sel.miss_upper * 100, PROTOCOL.MISS_CEILING * 100))
-    -- rho is gated on the MEAN, unlike the two above. Printed with its across-repeat
-    -- spread so that asymmetry is visible rather than implied away by the section
-    -- heading, which used to claim every figure here was a pessimistic bound.
-    Msg(('    rho (MEAN, not a bound): %+.3f   (floor %.2f)  split range [%+.3f, %+.3f]\n')
-        :format(sel.rho_mean, PROTOCOL.RHO_FLOOR,
-                sel.rho_lo_split or sel.rho_mean, sel.rho_hi_split or sel.rho_mean))
+    -- rho is read from its pessimistic end too, as of 2026-08-22. The mean is printed
+    -- beside the bound because the two answer different questions and the mean is what
+    -- every figure before that date was gated on.
+    local rho_boot = boot and boot.stat and boot.stat.rho
+    if rho_boot then
+        Msg(('    rho lower bound    : %+.3f   (floor %.2f, pack bootstrap p05)\n')
+            :format(rho_boot.lo, PROTOCOL.RHO_FLOOR))
+        Msg(('       mean %+.3f, split range [%+.3f, %+.3f] - split noise, not uncertainty\n')
+            :format(sel.rho_mean, sel.rho_lo_split or sel.rho_mean,
+                    sel.rho_hi_split or sel.rho_mean))
+    else
+        Msg(('    rho (MEAN - no bootstrap): %+.3f   (floor %.2f)  split range [%+.3f, %+.3f]\n')
+            :format(sel.rho_mean, PROTOCOL.RHO_FLOOR,
+                    sel.rho_lo_split or sel.rho_mean, sel.rho_hi_split or sel.rho_mean))
+    end
     if passed then
         Msg('    -> PASSES the gate on the development set.\n')
     else
@@ -604,6 +613,11 @@ local function AnalyseInstrument(csv, inst)
         rho_mean     = sel.rho_mean,
         rho_lo_split = sel.rho_lo_split,
         rho_hi_split = sel.rho_hi_split,
+        -- What the gate ACTUALLY read for rho as of 2026-08-22. Recorded separately from
+        -- rho_mean because a manifest that only carried the mean would no longer describe
+        -- the decision it is supposed to be the record of. nil if no bootstrap ran, which
+        -- is also the signal that the mean was used instead.
+        rho_lower    = rho_boot and rho_boot.lo or nil,
         gate_passed  = passed,
     }
 end
@@ -692,11 +706,11 @@ Msg('  * The usable and miss gates read interval bounds at the pessimistic end, 
 Msg('    pass on them is harder than the point estimates the earlier rounds reported.\n')
 Msg('    A point estimate above 90% with a lower bound below it means the corpus is too\n')
 Msg('    small to prove the claim yet, not that the model got worse.\n')
-Msg('  * RHO IS GATED ON ITS MEAN, not on a bound - the one figure here that is not\n')
-Msg('    read pessimistically. Its printed split range is repeat-to-repeat spread, not\n')
-Msg('    a confidence interval: the ten repeats reuse the same songs, so they are\n')
-Msg('    correlated reruns and their spread understates real uncertainty. A defensible\n')
-Msg('    lower bound for rho needs packs as the resampling unit.\n')
+Msg('  * RHO IS GATED ON ITS PACK-BOOTSTRAP LOWER BOUND as of 2026-08-22, so every\n')
+Msg('    figure the gate reads is now the pessimistic end. It was gated on the MEAN\n')
+Msg('    until then, because ten correlated reruns over the same songs have no honest\n')
+Msg('    interval. The split range printed beside it is still repeat-to-repeat spread\n')
+Msg('    and still is NOT a confidence interval - read the bound, not the range.\n')
 Msg('  * These are DEVELOPMENT-SET figures and the Wilson bounds are not confirmatory\n')
 Msg('    intervals. The same repeated-CV results both choose the candidate and report\n')
 Msg('    its quality, so the bound on the selected model is optimistic by an unmeasured\n')
@@ -747,7 +761,11 @@ do
         mf:write('--\n')
         mf:write('-- Regenerate with:  lua dev/calibration/run_protocol_offline.lua\n\n')
         mf:write('CALIBRATION_MANIFEST = {\n')
-        mf:write('    schema   = 1,\n')
+        -- SCHEMA 2 as of 2026-08-22: rho_lower joins each selection, and the gate now
+        -- reads it instead of rho_mean. Bumped rather than added silently because the
+        -- change is to what the manifest MEANS - a consumer reading rho_mean from a
+        -- schema 1 file is reading the gate input, and from a schema 2 file it is not.
+        mf:write('    schema   = 2,\n')
         -- Only reached after every instrument has been analysed, so this flag being true
         -- is a statement about the whole file and not just its header.
         mf:write('    complete = true,\n')
@@ -784,6 +802,10 @@ do
             mf:write(('            rho_mean = %.6f, rho_lo_split = %.6f, rho_hi_split = %.6f,\n')
                 :format(dc.rho_mean, dc.rho_lo_split or dc.rho_mean,
                         dc.rho_hi_split or dc.rho_mean))
+            -- The gate's actual rho input. Written as nil when no bootstrap ran, which
+            -- is the signal that rho_mean was used instead.
+            mf:write(('            rho_lower = %s,\n')
+                :format(dc.rho_lower and ('%.6f'):format(dc.rho_lower) or 'nil'))
             mf:write(('            gate_passed = %s,\n'):format(tostring(dc.gate_passed)))
             mf:write('        },\n')
         end

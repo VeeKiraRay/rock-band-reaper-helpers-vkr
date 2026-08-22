@@ -23,24 +23,27 @@ Selected model per instrument, as of round 22 (2026-08-18), on the 394-song corp
 factor columns. Reproduced from `calibration_protocol_report.txt`, which is regenerated on
 every protocol run and is the authority if these disagree.
 
-| instrument | selected candidate | scale | k | usable | usable lower bound | miss upper bound | rho | |
-|---|---|---|---:|---:|---:|---:|---:|---|
-| guitar | `full@attacks` | log(rank) | 21 | 94.16% | **91.64%** | 1.36% | +0.862 | **passes** |
-| bass | `baseline+entropy` | log(rank) | 3 | 94.18% | **91.68%** | 1.35% | +0.802 | **passes** |
-| drum | `full_drum@noroll` | log(rank) | 26 | 96.46% | **94.37%** | 1.35% | +0.894 | **passes** |
-| keys | `primary+ent_rel+complex@attacks-chord` | rank | 7 | 92.97% | 89.94% | 1.08% | +0.878 | fails by 0.06 |
-| real_keys | `primary+ent_rel@attacks` | rank | 7 | 89.40% | 85.89% | 2.02% | +0.861 | fails |
-| vocals | `parts+tess+move@parts_step3` | log(rank) | 12 | 88.63% | 85.42% | 4.32% | +0.674 | fails |
+| instrument | selected candidate | scale | k | usable | usable lower bound | miss upper bound | rho | rho lower bound | |
+|---|---|---|---:|---:|---:|---:|---:|---:|---|
+| guitar | `full@attacks` | log(rank) | 21 | 94.16% | **91.64%** | 1.36% | +0.862 | **+0.830** | **passes** |
+| bass | `baseline+entropy` | log(rank) | 3 | 94.18% | **91.68%** | 1.35% | +0.802 | **+0.746** | **passes** |
+| drum | `full_drum@noroll` | log(rank) | 26 | 96.46% | **94.37%** | 1.35% | +0.894 | **+0.870** | **passes** |
+| keys | `primary+ent_rel+complex@attacks-chord` | rank | 7 | 92.97% | 89.94% | 1.08% | +0.878 | +0.837 | fails by 0.06 |
+| real_keys | `primary+ent_rel@attacks` | rank | 7 | 89.40% | 85.89% | 2.02% | +0.861 | +0.824 | fails |
+| vocals | `parts+tess+move@parts_step3` | log(rank) | 12 | 88.63% | 85.42% | 4.32% | +0.674 | +0.606 | fails |
 
 Rounds 19-22 changed two of the six. Drums took the roll-lane peak twins (+0.99 on the
 lower bound) and vocals took the harmony count as a step instead of a number (+0.30).
 Guitar, bass, keys and Pro Keys are unchanged **to the decimal**, which is what confirms
 the eighteen new columns did not leak into the four instruments they were not for.
 
-"usable" is within-one-tier accuracy, averaged across repeats; the two bounds beside it are
-the pessimistic end of each interval, which is what the gate reads (floors: usable >= 90%,
-miss <= 5%, rho >= 0.70). Keys and Pro Keys fail on the usable lower bound alone; vocals
-fails that and rho.
+"usable" is within-one-tier accuracy, averaged across repeats. **Every bound in that table
+is the pessimistic end of an interval, and all three are what the gate reads** (floors:
+usable >= 90%, miss <= 5%, rho >= 0.70). The usable and miss bounds are Wilson; **rho's is
+the pack bootstrap's 5th percentile, adopted 2026-08-22** — until then rho was gated on its
+mean, which was the last asymmetry in the gate. It changed no verdict: all three passing
+instruments clear 0.70 on the bound as they did on the mean. Keys and Pro Keys fail on the
+usable lower bound alone; vocals fails that and rho.
 
 Development rows per instrument: guitar 327, bass 330, drum 328, vocals 328, keys 266,
 real_keys 266 - all `rb3_dlc`, with 0 disputed rows held out. Lego (45 rows) and the RB2
@@ -310,12 +313,18 @@ Worth checking rather than assuming, and it came out in the gate's favour.
 **Wilson is not fine on the endpoint band**, design 1.55–2.42, which corrects the phase-3
 recommendation quoted above. See the note there.
 
-**Rho now has a lower bound, and adopting it costs nothing.** The gate reads rho as a
-*mean* while reading the pessimistic end of everything else — the asymmetry the peer review
-caught. Against the 0.70 floor the bootstrap p05 gives guitar 0.830, bass 0.746, drum
-0.870: **all three still pass**. The asymmetry can be repaired without moving a single
-verdict, which makes it the cheapest honest improvement available to the gate. It is still
-a gate change and so a declared decision under rule 1, not something to slip in.
+**Rho now has a lower bound, and the gate reads it as of 2026-08-22.** It used to read
+rho's *mean* while reading the pessimistic end of everything else — the asymmetry the peer
+review caught, and the last one in the gate. Against the 0.70 floor the bootstrap p05 gives
+guitar 0.830, bass 0.746, drum 0.870, so **no verdict moved**; vocals now fails rho on the
+bound (0.606) as it already did on the mean (0.674).
+
+The numbers were visible when this was decided, which is recorded rather than dressed up as
+a blind pre-registration — the bootstrap was built and reported first. What makes it
+defensible anyway is the **direction**: it replaces a point estimate with a strictly lower
+number, so it can only make the gate harder to pass. There is no version of it that
+flatters the model, which is the same test applied to raising `RESERVED_PCT` after seeing
+the batch. Moving rho the other way would be the forbidden direction.
 
 **A caution about macro, which this was built to unblock.** A macro floor is now
 computable, but bass's interval is not clean — sd 4.37 and p05 79.19, driven by the **4.7%

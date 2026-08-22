@@ -7,13 +7,13 @@
 -- Regenerate with:  lua dev/calibration/run_protocol_offline.lua
 
 CALIBRATION_MANIFEST = {
-    schema   = 1,
+    schema   = 2,
     complete = true,
     inputs = {
         csv_hash      = "07aae114239c9dbb",
         csv_bytes     = 1140165,
         csv_rows      = 2101,
-        protocol_hash = "968f3b75699fc8cc",
+        protocol_hash = "89c9fa9811ec59ce",
         factors_hash  = "73d526ddb35359fe",
         factors_n     = 114,
         lua           = "Lua 5.4",
@@ -33,6 +33,7 @@ CALIBRATION_MANIFEST = {
             n_features = 21, n_target = 327, n_aux = 60, n_weird = 0,
             usable_mean = 0.941590, usable_lower = 0.916413, miss_upper = 0.013591,
             rho_mean = 0.862000, rho_lo_split = 0.860252, rho_hi_split = 0.864019,
+            rho_lower = 0.830028,
             gate_passed = true,
         },
         {
@@ -40,6 +41,7 @@ CALIBRATION_MANIFEST = {
             n_features = 3, n_target = 330, n_aux = 60, n_weird = 0,
             usable_mean = 0.941818, usable_lower = 0.916810, miss_upper = 0.013468,
             rho_mean = 0.801868, rho_lo_split = 0.798896, rho_hi_split = 0.804071,
+            rho_lower = 0.745827,
             gate_passed = true,
         },
         {
@@ -47,6 +49,7 @@ CALIBRATION_MANIFEST = {
             n_features = 26, n_target = 328, n_aux = 60, n_weird = 0,
             usable_mean = 0.964634, usable_lower = 0.943697, miss_upper = 0.013550,
             rho_mean = 0.894393, rho_lo_split = 0.892161, rho_hi_split = 0.896386,
+            rho_lower = 0.869507,
             gate_passed = true,
         },
         {
@@ -54,6 +57,7 @@ CALIBRATION_MANIFEST = {
             n_features = 12, n_target = 328, n_aux = 60, n_weird = 0,
             usable_mean = 0.886280, usable_lower = 0.854229, miss_upper = 0.043152,
             rho_mean = 0.674439, rho_lo_split = 0.664365, rho_hi_split = 0.685053,
+            rho_lower = 0.606276,
             gate_passed = false,
         },
         {
@@ -61,6 +65,7 @@ CALIBRATION_MANIFEST = {
             n_features = 7, n_target = 266, n_aux = 0, n_weird = 0,
             usable_mean = 0.929699, usable_lower = 0.899354, miss_upper = 0.010802,
             rho_mean = 0.877668, rho_lo_split = 0.873604, rho_hi_split = 0.881629,
+            rho_lower = 0.837109,
             gate_passed = false,
         },
         {
@@ -68,6 +73,7 @@ CALIBRATION_MANIFEST = {
             n_features = 7, n_target = 266, n_aux = 0, n_weird = 0,
             usable_mean = 0.893985, usable_lower = 0.858869, miss_upper = 0.020207,
             rho_mean = 0.860907, rho_lo_split = 0.858350, rho_hi_split = 0.863105,
+            rho_lower = 0.823832,
             gate_passed = false,
         },
     },

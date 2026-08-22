@@ -1,7 +1,7 @@
 ======  Difficulty calibration - LOCKED PROTOCOL  ======
 
 corpus_scores.csv  07aae114239c9dbb  1140165 bytes, 2101 rows
-protocol.lua       968f3b75699fc8cc
+protocol.lua       89c9fa9811ec59ce
 factor set         73d526ddb35359fe  114 columns
 interpreter        Lua 5.4
 
@@ -144,7 +144,8 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
   -- release gate --
     usable lower bound :  91.64%   (floor 90%, one-sided 95% Wilson)
     miss upper bound   :   1.36%   (ceiling 5%, one-sided 95% Wilson)
-    rho (MEAN, not a bound): +0.862   (floor 0.70)  split range [+0.860, +0.864]
+    rho lower bound    : +0.830   (floor 0.70, pack bootstrap p05)
+       mean +0.862, split range [+0.860, +0.864] - split noise, not uncertainty
     -> PASSES the gate on the development set.
 
 ==================  BASS  ==================
@@ -305,7 +306,8 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
   -- release gate --
     usable lower bound :  91.68%   (floor 90%, one-sided 95% Wilson)
     miss upper bound   :   1.35%   (ceiling 5%, one-sided 95% Wilson)
-    rho (MEAN, not a bound): +0.802   (floor 0.70)  split range [+0.799, +0.804]
+    rho lower bound    : +0.746   (floor 0.70, pack bootstrap p05)
+       mean +0.802, split range [+0.799, +0.804] - split noise, not uncertainty
     -> PASSES the gate on the development set.
 
 ==================  DRUM  ==================
@@ -474,7 +476,8 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
   -- release gate --
     usable lower bound :  94.37%   (floor 90%, one-sided 95% Wilson)
     miss upper bound   :   1.35%   (ceiling 5%, one-sided 95% Wilson)
-    rho (MEAN, not a bound): +0.894   (floor 0.70)  split range [+0.892, +0.896]
+    rho lower bound    : +0.870   (floor 0.70, pack bootstrap p05)
+       mean +0.894, split range [+0.892, +0.896] - split noise, not uncertainty
     -> PASSES the gate on the development set.
 
 ==================  VOCALS  ==================
@@ -761,10 +764,11 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
   -- release gate --
     usable lower bound :  85.42%   (floor 90%, one-sided 95% Wilson)
     miss upper bound   :   4.32%   (ceiling 5%, one-sided 95% Wilson)
-    rho (MEAN, not a bound): +0.674   (floor 0.70)  split range [+0.664, +0.685]
+    rho lower bound    : +0.606   (floor 0.70, pack bootstrap p05)
+       mean +0.674, split range [+0.664, +0.685] - split noise, not uncertainty
     -> DOES NOT PASS:
        - usable lower bound 85.4% is below the 90% floor
-       - rho 0.674 is below the 0.70 floor
+       - rho lower bound 0.606 is below the 0.70 floor
 
 ==================  KEYS  ==================
   development rows : 266 rb3_dlc
@@ -933,7 +937,8 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
   -- release gate --
     usable lower bound :  89.94%   (floor 90%, one-sided 95% Wilson)
     miss upper bound   :   1.08%   (ceiling 5%, one-sided 95% Wilson)
-    rho (MEAN, not a bound): +0.878   (floor 0.70)  split range [+0.874, +0.882]
+    rho lower bound    : +0.837   (floor 0.70, pack bootstrap p05)
+       mean +0.878, split range [+0.874, +0.882] - split noise, not uncertainty
     -> DOES NOT PASS:
        - usable lower bound 89.9% is below the 90% floor
 
@@ -1100,7 +1105,8 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
   -- release gate --
     usable lower bound :  85.89%   (floor 90%, one-sided 95% Wilson)
     miss upper bound   :   2.02%   (ceiling 5%, one-sided 95% Wilson)
-    rho (MEAN, not a bound): +0.861   (floor 0.70)  split range [+0.858, +0.863]
+    rho lower bound    : +0.824   (floor 0.70, pack bootstrap p05)
+       mean +0.861, split range [+0.858, +0.863] - split noise, not uncertainty
     -> DOES NOT PASS:
        - usable lower bound 85.9% is below the 90% floor
 
@@ -1112,11 +1118,11 @@ Reading this report:
     pass on them is harder than the point estimates the earlier rounds reported.
     A point estimate above 90% with a lower bound below it means the corpus is too
     small to prove the claim yet, not that the model got worse.
-  * RHO IS GATED ON ITS MEAN, not on a bound - the one figure here that is not
-    read pessimistically. Its printed split range is repeat-to-repeat spread, not
-    a confidence interval: the ten repeats reuse the same songs, so they are
-    correlated reruns and their spread understates real uncertainty. A defensible
-    lower bound for rho needs packs as the resampling unit.
+  * RHO IS GATED ON ITS PACK-BOOTSTRAP LOWER BOUND as of 2026-08-22, so every
+    figure the gate reads is now the pessimistic end. It was gated on the MEAN
+    until then, because ten correlated reruns over the same songs have no honest
+    interval. The split range printed beside it is still repeat-to-repeat spread
+    and still is NOT a confidence interval - read the bound, not the range.
   * These are DEVELOPMENT-SET figures and the Wilson bounds are not confirmatory
     intervals. The same repeated-CV results both choose the candidate and report
     its quality, so the bound on the selected model is optimistic by an unmeasured
