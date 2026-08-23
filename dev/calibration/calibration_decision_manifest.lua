@@ -7,13 +7,13 @@
 -- Regenerate with:  lua dev/calibration/run_protocol_offline.lua
 
 CALIBRATION_MANIFEST = {
-    schema   = 3,
+    schema   = 4,
     complete = true,
     inputs = {
         csv_hash      = "07aae114239c9dbb",
         csv_bytes     = 1140165,
         csv_rows      = 2101,
-        protocol_hash = "15465f539c7c1020",
+        protocol_hash = "c8094bf0fbdcb8bd",
         factors_hash  = "73d526ddb35359fe",
         factors_n     = 114,
         lua           = "Lua 5.4",
@@ -36,6 +36,15 @@ CALIBRATION_MANIFEST = {
             rho_mean = 0.861807, rho_lo_split = 0.858783, rho_hi_split = 0.866126,
             rho_lower = 0.830323,
             endpoint_lower = 0.831683, endpoint_n = 113,
+            reliability = {
+                [0] = { n_act = 13, n_pred = 6, ok_pred = 6, actual = { [0]=4, [1]=2 } },
+                [1] = { n_act = 39, n_pred = 26, ok_pred = 25, actual = { [0]=6, [1]=11, [2]=8, [3]=1 } },
+                [2] = { n_act = 83, n_pred = 106, ok_pred = 102, actual = { [0]=3, [1]=22, [2]=54, [3]=26, [4]=1 } },
+                [3] = { n_act = 75, n_pred = 89, ok_pred = 81, actual = { [1]=4, [2]=20, [3]=38, [4]=23, [5]=3, [6]=1 } },
+                [4] = { n_act = 56, n_pred = 57, ok_pred = 54, actual = { [2]=1, [3]=10, [4]=27, [5]=17, [6]=2 } },
+                [5] = { n_act = 36, n_pred = 28, ok_pred = 28, actual = { [4]=5, [5]=14, [6]=9 } },
+                [6] = { n_act = 25, n_pred = 15, ok_pred = 15, actual = { [5]=2, [6]=13 } },
+            },
             gate_passed = true,
         },
         {
@@ -45,6 +54,15 @@ CALIBRATION_MANIFEST = {
             rho_mean = 0.801835, rho_lo_split = 0.798882, rho_hi_split = 0.804058,
             rho_lower = 0.745803,
             endpoint_lower = 0.890323, endpoint_n = 140,
+            reliability = {
+                [0] = { n_act = 23, n_pred = 6, ok_pred = 6, actual = { [0]=5, [1]=1 } },
+                [1] = { n_act = 89, n_pred = 77, ok_pred = 75, actual = { [0]=18, [1]=37, [2]=20, [3]=1, [4]=1 } },
+                [2] = { n_act = 85, n_pred = 137, ok_pred = 133, actual = { [1]=47, [2]=51, [3]=35, [4]=4 } },
+                [3] = { n_act = 72, n_pred = 77, ok_pred = 68, actual = { [1]=4, [2]=14, [3]=32, [4]=22, [5]=5 } },
+                [4] = { n_act = 33, n_pred = 17, ok_pred = 16, actual = { [3]=3, [4]=4, [5]=9, [6]=1 } },
+                [5] = { n_act = 24, n_pred = 11, ok_pred = 10, actual = { [3]=1, [5]=8, [6]=2 } },
+                [6] = { n_act = 4, n_pred = 5, ok_pred = 3, actual = { [4]=2, [5]=2, [6]=1 } },
+            },
             gate_passed = true,
         },
         {
@@ -54,6 +72,15 @@ CALIBRATION_MANIFEST = {
             rho_mean = 0.893795, rho_lo_split = 0.891052, rho_hi_split = 0.896386,
             rho_lower = 0.868691,
             endpoint_lower = 0.843362, endpoint_n = 90,
+            reliability = {
+                [0] = { n_act = 10, n_pred = 5, ok_pred = 5, actual = { [0]=3, [1]=2 } },
+                [1] = { n_act = 26, n_pred = 19, ok_pred = 17, actual = { [0]=4, [1]=6, [2]=7, [3]=2 } },
+                [2] = { n_act = 55, n_pred = 43, ok_pred = 41, actual = { [0]=2, [1]=14, [2]=16, [3]=11 } },
+                [3] = { n_act = 100, n_pred = 126, ok_pred = 121, actual = { [0]=1, [1]=4, [2]=31, [3]=71, [4]=19 } },
+                [4] = { n_act = 83, n_pred = 98, ok_pred = 95, actual = { [2]=1, [3]=16, [4]=62, [5]=17, [6]=2 } },
+                [5] = { n_act = 42, n_pred = 26, ok_pred = 26, actual = { [4]=2, [5]=20, [6]=4 } },
+                [6] = { n_act = 12, n_pred = 11, ok_pred = 11, actual = { [5]=5, [6]=6 } },
+            },
             gate_passed = true,
         },
         {
@@ -63,6 +90,15 @@ CALIBRATION_MANIFEST = {
             rho_mean = 0.674023, rho_lo_split = 0.665678, rho_hi_split = 0.684745,
             rho_lower = 0.606371,
             endpoint_lower = 0.535346, endpoint_n = 75,
+            reliability = {
+                [0] = { n_act = 2, n_pred = 4, ok_pred = 4, actual = { [0]=2, [1]=2 } },
+                [1] = { n_act = 25, n_pred = 10, ok_pred = 8, actual = { [1]=6, [2]=2, [3]=2 } },
+                [2] = { n_act = 95, n_pred = 66, ok_pred = 62, actual = { [1]=12, [2]=36, [3]=14, [4]=2, [5]=1, [6]=1 } },
+                [3] = { n_act = 102, n_pred = 159, ok_pred = 143, actual = { [1]=5, [2]=54, [3]=62, [4]=27, [5]=5, [6]=6 } },
+                [4] = { n_act = 56, n_pred = 78, ok_pred = 66, actual = { [2]=3, [3]=22, [4]=24, [5]=20, [6]=9 } },
+                [5] = { n_act = 28, n_pred = 10, ok_pred = 8, actual = { [3]=2, [4]=3, [5]=2, [6]=3 } },
+                [6] = { n_act = 20, n_pred = 1, ok_pred = 1, actual = { [6]=1 } },
+            },
             gate_passed = false,
         },
         {
@@ -72,6 +108,15 @@ CALIBRATION_MANIFEST = {
             rho_mean = 0.877657, rho_lo_split = 0.873590, rho_hi_split = 0.881632,
             rho_lower = 0.837094,
             endpoint_lower = 0.820896, endpoint_n = 129,
+            reliability = {
+                [0] = { n_act = 20, n_pred = 12, ok_pred = 12, actual = { [0]=8, [1]=4 } },
+                [1] = { n_act = 64, n_pred = 46, ok_pred = 46, actual = { [0]=9, [1]=30, [2]=7 } },
+                [2] = { n_act = 45, n_pred = 63, ok_pred = 59, actual = { [0]=3, [1]=24, [2]=25, [3]=10, [4]=1 } },
+                [3] = { n_act = 49, n_pred = 75, ok_pred = 68, actual = { [1]=6, [2]=13, [3]=32, [4]=23, [5]=1 } },
+                [4] = { n_act = 43, n_pred = 37, ok_pred = 31, actual = { [3]=6, [4]=16, [5]=9, [6]=6 } },
+                [5] = { n_act = 22, n_pred = 23, ok_pred = 22, actual = { [3]=1, [4]=3, [5]=12, [6]=7 } },
+                [6] = { n_act = 23, n_pred = 10, ok_pred = 10, actual = { [6]=10 } },
+            },
             gate_passed = false,
         },
         {
@@ -81,6 +126,15 @@ CALIBRATION_MANIFEST = {
             rho_mean = 0.860882, rho_lo_split = 0.858326, rho_hi_split = 0.863085,
             rho_lower = 0.823832,
             endpoint_lower = 0.763772, endpoint_n = 132,
+            reliability = {
+                [0] = { n_act = 14, n_pred = 12, ok_pred = 12, actual = { [0]=5, [1]=7 } },
+                [1] = { n_act = 61, n_pred = 39, ok_pred = 38, actual = { [0]=8, [1]=22, [2]=8, [3]=1 } },
+                [2] = { n_act = 47, n_pred = 46, ok_pred = 44, actual = { [1]=23, [2]=15, [3]=6, [4]=2 } },
+                [3] = { n_act = 46, n_pred = 86, ok_pred = 70, actual = { [0]=1, [1]=9, [2]=23, [3]=29, [4]=18, [5]=6 } },
+                [4] = { n_act = 41, n_pred = 50, ok_pred = 42, actual = { [2]=1, [3]=9, [4]=19, [5]=14, [6]=7 } },
+                [5] = { n_act = 27, n_pred = 18, ok_pred = 17, actual = { [3]=1, [4]=2, [5]=5, [6]=10 } },
+                [6] = { n_act = 30, n_pred = 15, ok_pred = 15, actual = { [5]=2, [6]=13 } },
+            },
             gate_passed = false,
         },
     },

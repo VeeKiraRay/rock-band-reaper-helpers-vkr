@@ -36,8 +36,17 @@
 --   n_aux       auxiliary-origin rows (Lego plus the RB2 disc export) that always train
 --               at their declared weight and are never predicted. Called n_lego before
 --               schema 4, by which point it had counted two origins for a while.
+--   reliability per-tier accuracy in the PREDICTED-tier conditional, from the protocol's
+--               OUT-OF-FOLD predictions - keyed by the tier the model produced, not the
+--               tier a chart officially holds. n_pred/ok_pred answer "how far out is a
+--               prediction of this tier?"; `actual` holds the full distribution of
+--               official tiers behind those predictions; n_act is how many charts really
+--               sit at this tier, which against n_pred is how far the model reaches.
+--               The report's per-tier table is the OPPOSITE conditional and reads much
+--               worse at the extremes - see TierReliability in protocol.lua for why a
+--               product note built on that one would mislead.
 
-RB_DIFFICULTY_MODELS_SCHEMA = 4
+RB_DIFFICULTY_MODELS_SCHEMA = 5
 RB_DIFFICULTY_MODELS_CSV_FINGERPRINT = 864960590
 
 RB_DIFFICULTY_MODEL_ORDER = {
@@ -151,6 +160,15 @@ RB_DIFFICULTY_MODELS = {
         ["playing_s|notes_total"] = 0.74825501045175,
         ["playing_s|total_changes"] = 0.7925718166531053,
     },
+    reliability = {
+        [0] = { n_act = 13, n_pred = 6, ok_pred = 6, actual = { [0]=4, [1]=2 } },
+        [1] = { n_act = 39, n_pred = 26, ok_pred = 25, actual = { [0]=6, [1]=11, [2]=8, [3]=1 } },
+        [2] = { n_act = 83, n_pred = 106, ok_pred = 102, actual = { [0]=3, [1]=22, [2]=54, [3]=26, [4]=1 } },
+        [3] = { n_act = 75, n_pred = 89, ok_pred = 81, actual = { [1]=4, [2]=20, [3]=38, [4]=23, [5]=3, [6]=1 } },
+        [4] = { n_act = 56, n_pred = 57, ok_pred = 54, actual = { [2]=1, [3]=10, [4]=27, [5]=17, [6]=2 } },
+        [5] = { n_act = 36, n_pred = 28, ok_pred = 28, actual = { [4]=5, [5]=14, [6]=9 } },
+        [6] = { n_act = 25, n_pred = 15, ok_pred = 15, actual = { [5]=2, [6]=13 } },
+    },
 },
 
 ["bass"] = {
@@ -192,6 +210,15 @@ RB_DIFFICULTY_MODELS = {
         density_ratio = 2.0891660435704815,
     },
     corr = {
+    },
+    reliability = {
+        [0] = { n_act = 23, n_pred = 6, ok_pred = 6, actual = { [0]=5, [1]=1 } },
+        [1] = { n_act = 89, n_pred = 77, ok_pred = 75, actual = { [0]=18, [1]=37, [2]=20, [3]=1, [4]=1 } },
+        [2] = { n_act = 85, n_pred = 137, ok_pred = 133, actual = { [1]=47, [2]=51, [3]=35, [4]=4 } },
+        [3] = { n_act = 72, n_pred = 77, ok_pred = 68, actual = { [1]=4, [2]=14, [3]=32, [4]=22, [5]=5 } },
+        [4] = { n_act = 33, n_pred = 17, ok_pred = 16, actual = { [3]=3, [4]=4, [5]=9, [6]=1 } },
+        [5] = { n_act = 24, n_pred = 11, ok_pred = 10, actual = { [3]=1, [5]=8, [6]=2 } },
+        [6] = { n_act = 4, n_pred = 5, ok_pred = 3, actual = { [4]=2, [5]=2, [6]=1 } },
     },
 },
 
@@ -322,6 +349,15 @@ RB_DIFFICULTY_MODELS = {
         ["tight_med|offbeat_frac"] = -0.8218189511291523,
         ["tight_p10|offbeat_frac"] = -0.7245175959264326,
     },
+    reliability = {
+        [0] = { n_act = 10, n_pred = 5, ok_pred = 5, actual = { [0]=3, [1]=2 } },
+        [1] = { n_act = 26, n_pred = 19, ok_pred = 17, actual = { [0]=4, [1]=6, [2]=7, [3]=2 } },
+        [2] = { n_act = 55, n_pred = 43, ok_pred = 41, actual = { [0]=2, [1]=14, [2]=16, [3]=11 } },
+        [3] = { n_act = 100, n_pred = 126, ok_pred = 121, actual = { [0]=1, [1]=4, [2]=31, [3]=71, [4]=19 } },
+        [4] = { n_act = 83, n_pred = 98, ok_pred = 95, actual = { [2]=1, [3]=16, [4]=62, [5]=17, [6]=2 } },
+        [5] = { n_act = 42, n_pred = 26, ok_pred = 26, actual = { [4]=2, [5]=20, [6]=4 } },
+        [6] = { n_act = 12, n_pred = 11, ok_pred = 11, actual = { [5]=5, [6]=6 } },
+    },
 },
 
 ["keys"] = {
@@ -375,6 +411,15 @@ RB_DIFFICULTY_MODELS = {
         ["tight_p10|tight_med"] = 0.7454157909766136,
         ["total_changes|playing_s"] = 0.7078425709323852,
     },
+    reliability = {
+        [0] = { n_act = 20, n_pred = 12, ok_pred = 12, actual = { [0]=8, [1]=4 } },
+        [1] = { n_act = 64, n_pred = 46, ok_pred = 46, actual = { [0]=9, [1]=30, [2]=7 } },
+        [2] = { n_act = 45, n_pred = 63, ok_pred = 59, actual = { [0]=3, [1]=24, [2]=25, [3]=10, [4]=1 } },
+        [3] = { n_act = 49, n_pred = 75, ok_pred = 68, actual = { [1]=6, [2]=13, [3]=32, [4]=23, [5]=1 } },
+        [4] = { n_act = 43, n_pred = 37, ok_pred = 31, actual = { [3]=6, [4]=16, [5]=9, [6]=6 } },
+        [5] = { n_act = 22, n_pred = 23, ok_pred = 22, actual = { [3]=1, [4]=3, [5]=12, [6]=7 } },
+        [6] = { n_act = 23, n_pred = 10, ok_pred = 10, actual = { [6]=10 } },
+    },
 },
 
 ["real_keys"] = {
@@ -426,6 +471,15 @@ RB_DIFFICULTY_MODELS = {
     corr = {
         ["tight_p10|tight_med"] = 0.7188109958566061,
         ["total_changes|playing_s"] = 0.7151576019048789,
+    },
+    reliability = {
+        [0] = { n_act = 14, n_pred = 12, ok_pred = 12, actual = { [0]=5, [1]=7 } },
+        [1] = { n_act = 61, n_pred = 39, ok_pred = 38, actual = { [0]=8, [1]=22, [2]=8, [3]=1 } },
+        [2] = { n_act = 47, n_pred = 46, ok_pred = 44, actual = { [1]=23, [2]=15, [3]=6, [4]=2 } },
+        [3] = { n_act = 46, n_pred = 86, ok_pred = 70, actual = { [0]=1, [1]=9, [2]=23, [3]=29, [4]=18, [5]=6 } },
+        [4] = { n_act = 41, n_pred = 50, ok_pred = 42, actual = { [2]=1, [3]=9, [4]=19, [5]=14, [6]=7 } },
+        [5] = { n_act = 27, n_pred = 18, ok_pred = 17, actual = { [3]=1, [4]=2, [5]=5, [6]=10 } },
+        [6] = { n_act = 30, n_pred = 15, ok_pred = 15, actual = { [5]=2, [6]=13 } },
     },
 },
 
@@ -493,6 +547,15 @@ RB_DIFFICULTY_MODELS = {
     },
     corr = {
         ["tight_p10|tight_med"] = 0.7047813061126207,
+    },
+    reliability = {
+        [0] = { n_act = 2, n_pred = 4, ok_pred = 4, actual = { [0]=2, [1]=2 } },
+        [1] = { n_act = 25, n_pred = 10, ok_pred = 8, actual = { [1]=6, [2]=2, [3]=2 } },
+        [2] = { n_act = 95, n_pred = 66, ok_pred = 62, actual = { [1]=12, [2]=36, [3]=14, [4]=2, [5]=1, [6]=1 } },
+        [3] = { n_act = 102, n_pred = 159, ok_pred = 143, actual = { [1]=5, [2]=54, [3]=62, [4]=27, [5]=5, [6]=6 } },
+        [4] = { n_act = 56, n_pred = 78, ok_pred = 66, actual = { [2]=3, [3]=22, [4]=24, [5]=20, [6]=9 } },
+        [5] = { n_act = 28, n_pred = 10, ok_pred = 8, actual = { [3]=2, [4]=3, [5]=2, [6]=3 } },
+        [6] = { n_act = 20, n_pred = 1, ok_pred = 1, actual = { [6]=1 } },
     },
 },
 }

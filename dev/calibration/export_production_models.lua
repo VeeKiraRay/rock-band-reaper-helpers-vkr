@@ -72,7 +72,11 @@ local _out = _root .. 'lib/reaper_difficulty_models.lua'
 --    while still being named for one of them, which the 2026-08-21 peer review flagged as
 --    a provenance field that misreports its own contents. Renamed rather than split
 --    because no consumer needs the breakdown; the report and manifest carry it per origin.
-local SCHEMA = 4
+-- 5: added `reliability` - per-tier counts in the PREDICTED-tier conditional, carried from
+--    the manifest rather than computed here (it comes from out-of-fold predictions and
+--    this file refits on every row). Feeds the product's per-tier reliability note, the
+--    first thing that tells an author WHERE the model is weak instead of how mature it is.
+local SCHEMA = 5
 
 dofile(_dir .. 'difficulty_score.lua')          -- SCORE_FACTOR_KEYS
 dofile(_dir .. 'difficulty_score_vocals.lua')   -- appends the vocal columns to it
@@ -709,6 +713,12 @@ io.write(('header  : fingerprint %d\n'):format(Fingerprint(csv.header_line)))
 -- every value passed it cleanly.
 local _manifest_path = _dir .. 'calibration_decision_manifest.lua'
 
+-- Per-instrument reliability tables lifted from the manifest, keyed by instrument. Global
+-- because the model-building loop below is a long way from the validation block that
+-- fills it, and threading one table through would obscure that it is carried rather than
+-- computed - which is the point worth being obvious.
+MANIFEST_RELIABILITY = {}
+
 local function ReadAll(path)
     local f = io.open(path, 'rb')
     if not f then return nil end
@@ -731,8 +741,8 @@ do
     -- extremes bar, so a schema 2 file records verdicts reached without it). Pinned
     -- exactly rather than accepted as ">= 1": this file's job is to refuse inputs it does
     -- not understand, and a schema it has never seen is exactly that.
-    if type(M) ~= 'table' or M.schema ~= 3 then
-        Fail('manifest schema is %s, expected 3', tostring(M and M.schema))
+    if type(M) ~= 'table' or M.schema ~= 4 then
+        Fail('manifest schema is %s, expected 4', tostring(M and M.schema))
     elseif not M.complete then
         -- A manifest is only written after every instrument is analysed, so this should
         -- be unreachable - but an incomplete one describes selections that were never
@@ -784,6 +794,20 @@ do
         -- status at all is a real omission.
         for _, s in ipairs(M.selections) do
             if not STATUS[s.inst] then Fail('%s has no entry in STATUS', s.inst) end
+        end
+
+        -- Per-tier reliability travels from the protocol to the artifact untouched. It is
+        -- computed from OUT-OF-FOLD predictions, and this script refits on every row, so
+        -- there is no honest way to recompute it here - carrying it is the only correct
+        -- option. Missing entries are fatal rather than skipped: the product's reliability
+        -- note is the one place an author is told where the model is weak, and shipping a
+        -- model with that silently absent is worse than not shipping.
+        for _, s in ipairs(M.selections) do
+            if type(s.reliability) ~= 'table' then
+                Fail('%s carries no reliability table - rerun the protocol', s.inst)
+            else
+                MANIFEST_RELIABILITY[s.inst] = s.reliability
+            end
         end
 
         if _errors > 0 then
@@ -903,6 +927,11 @@ for _, sel in ipairs(SELECTIONS) do
                     corr      = FactorCorrelations(d, target, cand.keys, pos),
                     n_target  = #target,
                     n_aux     = #extra,
+                    -- Straight from the manifest, never recomputed here: it comes from the
+                    -- protocol's out-of-fold predictions, and this file refits on ALL rows
+                    -- and so has no honest way to produce it. The protocol decides; the
+                    -- exporter obeys.
+                    reliability = MANIFEST_RELIABILITY[sel.inst],
                 }
 
                 -- Self-check: the artifact, applied through the shipped predictor, must
@@ -989,6 +1018,15 @@ W([[
 --   n_aux       auxiliary-origin rows (Lego plus the RB2 disc export) that always train
 --               at their declared weight and are never predicted. Called n_lego before
 --               schema 4, by which point it had counted two origins for a while.
+--   reliability per-tier accuracy in the PREDICTED-tier conditional, from the protocol's
+--               OUT-OF-FOLD predictions - keyed by the tier the model produced, not the
+--               tier a chart officially holds. n_pred/ok_pred answer "how far out is a
+--               prediction of this tier?"; `actual` holds the full distribution of
+--               official tiers behind those predictions; n_act is how many charts really
+--               sit at this tier, which against n_pred is how far the model reaches.
+--               The report's per-tier table is the OPPOSITE conditional and reads much
+--               worse at the extremes - see TierReliability in protocol.lua for why a
+--               product note built on that one would mislead.
 ]])
 
 W(('\nRB_DIFFICULTY_MODELS_SCHEMA = %d\n'):format(SCHEMA))
@@ -1042,6 +1080,24 @@ for _, m in ipairs(models) do
     W('    corr = {\n')
     for _, k in ipairs(pair_keys) do
         W(('        [%s] = %s,\n'):format(Quote(k), Num(m.corr[k])))
+    end
+    W('    },\n')
+
+    -- Integer keys 0..6 in ascending order, so this stays byte-stable like everything
+    -- else here. Emitted last because it is the largest per-model block after the
+    -- coefficients and reads better below them.
+    W('    reliability = {\n')
+    for t = 0, 6 do
+        local rt = m.reliability and m.reliability[t]
+        if rt then
+            local acts = {}
+            for a = 0, 6 do
+                local c = rt.actual and rt.actual[a]
+                if c then acts[#acts + 1] = ('[%d]=%d'):format(a, c) end
+            end
+            W(('        [%d] = { n_act = %d, n_pred = %d, ok_pred = %d, actual = { %s } },\n')
+                :format(t, rt.n_act, rt.n_pred, rt.ok_pred, table.concat(acts, ', ')))
+        end
     end
     W('    },\n')
 

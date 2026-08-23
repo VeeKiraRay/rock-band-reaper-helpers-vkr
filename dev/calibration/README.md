@@ -286,6 +286,50 @@ the middle tiers already run at 96–100%; grade it on macro or report all three
 it is spent, "everything unwalked is reserved" stops being the right policy, and the
 replacement is a new declaration with its own reasoning.
 
+### The per-tier reliability note — the first user-visible result
+
+Shipped 2026-08-22. Every earlier phase improved how the project *measures itself*; this is
+the first that changes what an author sees. Artifact schema 5 adds `reliability`, carried
+from the manifest (it comes from out-of-fold predictions, and the exporter refits on every
+row, so it cannot honestly recompute it).
+
+**It reads the opposite conditional from the calibration report, and that is the whole
+point.** `TierDiagnostics` conditions on the *official* tier — "of charts really at tier 6,
+how many did the model place within one?" — which is what shows a calibrator the model
+compresses. An author holds a *predicted* tier and needs "how much should I trust this?"
+
+The two answers differ enormously. On vocals the official-tier view says tier 6 scores
+**20%**; the predicted-tier view runs **80–94%** at every tier with a usable sample. Both
+are true: the model hedges to the middle, so what it says is usually near-right — it just
+almost never commits to an extreme. A note built on the official-tier figure would frighten
+authors about predictions that are sound, and miss the thing they cannot see.
+
+Two rules, both statable rather than fitted:
+
+- **Miss direction** — when more than **one in ten** charts at the same predicted tier were
+  officially *two or more* tiers away, name the dominant direction. Two-or-more because one
+  tier out is what the suggestion is calibrated to allow. Requires ≥ 15 reference charts at
+  that tier; below that, one in ten is one chart.
+- **Reach** — when the model places charts in the top band less than **half** as often as
+  charts actually occupy it, and the chart landed at tier 4+.
+
+**Firing rate: 7 of 42 instrument-tier cells** — drums at Apprentice, keys at Challenging,
+Pro Keys at Moderate and Challenging, vocals at Challenging, Nightmare and Impossible.
+Guitar and bass never fire. That selectivity is deliberate: a note on every card trains the
+eye to skip the area where chart-specific warnings live, which is why model *maturity*
+stays on the badge tooltip instead. The thresholds were checked against the firing pattern
+to confirm they are selective; they were not chosen from it.
+
+Vocals is the motivating case and now says so out loud:
+
+> This model rarely rates vocals at the top of the scale: 48 reference charts are officially
+> in the highest two tiers and it placed 11 there. A genuinely top-end chart is likely to be
+> rated below its real difficulty.
+
+The closing sentence flips for a chart already rated tier 5–6 ("a rating this high is
+unusual from it"), because telling an author rated Impossible that top charts get under-rated
+does not follow.
+
 ### The gate gained an extremes bar
 
 Decided 2026-08-22, closing most of finding 2's divergence. `GateVerdict` now has a fourth

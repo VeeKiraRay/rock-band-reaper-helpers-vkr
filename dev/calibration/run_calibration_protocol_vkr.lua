@@ -637,6 +637,10 @@ local function AnalyseInstrument(csv, inst)
         endpoint_lower = ep_boot and ep_boot.lo or nil,
         endpoint_n     = boot and boot.ep_n or nil,
         gate_passed  = passed,
+        -- Per-tier reliability in the PREDICTED-tier conditional, for the product's
+        -- reliability note. See TierReliability in protocol.lua for why the report's
+        -- official-tier table is the wrong way round for a user.
+        reliability  = diag and TierReliability(diag) or nil,
     }
 end
 
@@ -784,7 +788,9 @@ do
         --   2  rho_lower added; the gate reads it instead of rho_mean.
         --   3  endpoint_lower added; the gate gained a fourth input, so a schema 2 file
         --      records a verdict reached WITHOUT the extremes bar.
-        mf:write('    schema   = 3,\n')
+        --   4  reliability added - per-tier counts in the PREDICTED-tier conditional, which
+        --      the exporter copies into the artifact for the product's reliability note.
+        mf:write('    schema   = 4,\n')
         -- Only reached after every instrument has been analysed, so this flag being true
         -- is a statement about the whole file and not just its header.
         mf:write('    complete = true,\n')
@@ -829,6 +835,24 @@ do
             mf:write(('            endpoint_lower = %s, endpoint_n = %s,\n')
                 :format(dc.endpoint_lower and ('%.6f'):format(dc.endpoint_lower) or 'nil',
                         dc.endpoint_n and ('%d'):format(dc.endpoint_n) or 'nil'))
+            if dc.reliability then
+                mf:write('            reliability = {\n')
+                for t = 0, 6 do
+                    local rt = dc.reliability[t]
+                    if rt then
+                        local acts = {}
+                        for a = 0, 6 do
+                            if rt.actual[a] then
+                                acts[#acts + 1] = ('[%d]=%d'):format(a, rt.actual[a])
+                            end
+                        end
+                        mf:write(('                [%d] = { n_act = %d, n_pred = %d, ok_pred = %d, actual = { %s } },\n')
+                            :format(t, rt.n_act, rt.n_pred, rt.ok_pred,
+                                    table.concat(acts, ', ')))
+                    end
+                end
+                mf:write('            },\n')
+            end
             mf:write(('            gate_passed = %s,\n'):format(tostring(dc.gate_passed)))
             mf:write('        },\n')
         end

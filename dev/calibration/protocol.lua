@@ -3494,6 +3494,64 @@ function TierDiagnostics(resid)
     }
 end
 
+-- Per-tier reliability, in the conditional a USER can actually act on.
+--
+-- THE REPORT'S PER-TIER TABLE IS THE WRONG WAY ROUND FOR THE PRODUCT, and that is the
+-- whole reason this function exists. TierDiagnostics conditions on the OFFICIAL tier -
+-- "of charts that really are tier 6, how many did the model place within one?" - which is
+-- what tells a calibrator the model compresses. An author holds the opposite thing: a
+-- PREDICTED tier, and the question "how much should I trust this number?".
+--
+-- The two answers differ enormously. On vocals the official-tier view says tier 6 scores
+-- 20%, which reads like a broken model. The predicted-tier view says every tier with a
+-- usable sample runs 80-94%. Both are true: the model hedges toward the middle, so its
+-- predictions are usually near-right - it just almost never COMMITS to an extreme.
+--
+-- A reliability note built on the official-tier figure would therefore frighten authors
+-- about predictions that are in fact sound, and would miss the thing they cannot see: that
+-- a genuinely top-end chart gets pulled down. Both facts are emitted:
+--
+--   n_act    charts whose OFFICIAL tier is this one
+--   n_pred   times the model PREDICTED this tier
+--   ok_pred  of those predictions, how many were within one tier of the truth
+--   actual   the full distribution of OFFICIAL tiers among those predictions,
+--            { [official tier] = count }, non-zero entries only
+--
+-- `actual` is what makes a genuinely useful note possible rather than a reassuring one.
+-- On vocals, of the 78 charts placed at tier 4, twenty-nine were actually tier 5 or 6 -
+-- so an author reading "tier 4" has better than a one-in-three chance of being
+-- under-rated, and no summary statistic short of the distribution can tell them that.
+-- n_act against n_pred additionally gives the reach signal (20 official tier 6 against 1
+-- predicted), and ok_pred/n_pred the trust-this-number signal. The product uses all three
+-- and none substitutes for another.
+function TierReliability(diag)
+    if not diag or not diag.matrix then return nil end
+    local out = {}
+    for t = 0, 6 do
+        local n_act, n_pred, ok_pred = 0, 0, 0
+        local actual = {}
+        for a = 0, 6 do
+            local row = diag.matrix[a]
+            if row then
+                local c = row[t] or 0
+                if c > 0 then
+                    n_pred = n_pred + c
+                    actual[a] = c
+                    if math.abs(a - t) <= 1 then ok_pred = ok_pred + c end
+                end
+                if a == t then
+                    for p = 0, 6 do n_act = n_act + (row[p] or 0) end
+                end
+            end
+        end
+        if n_act > 0 or n_pred > 0 then
+            out[t] = { n_act = n_act, n_pred = n_pred, ok_pred = ok_pred,
+                       actual = actual }
+        end
+    end
+    return out
+end
+
 ----------------------------------------------------------------------
 -- Per-song residuals for the SELECTED model
 ----------------------------------------------------------------------

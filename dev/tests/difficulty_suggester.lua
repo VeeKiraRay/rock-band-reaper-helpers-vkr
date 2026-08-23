@@ -312,10 +312,11 @@ Test.section('frozen model artifact')
 
 Test.it('loads, declares a schema this build understands, and covers six instruments', function()
     Test.expect(type(RB_DIFFICULTY_MODELS) == 'table', 'no RB_DIFFICULTY_MODELS table')
-    -- 2 added `corr`; 3 allows more than one trailing origin flag. Bumping this
-    -- deliberately is the point of the field: a stale artifact should fail loudly here
-    -- rather than be read as a plausible but wrong model.
-    Test.expect(RB_DIFFICULTY_MODELS_SCHEMA == 4,
+    -- 2 added `corr`; 3 allows more than one trailing origin flag; 4 renamed n_lego to
+    -- n_aux; 5 added `reliability`. Bumping this deliberately is the point of the field:
+    -- a stale artifact should fail loudly here rather than be read as a plausible but
+    -- wrong model.
+    Test.expect(RB_DIFFICULTY_MODELS_SCHEMA == 5,
         'unexpected artifact schema ' .. tostring(RB_DIFFICULTY_MODELS_SCHEMA))
     Test.expect(#RB_DIFFICULTY_MODEL_ORDER == 6,
         'expected 6 models, got ' .. #RB_DIFFICULTY_MODEL_ORDER)
@@ -1203,6 +1204,126 @@ Test.it('interval factors read the inverted way round', function()
         'low tight_p10 should read as closely spaced, got: ' .. tostring(rec.explanations[1].text))
 end)
 
+Test.section('per-tier reliability note')
+
+-- A model carrying only what DifficultyReliabilityNote reads. Built by hand so the
+-- thresholds are tested against known counts rather than against whatever the shipped
+-- artifact happens to hold this month.
+local function RelModel(rel) return { reliability = rel } end
+
+Test.it('reports the dominant miss direction when one in ten is 2+ tiers out', function()
+    -- 20 predictions at tier 3; 3 of them were actually tier 5 or worse = 15%.
+    local m = RelModel({ [3] = { n_act = 20, n_pred = 20, ok_pred = 17,
+                                 actual = { [2] = 5, [3] = 10, [4] = 2, [5] = 2, [6] = 1 } } })
+    local n = DifficultyReliabilityNote(m, 3, 'keys')
+    Test.expect(n ~= nil, 'expected a note')
+    Test.expect(n.kind == 'reliability', 'wrong kind: ' .. tostring(n and n.kind))
+    Test.expect(n.text:find('15%%') ~= nil, 'expected 15%; got: ' .. n.text)
+    Test.expect(n.text:find('harder') ~= nil, 'expected the harder direction; got: ' .. n.text)
+end)
+
+Test.it('names the easier direction when that is the dominant one', function()
+    local m = RelModel({ [4] = { n_act = 20, n_pred = 20, ok_pred = 16,
+                                 actual = { [1] = 3, [2] = 1, [4] = 10, [5] = 6 } } })
+    local n = DifficultyReliabilityNote(m, 4, 'Pro Keys')
+    Test.expect(n and n.text:find('easier') ~= nil,
+        'expected the easier direction; got: ' .. tostring(n and n.text))
+end)
+
+Test.it('says nothing when the misses are within one tier', function()
+    -- Every prediction lands one tier out at worst. That is what the whole suggestion is
+    -- calibrated to allow, so flagging it would contradict the headline claim.
+    local m = RelModel({ [3] = { n_act = 30, n_pred = 30, ok_pred = 30,
+                                 actual = { [2] = 10, [3] = 10, [4] = 10 } } })
+    Test.expect(DifficultyReliabilityNote(m, 3, 'guitar') == nil,
+        'within-one misses must not produce a note')
+end)
+
+Test.it('quotes no share below fifteen reference charts', function()
+    -- 2 of 8 is 25%, but it is two songs, and a percentage on that is theatre.
+    local m = RelModel({ [3] = { n_act = 8, n_pred = 8, ok_pred = 6,
+                                 actual = { [3] = 6, [6] = 2 } } })
+    Test.expect(DifficultyReliabilityNote(m, 3, 'bass') == nil,
+        'a tiny sample must not produce a percentage')
+end)
+
+Test.it('warns about reach when the model barely touches the top band', function()
+    -- 40 charts officially in tiers 5-6, the model puts 8 there = 0.20, under the half
+    -- bar. This is the vocals case the note exists for.
+    local m = RelModel({
+        [4] = { n_act = 30, n_pred = 60, ok_pred = 58, actual = { [4] = 58, [5] = 2 } },
+        [5] = { n_act = 25, n_pred = 7,  ok_pred = 7,  actual = { [5] = 7 } },
+        [6] = { n_act = 15, n_pred = 1,  ok_pred = 1,  actual = { [6] = 1 } },
+    })
+    local n = DifficultyReliabilityNote(m, 4, 'vocals')
+    Test.expect(n ~= nil, 'expected a reach note')
+    Test.expect(n.text:find('rarely rates vocals') ~= nil, 'got: ' .. n.text)
+    Test.expect(n.text:find('below its real difficulty') ~= nil,
+        'a chart below the top band should be told it may be under-rated; got: ' .. n.text)
+end)
+
+Test.it('flips the reach wording for a chart already rated at the top', function()
+    -- Telling an author rated Impossible that top charts get under-rated does not follow.
+    local m = RelModel({
+        [4] = { n_act = 30, n_pred = 60, ok_pred = 58, actual = { [4] = 58, [5] = 2 } },
+        [5] = { n_act = 25, n_pred = 7,  ok_pred = 7,  actual = { [5] = 7 } },
+        [6] = { n_act = 15, n_pred = 1,  ok_pred = 1,  actual = { [6] = 1 } },
+    })
+    local n = DifficultyReliabilityNote(m, 6, 'vocals')
+    Test.expect(n ~= nil, 'expected a reach note')
+    Test.expect(n.text:find('unusual from it') ~= nil, 'got: ' .. n.text)
+    Test.expect(n.text:find('below its real difficulty') == nil,
+        'must not tell a top-rated chart it is under-rated; got: ' .. n.text)
+end)
+
+Test.it('stays silent on low tiers even when reach at the top is poor', function()
+    local m = RelModel({
+        [2] = { n_act = 40, n_pred = 40, ok_pred = 40, actual = { [2] = 40 } },
+        [5] = { n_act = 25, n_pred = 2,  ok_pred = 2,  actual = { [5] = 2 } },
+        [6] = { n_act = 15, n_pred = 0,  ok_pred = 0,  actual = {} },
+    })
+    Test.expect(DifficultyReliabilityNote(m, 2, 'vocals') == nil,
+        'a Moderate chart is not affected by the top of the scale')
+end)
+
+Test.it('returns nil rather than erroring on a pre-schema-5 model', function()
+    Test.expect(DifficultyReliabilityNote({}, 3, 'guitar') == nil, 'no reliability table')
+    Test.expect(DifficultyReliabilityNote(nil, 3, 'guitar') == nil, 'nil model')
+    Test.expect(DifficultyReliabilityNote(RelModel({}), 3, 'guitar') == nil, 'empty table')
+end)
+
+Test.it('every shipped model carries a reliability table that adds up', function()
+    -- Guards the manifest -> exporter -> artifact path. If the exporter ever stopped
+    -- carrying it, the note would silently vanish for every author.
+    for _, inst in ipairs(RB_DIFFICULTY_MODEL_ORDER) do
+        local m = RB_DIFFICULTY_MODELS[inst]
+        Test.expect(type(m.reliability) == 'table', inst .. ' has no reliability table')
+        local total_pred, total_act = 0, 0
+        for t = 0, 6 do
+            local rt = m.reliability[t]
+            if rt then
+                total_pred = total_pred + rt.n_pred
+                total_act  = total_act + rt.n_act
+                local sum = 0
+                for _, c in pairs(rt.actual or {}) do sum = sum + c end
+                Test.expect(sum == rt.n_pred,
+                    ('%s tier %d: actual sums to %d, n_pred is %d')
+                        :format(inst, t, sum, rt.n_pred))
+                Test.expect(rt.ok_pred <= rt.n_pred,
+                    ('%s tier %d: ok_pred exceeds n_pred'):format(inst, t))
+            end
+        end
+        -- Both conditionals count the same songs, just sliced differently.
+        Test.expect(total_pred == total_act,
+            ('%s: %d predictions against %d official rows')
+                :format(inst, total_pred, total_act))
+        Test.expect(total_pred == m.n_target,
+            ('%s: reliability covers %d rows, model was fitted on %d')
+                :format(inst, total_pred, m.n_target))
+    end
+end)
+
+----------------------------------------------------------------------
 Test.section('difficulty warnings')
 
 Test.it('flags both tier boundaries, and neither past the ends of the ladder', function()

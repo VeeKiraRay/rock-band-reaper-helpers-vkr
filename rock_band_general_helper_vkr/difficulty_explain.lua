@@ -587,6 +587,102 @@ function DifficultyExplanations(rec)
 end
 
 ----------------------------------------------------------------------
+-- Per-tier reliability
+----------------------------------------------------------------------
+
+-- WHAT THIS EXISTS FOR. Every other note here is about the CHART. This one is about the
+-- MODEL at the point on the scale where this chart landed, and it is the only place an
+-- author is told where the model is weak rather than how mature it is.
+--
+-- The status chip cannot do this job. It carries one word per instrument, so it says the
+-- same thing about a vocal chart the model is confident on and one sitting in the band
+-- where the model systematically under-rates. The difference between those two is what an
+-- author actually needs.
+--
+-- IT READS THE PREDICTED-TIER CONDITIONAL, which is the opposite of the one the
+-- calibration report shows. See TierReliability in dev/calibration/protocol.lua: on vocals
+-- the official-tier view says tier 6 scores 20%, which would frighten authors about
+-- predictions that are in fact sound, while the predicted-tier view runs 80-94%. The model
+-- hedges toward the middle, so what it says is usually near-right - it just rarely commits
+-- to an extreme, and THAT is the thing to surface.
+
+-- Below this many reference charts at a predicted tier, no share is quoted: one in ten of
+-- twelve charts is one chart, and a percentage on that is theatre.
+local RELIABILITY_MIN_N = 15
+-- One in ten similar charts landing two or more tiers away is worth telling an author
+-- about. Two-or-more rather than any miss, because "one tier out" is what the whole
+-- suggestion is calibrated to allow and flagging it would contradict the headline.
+local RELIABILITY_SKEW = 0.10
+-- A band the model reaches less than half as often as charts actually occupy it. Applied
+-- only to the top, and only from tier 4 up, because that is where under-rating costs an
+-- author something: a chart rated below its real difficulty gets under-charted.
+local RELIABILITY_REACH = 0.50
+local RELIABILITY_REACH_FROM = 4
+
+-- THRESHOLDS AND HONESTY. All three are statable rules rather than fitted constants - one
+-- in ten, half, and "fifteen is enough to quote a percentage". They were then checked
+-- against how often they fire, which matters because a note appearing on every card trains
+-- the eye to skip the area where the chart-specific warnings live. Five of the 42
+-- instrument-tier cells trigger the skew rule and only vocals triggers the reach rule; the
+-- check confirmed the rules are selective, and did not choose them.
+
+-- Returns a { kind, text } note or nil. Split out from DifficultyWarnings so it can be
+-- tested against a hand-built reliability table without constructing a whole suggestion.
+function DifficultyReliabilityNote(model, tier, label)
+    if type(model) ~= 'table' or type(tier) ~= 'number' then return nil end
+    local rel = model.reliability
+    if type(rel) ~= 'table' then return nil end          -- pre-schema-5 artifact
+    local here = rel[tier]
+    if type(here) ~= 'table' or (here.n_pred or 0) <= 0 then return nil end
+
+    local part = label or 'this part'
+
+    -- 1. Direction of the misses at this tier. Only the dominant side is reported: naming
+    --    both invites the reader to average them into "it could be anything".
+    if here.n_pred >= RELIABILITY_MIN_N and type(here.actual) == 'table' then
+        local harder, easier = 0, 0
+        for a, c in pairs(here.actual) do
+            if     a >= tier + 2 then harder = harder + c
+            elseif a <= tier - 2 then easier = easier + c end
+        end
+        local h, e = harder / here.n_pred, easier / here.n_pred
+        if h >= RELIABILITY_SKEW or e >= RELIABILITY_SKEW then
+            local worse = h >= e
+            local share = worse and h or e
+            return { kind = 'reliability', text = ('Of %d reference charts this model '
+                .. 'rated %s, %.0f%% were officially two or more tiers %s.')
+                :format(here.n_pred, TierName(tier) or ('tier ' .. tier),
+                        share * 100, worse and 'harder' or 'easier') }
+        end
+    end
+
+    -- 2. Reach. Fires where the skew rule cannot: the top tiers hold too few predictions
+    --    to quote a share, which is itself the finding. Vocals is the case this is for -
+    --    20 reference charts are officially tier 6 and the model places one there.
+    if tier >= RELIABILITY_REACH_FROM then
+        local pred, act = 0, 0
+        for t = 5, 6 do
+            local r = rel[t]
+            if r then pred = pred + (r.n_pred or 0); act = act + (r.n_act or 0) end
+        end
+        if act > 0 and pred / act < RELIABILITY_REACH then
+            -- The closing sentence has to flip with where the chart landed. Telling an
+            -- author whose chart was rated Impossible that top-end charts get under-rated
+            -- does not follow - they are the exception, and the useful reading for them is
+            -- that a rating this high is rare from this model.
+            local tail = (tier >= 5)
+                and 'A rating this high is unusual from it.'
+                or  'A genuinely top-end chart is likely to be rated below its real '
+                    .. 'difficulty.'
+            return { kind = 'reliability', text = ('This model rarely rates %s at the top '
+                .. 'of the scale: %d reference charts are officially in the highest two '
+                .. 'tiers and it placed %d there. %s'):format(part, act, pred, tail) }
+        end
+    end
+    return nil
+end
+
+----------------------------------------------------------------------
 -- Warnings
 ----------------------------------------------------------------------
 
@@ -679,6 +775,17 @@ function DifficultyWarnings(rec)
             text = 'This track has no authored playing states, so playing time was inferred '
                  .. 'from the notes. Authoring them will make the suggestion more reliable.' }
     end
+
+    -- 6. Per-tier reliability. This one IS about the model rather than the chart, which
+    --    the paragraph below rules out as a warning - so the distinction is worth being
+    --    precise about. Model MATURITY is one word per instrument and would repeat on
+    --    every card. This note is conditioned on the tier the chart landed in, so it
+    --    appears on some cards and not others, says something different depending on
+    --    where the chart sits, and only fires where the reference data shows a real
+    --    asymmetry. That earns it a place beside the chart-specific notes; a constant
+    --    sentence would not.
+    local reliability = DifficultyReliabilityNote(m, rec.tier, rec.label or rec.instrument)
+    if reliability then out[#out + 1] = reliability end
 
     -- Model maturity is deliberately NOT a warning. It is a property of the model, not of
     -- this chart, so it would repeat identically on every keys/Pro Keys/vocals card in
