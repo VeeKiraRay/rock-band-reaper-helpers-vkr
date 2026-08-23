@@ -56,4 +56,17 @@ dev/calibration/_[0-9][0-9]_*.txt
 dev/calibration/calibration_protocol_report.txt.part
 dev/calibration/calibration_protocol_report.lock
 
+# Human rating studies: the WORKSHEETS AND KEYS, not the tools that make them.
+#
+# A filled worksheet is one author's gut reaction on a few dozen charts. The vocals round
+# of 2026-08-23 was a null result against its own pre-registered bar, and the finding that
+# did turn up was about the RATER's scale (-1.57 tiers against official on control songs)
+# rather than about the labels. Kept local so it cannot later be cited as project evidence.
+#
+# write_rating_worksheet.lua and score_human_ratings.lua stay tracked: they carry the
+# pre-registered analysis and the blinding design, and the follow-up calibration round
+# would use them unchanged. Findings live in _future_ideas/, already ignored above.
+dev/calibration/*_rating_worksheet.txt
+dev/calibration/*_rating_key.txt
+
 *.zip
