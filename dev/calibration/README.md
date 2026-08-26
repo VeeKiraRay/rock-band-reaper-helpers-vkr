@@ -238,10 +238,11 @@ which is the same enrichment that depresses their pooled figures.
 
 **Two things this table is not.**
 
-1. These are **development-set repeated-CV** figures. The reserved test partition is
-   defined and has deliberately **never been drawn** — it can be spent only once, and it
-   is worth more at a real release decision than as a progress check. Call these
-   "development-gate passes", not "validated".
+1. These are **development-set repeated-CV** figures — but as of 2026-08-23 they are no
+   longer the only evidence. The reserved partition was spent and graded once; guitar,
+   bass and drum passed **out of sample**, which is what restored the word "validated" to
+   those three. See "The reserved partition, spent" below. Keys, Pro Keys and vocals
+   remain development-gate figures with a failing verdict on both sets.
 2. A failing instrument is not a broken one. Keys misses by **0.06 points** at n=266 with
    the best rho of any instrument (+0.878) - a statement about certifying a 90% floor,
    not a claim that the model got worse. It does **not** follow that a few more charts
@@ -285,6 +286,69 @@ Two things to hold onto when the partition is spent. The new material is **mostl
 the middle tiers already run at 96–100%; grade it on macro or report all three. And once
 it is spent, "everything unwalked is reserved" stops being the right policy, and the
 replacement is a new declaration with its own reasoning.
+
+### The reserved partition, spent
+
+**2026-08-23. The one number this whole apparatus was built to produce.**
+
+258 rb3_dlc songs from packs that had never been walked — held out by construction since
+the assignment rule was committed *before a single eligible pack existed* — were scored
+under origin `rb3_dlc_test` and graded **once**, with the shipped models applied unchanged
+through the shipped predictor. Nothing was refitted.
+
+| instrument | n | pooled | **Wilson lower** | miss upper | endpoints | rho | |
+|---|---:|---:|---:|---:|---:|---:|---|
+| guitar | 257 | 96.50% | **94.08%** | 1.73% | 87.88% | +0.765 | **passes** |
+| bass | 257 | 93.77% | **90.81%** | 1.04% | 92.31% | +0.726 | **passes** |
+| drum | 257 | 97.67% | **95.55%** | 1.04% | 87.50% | +0.867 | **passes** |
+| keys | 159 | 85.53% | 80.35% | 2.77% | 78.72% | +0.756 | fails |
+| real_keys | 159 | 88.68% | 83.88% | 4.63% | 78.43% | +0.802 | fails |
+| vocals | 258 | 88.76% | 85.11% | 3.41% | **48.39%** | +0.529 | fails |
+
+**Guitar, bass and drums clear the 90% floor on charts nothing in this project had ever
+seen.** That is the first non-circular evidence here, and it is why those three carry
+`validated` again — the word was stripped on 2026-08-21 precisely because it rested on
+development-set CV, and the note left behind said restoring it needed "genuinely new
+pack-held-out data evaluated once". This is that.
+
+**The verdict set is identical to the development gate's**, which is nearly as valuable as
+the pass itself: the gate was predicting honestly rather than flattering the rows it was
+built on. Guitar and drum scored *higher* out of sample than in CV.
+
+#### Four things this does not say
+
+**Two of the gate's four inputs could not be applied.** rho's bootstrap p05 and the
+endpoint p05 both resample out-of-fold residuals, which rows that were never in a fold do
+not have. Pooled and miss are genuine confirmatory bounds; rho and endpoints are point
+estimates. Bass's rho of +0.726 sits close enough to the 0.70 floor that a bound could dip
+under it.
+
+**Keys degraded materially**: 92.97% → 85.53% pooled, a 7.4-point drop well outside
+anything CV showed. It was the "fails by 0.06" instrument; out of sample it is not close.
+That deserves understanding rather than filing away.
+
+**rho fell on every instrument** (−0.03 to −0.15), and this is largely expected rather than
+alarming. The development corpus was deliberately enriched at the extremes; this partition
+is mostly middle, as predicted. Narrower range attenuates correlation — the same
+range-restriction effect that limited the human rating study. Not a like-for-like number.
+
+**Vocals' endpoint band collapsed to 48.39%** from 64.00%, confirming out of sample what
+the per-tier reliability note already tells authors: the model cannot reach the top of the
+vocal scale.
+
+#### It cannot be done again
+
+The partition is spent. Any future model change makes these figures describe the **old**
+models, and `validated` comes off until new held-out data exists. `RESERVED_PCT` is 100, so
+"everything unwalked is reserved" also stops being the right policy now — replacing it is a
+new declaration with its own reasoning.
+
+Integrity checks that had to hold, and did: the artifact regenerated **byte-identical**
+apart from the three `status` fields; every pre-existing CSV row is byte-identical with
+1,347 added, 0 changed, 0 lost; `FROZEN_DEVELOPMENT_SET.txt` still reads 394 development /
+258 reserved, so the test rows were not swept into training.
+
+Grade with `dev/calibration/evaluate_reserved_partition.lua`. **Do not tune against it.**
 
 ### The per-tier reliability note — the first user-visible result
 
@@ -1093,12 +1157,17 @@ model has to earn its place consistently, not post a higher average once.
    protocol. If the selection genuinely changed, update `SELECTIONS` **and the reasoning
    beside it** in the exporter, which is the one edit that makes a reselection visible in
    review rather than arriving as a coefficient diff.
-10. **No instrument may be called `validated` until the reserved partition is spent.**
-   Every figure here is development-set repeated CV. Guitar, bass and drum shipped as
-   `validated` until 2026-08-21 on the strength of passing the gate; they are `beta` now.
-   A better number on the current rows cannot earn the word back — only new pack-held-out
-   data can. See `PARTITION` / `PackIsReserved` in `protocol.lua` for the rule that
-   decides which packs those are, committed before any of them exist.
+10. **`validated` means the reserved partition was spent and the model passed on it —
+   nothing else.** Guitar, bass and drum shipped as `validated` on development-set CV
+   until 2026-08-21, were demoted to `beta` when the peer review named that as
+   unsupportable, and regained the word on 2026-08-23 by clearing the 90% floor on 258
+   held-out songs. That is the *only* route to it.
+
+   **The partition is now spent, so the route is closed.** A better number on existing
+   rows never earned the word and still cannot. If the models change, the 2026-08-23
+   figures describe the *old* ones and the word comes off until genuinely new
+   pack-held-out data exists — which requires a new partition rule, since `RESERVED_PCT`
+   at 100 has nothing left to reserve.
 
 11. **`PROTOCOL.GROUP_FOLDS` is not a flag to flip.** Every published figure is measured
    under row-level folds. Setting it true changes all of them at once, which README rule 1

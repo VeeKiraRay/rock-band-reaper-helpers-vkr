@@ -1,10 +1,10 @@
 
-Rows: 2101
+Rows: 3448
 
 ==============  GUITAR  (n=387 fitted)  ==============
-  rows: 327 rb3_dlc (the target), 45 lego (weight 0.30), 15 rb2 (weight 0.30), 4 excluded from all fits
+  rows: 327 rb3_dlc (the target), 45 lego (weight 0.30), 15 rb2 (weight 0.30), 261 excluded from all fits
   disputed labels held out: 0 of 0 on the list (cap ~2% of the corpus)
-  playing spans: 390 from animation events, 1 from the fallback
+  playing spans: 647 from animation events, 1 from the fallback
   packs: 170 distinct across the rb3_dlc rows; largest holds 15 (5%)
 
   -- individual factors vs rank, rb3_dlc only (Spearman) --
@@ -302,9 +302,9 @@ Rows: 2101
       what solo_change_ratio is supposed to notice.
 
 ==============  BASS  (n=390 fitted)  ==============
-  rows: 330 rb3_dlc (the target), 45 lego (weight 0.30), 15 rb2 (weight 0.30), 4 excluded from all fits
+  rows: 330 rb3_dlc (the target), 45 lego (weight 0.30), 15 rb2 (weight 0.30), 261 excluded from all fits
   disputed labels held out: 0 of 0 on the list (cap ~2% of the corpus)
-  playing spans: 392 from animation events, 2 from the fallback
+  playing spans: 649 from animation events, 2 from the fallback
   packs: 172 distinct across the rb3_dlc rows; largest holds 15 (5%)
 
   -- individual factors vs rank, rb3_dlc only (Spearman) --
@@ -611,9 +611,9 @@ Rows: 2101
       what solo_change_ratio is supposed to notice.
 
 ==============  DRUM  (n=388 fitted)  ==============
-  rows: 328 rb3_dlc (the target), 45 lego (weight 0.30), 15 rb2 (weight 0.30), 4 excluded from all fits
+  rows: 328 rb3_dlc (the target), 45 lego (weight 0.30), 15 rb2 (weight 0.30), 261 excluded from all fits
   disputed labels held out: 0 of 0 on the list (cap ~2% of the corpus)
-  playing spans: 392 from animation events, 0 from the fallback
+  playing spans: 649 from animation events, 0 from the fallback
   packs: 172 distinct across the rb3_dlc rows; largest holds 15 (5%)
 
   -- individual factors vs rank, rb3_dlc only (Spearman) --
@@ -909,9 +909,9 @@ Rows: 2101
       what solo_change_ratio is supposed to notice.
 
 ==============  VOCALS  (n=388 fitted)  ==============
-  rows: 328 rb3_dlc (the target), 45 lego (weight 0.30), 15 rb2 (weight 0.30), 4 excluded from all fits
+  rows: 328 rb3_dlc (the target), 45 lego (weight 0.30), 15 rb2 (weight 0.30), 262 excluded from all fits
   disputed labels held out: 0 of 0 on the list (cap ~2% of the corpus)
-  playing spans: 0 from animation events, 392 from the fallback
+  playing spans: 0 from animation events, 650 from the fallback
   packs: 170 distinct across the rb3_dlc rows; largest holds 15 (5%)
 
   -- individual factors vs rank, rb3_dlc only (Spearman) --
@@ -1202,9 +1202,9 @@ Rows: 2101
     on an empty chart. Vocals needs its own pattern builder.
 
 ==============  KEYS  (n=266 fitted)  ==============
-  rows: 266 rb3_dlc (the target), no auxiliary origins, 0 excluded from all fits
+  rows: 266 rb3_dlc (the target), no auxiliary origins, 159 excluded from all fits
   disputed labels held out: 0 of 0 on the list (cap ~2% of the corpus)
-  playing spans: 266 from animation events, 0 from the fallback
+  playing spans: 424 from animation events, 1 from the fallback
   packs: 140 distinct across the rb3_dlc rows; largest holds 12 (5%)
 
   -- individual factors vs rank, rb3_dlc only (Spearman) --
@@ -1489,9 +1489,9 @@ Rows: 2101
       what solo_change_ratio is supposed to notice.
 
 ==============  REAL_KEYS  (n=266 fitted)  ==============
-  rows: 266 rb3_dlc (the target), no auxiliary origins, 0 excluded from all fits
+  rows: 266 rb3_dlc (the target), no auxiliary origins, 159 excluded from all fits
   disputed labels held out: 0 of 0 on the list (cap ~2% of the corpus)
-  playing spans: 266 from animation events, 0 from the fallback
+  playing spans: 424 from animation events, 1 from the fallback
   packs: 140 distinct across the rb3_dlc rows; largest holds 12 (5%)
 
   -- individual factors vs rank, rb3_dlc only (Spearman) --

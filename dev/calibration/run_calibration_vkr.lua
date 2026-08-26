@@ -76,6 +76,26 @@ local _corpora = {
 -- This only matters once a CSV exists. A first run from an empty CSV has no partition to
 -- protect and scores everything, which is how the development set was built.
 SPEND_RESERVED_PARTITION = false
+
+-- THE ORIGIN RESERVED ROWS ARE WRITTEN UNDER, and the reason it exists.
+--
+-- Scoring a reserved song is only half the danger. The other half is what happens to the
+-- row afterwards: run_calibration_protocol_vkr.lua builds its fitting set from EVERY row
+-- whose origin is 'rb3_dlc', and nothing anywhere reads FROZEN_DEVELOPMENT_SET.txt. So a
+-- reserved song written under its natural origin is indistinguishable from a development
+-- one, and the very next protocol run fits coefficients, tunes ridge and selects
+-- candidates on the only confirmatory evidence the project will ever have - silently, and
+-- with no way to notice afterwards.
+--
+-- Writing them under a DIFFERENT origin makes the existing code do the right thing for
+-- free: `if o == 'rb3_dlc'` stops matching, AuxWeight() returns nil, and the rows sit in
+-- the CSV inert until something asks for them by name. No CSV schema change; the origin
+-- column already exists.
+--
+-- Only rb3_dlc songs are retagged. RBN rows are also absent from the CSV - their ranks are
+-- tier floors and were never scorable as regression targets - and they are not the
+-- reserved partition, so they keep their own origin.
+RESERVED_ORIGIN = 'rb3_dlc_test'
 local _csv      = _dir .. 'corpus_scores.csv'
 local _manifest = _dir .. 'corpus_scores.manifest.txt'
 
@@ -352,7 +372,7 @@ end
 -- which is exactly the development set, leaving the reserved ones as the only work left
 -- to do. Without this the most natural possible run - "re-scan the corpus" - would spend
 -- the whole partition.
-if had_csv and not SPEND_RESERVED_PARTITION then
+if had_csv then
     -- done keys are shortname .. '\0' .. instrument; take the shortname half. Written as
     -- an explicit \0 class because %z was removed in Lua 5.2 and would be a malformed
     -- pattern under REAPER's 5.4.
@@ -360,22 +380,78 @@ if had_csv and not SPEND_RESERVED_PARTITION then
     for key in pairs(done) do
         in_csv[key:match('^([^%z\0]*)') or key] = true
     end
-    local keep, held = {}, 0
-    for _, song in ipairs(songs) do
-        if in_csv[song.shortname] then
-            keep[#keep + 1] = song
-        else
-            held = held + 1
+
+    if not SPEND_RESERVED_PARTITION then
+        local keep, held = {}, 0
+        for _, song in ipairs(songs) do
+            if in_csv[song.shortname] then
+                keep[#keep + 1] = song
+            else
+                held = held + 1
+            end
         end
-    end
-    if held > 0 then
-        r.ShowConsoleMsg(('\nRESERVED PARTITION: holding back %d song(s) absent from the CSV.\n')
-            :format(held))
-        r.ShowConsoleMsg('These have never been walked and are the test set. Scoring one\n')
-        r.ShowConsoleMsg('spends it permanently and undetectably.\n')
-        r.ShowConsoleMsg('To spend the partition deliberately, set SPEND_RESERVED_PARTITION\n')
-        r.ShowConsoleMsg('at the top of this script - and read the README section first.\n')
-        songs = keep
+        if held > 0 then
+            r.ShowConsoleMsg(('\nRESERVED PARTITION: holding back %d song(s) absent from the CSV.\n')
+                :format(held))
+            r.ShowConsoleMsg('These have never been walked and are the test set. Scoring one\n')
+            r.ShowConsoleMsg('spends it permanently and undetectably.\n')
+            r.ShowConsoleMsg('To spend the partition deliberately, set SPEND_RESERVED_PARTITION\n')
+            r.ShowConsoleMsg('at the top of this script - and read the README section first.\n')
+            songs = keep
+        end
+    else
+        -- SPENDING. Retag before a single MIDI is imported, so the rows can never be
+        -- written under an origin that would fold them into the training set. See
+        -- RESERVED_ORIGIN at the top for why the origin rather than a new column.
+        -- COUNTED BY WHAT WILL ACTUALLY BE SCORED, not by dta entries.
+        --
+        -- WalkCorpus returns every songs.dta entry, including ones whose MIDI is absent
+        -- (midi_path = nil). Those are reported as MISSING MIDI later and never produce a
+        -- row. The corpus dtas describe far more songs than the collection holds - 609
+        -- rb3_dlc entries against 588 MIDIs, 79 rb2 entries against 15 scorable ones.
+        --
+        -- Counting entries made the 2026-08-23 run announce 269 retagged when the true
+        -- partition was 258, and 64 rb2 + 1 greenday as "absent" when every aux MIDI was
+        -- already scored. Both were harmless, and both looked exactly like the corruption
+        -- this message exists to catch, so the run was stopped to investigate. On the one
+        -- run where this number IS the safety check, it has to mean what a reader assumes.
+        local tagged, nomid, others = 0, 0, {}
+        for _, song in ipairs(songs) do
+            if not in_csv[song.shortname] then
+                if song.origin == 'rb3_dlc' then
+                    -- Retagged regardless of whether a MIDI is present: the origin must
+                    -- never depend on which files happen to be on disk today. Only the
+                    -- COUNT separates the two.
+                    song.origin = RESERVED_ORIGIN
+                    if song.midi_path then tagged = tagged + 1 else nomid = nomid + 1 end
+                elseif song.midi_path then
+                    local o = song.origin or '?'
+                    others[o] = (others[o] or 0) + 1
+                end
+            end
+        end
+        r.ShowConsoleMsg('\n*** SPENDING THE RESERVED PARTITION ***\n')
+        r.ShowConsoleMsg(('%d rb3_dlc song(s) WITH A MIDI will be scored under origin "%s".\n')
+            :format(tagged, RESERVED_ORIGIN))
+        r.ShowConsoleMsg('That origin keeps them OUT of every fit, ridge search and\n')
+        r.ShowConsoleMsg('candidate selection. They are graded once, by the evaluation\n')
+        r.ShowConsoleMsg('script, and are worthless the moment anything trains on them.\n')
+        if nomid > 0 then
+            r.ShowConsoleMsg(('(%d further rb3_dlc entry(s) retagged but with no MIDI, so\n')
+                :format(nomid))
+            r.ShowConsoleMsg(' they score nothing and appear below as MISSING MIDI.)\n')
+        end
+        if next(others) then
+            local parts = {}
+            for o, n in pairs(others) do parts[#parts + 1] = ('%d %s'):format(n, o) end
+            table.sort(parts)
+            r.ShowConsoleMsg(('Also SCORABLE, absent from the CSV, NOT retagged: %s.\n')
+                :format(table.concat(parts, ', ')))
+            r.ShowConsoleMsg('Those are not the reserved partition and keep their own origin,\n')
+            r.ShowConsoleMsg('so they WOULD enter the fit at their own weight. Check that a\n')
+            r.ShowConsoleMsg('corpus expansion is what you intended before continuing.\n')
+        end
+        r.ShowConsoleMsg('This is a one-time, irreversible act.\n\n')
     end
 end
 

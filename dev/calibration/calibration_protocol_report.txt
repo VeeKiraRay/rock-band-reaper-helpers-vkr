@@ -1,16 +1,19 @@
 ======  Difficulty calibration - LOCKED PROTOCOL  ======
 
-corpus_scores.csv  07aae114239c9dbb  1140165 bytes, 2101 rows
+corpus_scores.csv  c4bb7d9026ff5112  1877667 bytes, 3448 rows
 protocol.lua       c8094bf0fbdcb8bd
 factor set         73d526ddb35359fe  114 columns
 interpreter        Lua 5.4
 
-rows 2101   repeats 10   folds 5   seed 20260812
+rows 3448   repeats 10   folds 5   seed 20260812
 candidates and thresholds are fixed in protocol.lua and were set before this ran.
 Changing any of them is a new experiment, not a re-run - say so if you do.
 
 ==================  GUITAR  ==================
   development rows : 327 rb3_dlc
+  reserved test set : 257 rb3_dlc_test rows, EXCLUDED from every fit,
+                      ridge search and candidate selection here. Graded
+                      once by evaluate_reserved_partition.lua.
   always-training   : 45 lego at weight 0.30, 15 rb2 at weight 0.30
   disputed held out : 0
   reserved test set : NOT DRAWN - this phase validates the approach, not a release
@@ -154,6 +157,9 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
 
 ==================  BASS  ==================
   development rows : 330 rb3_dlc
+  reserved test set : 257 rb3_dlc_test rows, EXCLUDED from every fit,
+                      ridge search and candidate selection here. Graded
+                      once by evaluate_reserved_partition.lua.
   always-training   : 45 lego at weight 0.30, 15 rb2 at weight 0.30
   disputed held out : 0
   reserved test set : NOT DRAWN - this phase validates the approach, not a release
@@ -318,6 +324,9 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
 
 ==================  DRUM  ==================
   development rows : 328 rb3_dlc
+  reserved test set : 257 rb3_dlc_test rows, EXCLUDED from every fit,
+                      ridge search and candidate selection here. Graded
+                      once by evaluate_reserved_partition.lua.
   always-training   : 45 lego at weight 0.30, 15 rb2 at weight 0.30
   disputed held out : 0
   reserved test set : NOT DRAWN - this phase validates the approach, not a release
@@ -492,6 +501,9 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
 
 ==================  VOCALS  ==================
   development rows : 328 rb3_dlc
+  reserved test set : 258 rb3_dlc_test rows, EXCLUDED from every fit,
+                      ridge search and candidate selection here. Graded
+                      once by evaluate_reserved_partition.lua.
   always-training   : 45 lego at weight 0.30, 15 rb2 at weight 0.30
   disputed held out : 0
   reserved test set : NOT DRAWN - this phase validates the approach, not a release
@@ -787,6 +799,9 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
 
 ==================  KEYS  ==================
   development rows : 266 rb3_dlc
+  reserved test set : 159 rb3_dlc_test rows, EXCLUDED from every fit,
+                      ridge search and candidate selection here. Graded
+                      once by evaluate_reserved_partition.lua.
   always-training   : none - no auxiliary-origin rows for this instrument
   disputed held out : 0
   reserved test set : NOT DRAWN - this phase validates the approach, not a release
@@ -963,6 +978,9 @@ Changing any of them is a new experiment, not a re-run - say so if you do.
 
 ==================  REAL_KEYS  ==================
   development rows : 266 rb3_dlc
+  reserved test set : 159 rb3_dlc_test rows, EXCLUDED from every fit,
+                      ridge search and candidate selection here. Graded
+                      once by evaluate_reserved_partition.lua.
   always-training   : none - no auxiliary-origin rows for this instrument
   disputed held out : 0
   reserved test set : NOT DRAWN - this phase validates the approach, not a release

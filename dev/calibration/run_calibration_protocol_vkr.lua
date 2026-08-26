@@ -307,9 +307,10 @@ end
 local function AnalyseInstrument(csv, inst)
     local d = Collect(csv, inst)
 
-    local rb_all = {}
+    local rb_all, n_test = {}, 0
     for i, o in ipairs(d.origins) do
-        if o == 'rb3_dlc' then rb_all[#rb_all + 1] = i end
+        if o == 'rb3_dlc' then rb_all[#rb_all + 1] = i
+        elseif o == 'rb3_dlc_test' then n_test = n_test + 1 end
     end
     -- Every auxiliary origin, pooled: always training, never predicted, each carrying
     -- its own indicator column and its own weight.
@@ -323,6 +324,16 @@ local function AnalyseInstrument(csv, inst)
 
     Msg(('\n==================  %s  ==================\n'):format(inst:upper()))
     Msg(('  development rows : %d rb3_dlc\n'):format(#target))
+    -- Held-out rows are NAMED, not silently skipped. An excluded set that never appears
+    -- in the report is one nobody notices has gone missing - or has quietly been let back
+    -- in. This line is the standing proof that the partition is still unspent by the
+    -- machinery that would spend it.
+    if n_test > 0 then
+        Msg(('  reserved test set : %d rb3_dlc_test rows, EXCLUDED from every fit,\n')
+            :format(n_test))
+        Msg('                      ridge search and candidate selection here. Graded\n')
+        Msg('                      once by evaluate_reserved_partition.lua.\n')
+    end
     if #aux > 0 then
         -- Per origin, not just a total: two origins at the same weight are not
         -- interchangeable, and a run where one of them is empty for this instrument

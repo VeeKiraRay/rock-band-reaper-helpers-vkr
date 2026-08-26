@@ -100,7 +100,15 @@ do
         local t = {}
         for c in (line .. ','):gmatch('([^,]*),') do t[#t + 1] = c end
         local sn = (t[idx.shortname] or ''):lower()
-        if sn ~= '' then origin[sn] = t[idx.origin]; packs[sn] = t[idx.pack] end
+        -- rb3_dlc_test rows are the SPENT RESERVED PARTITION and must never be listed
+        -- here. This file defines the development set, and the reserved partition is
+        -- defined by ABSENCE from it - so sweeping in every scored row, which is what
+        -- this loop used to do, would quietly promote the test set to training data the
+        -- first time the frozen set was regenerated after spending it. The header's own
+        -- instruction to "run this after any rescore" is what would have triggered it.
+        if sn ~= '' and t[idx.origin] ~= 'rb3_dlc_test' then
+            origin[sn] = t[idx.origin]; packs[sn] = t[idx.pack]
+        end
     end
     f:close()
 end

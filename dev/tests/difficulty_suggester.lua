@@ -401,14 +401,19 @@ Test.it('the selected candidate and scale are the ones the protocol chose', func
 end)
 
 Test.it('maturity badges match the product status table', function()
-    -- No instrument is 'validated', and this test is where that stays true. Guitar,
-    -- bass and drum were 'validated' until 2026-08-21 on the strength of passing the
-    -- release gate; the peer review that day pointed out the README already says these
-    -- are development-set repeated-CV figures and that the reserved test partition has
-    -- never been drawn. Nothing may claim 'validated' until one is spent - see the
-    -- STATUS table in dev/calibration/export_production_models.lua.
+    -- 'validated' means ONE THING here, and this test is where it stays meaning it: the
+    -- reserved test partition was spent and the model passed on it. Guitar, bass and drum
+    -- held the word until 2026-08-21, when the peer review pointed out it rested on
+    -- development-set CV with no partition ever drawn, and they were demoted to 'beta'.
+    -- The 258-song partition was scored and graded once on 2026-08-23; all three cleared
+    -- the 90% floor OUT OF SAMPLE (Wilson lower 94.08 / 90.81 / 95.55), so the word is
+    -- now earned rather than assumed.
+    --
+    -- THE PARTITION IS SPENT, so it cannot be earned this way a second time. If the models
+    -- change, these figures describe the OLD ones and the word comes off until new
+    -- held-out data exists. See STATUS in dev/calibration/export_production_models.lua.
     local EXPECTED = {
-        guitar = 'beta', bass = 'beta', drum = 'beta',
+        guitar = 'validated', bass = 'validated', drum = 'validated',
         keys = 'beta', real_keys = 'experimental', vocals = 'experimental',
     }
     for inst, want in pairs(EXPECTED) do
@@ -1545,22 +1550,32 @@ Test.it('carries model maturity as a badge, never as a per-chart warning', funct
     -- the one-line change that turns it back on to be safe.
     -- Every model is annotated with no badge, because the feature switches them off -
     -- not because any of them is mature enough to need none. That distinction used to
-    -- be blurred here by asserting it on guitar under the name `validated`; guitar is
-    -- 'beta' now and no shipped model claims otherwise.
+    -- be blurred here by asserting it on guitar under the name `validated`. Guitar IS
+    -- 'validated' again since the reserved partition was spent on 2026-08-23, so the
+    -- distinction matters more than ever: the badge is nil because the feature is off,
+    -- not because the model needs no badge.
     local off = FakeRec('guitar')
     DifficultyAnnotate(off)
     Test.expect(off.badge == nil, 'badges are switched off, so no record may carry one')
 
+    -- 'validated' maps to NO badge on purpose: the chip exists to flag a caveat, and a
+    -- model that cleared a held-out partition has none to flag. Its absence is the
+    -- message. Everything below it gets a chip and a tooltip explaining what the word
+    -- means, because those words are the ones a reader can misjudge.
     for inst, badge in pairs({
-        guitar = 'Beta', bass = 'Beta', drum = 'Beta',
+        guitar = false, bass = false, drum = false,
         keys = 'Beta', real_keys = 'Experimental', vocals = 'Experimental',
     }) do
         local status = RB_DIFFICULTY_MODELS[inst].status
-        Test.expect(DIFFICULTY_STATUS_BADGE[status] == badge,
+        local want = badge or nil
+        Test.expect(DIFFICULTY_STATUS_BADGE[status] == want,
             ('%s (%s) maps to %s, expected %s'):format(
-                inst, status, tostring(DIFFICULTY_STATUS_BADGE[status]), badge))
-        Test.expect(DIFFICULTY_STATUS_NOTE[status] ~= nil,
-            inst .. ' badge has no tooltip text to explain it')
+                inst, status, tostring(DIFFICULTY_STATUS_BADGE[status]), tostring(want)))
+        -- A chip with no tooltip is a word with no explanation; no chip needs neither.
+        if want then
+            Test.expect(DIFFICULTY_STATUS_NOTE[status] ~= nil,
+                inst .. ' badge has no tooltip text to explain it')
+        end
     end
 
     -- No record of any maturity should reach the warning list.

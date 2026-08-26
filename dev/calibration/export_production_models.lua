@@ -200,28 +200,53 @@ local SELECTIONS = {
 -- These describe validation against noisy official ranks - they are NOT the probability
 -- that a given prediction is right.
 --
--- NOTHING HERE IS 'validated', AND NOTHING MAY BE UNTIL A TEST SET IS SPENT. Guitar,
--- bass and drum carried 'validated' until 2026-08-21, on the strength of passing the
--- release gate. The peer review that day named the contradiction: dev/calibration's own
--- README says in as many words that these are development-set repeated-CV figures and
--- must be called "development-gate passes", not validated, because the reserved test
--- partition has deliberately never been drawn. Every RB3 row has already informed
--- factor design, residual inspection and candidate selection across 23 rounds, so no
--- current row can supply confirmatory evidence later, whatever it is renamed to.
+-- 'validated' RESTORED FOR GUITAR, BASS AND DRUM ON 2026-08-23, AND THIS IS THE ONLY WAY
+-- IT COULD HAVE BEEN. They carried the word until 2026-08-21, when the peer review named
+-- the contradiction: the README says in as many words that those were development-set
+-- repeated-CV figures and must be called "development-gate passes", because every RB3 row
+-- had already informed factor design, residual inspection and candidate selection across
+-- 23 rounds. No such row can supply confirmatory evidence however it is later relabelled.
+-- They were demoted to 'beta', and the note left behind said restoring the word needed
+-- "genuinely new pack-held-out data evaluated once, not a better number on these rows".
 --
--- They are 'beta' instead - the same word keys carries, which is the honest reading:
--- the model passed the gate the project can currently evaluate, and that gate is
--- narrower than the release gate the implementation plan describes. Restoring
--- 'validated' needs genuinely new pack-held-out data evaluated once, not a better
--- number on these rows.
+-- That is exactly what happened. The reserved partition - 258 rb3_dlc songs from packs
+-- that had never been walked, held out by construction since the rule was committed
+-- before a single eligible pack existed - was scored on 2026-08-23 under origin
+-- rb3_dlc_test and graded ONCE with these very models, unchanged, through the shipped
+-- predictor. Out-of-sample, on charts nothing in this project had ever looked at:
 --
--- 'beta' rather than a new 'development_gate_pass': DIFFICULTY_STATUS_BADGE and
--- DIFFICULTY_STATUS_NOTE in difficulty_explain.lua know three statuses, and inventing a
--- fourth is a UI wording decision that belongs with the wider gate, not with this fix.
+--   instrument   n     pooled    Wilson lower (floor 90%)
+--   guitar       257   96.50%    94.08%   PASS
+--   bass         257   93.77%    90.81%   PASS
+--   drum         257   97.67%    95.55%   PASS
+--   keys         159   85.53%    80.35%   fail
+--   real_keys    159   88.68%    83.88%   fail
+--   vocals       258   88.76%    85.11%   fail
+--
+-- The verdict set is IDENTICAL to the development gate's, which is the second finding and
+-- nearly as valuable as the first: the gate was predicting honestly rather than flattering
+-- the rows it was built on. Guitar and drum scored HIGHER out of sample than in CV.
+--
+-- WHAT THE WORD STILL DOES NOT MEAN. This is one grading of one partition against noisy
+-- official ranks; it is not a claim about any individual prediction. Two of the gate's
+-- four inputs could not be applied - rho's bootstrap p05 and the endpoint p05 both need
+-- out-of-fold residuals, which rows that were never in a fold do not have - so the pooled
+-- and miss columns are genuine confirmatory bounds and rho/endpoints are point estimates.
+-- Bass's rho of +0.726 sits close enough to the 0.70 floor that a bound could dip under.
+--
+-- AND IT CANNOT BE EARNED AGAIN THIS WAY. The partition is spent. A future model change
+-- makes these figures describe the OLD models, and the word would have to come off until
+-- new held-out data exists. See evaluate_reserved_partition.lua.
+--
+-- keys stays 'beta' and DEGRADED out of sample - 92.97% -> 85.53% pooled, a 7.4-point drop
+-- well outside anything CV showed. real_keys and vocals stay 'experimental'; vocals'
+-- endpoint band fell to 48.39%, confirming out of sample that the model cannot reach the
+-- top of the vocal scale.
 local STATUS = {
-    guitar = 'beta', bass = 'beta', drum = 'beta',
+    guitar = 'validated', bass = 'validated', drum = 'validated',
     keys = 'beta', real_keys = 'experimental', vocals = 'experimental',
 }
+
 
 ----------------------------------------------------------------------
 -- Failing loudly
