@@ -237,6 +237,22 @@ function Fnv1a64Hex(s) return string.format('%016x', Fnv1a64(s)) end
 -- from memory. ALLOCATING A LATER BATCH IS A NEW DECLARATION - once this partition has
 -- been spent, "everything unwalked is reserved" stops being the right policy, and the
 -- replacement belongs in this comment with its own reasoning.
+-- SPENT AND EXHAUSTED, 2026-08-23. Both words matter and they are not the same thing.
+--
+-- SPENT: the 258 songs this rule selected were scored and graded once. They are in
+-- corpus_scores.csv under origin rb3_dlc_test and are worthless as evidence the moment
+-- anything trains on them.
+--
+-- EXHAUSTED: there is no more rb3_dlc. All 588 songs are in the corpus - 330 development,
+-- 258 test - and RESERVED_PCT at 100 has nothing left to reserve because nothing is left.
+-- So `validated` on guitar, bass and drum is TERMINAL: any refit makes the 2026-08-23
+-- figures describe the old models, and there is no comparable data to earn the word back.
+--
+-- The two remaining routes both change the estimand and each needs its own declared rule,
+-- fixed before the songs are in hand: on-disc RB3 (~83 songs, same scale but ranked at
+-- launch), and pre-RB3 titles (which cannot validate at all here - lego and rb2 carry
+-- origin indicators and train at 0.30 because their ranks sit on another scale, so
+-- grading them on the RB3 scale would measure that offset rather than the model).
 PARTITION = {
     SALT         = 'rb3-difficulty-reserved-v1',
     RESERVED_PCT = 100,   -- was 20 until 2026-08-21; see above
@@ -248,6 +264,20 @@ PARTITION = {
 -- { [pack] = true }. Pass it. Omitting it silently turns rule 1 off, which would let an
 -- already-spent development pack be reported as held-out - the one mistake this whole
 -- block exists to prevent.
+--
+-- WHAT "SEEN" MEANS CHANGED ON 2026-08-23, and the comment above it used to be wrong.
+-- Until then, a pack in the CSV was a DEVELOPMENT pack, and that is what the surrounding
+-- documentation says. Since the partition was spent there are THREE states, not two:
+--
+--   development  in the CSV under origin rb3_dlc - trains, and is cross-validated
+--   spent test   in the CSV under origin rb3_dlc_test - trains on NOTHING, was graded once
+--   unwalked     absent from the CSV - and no rb3_dlc pack is in this state any more
+--
+-- This function still behaves correctly, because both of the first two are in the CSV and
+-- so return false. But it returns false for two different reasons and cannot tell them
+-- apart, and a reader going by the old wording would conclude the 258 test songs are
+-- training data. Any future partition rule must distinguish all three: a spent-test pack
+-- must never be re-reserved AND never be treated as development.
 function PackIsReserved(pack, seen_packs)
     if not pack or pack == '' then return false end     -- no pack id: cannot be held out
     if seen_packs and seen_packs[pack] then return false end

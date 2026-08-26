@@ -1,7 +1,7 @@
 ======  Difficulty calibration - LOCKED PROTOCOL  ======
 
 corpus_scores.csv  c4bb7d9026ff5112  1877667 bytes, 3448 rows
-protocol.lua       c8094bf0fbdcb8bd
+protocol.lua       384a0425a5914d53
 factor set         73d526ddb35359fe  114 columns
 interpreter        Lua 5.4
 

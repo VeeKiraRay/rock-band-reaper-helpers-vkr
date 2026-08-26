@@ -336,12 +336,35 @@ range-restriction effect that limited the human rating study. Not a like-for-lik
 the per-tier reliability note already tells authors: the model cannot reach the top of the
 vocal scale.
 
-#### It cannot be done again
+#### It cannot be done again, and that is stronger than it sounds
 
-The partition is spent. Any future model change makes these figures describe the **old**
-models, and `validated` comes off until new held-out data exists. `RESERVED_PCT` is 100, so
-"everything unwalked is reserved" also stops being the right policy now — replacing it is a
-new declaration with its own reasoning.
+The partition is spent — and **the rb3_dlc population is exhausted**. All 588 songs are in
+the corpus, 330 development and 258 test, with nothing behind them. `RESERVED_PCT` at 100
+has nothing left to reserve because there is nothing left at all.
+
+**So `validated` is a terminal state, not a refreshable one.** Any future change to guitar,
+bass or drums makes the figures above describe the *old* models, and those three drop back
+to `beta` **with no route back on this population**. Not "until more data is collected" —
+there is no more comparable data. Price that in before touching a coefficient: a refit that
+buys half a point of development accuracy costs the only confirmatory evidence the project
+has.
+
+Two routes remain and **both change the estimand**, so neither is topping up this test:
+
+- **On-disc RB3** (~83 songs). Same game, same rank scale, the closest thing available. But
+  they were ranked at launch, before the DLC calibration settled, and the label probe
+  already notes keys and Pro Keys had no prior calibration in RB3. A pass there answers
+  *"does this generalise to on-disc RB3"* — a different, arguably harder question than
+  *"does it generalise to unseen DLC"*. Legitimate if declared as its own experiment.
+- **Pre-RB3 songs cannot validate at all** in the current framing. Lego and RB2 carry origin
+  indicator columns and train at 0.30 precisely because their ranks sit on another scale.
+  Predicting them with the indicators at zero and grading against native ranks measures that
+  offset, not the model.
+
+Either route needs its rule declared **before the songs are in hand**, for the same reason
+`PackIsReserved` was committed before a single eligible pack existed: once you have seen the
+data, any rule you write is a choice about it, and git's history of the file is the only
+evidence of when it was fixed.
 
 Integrity checks that had to hold, and did: the artifact regenerated **byte-identical**
 apart from the three `status` fields; every pre-existing CSV row is byte-identical with
