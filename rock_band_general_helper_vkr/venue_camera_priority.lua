@@ -1,7 +1,7 @@
 -- Camera shot priority: which stacked shot the game actually plays.
 --
--- Source: _external_docs/RBN2 Camera And Lights - RBN_C3 Documentation.htm
--- (sections "Camera Shot Priority" and "Directed Cuts Priority").
+-- Source: the RBN2 "Camera And Lights" RBN/C3 documentation, sections
+-- "Camera Shot Priority" and "Directed Cuts Priority".
 --
 -- Because only 4 band members can be on stage at once, and because keys
 -- physically replaces a guitarist or bassist, authors stack several camera

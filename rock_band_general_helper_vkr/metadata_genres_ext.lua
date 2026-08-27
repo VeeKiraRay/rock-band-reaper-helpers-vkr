@@ -22,8 +22,8 @@
 -- Only case 3 justifies a second candidate here. dev/tools/genre_corpus_report.lua
 -- regenerates the multi-filed list so the calls can be re-checked against the web.
 --
--- Calibrated against 3126 catalogue songs (1375 carrying a subgenre, 1319 artists) in
--- _external_docs/genre_reference_songs/. Findings that shaped entries below:
+-- Calibrated against a local catalogue export of 3126 songs (1375 carrying a subgenre,
+-- 1319 artists), which is not part of this repo. Findings that shaped entries below:
 --   * The -core family is one bucket. metalcore, deathcore, mathcore and the heavier
 --     end of post-hardcore all sit under Metal / Metalcore in practice.
 --   * Heavy but radio-facing goes to Rock / Hard Rock, not Metal. Creed, Seether,

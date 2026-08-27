@@ -4,8 +4,8 @@
 -- no file I/O, so dev/tests can drive it with literal strings and the corpus
 -- walker can drive it with real files.
 --
--- Status: calibration pilot, dev-only. See
--- _future_ideas/general_difficulty_suggester.md -> "Calibration corpus".
+-- Status: dev-only. See dev/calibration/README.md for what the corpus is,
+-- where it has to be placed, and how to run the harness over it.
 --
 -- ---------------------------------------------------------------------------
 -- What the real files taught us (all of this is load-bearing, not defensive):

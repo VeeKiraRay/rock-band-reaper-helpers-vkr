@@ -197,7 +197,7 @@ DRUM_PATTERNS = {
 --   Sixth dyad, Octave) that aren't conventionally written as a chord
 --   symbol; inventing one would be more confusing than a dash.
 --
--- Originally derived from _external_docs/GUITAR_THEORY.md, which is also
+-- Originally derived from a GUITAR_THEORY reference doc, which is also
 -- written low-to-high, so these rows now read in the same direction as that
 -- doc again. DO NOT take that as licence to copy fret numbers back out of
 -- it: independent verification found the doc's literal numbers for the

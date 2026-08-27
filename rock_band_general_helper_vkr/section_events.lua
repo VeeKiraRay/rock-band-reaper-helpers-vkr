@@ -1,6 +1,7 @@
 -- EVENTS-track event vocabulary for the Venue > Events sub-tab.
--- Derived from _external_docs/Text Events List - Events.txt (ground truth);
--- dev/tests/venue_events.lua re-verifies every generatable string against it.
+-- Derived from the community "Text Events List - Events" reference (ground
+-- truth); dev/tests/venue_events.lua re-verifies every generatable string
+-- against it when a local copy is present, and skips when it is not.
 -- No S/TIPS/REAPER dependencies - loadable standalone by the test runner.
 --
 -- Caps string per prc base: the character at position num+1 is the rule for

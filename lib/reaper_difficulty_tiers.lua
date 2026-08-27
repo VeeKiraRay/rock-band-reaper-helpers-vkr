@@ -1,7 +1,9 @@
 -- Rock Band rank -> difficulty tier conversion.
 --
--- PURE: no r.*, no S. Ported from _external_docs/InstrumentDifficulty.ts, which
--- is the authoritative copy for this repo. Keys match songs.dta's own rank key
+-- PURE: no r.*, no S. Ported from the community InstrumentDifficulty.ts, which
+-- is the authoritative source for these thresholds. dev/tests re-asserts every
+-- row against a local copy of it and FAILS if that copy is absent, so the
+-- suggester suite needs one. Keys match songs.dta's own rank key
 -- names (see DTA_RANK_KEYS in dev/calibration/songs_dta.lua) so a rank can be
 -- converted without a translation step.
 --

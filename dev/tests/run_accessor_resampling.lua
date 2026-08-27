@@ -2,8 +2,8 @@
 -- @author VeeKiraRay
 -- @about
 --   Answers whether REAPER's audio accessor honours the samplerate argument
---   to GetAudioAccessorSamples, which is the open question blocking item 7
---   of _future_ideas/vocal_pitch_engine_port.md (analyse at a fixed 16 kHz).
+--   to GetAudioAccessorSamples, which is the open question blocking a
+--   proposed pitch-engine change (analyse at a fixed 16 kHz).
 --   Builds its own WAV fixture, so no project setup is needed - just run it.
 --   Creates and removes one temporary track. Results appear in the REAPER
 --   console (View > Show REAPER console).

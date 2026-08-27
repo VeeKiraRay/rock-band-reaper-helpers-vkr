@@ -1,12 +1,12 @@
 -- Does REAPER's audio accessor actually resample when asked for a rate other
 -- than the source rate?
 --
--- This is the open question blocking item 7 of
--- _future_ideas/vocal_pitch_engine_port.md (analyse at a fixed ~16 kHz, which
--- would make the CMND ~9x cheaper and make item 6's multi-window sampling
--- affordable). If GetAudioAccessorSamples honours its samplerate argument,
--- item 7 is a small diff. If it ignores it and returns source-rate samples,
--- the whole approach needs a hand-rolled decimator instead.
+-- This is the open question blocking a proposed pitch-engine change: analyse
+-- at a fixed ~16 kHz rather than the source rate, which would make the CMND
+-- roughly 9x cheaper and make multi-window sampling affordable. If
+-- GetAudioAccessorSamples honours its samplerate argument, that change is a
+-- small diff. If it ignores it and returns source-rate samples, the whole
+-- approach needs a hand-rolled decimator instead.
 --
 -- Cannot be answered outside REAPER, so it lives here rather than in
 -- dsp_algorithms.lua.

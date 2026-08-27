@@ -1,7 +1,7 @@
 -- Rock Band supported genre vocabulary.
 --
--- Transcribed from _external_docs/Subgenre Descriptions - RBN_C3 Documentation.htm
--- (ground truth). dev/tests/metadata_genres.lua re-verifies the counts and shape.
+-- Transcribed from the RBN/C3 "Subgenre Descriptions" documentation (ground
+-- truth). dev/tests/metadata_genres.lua re-verifies the counts and shape.
 --
 -- 29 major genres, 126 subgenres. NOTE: that page's own intro prose says
 -- "120 subgenre groupings, under 21 major genres" while the page itself enumerates

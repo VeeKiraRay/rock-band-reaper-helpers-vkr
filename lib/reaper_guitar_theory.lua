@@ -49,10 +49,9 @@ GUITAR_DYAD_INTERVALS = {
 }
 
 -- Root-relative pitch-class-set templates for 3+ distinct-pitch shapes.
--- Extends the interval-template idea sketched (unimplemented) in
--- _future_ideas/CHORD_PLAN.md for piano chord detection, with the extra
--- 2-note-adjacent qualities that plan doesn't need but guitar dyads do
--- (those live in GUITAR_DYAD_INTERVALS above, not here).
+-- The same interval-template approach would serve piano chord detection, with
+-- the extra 2-note-adjacent qualities that guitar dyads need and piano does
+-- not (those live in GUITAR_DYAD_INTERVALS above, not here).
 local function _mk_template(name, pcs)
     local sorted = {}
     for _, pc in ipairs(pcs) do sorted[#sorted + 1] = pc end

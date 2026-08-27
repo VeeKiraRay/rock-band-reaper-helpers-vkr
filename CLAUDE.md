@@ -473,12 +473,26 @@ before adding anything: *would this still be true in three months, and does a de
 who just cloned this repo need it?*
 
 Roadmaps, active tasks, WIP notes and local environment details go in `CLAUDE.local.md`
-at the repo root, which is gitignored. In particular, **a committed file must not link
-into `_future_ideas/`, `_external_docs/`, `_raw_assets/` or `_old_stuff/`** — all four are
-gitignored, so such a link is a dead end in a fresh clone. Where the durable lesson from a
-planning document is worth keeping, state the lesson in the committed file and leave the
-document out of it. The one exception is `dev/calibration/README.md`, which must name
-`_external_docs/` corpus paths to be runnable at all, and says so.
+at the repo root, which is gitignored.
+
+### Never cite an unversioned document from a versioned file
+
+`_future_ideas/`, `_old_stuff/`, `_external_docs/` and `_raw_assets/` are all gitignored,
+so **no committed file — Lua source and code comments included, not just markdown — may
+point a reader at a document inside them.** A fresh clone cannot open it, so the citation
+is a dead end that also implies something is missing when nothing is.
+
+Where the fact is worth keeping, **state the fact and drop the path.** A comment saying
+"transcribed from the RBN/C3 Subgenre Descriptions documentation" is provenance a reader
+can act on; the same sentence prefixed with `_external_docs/` only looks like a broken
+repo path. Where a planning document holds a durable lesson, write the lesson into the
+committed file and leave the document out of it.
+
+**A path the code actually loads is not a citation and stays.** `dev/calibration/` and
+`dev/tests/` build real filesystem paths under `_external_docs/` because that is where
+the corpus and reference files have to be placed; those, and the prose explaining that the
+folder is unversioned and must be supplied, are operating instructions rather than
+pointers to reading material.
 
 ### Quick actions (`quick_actions/`)
 

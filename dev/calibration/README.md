@@ -981,7 +981,7 @@ invalidate every model here.
 |---|---|
 | `lib/reaper_difficulty_score.lua` | The gem scorer: `ScoreChart(events, spans, opts)` for guitar, bass, drums, 5-lane keys and Pro Keys. Owns `SCORE_FACTOR_KEYS`, the authoritative factor list and column order. Pure. |
 | `lib/reaper_difficulty_score_vocals.lua` | The vocal scorer: `ScoreVocalChart(notes, phrase_spans, opts)`. Pure. **Appends** its columns to `SCORE_FACTOR_KEYS`, so it must load immediately after the gem scorer and before anything that reads that list. |
-| `lib/reaper_difficulty_tiers.lua` | Rank to displayed tier (0 Warmup … 6 Impossible) plus `TierBand` / `TierPosition`, from `_external_docs/InstrumentDifficulty.ts`. Pure. |
+| `lib/reaper_difficulty_tiers.lua` | Rank to displayed tier (0 Warmup … 6 Impossible) plus `TierBand` / `TierPosition`, ported from the community `InstrumentDifficulty.ts`. Pure. |
 | `lib/reaper_difficulty_predict.lua` | `DifficultyPredictRank`, `DifficultyFactorZ`, `DifficultyOutOfRange` — how to apply a frozen model. Pure. Coefficients are in **standardized** units; nothing should ever apply them by hand. |
 | `lib/reaper_difficulty_models.lua` | **Generated.** The six frozen models: factor order, standardization statistics, coefficients, ridge, rank clamp, per-factor support bounds, concentration thresholds, maturity badge. Rewritten only by `export_production_models.lua`. |
 | `rock_band_general_helper_vkr/difficulty_read.lua` | The chart readers: track lookup, gems grouped into chord events, marker spans, animation states, vocal notes with tick-matched lyrics, phrase and percussion ranges, Pro Keys lane shifts. Touches `r.*`; no `S`, no `ctx`. Attaches the `qn` field, which is the one thing the pure scorer cannot compute for itself. |
@@ -1202,9 +1202,11 @@ model has to earn its place consistently, not post a higher average once.
 
 12. **This file records what was measured, not what to do next.** It is committed, so it
    holds results, the protocol, how to run the harness, and the rules above — the things a
-   fresh clone needs. Work queues, candidate ideas and round plans go in the gitignored
-   `_future_ideas/` instead. A finding that closes an approach stays here, because "this
-   was tried and it failed for this reason" is a result; "try this next" is not.
+   fresh clone needs. Work queues, candidate ideas and round plans are kept outside version
+   control. A finding that closes an approach stays here, because "this was tried and it
+   failed for this reason" is a result; "try this next" is not. Do not cite an unversioned
+   document from this file: a reader with a clean clone cannot open it, so state the finding
+   instead of pointing at it.
 
 ---
 
@@ -1696,20 +1698,21 @@ measurement change was concentrated (6.1% of drum rows); the model effect was co
 Adding or changing a scored column forces a full REAPER re-run of all 2101 rows
 (`run_calibration_vkr.lua` refuses to resume on a column-set change), so changes not
 worth that cost on their own are collected until a rescore happens for another reason.
-The queue itself is work not yet done rather than a record of what was measured, so it
-lives in the gitignored `_future_ideas/` beside the round narrative rather than here.
+That queue is work not yet done rather than a record of what was measured, so per rule 12
+it is kept outside version control and is not reproduced here.
 
 ---
 
 ## The full history
 
-The round-by-round record — every hypothesis, every negative result, the reasoning behind
-each factor, and the residual investigations — lives in
-`_future_ideas/general_difficulty_suggester.md`, with per-round detail in the
-`_round14_results.md` and `_round15_results.md` files beside it.
+The narrative record — the round-by-round prose, the peer review, the plan documents — was
+never version-controlled and is not in this repository. **This README is the whole of the
+tracked account**, which is why it carries the results, the protocol and the rules rather
+than pointing elsewhere for them.
 
-That folder is **gitignored**, so those documents exist only on the authoring machine.
-This README is the tracked summary. If you have the narrative file, read the
-**CURRENT STATUS** block at the top of it before anything else: the rest is chronological,
-and numbers quoted inside a round section are that round's numbers and are often
-superseded.
+Nothing is missing that you need. The in-repo record of what was tried is
+**`protocol.lua`**: it declares every round from 10 through 23a with that round's
+pre-registered predictions, its candidate list, and its measured-and-rejected blocks. For
+"has X already been tested?", that file answers it, and it is current in a way a narrative
+document would not be. `calibration_protocol_report.txt` holds the numbers those
+declarations produced.

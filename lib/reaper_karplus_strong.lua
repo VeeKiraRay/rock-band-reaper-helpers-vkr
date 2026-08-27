@@ -100,12 +100,13 @@ end
 -- The piano presets vary along ONE axis: hammer softness (plus a little
 -- damping to match). Everything else is held equal, which keeps them easy to
 -- reason about and cheap to re-tune from "too dull" / "too bright" feedback.
--- The numbers came from spectral measurement, not taste -- see the tuning
--- notes in _future_ideas/music_theory_karplus_strong_extensions.md.
+-- The numbers came from spectral measurement, not taste.
 --
 -- Not modelled: inharmonicity (the stiff-string partial stretch that is a
 -- real part of piano timbre). It was attempted and measured at exactly zero
--- effect; the same doc records what was tried and why it cannot work here.
+-- effect. Worth noting when reconsidering it: the loop length N below is a
+-- whole number of samples, so this model's partials land on exact
+-- subdivisions of the delay line by construction.
 ----------------------------------------------------------------------
 
 SYNTH_TONES = {
