@@ -31,7 +31,7 @@ end
 
 The 6.x floor is set by ReaImGui's own requirements. All REAPER core APIs (audio accessor, MIDI events, `new_array`) have been available since REAPER 5.x.
 
-Note: the 0.7 floor is nominal — sprite tooltips and image loading already use v0.8 APIs behind pcall guards (silently absent on 0.7). ReaImGui version landscape, floor-bump plan, and the repo's move to Codeberg are documented in `REAIMGUI_UPDATE_PLAN.md`.
+Note: the 0.7 floor is nominal — sprite tooltips and image loading already use v0.8 APIs behind pcall guards, so those features are silently absent on 0.7 rather than breaking the script. Any new use of a post-0.7 API must follow the same pattern until the declared floor is raised.
 
 **Versioning.** Entry point header carries `@version`. Bump it whenever behavior or UI changes meaningfully. Document changes in the `@about` block.
 
@@ -83,7 +83,7 @@ dofile(_mdir .. 'defaults.lua')                   -- script-specific modules
 | `lib/reaper_difficulty_score_vocals.lua` | `ScoreVocalChart`, `NormalizeVocalPhrases`, `VocalClassifyLyric`, `VocalPitchClassDistance`, `VocalNoteIsPitched`, `VocalSubtractPercussion` — the vocal factor set. Pure. **Load after `reaper_difficulty_score.lua`**: it uses that file's span helpers and appends its columns to `SCORE_FACTOR_KEYS` |
 | `lib/reaper_difficulty_tiers.lua` | `RANK_TIER_THRESHOLDS`, `TIER_NAMES`, `TierForRank`, `TierName`, `TierBand`, `TierPosition` — rank to displayed tier (0 Warmup … 6 Impossible), from `_external_docs/InstrumentDifficulty.ts`. Pure. **Both open-ended bands are closed by the model, not the tier table**: tier 6 by `rank_hi`, tier 0 by `rank_lo`. Measured from rank 1 instead, every floor-clamped Warmup chart computed 0.85–0.97 and read as almost-Apprentice while having fallen off the *bottom* of the scale (drums: 97% of a 1–124 band whose model floor is 120). Both args are optional and omitting them keeps the tier table's own 1-and-infinity |
 | `lib/reaper_difficulty_predict.lua` | `DIFFICULTY_SCALE_INV`, `DifficultyModelInputs`, `DifficultyPredictRank`, `DifficultyFactorZ`, `DifficultyOutOfRange` — how to apply a frozen model. Pure. Coefficients are in **standardized** units, so nothing may apply them by hand |
-| `lib/reaper_difficulty_models.lua` | **Generated** — `RB_DIFFICULTY_MODELS`, `RB_DIFFICULTY_MODEL_ORDER`, `RB_DIFFICULTY_MODELS_SCHEMA`. The six frozen fitted models, at schema 4. Carries coefficients, standardization stats, rank clamp, per-factor `bounds`, concentration thresholds, and `corr` (pairwise factor correlations at \|r\| ≥ 0.70, used to stop the explanation panel restating one observation twice). Rewritten only by `dev/calibration/export_production_models.lua`; never hand-edit |
+| `lib/reaper_difficulty_models.lua` | **Generated** — `RB_DIFFICULTY_MODELS`, `RB_DIFFICULTY_MODEL_ORDER`, `RB_DIFFICULTY_MODELS_SCHEMA`. The six frozen fitted models. The file states its own format version in `RB_DIFFICULTY_MODELS_SCHEMA`, which is the only place to read it — a copy quoted here drifts the first time the exporter bumps it. Carries coefficients, standardization stats, rank clamp, per-factor `bounds`, concentration thresholds, and `corr` (pairwise factor correlations at \|r\| ≥ 0.70, used to stop the explanation panel restating one observation twice). Rewritten only by `dev/calibration/export_production_models.lua`; never hand-edit |
 | `lib/reaper_wav_writer.lua` | `WriteMonoWAV16` |
 
 The three `reaper_difficulty_*` modules are shared with the calibration harness in
@@ -137,7 +137,8 @@ a script where a string belongs to a pool rather than to a widget —
 
 For MIDI edits, `MarkTrackItemsDirty` is **required** inside the block — REAPER's MIDI
 functions do not mark the take dirty, so without it the undo entry is silently dropped.
-`MarkProjectDirty` and `UpdateArrange` do **not** fix this. See `.claude/CLAUDE_undo_fix.md`.
+`MarkProjectDirty` and `UpdateArrange` do **not** fix this — they mark the project, not the
+take, and the undo system checks the take.
 
 ```lua
 r.PreventUIRefresh(1)
@@ -463,6 +464,21 @@ that dofiles the code under test and the set.
 ```
 
 Module file contents and load orders are in the script-specific CLAUDE files.
+
+### What belongs in a committed CLAUDE file
+
+`CLAUDE.md` and everything in `.claude/` carry **stable project knowledge only** —
+architecture, conventions, how to build and deploy, and lessons that stay true. The test
+before adding anything: *would this still be true in three months, and does a developer
+who just cloned this repo need it?*
+
+Roadmaps, active tasks, WIP notes and local environment details go in `CLAUDE.local.md`
+at the repo root, which is gitignored. In particular, **a committed file must not link
+into `_future_ideas/`, `_external_docs/`, `_raw_assets/` or `_old_stuff/`** — all four are
+gitignored, so such a link is a dead end in a fresh clone. Where the durable lesson from a
+planning document is worth keeping, state the lesson in the committed file and leave the
+document out of it. The one exception is `dev/calibration/README.md`, which must name
+`_external_docs/` corpus paths to be runnable at all, and says so.
 
 ### Quick actions (`quick_actions/`)
 

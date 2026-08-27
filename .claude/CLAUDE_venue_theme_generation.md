@@ -641,20 +641,11 @@ least one qualifying note starts. Grid positions with no notes are silently skip
 
 ---
 
-## Deferred / not yet implemented
+## Solo shot-type weighting
 
-| Feature | Notes |
-|---------|-------|
-| `extra_sections` | Wildcard/pattern-based section matching from official spec. Not parsed. |
-| Per-section directed pools | Themes can't currently restrict which directed cuts fire for a given section. |
-| Keyframe rate in 16ths (not beats) | `keyframe_rate` is currently in beats × PPQ. Some themes may benefit from 16th-note resolution. |
-| Other time signatures | `FindNextMeasureStartPpq` works for any time sig via `TimeMap_GetMeasureInfo`, but "Downbeat" with `keyframe_rate` not equal to the measure length won't land on all downbeats in non-4/4. |
-
-### Solo shot-type weighting
-
-Currently when the Solo group is selected, any shot from the chosen instrument's sub-pool is
-picked with equal probability. The intent is to replace the equal pick with a **weighted
-secondary roll** that favours closer angles:
+When the Solo group is selected, the shot is not picked from the instrument's sub-pool with
+equal probability. A **weighted secondary roll** favours closer angles, applied after the
+instrument is chosen by `WeightedPickInstrument`:
 
 **Vocals** (3 variants):
 
@@ -673,25 +664,26 @@ secondary roll** that favours closer angles:
 | `_closeup_hand` | 20% |
 | `_behind` | 15% |
 
-These weights apply after the instrument is selected by `WeightedPickInstrument`. The pool is
-split by view suffix, one is picked by weight, and then a random event from that suffix's
-candidates is picked (there may be multiple `_near` variants, for example).
+The weight tables live in `venue_camera.lua` as `SOLO_SUFFIX_WEIGHTS` (per instrument) and
+`SOLO_SUFFIX_WEIGHTS_DEFAULT`. The mechanism is two functions:
 
-When **sing notes** (see below) are active for an instrument, the weights for `_near` and
-`_closeup_head` (or `_closeup` for vocals) are boosted at the expense of `_behind` and
-`_closeup_hand`. The exact boost values are TBD.
+- **`BuildSuffixPools(solo_pools)`** splits each instrument's sub-pool by view suffix
+  **once per generation**, not per tick, returning `suffix_pools[letter][view] = {shots}`.
+  Callers pass the result as `coop_opts.suffix_pools`.
+- **`WeightedPickSoloShot(letter, suffix_by_view, avoid, singing_set)`** rolls against the
+  weight table, then picks a random event from that suffix's candidates — there may be
+  several `_near` variants, for example.
 
-**Implementation sketch:**
-- Split each instrument's sub-pool by view suffix once per generation (not per tick) into a
-  `suffix_pools[letter][suffix]` table.
-- Replace the current `PickRandom(sub_pool)` call with a weighted suffix pick, then
-  `PickRandom(suffix_pools[letter][suffix])`.
-- Pass an optional `sing_boost` flag to apply the boosted weights when a sing note is active.
-- Instruments or shots with no `_suffix` in their event name fall through to equal probability
-  (the instrument codes like `_all` / `_front` are in the venue group, not solo, so no
-  conflict there).
+Shots whose event name carries no recognised suffix go into an `'__other'` pool and are
+picked with equal probability, which is also the fallback when no weighted view has any
+candidates. The instrument codes like `_all` / `_front` belong to the venue group rather
+than solo, so they never collide with a view suffix.
 
-### VENUE MIDI sing notes
+When **sing notes** (see below) are active for an instrument, `SOLO_SUFFIX_WEIGHTS_SING`
+replaces the normal table — see effect 2 for the values. Vocals (`'v'`) is excluded by an
+explicit `letter ~= 'v'` guard: its weights are never shifted.
+
+## VENUE MIDI sing notes
 
 The VENUE track carries MIDI notes that signal which instrument players are singing:
 
@@ -704,9 +696,9 @@ The VENUE track carries MIDI notes that signal which instrument players are sing
 Keys has no dedicated sing note — the keys/guitar/bass failsafe already handles which slot
 is populated, so a guitarist-sing note on a keys song would carry over via that mechanism.
 
-Sing notes drive two implemented effects and one deferred:
+Sing notes drive two effects:
 
-**1. Instrument weight redistribution** (implemented)
+**1. Instrument weight redistribution**
 When some (not all) of {b,d,g} have active sing notes, non-singing {b,d,g} and keys drop
 to idle weight (5). Their "missing" weight (base−5 each, across available instruments)
 redistributes equally to the active singers. When all three sing or none sing, base weights
@@ -719,13 +711,9 @@ apply unchanged. Vocals ('v') is always unchanged (no sing pitch exists for voca
 | all 3 sing | 40 | 15 | 15 | 15 | 15 (no change) |
 
 Redistribution applies only in `WeightedPickInstrument` for the **solo** group pick.
-The duo group pick is unaffected (see effect 2 below).
+The duo group pick is unaffected.
 
-**2. Duo likelihood boost** (not yet implemented)
-Active sing note → increase the probability of duo events pairing that instrument with
-the vocalist (e.g. `gv`, `bv`, `dv`). Keys falls back to the failsafe companions (`kv`).
-
-**3. Shot-type suffix boost** (implemented)
+**2. Shot-type suffix boost**
 When the chosen solo instrument has an active sing note, `_closeup_head` is favoured at
 the expense of `_closeup_hand` and `_behind`. Vocals ('v') weights are never shifted.
 
@@ -749,19 +737,20 @@ the expense of `_closeup_hand` and `_behind`. Vocals ('v') weights are never shi
 
 ---
 
-## Future fine-tuning controls (randomness UI)
+## Known limitations
 
-The following constants in `venue_generator.lua` are marked "Future S-field candidates"
-and are good candidates for UI sliders in the Venue tab:
+| Area | Limitation |
+|------|------------|
+| `extra_sections` | The official spec's wildcard/pattern-based section matching is not parsed. |
+| Non-4/4 time signatures | `FindNextMeasureStartPpq` works for any time signature via `TimeMap_GetMeasureInfo`, but "Downbeat" alignment with a `keyframe_rate` that is not the measure length won't land on every downbeat outside 4/4. |
+| `keyframe_rate` resolution | Expressed in beats × PPQ, so it cannot express a 16th-note rate. |
 
-- **Camera interval** (`CAM_INTERVAL_16THS`): slider 4–64 16ths. Used in no-theme mode.
-- **Camera jitter** (`CAM_JITTER`): slider 0–0.5 (0 = perfectly even, 0.5 = very loose).
-- **Directed cut count** (`DIRECTED_MIN_COUNT` / `DIRECTED_MAX_COUNT`): two sliders or one range, no-theme mode only.
-- **Lighting interval** (`LIGHTING_INTERVAL_16THS`): slider 32–256. No-theme mode.
-- **Lighting jitter** (`LIGHTING_JITTER`): slider 0–0.5.
-- **Keyframe rate range** (`KEYFRAME_MIN_BEATS` / `KEYFRAME_MAX_BEATS`): used when theme has no `keyframe_rate`. Could be a single slider (fixed rate) or two (range).
+## Exposing a generator constant as an `S` field
 
-Pattern for exposing a constant as `S` field:
+Several constants in `venue_generator.lua` are marked "Future S-field candidates" —
+`CAM_INTERVAL_16THS`, `CAM_JITTER`, `DIRECTED_MIN_COUNT` / `DIRECTED_MAX_COUNT`,
+`LIGHTING_INTERVAL_16THS`, `LIGHTING_JITTER`, and `KEYFRAME_MIN_BEATS` /
+`KEYFRAME_MAX_BEATS`. Promoting one to a user control is a four-step change:
 1. Add to `S` in `defaults.lua` with the same default value
 2. Add serialize/deserialize in `settings.lua`
 3. Replace the local constant reference in `venue_generator.lua` with `S.field`

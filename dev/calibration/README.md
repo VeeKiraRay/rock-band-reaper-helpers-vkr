@@ -247,7 +247,7 @@ which is the same enrichment that depresses their pooled figures.
    the best rho of any instrument (+0.878) - a statement about certifying a 90% floor,
    not a claim that the model got worse. It does **not** follow that a few more charts
    would clear it: two collection rounds have now tried exactly that and both cancelled
-   out. See Open threads.
+   out. See "Why three instruments still fail".
 
 The reserved partition should be drawn **by whole pack**, not by random rows: the corpus's
 multi-song packs are thematic, so related songs would otherwise leak across the split, and
@@ -1091,7 +1091,7 @@ scored, the rest being 45 Lego-era, 15 RB2-era and 4 `greenday`.
 
 > **Two different song counts, and they are easy to confuse.** `corpus_scores.manifest.txt`
 > reports `corpus songs : 526` — that is songs **walked**, and 132 of them had no readable
-> MIDI (mostly RBN `ugc_plus`, whose dta dialect is not parsed; see Open threads). **394**
+> MIDI (mostly RBN `ugc_plus`, whose dta dialect is not parsed; see "Why three instruments still fail"). **394**
 > songs reached the CSV, which is the number every figure in this document is about.
 > Confirm either from the CSV itself rather than from the manifest's headline.
 
@@ -1199,6 +1199,12 @@ model has to earn its place consistently, not post a higher average once.
    reason. As of 2026-08-22 the two agree, so there is nothing to decide; if a future
    corpus makes them disagree by more than about a point, the grouped number is the honest
    one and the switch is the whole experiment, artifact regeneration included.
+
+12. **This file records what was measured, not what to do next.** It is committed, so it
+   holds results, the protocol, how to run the harness, and the rules above — the things a
+   fresh clone needs. Work queues, candidate ideas and round plans go in the gitignored
+   `_future_ideas/` instead. A finding that closes an approach stays here, because "this
+   was tried and it failed for this reason" is a result; "try this next" is not.
 
 ---
 
@@ -1332,7 +1338,7 @@ model has to earn its place consistently, not post a higher average once.
   89.44% against the 90% floor, read at the time as a sample-size problem at n=122.
 
   > *Corrected since.* Keys is now at n=266 and the gate still fails, by 0.06. The
-  > sample-size reading was wrong; see Open threads. The figures above are left as they
+  > sample-size reading was wrong; see "Why three instruments still fail". The figures above are left as they
   > stood at round 16 rather than rewritten — this section is a record of what each round
   > found, not a running status.
 
@@ -1545,9 +1551,12 @@ model has to earn its place consistently, not post a higher average once.
 
 ---
 
-## Open threads
+## Why three instruments still fail
 
-Where the three failing instruments actually stand, so this is not re-derived.
+Where keys, Pro Keys and vocals actually stand, and what has already been ruled out for
+each. Every claim here is measured; the point of the section is that none of it should be
+re-derived, and that the approaches marked closed should not be re-proposed without a new
+mechanism. What to do about any of it is a plan, and plans are not kept in this file.
 
 - **Keys' 0.06-point gap is an accuracy ceiling, not a sample-size shortfall.** Two
   collection attempts have now been made specifically to close it, and both failed the
@@ -1685,108 +1694,10 @@ measurement change was concentrated (6.1% of drum rows); the model effect was co
 ## Queued for the next full rescore
 
 Adding or changing a scored column forces a full REAPER re-run of all 2101 rows
-(`run_calibration_vkr.lua` refuses to resume on a column-set change). Nothing below is
-worth triggering a rescore on its own; it is here so that whenever one happens for another
-reason, it goes in too.
-
-### Big Rock Endings are over-charted bonus material and are being counted
-
-**The same class of error as the drum roll lane, and it lands on five instruments.** A BRE
-is a free-play region: the notes exist so the characters animate, and the player may play
-as much or as little as they like. Every gem inside one inflates density, attack rate, note
-totals and playing time without asking anything of the player. Vocals is exempt by spec —
-nothing may be authored during a BRE.
-
-**Use `[coda]` in the EVENTS track, never the lanes.** The lanes are pitch 120-124, but on
-drums that range is also the activation/fill lane. Measured over 394 corpus songs:
-
-> **The 4% is the catalogue, not the sample — measured 2026-08-21, and it closes this
-> thread.** The BRE round was left unfitted because 18 of 394 is a coin toss, with the
-> implicit hope that a bigger corpus would fix it. A census over
-> `all_rb3_dlc_reference_songs` says it will not: **16 of its 305 development songs (5.2%)
-> carry a real BRE, and only 8 of the 258 reserved ones (3.1%)**. Spending the entire test
-> partition would take the total from ~18 to ~26. BREs are simply rare in RB3 DLC, so no
-> amount of RB3 material makes this fittable — the constraint is prevalence, not corpus
-> size. The lane-versus-coda gap holds at the same ratio in the new material too (287 and
-> 249 songs respectively have lanes with no coda), which independently re-confirms that
-> reading the lanes would strip material from the ~95% of songs that have no BRE at all.
->
-> That census read the EVENTS text of reserved MIDIs and nothing else — no ranks, no
-> factors, no predictions. Recorded here because rule 4 requires reserved-partition
-> contact to be deliberate and visible; a structural census cannot enable overfitting,
-> since reserved rows can never be trained on.
-
-```
-[coda] in EVENTS        :  18
-120-124 lane present    : 392
-both (a real BRE)       :  18
-lane but NO coda        : 374   <- drum fills, not BREs
-coda but no lane        :   0
-```
-
-Reading the lanes alone would strip material from **374 songs that have no BRE at all**.
-The authoring doc's requirement holds perfectly in this corpus, so `[coda]` is exact.
-
-**One coda per song, always — 0 of 18 have more than one.** So the implementation needs no
-per-instrument lane parsing at all: find the single `[coda]`, cut everything after it. That
-also sidesteps the drums 120-124 ambiguity entirely, because the lanes are never read.
-
-**The cut also discards the required final hit, and that is fine.** The doc requires a hit
-*after* the lanes end, so a coda cutoff eats it — measured at a median of 1-3 gems per
-instrument and a maximum of 9, against chart totals of 1000-2600. In practice a short roll,
-a crash, or a few chords. A deliberate approximation, recorded here so it is not later
-mistaken for an oversight.
-
-Where a BRE exists it is worth 3-4% of gems on average, up to **16.2%** (`2112pt3` bass,
-149 of 918 over 17.4s). `dreamonlive` — the chart whose regression in round 22 prompted
-this — carries 84 drum gems across 10.7s, 8.3% of the chart.
-
-**The LOCAL direction is a coin flip:**
-
-```
-over-predicted   38 rows, mean error +38   -> exclusion helps
-under-predicted  40 rows, mean error -47   -> exclusion hurts
-```
-
-and the losing half loses harder. The charts most at risk are already badly under-read:
-`rizeofthefenix` drum **-157**, `2112pt3` drum **-129**, `starshiptrooper` keys **-125**,
-`flightoficarus` drum **-123**. Stripping 3-16% of their gems pushes them further down.
-
-**But that check cannot answer the question, and an earlier version of this section wrongly
-concluded from it that the round was not worth running.** It measures where the 18 BRE
-charts currently sit and infers the sign of a *local* effect. Round 22 proved that is the
-smaller half: its two regressions, `dreamonlive` and `wearethechampions2`, had
-**byte-identical measurements** before and after, and broke only because removing the
-outliers cut the column's corpus sd by 17.7% and re-scaled every chart's z. **Excluding an
-outlier from a standardized column moves the 376 songs that do not have one.**
-
-So the honest position is that the corpus-wide effect is *unmeasured*, the mechanism that
-dominated round 22 is present here too, and 18 songs' worth of extreme values is enough to
-move an sd. The round is worth running; a prediction from the local signs is not a
-substitute for running it. The one thing the local check does establish is that this is not
-the same easy win as the roll lanes - there is no concentrated set of obviously-wrong
-predictions waiting to be fixed, so expect the gain to come from re-scaling rather than
-from the BRE charts themselves, and declare it that way.
-
-A Stage A offline preview is possible and cheap: the cutoff is a **tick** (the `[coda]`
-position), so the exclusion itself is exact offline. The resulting density values depend on
-the tempo map, so the preview may differ from REAPER in the last decimals and **must never
-be merged into the REAPER-scored CSV** - name it `_2N_*` per the usual rule.
-
-**The product argument is separate and the corpus cannot see it.** An author who writes a
-BRE and gets a rank inflated by their own bonus section is being handed a wrong answer,
-whether or not fixing it moves a corpus statistic. Unlike the harmony-mirroring case this
-is not a judgement call — a BRE is a documented, unambiguous free-play region. So the
-recommendation is: fold it in when a rescore happens anyway, not before.
-
-**`playing_s` is the subtler half and the round must declare it.** BRE time currently
-counts as playing time. Removing the gems but not the time lowers every density twice over;
-removing both is the honest treatment, but `playing_s` carries a positive coefficient in
-five of six models, so the two effects partly cancel. Declare it as one substitution, not
-two.
-
-Implementation cost, once a rescore is happening anyway: one EVENTS text scan and one time
-cutoff in `difficulty_read.lua`, which does not parse the EVENTS track today.
+(`run_calibration_vkr.lua` refuses to resume on a column-set change), so changes not
+worth that cost on their own are collected until a rescore happens for another reason.
+The queue itself is work not yet done rather than a record of what was measured, so it
+lives in the gitignored `_future_ideas/` beside the round narrative rather than here.
 
 ---
 

@@ -76,12 +76,10 @@ content is not a lookup table but a *model* (clefs, key signatures, the
 diatonic step), so it lives in `lib/reaper_music_notation.lua` where it can be
 unit-tested. `defaults.lua` holds only that tab's `S` fields and `TIPS`.
 
-Two planned Drums sections have no table yet — `RB_LANE_COLORS` (RB lane colour
-per drum piece) and `PRO_VS_4LANE`. Earlier revisions of this file listed both
-as "currently empty" tables in `defaults.lua`; they were never actually
-created. See [`_future_ideas/music_theory_drum_colors.md`](../_future_ideas/music_theory_drum_colors.md)
-and [`_future_ideas/music_theory_pro_vs_4lane.md`](../_future_ideas/music_theory_pro_vs_4lane.md),
-which make the same stale claim.
+Two Drums sections have no table — `RB_LANE_COLORS` (RB lane colour per drum
+piece) and `PRO_VS_4LANE`. Earlier revisions of this file listed both as
+"currently empty" tables in `defaults.lua`; they were never actually created,
+so do not go looking for them there.
 
 ---
 
@@ -169,7 +167,7 @@ Real recorded samples aren't practical for the Guitar tab: Shape Search takes ar
 Instead: synthesize the chord as a short WAV waveform ourselves, and preview it through the *same* `CF_CreatePreview` mechanism Drums already uses — zero project mutation, same SWS dependency Drums already has (not a new one), and full control over the tone instead of depending on whatever MIDI synth may or may not be configured on a given machine. Trade-off: it's a synthesized pluck, not a realistic guitar recording.
 
 **Synthesis** — `lib/reaper_karplus_strong.lua`, pure Lua, no `reaper.*`:
-- `KarplusStrongVoice(freq, n_samples, opts)` — one plucked string. Physical modeling: a short delay line (`round(sample_rate / freq)` samples) seeded with noise (the "pluck"), then each output sample is emitted and the delay line is fed back `damping * 0.5 * (current + next)` (a one-zero lowpass in the loop) — this alone produces a decaying, harmonically rich tone with no hand-shaped envelope needed. `opts.damping` is the brightness/energy-loss knob (future tone presets would tune this — see [`_future_ideas/music_theory_karplus_strong_extensions.md`](_future_ideas/music_theory_karplus_strong_extensions.md) for guitar tone variants and other-instrument reuse, not yet implemented); `opts.seed`, if given, seeds the RNG right before that voice's noise burst for reproducible output (tests, and the hook a future "user-controlled variation" feature would use) — if omitted, relies on the ambient RNG state (seeded once with `math.randomseed(os.time())` at entry-point startup) so repeated plays of the same chord sound slightly different, like a real strum.
+- `KarplusStrongVoice(freq, n_samples, opts)` — one plucked string. Physical modeling: a short delay line (`round(sample_rate / freq)` samples) seeded with noise (the "pluck"), then each output sample is emitted and the delay line is fed back `damping * 0.5 * (current + next)` (a one-zero lowpass in the loop) — this alone produces a decaying, harmonically rich tone with no hand-shaped envelope needed. `opts.damping` is the brightness/energy-loss knob (the tuning point for any further tone presets); `opts.seed`, if given, seeds the RNG right before that voice's noise burst for reproducible output (tests, and the hook a future "user-controlled variation" feature would use) — if omitted, relies on the ambient RNG state (seeded once with `math.randomseed(os.time())` at entry-point startup) so repeated plays of the same chord sound slightly different, like a real strum.
 - `SynthesizeChordSamples(pitches, sample_rate, duration_s, opts)` — one voice per pitch, each staggered `opts.stagger_s` (default ~13ms) after the previous (sorted ascending) so a chord sounds strummed rather than a synchronized block hit. Mixes all voices into one flat float buffer.
 
 **Writing** — `lib/reaper_wav_writer.lua`, pure Lua, `io`/`string` only, generic to any float buffer (not Karplus-Strong-specific): `WriteMonoWAV16(samples, sample_rate, path)` peak-normalizes (loudest sample at ~90% of full scale, so multi-note chords never clip) and writes a mono 16-bit RIFF/WAVE/fmt/data file, byte-packed manually via `string.char` (not `string.pack`, to avoid any assumption about the Lua version REAPER embeds on a given machine).
@@ -183,7 +181,7 @@ Instead: synthesize the chord as a short WAV waveform ourselves, and preview it 
 - **Guitar** passes no `opts` at all and therefore lands on `guitar`, which reproduces the original sound exactly. A test asserts `hammer = 1.0` is byte-identical to omitting it — that is the regression guard for the whole preset change, and it should survive any future work here.
 - **Piano** passes `{ tone = S.piano_tone }`, one of `piano_soft` / `piano_natural` / `piano_bright`, chosen from a **Tone** combo. Duration comes from the preset too (2.5 s vs the guitar's 1.0 s): a struck string needs far longer to decay, and cutting it short is audible.
 
-Two things worth not re-deriving, both measured (full numbers in [`_future_ideas/music_theory_karplus_strong_extensions.md`](../_future_ideas/music_theory_karplus_strong_extensions.md)):
+Two things worth not re-deriving, both measured:
 
 - **`release_s` is a defect fix, not a tone.** The buffer used to just stop while the string was still ringing — a 1 s guitar preview ended at 6.9% of peak, an audible click on *every* play, and the single biggest reason the previews sounded synthetic. The raised-cosine fade takes that to 0.015%. It lives in shared chord-assembly code, so both tabs get it with no per-instrument code.
 - **`hammer` only does something below ~0.15.** At 0.3 the difference from a flat white-noise burst is about 1 dB. `piano_bright` sits at 0.35 precisely because "bright" here means "close to the original pluck".
@@ -279,7 +277,7 @@ Note heads are stored **per staff**, not once for the grand staff: the same slot
 
 ### Deferred
 
-Chord-name identification, Pro Keys range checking, a clickable keyboard, and per-note accidental overrides were scoped with the tab and deliberately left out. [`_future_ideas/music_theory_piano_tab_extensions.md`](../_future_ideas/music_theory_piano_tab_extensions.md) has the design for each, including the two that need a `lib/` move first. The `accidental` parameter on `NotationStepToPitch` is already the hook for the fourth.
+Chord-name identification, Pro Keys range checking, a clickable keyboard, and per-note accidental overrides were scoped with the tab and deliberately left out. The `accidental` parameter on `NotationStepToPitch` is already the hook for the fourth.
 
 ---
 

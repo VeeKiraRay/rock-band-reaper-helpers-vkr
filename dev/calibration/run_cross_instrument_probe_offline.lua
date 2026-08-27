@@ -3,9 +3,10 @@
 --   lua dev/calibration/run_cross_instrument_probe_offline.lua
 --
 -- Every model fitted so far predicts an instrument's rank from that instrument's own
--- chart. README.md's Open threads calls this the cheapest remaining lead: the other
--- instruments' RANKS cannot be used at suggest time (a rank is what the author is asking
--- the tool for), but their MEASURED FACTORS can, because the author has the whole MIDI.
+-- chart. README.md's "Why three instruments still fail" called this the cheapest remaining
+-- lead before the probe closed it: the other instruments' RANKS cannot be used at suggest
+-- time (a rank is what the author is asking the tool for), but their MEASURED FACTORS can,
+-- because the author has the whole MIDI.
 --
 -- This is a PROBE, not a round. Nothing here fits a shipped model, declares a candidate,
 -- or touches lib/ or corpus_scores.csv. Its output is evidence for deciding whether a

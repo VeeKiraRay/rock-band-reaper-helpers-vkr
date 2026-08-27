@@ -3,7 +3,7 @@
 -- Every model fitted so far predicts an instrument's official rank from that instrument's
 -- own chart. This module supplies the join needed to ask whether the other parts of the
 -- same song carry anything the target chart does not - the "cross-instrument chart
--- factors" thread in README.md's Open threads.
+-- factors" thread in README.md's "Why three instruments still fail".
 --
 -- Pure: no r.*, no S, no ctx, no io. It takes an already-parsed CSV and returns tables.
 -- The exporter, the shipped-vs-CSV parity tool and the probe would each otherwise build

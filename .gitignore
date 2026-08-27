@@ -8,6 +8,11 @@ Thumbs.db
 # Editor
 *.lua~
 
+# Working context. The committed CLAUDE.md and .claude/CLAUDE_*.md carry stable
+# project knowledge only - what a fresh clone needs. Active tasks, roadmaps, WIP
+# notes and local environment details live here instead, per the file convention.
+CLAUDE.local.md
+
 # Resources — distributed separately; asset files are not versioned.
 # Folder stubs (.gitkeep) and INSTALLATION_GUIDE.md are tracked so the
 # expected structure is visible in the repo without the actual assets.

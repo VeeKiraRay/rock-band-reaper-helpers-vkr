@@ -663,25 +663,18 @@ Assign Lyrics only ever guarantees word *i* ↔ the *i*-th vocal-range note — 
 
 ---
 
-## Things on the radar
-
-See [`_future_ideas/`](_future_ideas/) for deferred work:
-
-- [Coroutine-based progress bar](_future_ideas/vocal_coroutine_progress.md) — live progress during slow operations; blocked by REAPER coroutine restrictions on `new_array` / `GetAudioAccessorSamples`
-- [Multi-item audio support](_future_ideas/vocal_multi_item_audio.md) — analyze tracks with multiple audio items
-- [Reference MIDI auto-alignment](_future_ideas/vocal_midi_auto_alignment.md) — cross-correlate onsets to find a global MIDI offset
-- [Local-peak-aware splitting](_future_ideas/vocal_local_peak_splitting.md) — per-syllable peaks for phrases with uneven dynamics
-- [Persist track selections](_future_ideas/vocal_persist_tracks.md) — use `GetTrackGUID` for stable cross-session track refs
-- [Lyrics syllable hint](_future_ideas/vocal_lyrics_syllable_hint.md) — opt-in warning for likely multi-syllable tokens
-
----
-
 ## Attempted approaches and what we learned
 
-See [`_future_ideas/`](_future_ideas/) for full context:
+Two features were built and then removed. Both are recorded here so they are not
+re-attempted from scratch.
 
-- [Coroutine-based progress bar](_future_ideas/vocal_coroutine_progress.md) — attempted in v2.0, reverted; `new_array` / `GetAudioAccessorSamples` return nil in coroutines (REAPER restriction)
-- [Automatic key detection](_future_ideas/vocal_key_detection.md) — K-S algorithm built and removed; only 1/4 accuracy on test songs; possible improvements documented
+- **Coroutine-based progress bar** — attempted in v2.0, reverted. `new_array` and
+  `GetAudioAccessorSamples` return nil inside a Lua coroutine; this is a REAPER
+  restriction, not a bug in the attempt, so there is no version of it that works. A
+  live progress bar during slow analysis needs a different mechanism entirely.
+- **Automatic key detection** — a Krumhansl-Schmuckler implementation was built and
+  removed at only 1/4 accuracy on the test songs. The Snap to Key Scale feature
+  therefore takes the key from the user rather than inferring it.
 
 ---
 
