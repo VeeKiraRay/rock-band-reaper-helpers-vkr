@@ -19,13 +19,17 @@ local _tempo_snapshot = nil
 -- first fixture's import set it. Materialize the implicit default into a real
 -- marker before the first snapshot ever happens, so there's always something
 -- concrete to restore to. Idempotent: no-op once any marker exists.
-local function EnsureDefaultTempoMarker()
+function EnsureDefaultTempoMarker()
     if r.CountTempoTimeSigMarkers(0) == 0 then
         r.AddTempoTimeSigMarker(0, 0, 120, 4, 4, false)
     end
 end
 
-local function SnapshotTempoMap()
+-- Global, not local: a suite that rewrites the tempo map itself (rather than
+-- picking one up from a fixture import) needs to bracket its own changes, or it
+-- leaves the user's map destroyed. LoadFixture/CleanupFixture still drive these
+-- for the fixture path; a suite calling them directly owns its own snapshot.
+function SnapshotTempoMap()
     local snap = {}
     for i = 0, r.CountTempoTimeSigMarkers(0) - 1 do
         local ok, timepos, _, _, bpm, num, denom, linear = r.GetTempoTimeSigMarker(0, i)
@@ -36,7 +40,7 @@ local function SnapshotTempoMap()
     return snap
 end
 
-local function RestoreTempoMap(snap)
+function RestoreTempoMap(snap)
     -- Index 0 is the project's always-present root marker; overwrite it
     -- in place rather than deleting it (REAPER refuses to delete the last one).
     for i = r.CountTempoTimeSigMarkers(0) - 1, 1, -1 do

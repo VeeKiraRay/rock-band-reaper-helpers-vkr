@@ -123,6 +123,19 @@ local function Loop()
                         end
                         Tooltip(TIPS.song_fade_out)
 
+                        r.ImGui_Separator(ctx)
+                        SectionHeader('Drums 2x kicks')
+                        local bw_2x = BtnGroupWidth({ 'Mark double kicks', 'Remove 2x-marked kicks' })
+                        if Btn('Mark double kicks', BTN_H, bw_2x) then
+                            RunAction(MarkDoubleBassKicks)
+                        end
+                        Tooltip(TIPS.drums_2x_mark_double)
+                        r.ImGui_SameLine(ctx)
+                        if Btn('Remove 2x-marked kicks', BTN_H, bw_2x) then
+                            RunAction(RemoveKicksMarkedBy2X)
+                        end
+                        Tooltip(TIPS.drums_2x_remove_kicks)
+
                         r.ImGui_EndTabItem(ctx)
                     end
 

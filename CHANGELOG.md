@@ -9,6 +9,27 @@ over 5. See `CLAUDE.md` → "Changelog / `@about` trimming" for the rule.
 
 `rock_band_general_helper_vkr.lua`
 
+**v0.9.53**
+  - Venue > Themes gen and Section gen no longer re-state a lighting or post
+    proc preset that is already running. A blend is authored by writing the
+    running preset a second time just before the change, so the game fades
+    into it - which means a section that happened to pick the preset already
+    playing was writing a blend nobody asked for, and the validator, the
+    Keyframes tab and Manual gen's Blend button all read it as deliberate.
+    If a section's theme pool offers alternatives it now picks one of those;
+    if the pool holds only the running preset the section keeps it and writes
+    nothing. Its keyframes are still generated either way, so a manual preset
+    keeps animating across the boundary. The report counts what was kept.
+    Manual gen is unchanged - ask it for a duplicate and you get one.
+  - Venue > Preview now understands blends. The second copy of a preset is an
+    anchor, not a preset of its own, so it is no longer shown as its own
+    event - before, the same preset filled two columns and every fade looked
+    like a hard cut. Each lighting and post proc card instead says how it
+    hands over: "blends into next", "blending now" while the playhead is
+    inside the fade, or "hard cut to next" (a valid choice, not an error).
+    Camera cards have no such line - a camera cut never fades.
+    Same change in the standalone Venue Preview window (its v0.4).
+
 **v0.9.52**
   - Venue > Actions > Validate: new "Validate camera stacks" button. Only
     two of bass/guitar/keys fit on stage at once, so a song charting all

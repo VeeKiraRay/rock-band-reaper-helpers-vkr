@@ -978,6 +978,46 @@ TIPS = {
                     "Select a range that starts at a musically meaningful point (e.g. end of\n" ..
                     "the last vocal phrase) for the most natural-sounding cutoff.",
 
+    -- General tab - Drums 2x kicks
+    drums_2x_mark_double =
+        "Find the double-bass lines on PART DRUMS_2X and move every second foot\n" ..
+        "from pitch 96 to pitch 95. Run this first, then Remove 2x-marked kicks to\n" ..
+        "take those same kicks out of the 1x chart on PART DRUMS.\n\n" ..
+        "What counts as a double-bass line:\n" ..
+        "  Kicks up to a 1/8 apart form one line.\n" ..
+        "  Two back-to-back 1/16 kicks are already two feet, so any line with a\n" ..
+        "  1/16 or tighter gap qualifies.\n" ..
+        "  A straight run of 1/8s needs more than 4 in a row - four or fewer is\n" ..
+        "  playable with one foot.\n" ..
+        "  A kick joined to the line by a wider gap across a bar line is a pickup\n" ..
+        "  or a tail, not part of it, and is left alone.\n\n" ..
+        "Every other kick in the line becomes the second foot, phased so a kick on\n" ..
+        "a bar downbeat is never taken - so a line ending on the downbeat starts\n" ..
+        "its alternation on the first kick instead of the second.\n\n" ..
+        "Kicks already at pitch 95 count as part of the line, so re-running is\n" ..
+        "safe. Any 95 sitting where these rules would not put one is reported and\n" ..
+        "left untouched - your own edits are never reverted.\n\n" ..
+        "The whole track is processed. A time selection does not change the result.\n\n" ..
+        "Fully undoable.",
+    drums_2x_remove_kicks =
+        "Remove every kick (pitch 96) on PART DRUMS that lines up with a 2x kick\n" ..
+        "marker (pitch 95) on PART DRUMS_2X.\n\n" ..
+        "Both tracks must exist and be unmuted; a muted drum track is treated as not\n" ..
+        "part of the chart. Nothing else on either track is read or changed - only\n" ..
+        "pitch 95 is matched, and only pitch 96 is removed.\n\n" ..
+        "Matching is by musical position, so a tempo change anywhere in the song\n" ..
+        "does not affect it. Each marker takes the nearest kick, and only when that\n" ..
+        "kick is clearly nearer than the next one along - so on a fast double-kick\n" ..
+        "run it cannot take the neighbouring gem by mistake. A marker whose kick is\n" ..
+        "too far away, or too close to call between two, is reported with the\n" ..
+        "distance rather than guessed at.\n\n" ..
+        "If PART DRUMS_2X also carries the 1x kicks as pitch 96 - the usual way to\n" ..
+        "author this - the result also says whether the kick counts on the two\n" ..
+        "tracks agree afterwards.\n\n" ..
+        "The whole track is processed. A time selection does not change the result.\n\n" ..
+        "Safe to run twice: if nothing matches it says so and changes nothing.\n\n" ..
+        "Fully undoable.",
+
     -- Difficulty tab - Pro Keys
     diff_pk_x       = "Expert Pro Keys track (PART REAL_KEYS_X).\n" ..
                       "Source for Copy to Hard and cross-difficulty validation.",

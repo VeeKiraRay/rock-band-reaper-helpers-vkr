@@ -28,6 +28,7 @@ local _dir    = _script:match('^(.+[\\/])')
 local _tdir   = _dir .. 'tests/'
 
 local results = { vocal = nil, general = nil, vocal_midi = nil, general_midi = nil,
+                  general_drums_2x = nil,
                   dsp_algo = nil, vocal_algo = nil, general_algo = nil,
                   quick_actions = nil, spritesheet = nil, venue_events = nil,
                   venue_subtracks = nil, venue_phrase_pacing = nil,
@@ -71,8 +72,8 @@ local function draw_status(res)
 end
 
 function Loop()
-    r.ImGui_SetNextWindowSizeConstraints(ctx, 340, 580, 9999, 9999)
-    r.ImGui_SetNextWindowSize(ctx, 340, 580, r.ImGui_Cond_FirstUseEver())
+    r.ImGui_SetNextWindowSizeConstraints(ctx, 340, 620, 9999, 9999)
+    r.ImGui_SetNextWindowSize(ctx, 340, 620, r.ImGui_Cond_FirstUseEver())
     local visible, open = r.ImGui_Begin(ctx, 'RB Helper Test Runner', true)
     if visible then
         r.ImGui_Spacing(ctx)
@@ -108,6 +109,14 @@ function Loop()
         end
         r.ImGui_SameLine(ctx)
         draw_status(results.general_midi)
+
+        r.ImGui_Spacing(ctx)
+
+        if r.ImGui_Button(ctx, 'Drums 2x Tests', 155, 24) then
+            run('run_general_drums_2x.lua', 'general_drums_2x')
+        end
+        r.ImGui_SameLine(ctx)
+        draw_status(results.general_drums_2x)
 
         r.ImGui_Spacing(ctx)
         r.ImGui_Separator(ctx)

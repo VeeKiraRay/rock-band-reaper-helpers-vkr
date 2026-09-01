@@ -1,6 +1,6 @@
 -- @description Rock Band General Helper
 -- @author VeeKiraRay
--- @version 0.9.57
+-- @version 0.9.58
 -- @about
 --   Utility actions for Rock Band authoring in REAPER.
 --
@@ -25,6 +25,48 @@
 --
 --   This @about block keeps only the 5 most recent versions.
 --   Full history: CHANGELOG.md in the repo.
+--
+--   v0.9.58
+--     - General > Actions: new "Mark double kicks" button. Charting a double
+--       bass pedal means deciding, hit by hit, which kicks in a fast line are
+--       the second foot - which is slow, and easy to lose track of halfway
+--       through a two-bar blast. Press this and it finds the fast lines on
+--       PART DRUMS_2X and moves every second foot from pitch 96 to 95.
+--       Kicks up to a 1/8 apart count as one line. Two back-to-back 1/16 kicks
+--       are already two feet, so any line that tight qualifies; a straight run
+--       of 1/8s needs more than four in a row, since four or fewer is playable
+--       with one foot. A kick joined to the line by a wider gap across a bar
+--       line is a pickup or a tail, and is left alone.
+--       Every other kick in the line becomes the second foot, phased so a kick
+--       on a bar downbeat is never taken - which is why a line ending on the
+--       downbeat alternates from its first kick instead of its second.
+--       Kicks already at 95 count as part of their line, so running it twice
+--       changes nothing. A 95 sitting where the rules would not put one is
+--       reported and left alone: your own edits are never reverted.
+--     - The two buttons are meant to be used in order. Author every kick on
+--       both drum tracks, press Mark double kicks, then Remove 2x-marked kicks
+--       to take those same hits out of the 1x chart.
+--     - General > Actions: new "Remove 2x-marked kicks" button. When a song is
+--       charted with a double kick pedal, the extra hits live on PART DRUMS_2X
+--       marked with pitch 95, and the 1x chart must not carry a kick at those
+--       same ticks. Deleting them by hand across a whole song is slow and easy
+--       to get wrong, so this does it in one pass: every kick on PART DRUMS
+--       that lines up with a 2x marker is removed, and nothing else on either
+--       track is touched.
+--     - Matching is by musical position, so a tempo change anywhere in the song
+--       does not affect it - which matters on fast songs, where a BPM jump makes
+--       a note's position in seconds drift by more than a MIDI tick. Each marker
+--       takes the nearest kick, and only when that kick is clearly nearer than
+--       the next one along, so on a fast double-kick run it cannot take the
+--       neighbouring gem by mistake. A marker whose kick is too far away, or too
+--       close to call between two, is reported with the distance rather than
+--       guessed at.
+--       If PART DRUMS_2X also carries the 1x kicks as pitch 96 - the usual way
+--       to author this - the result also says whether the kick counts on the two
+--       tracks agree afterwards.
+--       The whole track is processed - a time selection does not change the
+--       result. Safe to run twice: a run that matches nothing says so and
+--       creates no undo point.
 --
 --   v0.9.57
 --     - Metadata > Difficulty: new suggestion models for drums, keys and vocals,
@@ -122,26 +164,6 @@
 --       "caused" a rank. The measurements are heavily interrelated, so naming
 --       one as the reason would be inventing an explanation; what is shown is
 --       what was measured.
---   v0.9.53
---     - Venue > Themes gen and Section gen no longer re-state a lighting or post
---       proc preset that is already running. A blend is authored by writing the
---       running preset a second time just before the change, so the game fades
---       into it - which means a section that happened to pick the preset already
---       playing was writing a blend nobody asked for, and the validator, the
---       Keyframes tab and Manual gen's Blend button all read it as deliberate.
---       If a section's theme pool offers alternatives it now picks one of those;
---       if the pool holds only the running preset the section keeps it and writes
---       nothing. Its keyframes are still generated either way, so a manual preset
---       keeps animating across the boundary. The report counts what was kept.
---       Manual gen is unchanged - ask it for a duplicate and you get one.
---     - Venue > Preview now understands blends. The second copy of a preset is an
---       anchor, not a preset of its own, so it is no longer shown as its own
---       event - before, the same preset filled two columns and every fade looked
---       like a hard cut. Each lighting and post proc card instead says how it
---       hands over: "blends into next", "blending now" while the playhead is
---       inside the fade, or "hard cut to next" (a valid choice, not an error).
---       Camera cards have no such line - a camera cut never fades.
---       Same change in the standalone Venue Preview window (its v0.4).
 r = reaper  -- global so all dofile'd modules can use it
 
 if not r.ImGui_CreateContext then
@@ -213,6 +235,7 @@ for _, _f in ipairs({
     _mdir .. 'actions.lua',
     _mdir .. 'actions_tempomap.lua',
     _mdir .. 'actions_drums.lua',
+    _mdir .. 'actions_drums_2x.lua',
     _mdir .. 'actions_keys.lua',
     _mdir .. 'actions_keys_guides.lua',
     _mdir .. 'actions_guitar.lua',
@@ -295,6 +318,7 @@ dofile(_mdir .. 'tempomap.lua')
 dofile(_mdir .. 'actions.lua')
 dofile(_mdir .. 'actions_tempomap.lua')
 dofile(_mdir .. 'actions_drums.lua')
+dofile(_mdir .. 'actions_drums_2x.lua')
 dofile(_mdir .. 'actions_keys.lua')
 dofile(_mdir .. 'actions_keys_guides.lua')
 dofile(_mdir .. 'actions_guitar.lua')
