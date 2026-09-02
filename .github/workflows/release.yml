@@ -32,21 +32,43 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Create zip archive
+        # Every .lua entry point must be listed. The "General > Other tools" tab
+        # looks for its sibling tools beside the running script and greys out any
+        # it cannot find, so an entry point left out here ships a dead button in
+        # both helpers rather than simply being absent. dev/tests/script_links.lua
+        # checks this list against the registry so an omission fails a test.
+        #
+        # .gitkeep files are kept: they are what create resources/audio/drums/ and
+        # the spritesheet folders, which are empty in git and are where
+        # INSTALLATION_GUIDE.md tells users to put the optional packs.
+        #
+        # LICENSE ships, copied to LICENSE.txt so a Windows double-click opens it
+        # instead of prompting for an application. No .lua file carries a
+        # copyright header, so without it the zip would state no permissions and
+        # no attribution at all - and the zip is the copy most likely to be passed
+        # on, which is exactly where MIT requires the notice to travel.
+        #
+        # Markdown stays out. README.md, CHANGELOG.md and the two per-script
+        # README pages are all read on the repo page, where they render properly
+        # and where the screenshots in assets/ (6 MB) resolve.
         run: |
+          cp LICENSE LICENSE.txt
           zip -r rb_helper_scripts_vkr.zip \
             rock_band_general_helper_vkr.lua \
             rock_band_vocal_helper_vkr.lua \
             rock_band_music_theory_helper_vkr.lua \
             rock_band_preview_vkr.lua \
             rock_band_pitch_tuner_vkr.lua \
+            rock_band_midi_pattern_vkr.lua \
             lib/ \
             rock_band_general_helper_vkr/ \
             rock_band_vocal_helper_vkr/ \
             rock_band_music_theory_helper_vkr/ \
             quick_actions/ \
             resources/ \
-            -x "*/README.md" \
-            -x "*/.gitkeep"
+            LICENSE.txt \
+            -x "rock_band_general_helper_vkr/README.md" \
+            -x "rock_band_vocal_helper_vkr/README.md"
 
       - name: Upload zip to release
         uses: softprops/action-gh-release@v2

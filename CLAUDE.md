@@ -82,6 +82,14 @@ dofile(_mdir .. 'defaults.lua')                   -- script-specific modules
 
 `_dir` = repo root (shared lib location). `_mdir` = `{repo root}/{script basename}/`. Renaming an entry point requires renaming its subfolder — intentional.
 
+**A new entry point needs three registrations, not one.** Adding the `.lua` file is the easy part; each of these fails differently and quietly if skipped:
+
+1. `SCRIPT_LINK_GROUPS` in `lib/reaper_script_links.lua` — otherwise the tool is invisible from every helper's *General > Other tools* tab.
+2. The zip list in `.github/workflows/release.yml` — otherwise it is registered but not shipped, and release users get a button greyed out as "Not installed" while everything in a working tree looks correct.
+3. `deploy_to_reaper.bat` (local, gitignored path) — otherwise your own REAPER install never sees it.
+
+Items 1 and 2 are covered by `dev/tests/script_links.lua`, which checks the registry against the repo in both directions *and* against the release zip list. Item 3 cannot be tested (the file is local by design).
+
 ### Shared lib (`lib/`)
 
 | File | Contents |

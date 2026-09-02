@@ -5,6 +5,11 @@
 -- simply invisible. Sections 3a and 3b guard each direction against the real
 -- repo, so a rename or an addition fails a test instead of shipping.
 --
+-- A third direction is guarded in the same section: a registry entry present in
+-- the working tree but absent from the release zip in .github/workflows/
+-- release.yml. Everything scanning the repo passes while release users get a
+-- dead button, so that one is checked against the workflow file itself.
+--
 -- The self-hide filter is the other thing worth pinning down: it is what keeps
 -- the General Helper from offering to open the General Helper, and a
 -- substring-based version of it would misfire on neighbouring filenames.
@@ -163,6 +168,46 @@ Test.it('every rock_band_*_vkr.lua at the root is in the registry', function()
     end
     Test.expect(#unlisted == 0,
         'entry point(s) at the root missing from SCRIPT_LINK_GROUPS: ' .. Join(unlisted))
+end)
+
+-- The third direction, and the one the two above cannot see: a registry entry
+-- that exists in the repo but is left out of the release zip. Release users then
+-- get a button that is permanently greyed out, while every test that scans the
+-- working tree passes - which is exactly how rock_band_midi_pattern_vkr.lua
+-- shipped absent from the zip while being registered and present here.
+local function ReleaseZipEntries(path)
+    local f = io.open(path, 'r')
+    if not f then return nil end
+    local entries, collecting = {}, false
+    for line in f:lines() do
+        if line:find('zip %-r rb_helper_scripts_vkr%.zip') then
+            collecting = true
+        elseif collecting then
+            local continues = line:match('\\%s*$') ~= nil
+            local tok = line:gsub('%s*\\%s*$', ''):match('^%s*(.-)%s*$')
+            -- Skip the -x exclusion arguments; only the included paths matter.
+            if tok ~= '' and not tok:match('^%-') then entries[tok] = true end
+            if not continues then break end
+        end
+    end
+    f:close()
+    return entries
+end
+
+Test.it('every registry file is listed in the release zip', function()
+    local parsed = ReleaseZipEntries(LINKS_ROOT .. '.github/workflows/release.yml')
+    Test.expect(parsed ~= nil, 'could not read .github/workflows/release.yml')
+    local zipped = parsed or {}
+    Test.expect(next(zipped) ~= nil,
+        'no included paths parsed from the zip step - has the workflow changed shape?')
+
+    local missing = {}
+    for _, e in ipairs(AllEntries(SCRIPT_LINK_GROUPS)) do
+        if not zipped[e.file] then missing[#missing + 1] = e.file end
+    end
+    Test.expect(#missing == 0,
+        'registered but not in the release zip, so the Other tools tab would grey ' ..
+        'them out for everyone installing from a release: ' .. Join(missing))
 end)
 
 ------------------------------------------------------------------
