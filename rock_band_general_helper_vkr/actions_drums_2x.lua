@@ -310,14 +310,29 @@ local function TightestGap(run, qns)
 end
 
 -- Rule 2. Loops because both ends can qualify.
+--
+-- Two things mark an edge kick as hanging off the line rather than belonging to
+-- it, and either is enough. Its neighbour inside the line is on a bar downbeat -
+-- the line starts or lands there, and the edge kick is a pickup into or a tail
+-- out of it. Or the line's tight section begins right at that neighbour, which
+-- makes the edge kick the ONLY one at the wider spacing: a lone 1/8 leaning
+-- against a burst of 1/16s is a separate hit, not the first of the burst.
+--
+-- The second test is what keeps a long line that merely STARTS with a stretch of
+-- 1/8s intact. Trimming on the wider gap alone would strip every one of those
+-- leading eighths off it, one pass at a time.
 local function TrimRunEdges(run, qns, is_downbeat)
     while #run >= 3 do
         local tight = TightestGap(run, qns)
-        local head  = qns[run[2]]  - qns[run[1]]
+        local head  = qns[run[2]]    - qns[run[1]]
         local tail  = qns[run[#run]] - qns[run[#run - 1]]
-        if head > tight + QN_EPS and is_downbeat(qns[run[2]]) then
+        -- Is the tight section adjacent to the edge, i.e. is this the only kick
+        -- sitting at the wider spacing?
+        local head_alone = math.abs((qns[run[3]] - qns[run[2]]) - tight) < QN_EPS
+        local tail_alone = math.abs((qns[run[#run - 1]] - qns[run[#run - 2]]) - tight) < QN_EPS
+        if head > tight + QN_EPS and (is_downbeat(qns[run[2]]) or head_alone) then
             table.remove(run, 1)
-        elseif tail > tight + QN_EPS and is_downbeat(qns[run[#run - 1]]) then
+        elseif tail > tight + QN_EPS and (is_downbeat(qns[run[#run - 1]]) or tail_alone) then
             table.remove(run)
         else
             return run
@@ -332,6 +347,22 @@ local function IsDoubleBassLine(run, qns)
     return TightestGap(run, qns) <= SIXTEENTH_QN + QN_EPS or #run > MAX_EIGHTH_RUN
 end
 
+-- Each kick's slot on the line's own subdivision grid, or nil when the kicks do
+-- not sit on one. Rounding to a grid is meaningless for a hand-played line, so
+-- every kick has to land on a multiple of the tightest gap for this to be usable.
+local function GridSlots(run, qns)
+    local step = TightestGap(run, qns)
+    if step <= 0 then return nil end
+    local slots = {}
+    for i, idx in ipairs(run) do
+        local exact = (qns[idx] - qns[run[1]]) / step
+        local slot  = math.floor(exact + 0.5)
+        if math.abs(exact - slot) * step > QN_EPS then return nil end
+        slots[i] = slot
+    end
+    return slots
+end
+
 -- Rule 4. Returns the run positions to take, 1-based within the run.
 local function PickAlternating(run, qns, is_downbeat)
     for _, phase in ipairs({ 2, 1 }) do
@@ -342,6 +373,40 @@ local function PickAlternating(run, qns, is_downbeat)
         end
         if clean then return picks end
     end
+
+    -- Neither phase could keep every bar downbeat on a primary kick. That happens
+    -- when the line is even-length and starts AND ends on a downbeat - and a line
+    -- like that is usually even-length only because it has a HOLE in it. Counting
+    -- played notes then flips the feet relative to the beat for the rest of the
+    -- line, stranding the primaries on offbeats and leaving the closing downbeat
+    -- to the second foot.
+    --
+    -- So read the line as a continuous grid instead and give each kick the foot
+    -- its slot calls for, ignoring that a slot is empty. The same foot then plays
+    -- either side of the rest, which is what actually happens: the silent slot
+    -- belonged to the other foot.
+    --
+    -- ONLY as a tie-break, never as the general rule. A long line that mixes 1/8s
+    -- and 1/16s has a grid of 1/16s in which every eighth-spaced kick sits on an
+    -- even slot, so grid parity would mark none of them - it scores 974/1080 on
+    -- the first reference chart when applied to every line. As a tie-break it is
+    -- inert on a line with no hole: grid slot and note index are then the same
+    -- sequence, so it re-offers the two sets the loop above already rejected and
+    -- falls through.
+    local slots = GridSlots(run, qns)
+    if slots then
+        for _, parity in ipairs({ 1, 0 }) do
+            local picks, clean = {}, true
+            for i = 1, #run do
+                if slots[i] % 2 == parity then
+                    picks[#picks + 1] = i
+                    if is_downbeat(qns[run[i]]) then clean = false end
+                end
+            end
+            if clean and #picks > 0 then return picks end
+        end
+    end
+
     local picks = {}
     for i = 2, #run, 2 do picks[#picks + 1] = i end
     return picks

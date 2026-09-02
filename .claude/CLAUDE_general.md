@@ -896,30 +896,77 @@ it is unit-testable with no project at all.
 **The rules**, in order:
 
 1. Kicks no more than a **1/8** apart form one line.
-2. **Edge trim.** A kick joined to the line by a gap wider than the line's tightest,
-   whose neighbour inside the line sits on a bar downbeat, is a pickup into or a
-   tail out of the line rather than part of it. Both ends are checked, repeatedly.
+2. **Edge trim.** A kick joined to the line by a gap wider than the line's tightest
+   is a pickup into or a tail out of the line rather than part of it, when *either*
+   its neighbour inside the line sits on a bar downbeat, *or* the line's tight
+   section begins right at that neighbour — which makes the edge kick the only one
+   at the wider spacing. Both ends are checked, repeatedly.
+   The second test is load-bearing: trimming on the wider gap alone strips every
+   one of the leading eighths off a long line that merely *starts* with a stretch
+   of 1/8s, one pass at a time (measured: 1009/1080 on the first reference chart).
 3. **Is it double bass?** Yes if the tightest gap is a 1/16 or closer — two
    back-to-back 1/16 kicks are already two feet — or if it is a straight run of
    more than `MAX_EIGHTH_RUN` (4) eighths.
 4. **Which ones.** Every other kick, phased so that no kick landing on a bar
    downbeat is taken: the 2nd kick is preferred, falling back to the 1st when
    that phase would take a downbeat.
+5. **Grid tie-break**, when *neither* phase can spare every downbeat. That happens
+   to an even-length line bounded by two downbeats, and a line is usually
+   even-length only because it has a **hole** in it. Counting played notes then
+   flips the feet relative to the beat for the rest of the line, stranding the
+   primaries on offbeats and handing the closing downbeat to the second foot. So
+   read the line as a continuous grid instead — `GridSlots` numbers each kick by
+   `(qn - qn_first) / tightest gap` — and take one parity of slots, ignoring that
+   a slot is empty. The same foot then plays either side of the rest, which is
+   what actually happens: the silent slot belonged to the other foot.
 
 Rule 4 is why an even-length line ending on a bar line alternates from its *first*
 kick — that is a consequence of the downbeat rule, not a special case.
 
-**Provenance.** These were derived from, and reproduce exactly (1080 of 1080
-kicks), the hand-authored double bass in one reference song. Two figures are worth
+**Rule 5 is a tie-break and must stay one.** Applied to every line it scores
+974/1080 on the first reference chart: a long line mixing 1/8s and 1/16s has a
+1/16 grid in which every eighth-spaced kick sits on an even slot, so grid parity
+marks none of them. As a tie-break it is provably inert on a line with no hole —
+slot number and note index are then the same sequence, so it re-offers the two
+sets rule 4 already rejected and falls through to the unchanged default. That is
+why adding it moved **zero** notes on the first chart. `GridSlots` returns nil
+when any kick misses the grid, so a hand-played line keeps the old behaviour
+rather than being rounded to a wrong slot.
+
+**Provenance.** These were derived from, and reproduce exactly, the hand-authored
+double bass in two reference songs — 1080/1080 kicks in the first, 577/577 in the
+second after its author corrected the output by hand. Two figures are worth
 knowing before changing anything:
 
 - `MAX_EIGHTH_RUN` is **not** pinned by that evidence. The reference chart's
   straight-1/8 runs are 2, 3, 13, 61 and 110 kicks long, so any threshold from 3
   to 12 scores identically on it. 4 is the author's stated intent, not a measured
   value.
-- Rule 2 rests on **two** distinct examples (each appearing twice, in a repeated
-  section). It is the most likely rule to be over-fitted; treat a disagreement
-  with a new chart as evidence about the rule, not about the chart.
+- Rule 2's *lone-edge* half was added after a second chart disagreed with the
+  bar-downbeat-only version — a lone 1/8 leaning on a 1/16 pair, where the pivot
+  was a half beat rather than a bar line. That confirmed the original phrasing had
+  over-fitted to the incidental fact that both first-chart examples happened to
+  pivot on a downbeat. Both halves together now fit two charts exactly (1080/1080
+  and 577/577), but each still rests on a handful of examples: treat a
+  disagreement with a new chart as evidence about the rule, not about the chart.
+- Rule 5 was added the same way: the second chart has two bars (m14, m78) of
+  steady 1/16 double bass with one kick missing in the middle, and counting played
+  notes put the second foot on the closing downbeat. It changed 16 notes on that
+  chart and none on the first.
+
+**Two approaches that look right and are not**, recorded so they are not retried:
+
+| Idea | Score on chart 1 | Why it fails |
+|---|---|---|
+| Split a line at an interior gap wider than its tightest | 974/1080 | Long mixed lines alternate continuously across 1/8↔1/16 changes and must not be cut there |
+| Use grid parity for every line, not just the tie-break | 974/1080 | Eighth-spaced kicks all land on even slots of a 1/16 grid, so none get marked |
+
+**This is a work in progress, and the tooltip says so.** Double-bass charts are
+scarce, so the rules are refined as new songs expose new shapes — the lone-edge
+half of rule 2 exists because the second chart disagreed with the first version.
+The tool is meant to do the bulk of the work on long passages; the author is
+expected to check the result rather than accept it. Do not reword the button or
+its tooltip to imply the output is authoritative.
 
 **Bar downbeats are read through `TimeMap2_timeToBeats`**, not `qn % 4`, so a
 song that is not in 4/4 or that changes time signature is handled. Everything

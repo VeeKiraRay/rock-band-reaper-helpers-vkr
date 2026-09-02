@@ -989,15 +989,25 @@ TIPS = {
         "  1/16 or tighter gap qualifies.\n" ..
         "  A straight run of 1/8s needs more than 4 in a row - four or fewer is\n" ..
         "  playable with one foot.\n" ..
-        "  A kick joined to the line by a wider gap across a bar line is a pickup\n" ..
-        "  or a tail, not part of it, and is left alone.\n\n" ..
+        "  A kick hanging off the line by a wider gap - a lone 1/8 leaning against\n" ..
+        "  a burst of 1/16s, or one across a bar line from the rest - is a separate\n" ..
+        "  hit, not part of the line, and is left alone.\n\n" ..
         "Every other kick in the line becomes the second foot, phased so a kick on\n" ..
         "a bar downbeat is never taken - so a line ending on the downbeat starts\n" ..
         "its alternation on the first kick instead of the second.\n\n" ..
+        "A line with a gap in it is read as one continuous grid rather than by\n" ..
+        "counting the kicks that are actually there, so the feet stay on the same\n" ..
+        "subdivisions across the gap and the downbeats either side stay primary.\n" ..
+        "The same foot plays on both sides of the rest, which is what happens when\n" ..
+        "the silent slot was the other foot's.\n\n" ..
         "Kicks already at pitch 95 count as part of the line, so re-running is\n" ..
         "safe. Any 95 sitting where these rules would not put one is reported and\n" ..
         "left untouched - your own edits are never reverted.\n\n" ..
         "The whole track is processed. A time selection does not change the result.\n\n" ..
+        "Check the result rather than trusting it. The rules come from a small number\n" ..
+        "of hand-charted songs, so an unusual passage can come out wrong - most often\n" ..
+        "where a line has a gap in it, or starts and ends on a downbeat. It is meant\n" ..
+        "to do the bulk of the work on the long passages, not to be the last word.\n\n" ..
         "Fully undoable.",
     drums_2x_remove_kicks =
         "Remove every kick (pitch 96) on PART DRUMS that lines up with a 2x kick\n" ..

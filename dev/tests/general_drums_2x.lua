@@ -617,6 +617,78 @@ Test.it('a 1/8 tail past the closing bar line is not part of the line either', f
     Test.expect(PlanStr(qns) == 'oXoXoo', PlanStr(qns))
 end)
 
+Test.it('a lone 1/8 leaning on a 1/16 burst is not part of it', function()
+    -- The reference chart at m62 beat 3: one kick on the half beat, then a 1/16
+    -- pair. The lone 1/8 is a separate hit, so the pair alternates on its own and
+    -- the half beat - the stronger position - stays a plain kick.
+    local qns = { 2.0, 2.5, 2.75 }
+    Test.expect(PlanStr(qns) == 'ooX', PlanStr(qns))
+end)
+
+Test.it('but a line that merely starts with a stretch of 1/8s keeps them', function()
+    -- The trim must not walk the whole 1/8 lead-in off a long mixed line: here
+    -- only the last two kicks are 1/16s, so no single kick is "the lone one at
+    -- the wider spacing" and every eighth stays in the alternation.
+    local qns = { 1.0, 1.5, 2.0, 2.5, 3.0, 3.25 }
+    Test.expect(PlanStr(qns) == 'oXoXoX', PlanStr(qns))
+end)
+
+Test.it('a lone 1/8 trailing off the end of a 1/16 burst is dropped too', function()
+    local qns = { 2.0, 2.25, 2.5, 3.0 }
+    Test.expect(PlanStr(qns) == 'oXoo', PlanStr(qns))
+end)
+
+-- A bar of 1/16 kicks from one downbeat to the next, with the kick on `hole_qn`
+-- missing. This is the m14 shape: 16 kicks, so the line is even-length AND
+-- bounded by two downbeats, which no alternation phase can satisfy.
+local function BarWithHole(hole_qn)
+    local qns = {}
+    for i = 0, 16 do
+        local qn = 4.0 + i * 0.25
+        if math.abs(qn - hole_qn) > 1e-9 then qns[#qns + 1] = qn end
+    end
+    return qns
+end
+
+Test.it('a bar-long 1/16 line with a hole keeps both downbeats primary', function()
+    -- The reference chart at m14: no kick on beat 3. Counting played notes would
+    -- flip the feet after the hole and leave the closing downbeat to the second
+    -- foot; reading the line as a continuous grid does not.
+    local qns = BarWithHole(6.0)
+    Test.expect(#qns == 16, 'fixture should be 16 kicks, got ' .. #qns)
+    Test.expect(PlanStr(qns) == 'oXoXoXoXXoXoXoXo', PlanStr(qns))
+    -- Stated as the properties that matter, so a future rule change that still
+    -- passes the literal string above cannot quietly lose them.
+    local marks = DoubleBassPlan(qns, Bar4)
+    Test.expect(not marks[1], 'the opening downbeat must stay a primary kick')
+    Test.expect(not marks[#qns], 'the closing downbeat must stay a primary kick')
+end)
+
+Test.it('the same bar with no hole is untouched by the grid tie-break', function()
+    -- 17 kicks: odd, so alternating from the 2nd already avoids both downbeats
+    -- and the grid branch never runs. Guards the property that makes it safe.
+    local qns = {}
+    for i = 0, 16 do qns[#qns + 1] = 4.0 + i * 0.25 end
+    Test.expect(PlanStr(qns) == 'oXoXoXoXoXoXoXoXo', PlanStr(qns))
+end)
+
+Test.it('a hole does not trigger the tie-break when a phase is already clean', function()
+    -- Same kind of gap, but the line neither starts nor ends on a downbeat, so
+    -- the ordinary phase rule applies and the answer counts played notes.
+    local qns = { 4.25, 4.5, 4.75, 5.25, 5.5, 5.75 }
+    Test.expect(PlanStr(qns) == 'oXoXoX', PlanStr(qns))
+end)
+
+Test.it('an off-grid kick falls back to plain alternation, not to nonsense', function()
+    -- Same bar, but one kick is nudged off the 1/16 grid, so slot numbers cannot
+    -- be trusted. The tie-break must decline rather than round to a wrong slot.
+    local qns = BarWithHole(6.0)
+    for i, qn in ipairs(qns) do
+        if math.abs(qn - 6.25) < 1e-9 then qns[i] = 6.20 end
+    end
+    Test.expect(PlanStr(qns) == 'oXoXoXoXoXoXoXoX', PlanStr(qns))
+end)
+
 Test.it('a lone kick, and an empty chart, plan to nothing', function()
     Test.expect(PlanStr({ 1.0 }) == 'o', 'single kick')
     Test.expect(#DoubleBassPlan({}, Bar4) == 0, 'empty input')

@@ -44,11 +44,16 @@
 --       Kicks up to a 1/8 apart count as one line. Two back-to-back 1/16 kicks
 --       are already two feet, so any line that tight qualifies; a straight run
 --       of 1/8s needs more than four in a row, since four or fewer is playable
---       with one foot. A kick joined to the line by a wider gap across a bar
---       line is a pickup or a tail, and is left alone.
+--       with one foot. A kick hanging off the line by a wider gap - a lone 1/8
+--       leaning against a burst of 1/16s, or one sitting across a bar line from
+--       the rest - is a separate hit rather than part of the line, and is left
+--       alone.
 --       Every other kick in the line becomes the second foot, phased so a kick
 --       on a bar downbeat is never taken - which is why a line ending on the
---       downbeat alternates from its first kick instead of its second.
+--       downbeat alternates from its first kick instead of its second. A line
+--       with a gap in it is read as one continuous grid rather than by counting
+--       the kicks that are there, so the feet stay on the same subdivisions
+--       across the gap and the downbeats either side stay primary.
 --       Kicks already at 95 count as part of their line, so running it twice
 --       changes nothing. A 95 sitting where the rules would not put one is
 --       reported and left alone: your own edits are never reverted.
