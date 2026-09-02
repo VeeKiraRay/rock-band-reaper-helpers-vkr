@@ -23,8 +23,7 @@ Four WIP tabs appear only when **Show WIPs? = Yes** in the General tab (persiste
 - **Align all audio** — aligns every audio item on every track to a common reference position.
 - **Align count-in** — positions the COUNT IN clip relative to the first measure.
 - **Song fade out** — creates a fade-out automation envelope on the master track at the end of the project.
-- **Mark double kicks** — finds the double-bass lines on `PART DRUMS_2X` and moves every second foot from pitch 96 to 95. Step one of the 2x workflow: author every kick on both tracks, mark here, then remove from the 1x chart with the button beside it. A kick already at 95 counts as part of its line, so re-running is safe; a 95 sitting where the rules would not put one is reported and left alone. Whole track. See "Feature: double-bass detection" below for the rules.
-- **Remove 2x-marked kicks** — deletes every kick (pitch 96) on `PART DRUMS` that lines up with a 2x kick marker (pitch 95) on `PART DRUMS_2X`. Matching is by musical position, so a tempo change does not affect it, and a marker whose kick is too far away or ambiguous between two is reported with the distance rather than guessed at. Both tracks must exist and be unmuted. Whole track: a time selection does not narrow it. Safe to re-run — a run that matches nothing reports that and creates no undo point.
+- **Remove 2x kicks** — works out which kicks on `PART DRUMS_2X` are the drummer's second foot and deletes those from `PART DRUMS`. `PART DRUMS_2X` is the complete chart (every kick at 96) and is never thinned; the only thing that can change there is a leftover pitch-95 note being put back to 96. Matching between the tracks is by musical position, so a tempo change does not affect it. Whole track: a time selection does not narrow it. Safe to re-run — the second run finds nothing to remove and creates no undo point. See "Feature: double-bass detection" below.
 
 *Settings sub-tab*
 - Venue preview size/sprite display options, Show WIPs? toggle.
@@ -284,7 +283,7 @@ The section's **keyframes are emitted either way** — only the lighting event i
 | `rock_band_general_helper_vkr/actions.lua` | `AlignAudioTracks`, `AlignAllAudio`, `AlignCountIn`, `CreateSongFadeOut`; `CountInBeatSlots` (local) |
 | `rock_band_general_helper_vkr/actions_tempomap.lua` | `ShowTempoContext`, `EstimateInitialBPM`, `AutoTuneThreshold`, `ClearGeneratedTempoMarkers`, `GenerateTempoMap`; `BPM_MIN`, `BPM_MAX` (locals) |
 | `rock_band_general_helper_vkr/actions_drums.lua` | `ConvertDrums` (global); `BuildMap`, `ReadMIDINotes`, `ClearDrumNotes`, `BuildDrumOutput`, `BuildReport` (local) |
-| `rock_band_general_helper_vkr/actions_drums_2x.lua` | `DoubleBassPlan`, `MarkDoubleBassKicks`, `RemoveKicksMarkedBy2X` (global); `TRACK_2X`, `TRACK_1X`, `MARK_2X`, `KICK`, `MAX_SNAP_QN`, `AMBIGUITY_RATIO`, `UNMATCHED_LIST_MAX`, `SCAN_SPAN`, `MBTAtQN`, `MIDITakesOn`, `NotesAtPitch`, `DescribeGap`, `MatchMarkers` (local) — General > Actions' "Remove 2x-marked kicks": deletes each pitch-96 kick on `PART DRUMS` that lines up with a pitch-95 marker on `PART DRUMS_2X`. Matches in **project QN** via `MIDI_GetProjQNFromPPQPos` — the same rule as the difficulty validators' beat-fraction checks, for the same reason: bridging between two takes through project seconds walks the tempo map twice in opposite directions, and is only exact before the first tempo marker. Seconds appear in this file **only** to render a report line. Each marker takes the nearest *unclaimed* kick, accepted only within `MAX_SNAP_QN` (a 1/32) **and** when at least 4× nearer than the runner-up (`AMBIGUITY_RATIO`); a claimed neighbour still counts as a competitor. That relative test is what makes the window scale with note density — in a 1/32 blast beat any fixed millisecond buffer wide enough to forgive hand-nudging is also wide enough to grab the wrong gem. Both lists are sorted, so a moving insertion point ±`SCAN_SPAN` finds every candidate in O(n+m). Scans read-only first and returns before any `Undo_*` call when nothing matches, so a no-op run leaves no undo point. Where `PART DRUMS_2X` also carries the 1x kicks as 96 (the usual authoring style) its 96 count is cross-checked against what `PART DRUMS` is left with; skipped silently when it carries none, since the action must not require that style |
+| `rock_band_general_helper_vkr/actions_drums_2x.lua` | `DoubleBassPlan`, `Remove2XKicks`, `MarkDoubleBassKicks` (global); `TRACK_2X`, `TRACK_1X`, `MARK_2X`, `KICK`, `MAX_SNAP_QN`, `AMBIGUITY_RATIO`, `UNMATCHED_LIST_MAX`, `SCAN_SPAN`, `SIXTEENTH_QN`, `EIGHTH_QN`, `MAX_EIGHTH_RUN`, `QN_EPS`, `BEAT_EPS`, `REVIEW_LIST_MAX` (module-level locals); `MBTAtQN`, `MIDITakesOn`, `NotesAtPitch`, `DescribeGap`, `MatchMarkers`, `MakeBarDownbeatTest`, `TightestGap`, `TrimRunEdges`, `IsDoubleBassLine`, `GridSlots`, `PickAlternating` — General > Actions' "Remove 2x kicks". **`PART DRUMS_2X` is a complete alternate chart, every kick at 96**; the build swaps the whole track in, and RB3 discards pitch 95, so a kick left at 95 simply never plays. `Remove2XKicks` reads that track's kicks (96 **and** any stale 95), plans the second foot in memory with `DoubleBassPlan`, deletes the matching kicks from `PART DRUMS`, and repairs any 95 back to 96 — all in one undo block across both tracks. Nothing records the plan on disk. Matching is in **project QN** via `MIDI_GetProjQNFromPPQPos`, the same rule as the difficulty validators' beat-fraction checks: bridging two takes through project seconds walks the tempo map twice in opposite directions and is only exact before the first tempo marker. Seconds appear here **only** to render report text. Each planned kick takes the nearest *unclaimed* kick on `PART DRUMS`, within `MAX_SNAP_QN` (a 1/32) **and** at least 4× nearer than the runner-up (`AMBIGUITY_RATIO`) — a relative test, so the window scales with note density; in a 1/32 blast beat any fixed millisecond buffer wide enough to forgive hand-nudging is also wide enough to grab the wrong gem. Both lists are sorted, so a moving insertion point ±`SCAN_SPAN` finds every candidate in O(n+m). Returns before any `Undo_*` call when there is nothing to remove *and* nothing to repair. Planned kicks already missing from `PART DRUMS` are normal on a re-run and are reported as "already absent", not as misses. `MarkDoubleBassKicks` writes pitch 95 and is **deliberately unreachable from the UI** — see `ui.lua`; it is kept and kept tested for a future version supporting games that read 95, and must not be wired up for RB3 |
 | `rock_band_general_helper_vkr/actions_keys.lua` | `SplitHands`, `ConvertProKeys`, `ConvertPianoToProKeys`, `ConvertKeys5` (global); `PK_MIN`, `PK_MAX`, `PK_RANGES`, `PK_PREF_LABEL` (module-level globals); `ReadMIDINotesWithChannel`, `IsRightHand`, `ClearAllNotesInTimeRange`, `WriteNotesToTrack`, `CompressChord` (local) |
 | `rock_band_general_helper_vkr/actions_keys_guides.lua` | `ProKeysTabGuide`, `VocalTabGuide` (global); `PkEventLabel`, `ParseTabToRaws` (local) |
 | `rock_band_general_helper_vkr/actions_guitar.lua` | `ConvertGuitar`, `ValidateGuitar`, `GetBPMAt`, `CompressChord`, `SortedChordPitches`, `GemLabel`, `PitchLabel`, `ChordTypeName`, `BuildShapeGemMap`, `ChordQualityLabel` (global); `GEM_MIN`, `GEM_MAX`, `GEM_LETTERS`, `CHORD_WINDOW_S`, `POOLS`, `POOLS2_NO14` (module-level globals) — Expert gem generation and authoring rule validation. `BuildShapeGemMap(events, max_chord, allow_14)` (shared with `actions_guitar_guide.lua`) is the global shape→gem-combo map builder; every 2+-note shape consults `GuitarSuggestRBMapping` (`lib/reaper_guitar_theory.lua`) BY PITCH CLASS (not physical note count) so e.g. a power chord — even voiced with a doubled root across 3 strings — always gets a 1-3-spread 2-gem combo. `max_chord`/`allow_14` are **parameters, not reads of `S`** — the two callers aren't governed by the same settings (see `actions_guitar_guide.lua` below); `max_chord = nil` skips compression entirely. Shapes with no principled width and 3+ notes bucket by `min(sz,3)`, since they all draw from `POOLS[3]` and must compete in one `AssignByConflict` group. `SortedChordPitches(pitches, max_chord)` returns an ascending **copy** (optionally compressed first) — `CompressChord` returns its argument unchanged when the chord already fits, so sorting in place used to reorder the caller's own `ev.pitches`. When a group has more distinct shapes than available combos, `AssignByConflict` gives the first (lowest-pitched) shapes a unique combo each, then assigns each overflow shape whichever already-claimed combo minimizes conflicts against shapes it's actually adjacent to anywhere in the passage (an adjacency table built from the real event sequence, restricted to same-group consecutive pairs), tie-broken toward the top of the pool and refined over a few bounded sweeps — returned as a third `shared` map so callers can flag reused combos; `ChordQualityLabel` names the recognized shape (e.g. `[Power chord]`) for the reason string |
@@ -429,7 +428,7 @@ actions_tempomap.lua           → ShowTempoContext, EstimateInitialBPM, AutoTun
                                   ClearGeneratedTempoMarkers, GenerateTempoMap
 actions_drums.lua              → ConvertDrums
 actions_drums_2x.lua           → DoubleBassPlan, MarkDoubleBassKicks,
-                                  RemoveKicksMarkedBy2X
+                                  Remove2XKicks
 actions_keys.lua               → SplitHands, ConvertProKeys, ConvertKeys5
 actions_keys_guides.lua        → ProKeysTabGuide, VocalTabGuide
 actions_guitar.lua             → ConvertGuitar, ValidateGuitar, GetBPMAt
@@ -887,39 +886,112 @@ The `(N parts)` annotation appears only for lettered groups with `sub_count > 1`
 
 ## Feature: double-bass detection
 
-`MarkDoubleBassKicks` (General > Actions, "Mark double kicks") decides which kicks
-in a fast line are the drummer's second foot, and moves those from pitch 96 to 95
-on `PART DRUMS_2X`. `DoubleBassPlan(qns, is_downbeat)` is the whole rule set as a
-pure function — quarter-note positions in, a parallel array of booleans out — so
-it is unit-testable with no project at all.
+**The model, first, because an earlier version of this feature got it wrong.**
+`PART DRUMS_2X` is a **complete alternate drum chart** — every kick in it,
+double-bass hits included, is pitch **96**. The build swaps that whole track in as
+the song's 2x version. `PART DRUMS` is the same chart with the drummer's second
+foot removed, so one pedal can play it. **Rock Band 3 discards pitch 95**, so a
+kick left at that pitch is simply never played.
+
+The first version wrote 95 onto `PART DRUMS_2X` to record which kicks were the
+second foot. That was wrong twice over: the marks did nothing in game, and on a
+chart where `PART DRUMS` still held every kick it left the "double bass" track
+playing *fewer* kicks than the normal one — measured on a real chart, 474 against
+577. Do not reintroduce a 95-writing step for RB3.
+
+`Remove2XKicks` (General > Actions, "Remove 2x kicks") therefore plans the second
+foot **in memory** and writes nothing to record it: it reads `PART DRUMS_2X`'s
+kicks, deletes the matching ones from `PART DRUMS`, and repairs any surviving 95
+back to 96. `DoubleBassPlan(qns, is_downbeat)` is the whole rule set as a pure
+function — quarter-note positions in, a parallel array of booleans out — so it is
+unit-testable with no project at all.
+
+The cost of planning in memory, accepted deliberately: **a hand correction has no
+durable home.** The 95s were an editable intermediate, and that is how two rule
+bugs were found. Review now happens after the fact — the action reports what it
+removed and is a single undo. A read-only preview would restore a before-the-fact
+review and is the obvious next addition if this proves annoying.
 
 **The rules**, in order:
 
 1. Kicks no more than a **1/8** apart form one line.
-2. **Edge trim.** A kick joined to the line by a gap wider than the line's tightest,
-   whose neighbour inside the line sits on a bar downbeat, is a pickup into or a
-   tail out of the line rather than part of it. Both ends are checked, repeatedly.
+2. **Edge trim.** A kick joined to the line by a gap wider than the line's tightest
+   is a pickup into or a tail out of the line rather than part of it, when *either*
+   its neighbour inside the line sits on a bar downbeat, *or* the line's tight
+   section begins right at that neighbour — which makes the edge kick the only one
+   at the wider spacing. Both ends are checked, repeatedly.
+   The second test is load-bearing: trimming on the wider gap alone strips every
+   one of the leading eighths off a long line that merely *starts* with a stretch
+   of 1/8s, one pass at a time (measured: 1009/1080 on the first reference chart).
 3. **Is it double bass?** Yes if the tightest gap is a 1/16 or closer — two
    back-to-back 1/16 kicks are already two feet — or if it is a straight run of
    more than `MAX_EIGHTH_RUN` (4) eighths.
 4. **Which ones.** Every other kick, phased so that no kick landing on a bar
    downbeat is taken: the 2nd kick is preferred, falling back to the 1st when
    that phase would take a downbeat.
+5. **Grid tie-break**, when *neither* phase can spare every downbeat. That happens
+   to an even-length line bounded by two downbeats, and a line is usually
+   even-length only because it has a **hole** in it. Counting played notes then
+   flips the feet relative to the beat for the rest of the line, stranding the
+   primaries on offbeats and handing the closing downbeat to the second foot. So
+   read the line as a continuous grid instead — `GridSlots` numbers each kick by
+   `(qn - qn_first) / tightest gap` — and take one parity of slots, ignoring that
+   a slot is empty. The same foot then plays either side of the rest, which is
+   what actually happens: the silent slot belonged to the other foot.
 
 Rule 4 is why an even-length line ending on a bar line alternates from its *first*
 kick — that is a consequence of the downbeat rule, not a special case.
 
-**Provenance.** These were derived from, and reproduce exactly (1080 of 1080
-kicks), the hand-authored double bass in one reference song. Two figures are worth
+**Rule 5 is a tie-break and must stay one.** Applied to every line it scores
+974/1080 on the first reference chart: a long line mixing 1/8s and 1/16s has a
+1/16 grid in which every eighth-spaced kick sits on an even slot, so grid parity
+marks none of them. As a tie-break it is provably inert on a line with no hole —
+slot number and note index are then the same sequence, so it re-offers the two
+sets rule 4 already rejected and falls through to the unchanged default. That is
+why adding it moved **zero** notes on the first chart. `GridSlots` returns nil
+when any kick misses the grid, so a hand-played line keeps the old behaviour
+rather than being rounded to a wrong slot.
+
+**Provenance.** These were derived from, and reproduce exactly, the hand-authored
+double bass in two reference songs — 1080/1080 kicks in the first, 577/577 in the
+second after its author corrected the output by hand. Two figures are worth
 knowing before changing anything:
 
 - `MAX_EIGHTH_RUN` is **not** pinned by that evidence. The reference chart's
   straight-1/8 runs are 2, 3, 13, 61 and 110 kicks long, so any threshold from 3
   to 12 scores identically on it. 4 is the author's stated intent, not a measured
   value.
-- Rule 2 rests on **two** distinct examples (each appearing twice, in a repeated
-  section). It is the most likely rule to be over-fitted; treat a disagreement
-  with a new chart as evidence about the rule, not about the chart.
+- Rule 2's *lone-edge* half was added after a second chart disagreed with the
+  bar-downbeat-only version — a lone 1/8 leaning on a 1/16 pair, where the pivot
+  was a half beat rather than a bar line. That confirmed the original phrasing had
+  over-fitted to the incidental fact that both first-chart examples happened to
+  pivot on a downbeat. Both halves together now fit two charts exactly (1080/1080
+  and 577/577), but each still rests on a handful of examples: treat a
+  disagreement with a new chart as evidence about the rule, not about the chart.
+- Rule 5 was added the same way: the second chart has two bars (m14, m78) of
+  steady 1/16 double bass with one kick missing in the middle, and counting played
+  notes put the second foot on the closing downbeat. It changed 16 notes on that
+  chart and none on the first.
+
+**Two approaches that look right and are not**, recorded so they are not retried:
+
+| Idea | Score on chart 1 | Why it fails |
+|---|---|---|
+| Split a line at an interior gap wider than its tightest | 974/1080 | Long mixed lines alternate continuously across 1/8↔1/16 changes and must not be cut there |
+| Use grid parity for every line, not just the tie-break | 974/1080 | Eighth-spaced kicks all land on even slots of a 1/16 grid, so none get marked |
+
+**This is a work in progress, and the tooltip says so.** Double-bass charts are
+scarce, so the rules are refined as new songs expose new shapes — the lone-edge
+half of rule 2 exists because the second chart disagreed with the first version.
+The tool is meant to do the bulk of the work on long passages; the author is
+expected to check the result rather than accept it. Do not reword the button or
+its tooltip to imply the output is authoritative.
+
+**Supporting a second game is open work, and hiding the button is a placeholder.**
+`MarkDoubleBassKicks` still exists and still writes 95, for a game that reads it —
+it is simply not drawn. The real answer is a game selector that decides which
+conventions apply, at which point this and anything else RB3-specific becomes
+conditional rather than commented out.
 
 **Bar downbeats are read through `TimeMap2_timeToBeats`**, not `qn % 4`, so a
 song that is not in 4/4 or that changes time signature is handled. Everything

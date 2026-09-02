@@ -1,9 +1,10 @@
 -- @description Rock Band General Helper - Drums 2x Kicks Tests
 -- @author VeeKiraRay
 -- @about
---   Tests for RemoveKicksMarkedBy2X (actions_drums_2x.lua): the General > Actions
---   button that deletes every kick (pitch 96) on PART DRUMS lining up with a 2x
---   kick marker (pitch 95) on PART DRUMS_2X.
+--   Tests for Remove2XKicks (actions_drums_2x.lua): the General > Actions button
+--   that works out which kicks on PART DRUMS_2X are the drummer's second foot and
+--   deletes those from PART DRUMS. Also covers DoubleBassPlan, the detection rules
+--   as a pure function, and MarkDoubleBassKicks, which is kept but not drawn.
 --
 --   Includes the tempo-change regression: matching is done in quarter notes, not
 --   seconds, so a BPM jump partway through a song does not stop it finding notes.
@@ -38,7 +39,7 @@ dofile(_tdir .. 'framework.lua')
 dofile(_tdir .. 'fixture_helpers.lua')
 dofile(_gdir .. 'defaults.lua')                   -- S
 dofile(_gdir .. 'helpers.lua')                    -- FindTrackByName, GetTakePPQPerQN
-dofile(_gdir .. 'actions_drums_2x.lua')           -- RemoveKicksMarkedBy2X
+dofile(_gdir .. 'actions_drums_2x.lua')           -- Remove2XKicks, DoubleBassPlan
 
 EnableFixtureAutoCleanup()  -- one aborted test must not poison the rest
 

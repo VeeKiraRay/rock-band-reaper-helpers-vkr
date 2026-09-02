@@ -1,4 +1,4 @@
--- Tests for RemoveKicksMarkedBy2X (actions_drums_2x.lua).
+-- Tests for Remove2XKicks and the double-bass rules (actions_drums_2x.lua).
 --
 -- Synthetic tracks rather than MIDI fixtures: the whole point of the action is
 -- which exact position a note sits on, so the positions have to be known exactly.
@@ -94,152 +94,202 @@ local function ResetStatus()
 end
 
 ----------------------------------------------------------------------
-Test.section('RemoveKicksMarkedBy2X')
+Test.section('Remove2XKicks')
 ----------------------------------------------------------------------
+
+-- PART DRUMS_2X is the complete chart: every kick at 96, doubles included.
+-- PART DRUMS is the same chart with the second foot taken out. Remove2XKicks
+-- works out which those are in memory - nothing records the plan on the tracks.
 
 -- These tests create tracks named "PART DRUMS" and "PART DRUMS_2X"; never run
 -- them against a project that already has either one.
 if FindTrackByName('PART DRUMS') or FindTrackByName('PART DRUMS_2X') then
-    r.ShowConsoleMsg('  SKIP  RemoveKicksMarkedBy2X tests (project already has a drums track)\n')
+    r.ShowConsoleMsg('  SKIP  Remove2XKicks tests (project already has a drums track)\n')
 else
 
-Test.it('removes kicks on marked positions and leaves unmarked kicks alone', function()
+-- Note tables for a list of quarter-note positions, all at the kick pitch.
+local function Kicks(qns, pitch)
+    local out = {}
+    for _, qn in ipairs(qns) do out[#out + 1] = { qn = qn, pitch = pitch or 96 } end
+    return out
+end
+
+local function CountPitch(take, pitch)
+    local _, n_notes = r.MIDI_CountEvts(take)
+    local n = 0
+    for i = 0, n_notes - 1 do
+        local ok, _, _, _, _, _, p = r.MIDI_GetNote(take, i)
+        if ok and p == pitch then n = n + 1 end
+    end
+    return n
+end
+
+-- A bar of 1/16 kicks: 4.0 4.25 4.5 4.75. The second foot is 4.25 and 4.75.
+local BAR16 = { 4.0, 4.25, 4.5, 4.75 }
+
+Test.it('removes the second foot of a 1/16 line from PART DRUMS', function()
     ResetStatus()
     local base = r.CountTracks(0)
-    MakeTrack('PART DRUMS_2X', 0, {
-        { qn = 2, pitch = 95 }, { qn = 6, pitch = 95 },
-    })
-    local _, _, _, tgt = MakeTrack('PART DRUMS', 0, {
-        { qn = 2, pitch = 96 }, { qn = 4, pitch = 96 },
-        { qn = 6, pitch = 96 }, { qn = 8, pitch = 96 },
-    })
+    local _, _, _, x2  = MakeTrack('PART DRUMS_2X', 0, Kicks(BAR16))
+    local _, _, _, tgt = MakeTrack('PART DRUMS', 0, Kicks(BAR16))
 
-    RemoveKicksMarkedBy2X()
+    Remove2XKicks()
 
-    local removed_ok = not HasNoteAtQN(tgt, 2, 96) and not HasNoteAtQN(tgt, 6, 96)
-    local kept_ok    = HasNoteAtQN(tgt, 4, 96) and HasNoteAtQN(tgt, 8, 96)
-    local count      = CountNotes(tgt)
-    local status     = tostring(S.status)
+    local kept   = HasNoteAtQN(tgt, 4.0, 96) and HasNoteAtQN(tgt, 4.5, 96)
+    local gone   = not HasNoteAtQN(tgt, 4.25, 96) and not HasNoteAtQN(tgt, 4.75, 96)
+    local left   = CountNotes(tgt)
+    local x2_n   = CountNotes(x2)
+    local status = tostring(S.status)
     CleanupFixture(base)
 
-    Test.expect(removed_ok, 'kicks at the two marked positions should be gone')
-    Test.expect(kept_ok, 'kicks at unmarked positions should survive')
-    Test.expect(count == 2, 'expected 2 notes left on PART DRUMS, got ' .. count)
+    Test.expect(gone, 'the two second-foot kicks should be gone from PART DRUMS')
+    Test.expect(kept, 'the two first-foot kicks should survive')
+    Test.expect(left == 2, 'expected 2 kicks left on PART DRUMS, got ' .. left)
+    Test.expect(x2_n == 4, 'PART DRUMS_2X must keep all 4 kicks, got ' .. x2_n)
     Test.expect(status:find('Removed 2 kicks'), 'status: ' .. status)
 end)
 
-Test.it('leaves non-kick notes on a marked position untouched', function()
+Test.it('never thins PART DRUMS_2X or touches its other drum notes', function()
     ResetStatus()
-    local base = r.CountTracks(0)
-    MakeTrack('PART DRUMS_2X', 0, { { qn = 2, pitch = 95 } })
-    local _, _, _, tgt = MakeTrack('PART DRUMS', 0, {
-        { qn = 2, pitch = 96 },   -- kick, removed
-        { qn = 2, pitch = 97 },   -- snare at the same position, kept
-        { qn = 2, pitch = 95 },   -- a 95 on PART DRUMS is not a kick either, kept
-    })
+    local base  = r.CountTracks(0)
+    local notes = Kicks(BAR16)
+    notes[#notes + 1] = { qn = 4.25, pitch = 97 }   -- snare on a second-foot position
+    notes[#notes + 1] = { qn = 4.5,  pitch = 99 }
+    local _, _, _, x2 = MakeTrack('PART DRUMS_2X', 0, notes)
+    MakeTrack('PART DRUMS', 0, Kicks(BAR16))
 
-    RemoveKicksMarkedBy2X()
+    Remove2XKicks()
 
-    local gone  = not HasNoteAtQN(tgt, 2, 96)
-    local snare = HasNoteAtQN(tgt, 2, 97)
-    local mark  = HasNoteAtQN(tgt, 2, 95)
+    local kicks = CountPitch(x2, 96)
+    local snare = HasNoteAtQN(x2, 4.25, 97)
+    local tom   = HasNoteAtQN(x2, 4.5, 99)
     CleanupFixture(base)
 
-    Test.expect(gone, 'the kick on the marked position should be gone')
-    Test.expect(snare, 'the snare at the same position should survive')
-    Test.expect(mark, 'a pitch-95 note on PART DRUMS should survive - only 96 is removed')
+    Test.expect(kicks == 4, 'PART DRUMS_2X must keep every kick, got ' .. kicks)
+    Test.expect(snare, 'the snare on PART DRUMS_2X must survive')
+    Test.expect(tom, 'the tom on PART DRUMS_2X must survive')
 end)
 
-Test.it('matches across items placed at different project positions', function()
+Test.it('counts a leftover pitch 95 as a kick and puts it back to 96', function()
     ResetStatus()
     local base = r.CountTracks(0)
-    -- The 2x item starts 5 QN later than the drums item, so the same musical
-    -- position is a different raw PPQ on each take.
-    MakeTrack('PART DRUMS_2X', 5, { { qn = 8, pitch = 95 } })
-    local _, _, _, tgt = MakeTrack('PART DRUMS', 0, {
-        { qn = 8, pitch = 96 }, { qn = 12, pitch = 96 },
+    -- A chart left in the old marked state: 4.25 was written as 95 by the
+    -- since-hidden Mark button. Rock Band 3 would never play it.
+    local _, _, _, x2 = MakeTrack('PART DRUMS_2X', 0, {
+        { qn = 4.0, pitch = 96 }, { qn = 4.25, pitch = 95 },
+        { qn = 4.5, pitch = 96 }, { qn = 4.75, pitch = 96 },
     })
+    local _, _, _, tgt = MakeTrack('PART DRUMS', 0, Kicks(BAR16))
 
-    RemoveKicksMarkedBy2X()
+    Remove2XKicks()
 
-    local gone  = not HasNoteAtQN(tgt, 8, 96)
-    local kept  = HasNoteAtQN(tgt, 12, 96)
-    local count = CountNotes(tgt)
+    local repaired = CountPitch(x2, 96) == 4 and CountPitch(x2, 95) == 0
+    local gone     = not HasNoteAtQN(tgt, 4.25, 96) and not HasNoteAtQN(tgt, 4.75, 96)
+    local kept     = HasNoteAtQN(tgt, 4.0, 96) and HasNoteAtQN(tgt, 4.5, 96)
+    local result   = tostring(S.last_result)
     CleanupFixture(base)
 
-    Test.expect(gone, 'the kick under the marker should be gone despite the item offset')
-    Test.expect(kept, 'the unmarked kick should survive')
-    Test.expect(count == 1, 'expected 1 note left, got ' .. count)
+    Test.expect(repaired, 'the 95 must come back as a 96 so the 2x chart plays it')
+    Test.expect(gone and kept, 'the removal must match an all-96 track')
+    Test.expect(result:find('95'), 'the repair should be reported:\n' .. result)
 end)
 
-Test.it('lists markers that had no kick to remove', function()
+Test.it('a second run removes nothing and says so', function()
     ResetStatus()
     local base = r.CountTracks(0)
-    MakeTrack('PART DRUMS_2X', 0, {
-        { qn = 2, pitch = 95 },    -- matches
-        { qn = 20, pitch = 95 },   -- no kick anywhere near
-    })
-    MakeTrack('PART DRUMS', 0, { { qn = 2, pitch = 96 } })
+    local _, _, _, x2  = MakeTrack('PART DRUMS_2X', 0, Kicks(BAR16))
+    local _, _, _, tgt = MakeTrack('PART DRUMS', 0, Kicks(BAR16))
 
-    RemoveKicksMarkedBy2X()
+    Remove2XKicks()
+    local after_first = CountNotes(tgt)
+    ResetStatus()
+    Remove2XKicks()
+    local after_second = CountNotes(tgt)
+    local x2_n         = CountNotes(x2)
+    local status       = tostring(S.status)
+    local result       = tostring(S.last_result)
+    CleanupFixture(base)
+
+    Test.expect(after_first == 2, 'first run should leave 2 kicks, got ' .. after_first)
+    Test.expect(after_second == 2, 'second run must change nothing')
+    Test.expect(x2_n == 4, 'PART DRUMS_2X must still hold every kick')
+    Test.expect(status:find('Nothing to remove'), 'status: ' .. status)
+    Test.expect(result:find('already absent'), 'result: ' .. result)
+end)
+
+Test.it('a line too slow to need two feet leaves both tracks alone', function()
+    ResetStatus()
+    local base = r.CountTracks(0)
+    local slow = { 4.0, 4.5, 5.0, 5.5 }   -- four 1/8s: one foot can play it
+    local _, _, _, x2  = MakeTrack('PART DRUMS_2X', 0, Kicks(slow))
+    local _, _, _, tgt = MakeTrack('PART DRUMS', 0, Kicks(slow))
+
+    Remove2XKicks()
+
+    local left   = CountNotes(tgt)
+    local x2_n   = CountNotes(x2)
+    local status = tostring(S.status)
+    CleanupFixture(base)
+
+    Test.expect(left == 4, 'nothing should be removed, got ' .. left .. ' left')
+    Test.expect(x2_n == 4, 'PART DRUMS_2X must be untouched')
+    Test.expect(status:find('Nothing to remove'), 'status: ' .. status)
+end)
+
+Test.it('flags when PART DRUMS holds kicks the 2x chart does not', function()
+    ResetStatus()
+    local base = r.CountTracks(0)
+    MakeTrack('PART DRUMS_2X', 0, Kicks(BAR16))
+    local extra = { 4.0, 4.25, 4.5, 4.75, 8.0 }   -- 8.0 is on PART DRUMS only
+    MakeTrack('PART DRUMS', 0, Kicks(extra))
+
+    Remove2XKicks()
 
     local result = tostring(S.last_result)
     CleanupFixture(base)
 
-    Test.expect(result:find('No kick matched at these markers:'),
-        'expected the unmatched-marker heading, got: ' .. result)
-    local _, n_lines = result:gsub('\n%s+%d+%.%d+%.%d+', '')
-    Test.expect(n_lines == 1, 'expected 1 listed marker position, got ' .. n_lines)
+    Test.expect(result:find('different kicks'),
+        'expected a consistency warning, got:\n' .. result)
 end)
 
-Test.it('a second run is a no-op and says so without listing every marker', function()
+Test.it('a second-foot kick already absent from PART DRUMS is reported, not an error', function()
     ResetStatus()
     local base = r.CountTracks(0)
-    MakeTrack('PART DRUMS_2X', 0, {
-        { qn = 2, pitch = 95 }, { qn = 4, pitch = 95 }, { qn = 6, pitch = 95 },
-    })
-    local _, _, _, tgt = MakeTrack('PART DRUMS', 0, {
-        { qn = 2, pitch = 96 }, { qn = 4, pitch = 96 }, { qn = 6, pitch = 96 },
-    })
+    MakeTrack('PART DRUMS_2X', 0, Kicks(BAR16))
+    -- 4.75 was already taken out by hand; 4.25 is still there.
+    MakeTrack('PART DRUMS', 0, Kicks({ 4.0, 4.25, 4.5 }))
 
-    RemoveKicksMarkedBy2X()
-    local after_first = CountNotes(tgt)
-    ResetStatus()
-    RemoveKicksMarkedBy2X()
-    local after_second = CountNotes(tgt)
-    local result       = tostring(S.last_result)
-    local status       = tostring(S.status)
+    Remove2XKicks()
+
+    local status = tostring(S.status)
+    local result = tostring(S.last_result)
     CleanupFixture(base)
 
-    Test.expect(after_first == 0, 'first run should remove all 3 kicks, ' .. after_first .. ' left')
-    Test.expect(after_second == 0, 'second run must change nothing')
-    Test.expect(result:find('No matching notes found'), 'result: ' .. result)
-    Test.expect(status:find('Nothing to remove'), 'status: ' .. status)
-    Test.expect(not result:find('No kick matched at these markers:'),
-        'the no-op report must not enumerate the markers')
+    Test.expect(status:find('Removed 1 kick'), 'status: ' .. status)
+    Test.expect(result:find('already absent'), 'result: ' .. result)
 end)
 
 Test.it('exits early when PART DRUMS_2X is missing', function()
     ResetStatus()
     local base = r.CountTracks(0)
-    local _, _, _, tgt = MakeTrack('PART DRUMS', 0, { { qn = 2, pitch = 96 } })
+    local _, _, _, tgt = MakeTrack('PART DRUMS', 0, Kicks(BAR16))
 
-    RemoveKicksMarkedBy2X()
+    Remove2XKicks()
 
-    local count  = CountNotes(tgt)
+    local left   = CountNotes(tgt)
     local status = tostring(S.status)
     CleanupFixture(base)
 
-    Test.expect(count == 1, 'nothing should be removed, got ' .. count .. ' notes left')
+    Test.expect(left == 4, 'nothing should be removed, got ' .. left)
     Test.expect(status:find('PART DRUMS_2X') and status:find('not found'), 'status: ' .. status)
 end)
 
 Test.it('exits early when PART DRUMS is missing', function()
     ResetStatus()
     local base = r.CountTracks(0)
-    MakeTrack('PART DRUMS_2X', 0, { { qn = 2, pitch = 95 } })
+    MakeTrack('PART DRUMS_2X', 0, Kicks(BAR16))
 
-    RemoveKicksMarkedBy2X()
+    Remove2XKicks()
 
     local status = tostring(S.status)
     CleanupFixture(base)
@@ -251,113 +301,109 @@ Test.it('exits early when either drum track is muted', function()
     for _, muted in ipairs({ 'PART DRUMS_2X', 'PART DRUMS' }) do
         ResetStatus()
         local base = r.CountTracks(0)
-        local _, src_tr = MakeTrack('PART DRUMS_2X', 0, { { qn = 2, pitch = 95 } })
-        local _, tgt_tr, _, tgt = MakeTrack('PART DRUMS', 0, { { qn = 2, pitch = 96 } })
+        local _, src_tr           = MakeTrack('PART DRUMS_2X', 0, Kicks(BAR16))
+        local _, tgt_tr, _, tgt   = MakeTrack('PART DRUMS', 0, Kicks(BAR16))
         r.SetMediaTrackInfo_Value(muted == 'PART DRUMS_2X' and src_tr or tgt_tr, 'B_MUTE', 1)
 
-        RemoveKicksMarkedBy2X()
+        Remove2XKicks()
 
-        local count  = CountNotes(tgt)
+        local left   = CountNotes(tgt)
         local status = tostring(S.status)
         CleanupFixture(base)
 
-        Test.expect(count == 1, muted .. ' muted: nothing should be removed, got ' .. count)
-        Test.expect(status:find(muted .. ' is muted', 1, true), muted .. ' muted, status: ' .. status)
+        Test.expect(left == 4, muted .. ' muted: nothing should be removed, got ' .. left)
+        Test.expect(status:find(muted .. ' is muted', 1, true), muted .. ', status: ' .. status)
     end
 end)
 
-Test.it('reports when PART DRUMS_2X has notes but no pitch-95 markers', function()
+Test.it('reports when either track has no MIDI item', function()
     ResetStatus()
     local base = r.CountTracks(0)
-    MakeTrack('PART DRUMS_2X', 0, { { qn = 2, pitch = 96 }, { qn = 4, pitch = 97 } })
-    local _, _, _, tgt = MakeTrack('PART DRUMS', 0, { { qn = 2, pitch = 96 } })
+    CreateEmptyFixtureTrack('PART DRUMS_2X')
+    MakeTrack('PART DRUMS', 0, Kicks(BAR16))
+    Remove2XKicks()
+    local a = tostring(S.status)
+    CleanupFixture(base)
 
-    RemoveKicksMarkedBy2X()
+    ResetStatus()
+    base = r.CountTracks(0)
+    MakeTrack('PART DRUMS_2X', 0, Kicks(BAR16))
+    CreateEmptyFixtureTrack('PART DRUMS')
+    Remove2XKicks()
+    local b = tostring(S.status)
+    CleanupFixture(base)
 
-    local count  = CountNotes(tgt)
+    Test.expect(a:find('PART DRUMS_2X has no MIDI item'), 'no 2x item, status: ' .. a)
+    Test.expect(b:find('PART DRUMS has no MIDI item'), 'no drums item, status: ' .. b)
+end)
+
+Test.it('reports when PART DRUMS_2X has fewer than two kicks', function()
+    ResetStatus()
+    local base = r.CountTracks(0)
+    MakeTrack('PART DRUMS_2X', 0, Kicks({ 4.0 }))
+    MakeTrack('PART DRUMS', 0, Kicks({ 4.0 }))
+
+    Remove2XKicks()
+
     local status = tostring(S.status)
     CleanupFixture(base)
 
-    Test.expect(count == 1, 'nothing should be removed, got ' .. count .. ' notes left')
-    Test.expect(status:find('no 2x kick markers'), 'status: ' .. status)
-end)
-
-Test.it('reports when PART DRUMS has no MIDI item', function()
-    ResetStatus()
-    local base = r.CountTracks(0)
-    MakeTrack('PART DRUMS_2X', 0, { { qn = 2, pitch = 95 } })
-    CreateEmptyFixtureTrack('PART DRUMS')   -- track exists, no item
-
-    RemoveKicksMarkedBy2X()
-
-    local status = tostring(S.status)
-    CleanupFixture(base)
-
-    Test.expect(status:find('PART DRUMS has no MIDI item'), 'status: ' .. status)
+    Test.expect(status:find('fewer than two kicks'), 'status: ' .. status)
 end)
 
 ----------------------------------------------------------------------
-Test.section('RemoveKicksMarkedBy2X - across a tempo change')
+Test.section('Remove2XKicks - across a tempo change')
 ----------------------------------------------------------------------
 
--- THE REGRESSION THIS SECTION EXISTS FOR. The first implementation matched by
--- converting one track's notes to project seconds and back to PPQ on the other,
--- which walks the tempo map twice in opposite directions. Before the first tempo
--- marker both takes share one linear mapping and the round trip is exact; after
--- one, grid-quantized notes land a few ms out - many ticks at a metal tempo - and
--- matching silently stopped finding anything past the change.
+-- The matching between the two tracks is in quarter notes, so a BPM jump partway
+-- through must not stop it finding kicks. An earlier version bridged through
+-- project seconds and silently stopped matching after the first tempo marker.
 
-Test.it('matches on both sides of a 210 -> 240 BPM jump', function()
+Test.it('removes on both sides of a 210 -> 240 BPM jump', function()
     ResetStatus()
     WithTempo(210, { { 32, 240 } }, function()
         local base = r.CountTracks(0)
-        MakeTrack('PART DRUMS_2X', 0, {
-            { qn = 8,  pitch = 95 }, { qn = 12, pitch = 95 },   -- before the jump
-            { qn = 40, pitch = 95 }, { qn = 44, pitch = 95 },   -- after it
-            { qn = 48, pitch = 95 },
-        })
-        local _, _, _, tgt = MakeTrack('PART DRUMS', 0, {
-            { qn = 8,  pitch = 96 }, { qn = 10, pitch = 96 }, { qn = 12, pitch = 96 },
-            { qn = 40, pitch = 96 }, { qn = 42, pitch = 96 }, { qn = 44, pitch = 96 },
-            { qn = 48, pitch = 96 },
-        })
+        local line = { 8.0, 8.25, 8.5, 8.75,      -- before the jump
+                       40.0, 40.25, 40.5, 40.75 } -- after it
+        local _, _, _, x2  = MakeTrack('PART DRUMS_2X', 0, Kicks(line))
+        local _, _, _, tgt = MakeTrack('PART DRUMS', 0, Kicks(line))
 
-        RemoveKicksMarkedBy2X()
+        Remove2XKicks()
 
-        local before_ok = not HasNoteAtQN(tgt, 8, 96) and not HasNoteAtQN(tgt, 12, 96)
-        local after_ok  = not HasNoteAtQN(tgt, 40, 96) and not HasNoteAtQN(tgt, 44, 96)
-                      and not HasNoteAtQN(tgt, 48, 96)
-        local kept_ok   = HasNoteAtQN(tgt, 10, 96) and HasNoteAtQN(tgt, 42, 96)
-        local count     = CountNotes(tgt)
+        local before_ok = not HasNoteAtQN(tgt, 8.25, 96) and not HasNoteAtQN(tgt, 8.75, 96)
+        local after_ok  = not HasNoteAtQN(tgt, 40.25, 96) and not HasNoteAtQN(tgt, 40.75, 96)
+        local kept_ok   = HasNoteAtQN(tgt, 8.0, 96) and HasNoteAtQN(tgt, 40.0, 96)
+        local left      = CountNotes(tgt)
+        local x2_n      = CountNotes(x2)
         local result    = tostring(S.last_result)
         CleanupFixture(base)
 
-        Test.expect(before_ok, 'marked kicks BEFORE the tempo jump should be gone')
+        Test.expect(before_ok, 'second-foot kicks BEFORE the jump should be gone')
         Test.expect(after_ok,
-            'marked kicks AFTER the tempo jump should be gone too - this is the bug:\n' .. result)
-        Test.expect(kept_ok, 'unmarked kicks on both sides should survive')
-        Test.expect(count == 2, 'expected 2 notes left, got ' .. count)
+            'second-foot kicks AFTER the jump should be gone too:\n' .. result)
+        Test.expect(kept_ok, 'first-foot kicks on both sides should survive')
+        Test.expect(left == 4, 'expected 4 kicks left, got ' .. left)
+        Test.expect(x2_n == 8, 'PART DRUMS_2X must keep all 8 kicks')
     end)
 end)
 
-Test.it('matches across a tempo change with the items at different positions', function()
+Test.it('removes across a tempo change with the items at different positions', function()
     ResetStatus()
     WithTempo(210, { { 32, 240 } }, function()
         local base = r.CountTracks(0)
-        MakeTrack('PART DRUMS_2X', 4, { { qn = 40, pitch = 95 } })
-        local _, _, _, tgt = MakeTrack('PART DRUMS', 0, {
-            { qn = 40, pitch = 96 }, { qn = 44, pitch = 96 },
-        })
+        local line = { 40.0, 40.25, 40.5, 40.75 }
+        MakeTrack('PART DRUMS_2X', 4, Kicks(line))
+        local _, _, _, tgt = MakeTrack('PART DRUMS', 0, Kicks(line))
 
-        RemoveKicksMarkedBy2X()
+        Remove2XKicks()
 
-        local gone  = not HasNoteAtQN(tgt, 40, 96)
-        local kept  = HasNoteAtQN(tgt, 44, 96)
+        local gone   = not HasNoteAtQN(tgt, 40.25, 96) and not HasNoteAtQN(tgt, 40.75, 96)
+        local kept   = HasNoteAtQN(tgt, 40.0, 96) and HasNoteAtQN(tgt, 40.5, 96)
         local result = tostring(S.last_result)
         CleanupFixture(base)
 
         Test.expect(gone, 'tempo change plus item offset must still match:\n' .. result)
-        Test.expect(kept, 'the unmarked kick should survive')
+        Test.expect(kept, 'the first-foot kicks should survive')
     end)
 end)
 
@@ -375,175 +421,6 @@ Test.it('the project tempo map is restored afterwards', function()
         ('marker count %d -> %d'):format(before_n, after_n))
     Test.expect(math.abs(after_bpm - before_bpm) < 1e-6,
         ('root tempo %.3f -> %.3f'):format(before_bpm, after_bpm))
-end)
-
-----------------------------------------------------------------------
-Test.section('RemoveKicksMarkedBy2X - nearest kick, with an ambiguity guard')
-----------------------------------------------------------------------
-
-Test.it('a blast beat of 1/32 kicks loses only the marked ones', function()
-    ResetStatus()
-    local base = r.CountTracks(0)
-    -- Kicks on every 1/32 (0.125 QN) for 4 beats; markers on alternate ones.
-    -- The neighbouring kick is only 0.125 QN away, so a matcher with a fixed
-    -- millisecond buffer would be at risk of taking the wrong one.
-    local marks, kicks = {}, {}
-    for i = 0, 32 do
-        local qn = i * 0.125
-        kicks[#kicks + 1] = { qn = qn, pitch = 96 }
-        if i % 2 == 0 then marks[#marks + 1] = { qn = qn, pitch = 95 } end
-    end
-    MakeTrack('PART DRUMS_2X', 0, marks)
-    local _, _, _, tgt = MakeTrack('PART DRUMS', 0, kicks)
-
-    RemoveKicksMarkedBy2X()
-
-    local wrong = {}
-    for i = 0, 32 do
-        local qn   = i * 0.125
-        local here = HasNoteAtQN(tgt, qn, 96)
-        if (i % 2 == 0) == here then wrong[#wrong + 1] = ('%.3f'):format(qn) end
-    end
-    local count = CountNotes(tgt)
-    CleanupFixture(base)
-
-    Test.expect(#wrong == 0, 'wrong notes at qn ' .. table.concat(wrong, ', '))
-    Test.expect(count == 16, 'expected the 16 unmarked kicks left, got ' .. count)
-end)
-
-Test.it('a marker midway between two kicks is rejected as ambiguous', function()
-    ResetStatus()
-    local base = r.CountTracks(0)
-    -- Both kicks a 1/64 away: inside MAX_SNAP_QN, but equally close, so neither
-    -- can be called the marker's kick.
-    MakeTrack('PART DRUMS_2X', 0, { { qn = 4.0, pitch = 95 } })
-    local _, _, _, tgt = MakeTrack('PART DRUMS', 0, {
-        { qn = 4.0 - 0.015625, pitch = 96 }, { qn = 4.0 + 0.015625, pitch = 96 },
-    })
-
-    RemoveKicksMarkedBy2X()
-
-    local count  = CountNotes(tgt)
-    local result = tostring(S.last_result)
-    local status = tostring(S.status)
-    CleanupFixture(base)
-
-    Test.expect(count == 2, 'neither kick should be removed, got ' .. count .. ' left')
-    Test.expect(status:find('Nothing to remove'), 'status: ' .. status)
-    Test.expect(result:find('No matching notes found'), 'result: ' .. result)
-end)
-
-Test.it('a marker with its nearest kick a beat away removes nothing', function()
-    ResetStatus()
-    local base = r.CountTracks(0)
-    MakeTrack('PART DRUMS_2X', 0, { { qn = 1.0, pitch = 95 } })
-    local _, _, _, tgt = MakeTrack('PART DRUMS', 0, { { qn = 2.0, pitch = 96 } })
-
-    RemoveKicksMarkedBy2X()
-
-    local count = CountNotes(tgt)
-    CleanupFixture(base)
-
-    Test.expect(count == 1, 'the distant kick must not be snapped to, got ' .. count .. ' left')
-end)
-
-Test.it('a kick nudged ~10 ticks off its marker still matches', function()
-    ResetStatus()
-    local base = r.CountTracks(0)
-    local nudge = 10 / 960   -- ~0.0104 QN, inside MAX_SNAP_QN, nothing else nearby
-    MakeTrack('PART DRUMS_2X', 0, { { qn = 4.0, pitch = 95 } })
-    local _, _, _, tgt = MakeTrack('PART DRUMS', 0, {
-        { qn = 4.0 + nudge, pitch = 96 }, { qn = 8.0, pitch = 96 },
-    })
-
-    RemoveKicksMarkedBy2X()
-
-    local gone  = not HasNoteAtQN(tgt, 4.0 + nudge, 96)
-    local kept  = HasNoteAtQN(tgt, 8.0, 96)
-    local result = tostring(S.last_result)
-    CleanupFixture(base)
-
-    Test.expect(gone, 'a hand-nudged kick should still match:\n' .. result)
-    Test.expect(kept, 'the far kick should survive')
-end)
-
-Test.it('two markers never claim the same kick', function()
-    ResetStatus()
-    local base = r.CountTracks(0)
-    -- Two markers a 1/32 apart but only one kick, sitting on the first of them.
-    MakeTrack('PART DRUMS_2X', 0, {
-        { qn = 4.0, pitch = 95 }, { qn = 4.03125, pitch = 95 },
-    })
-    local _, _, _, tgt = MakeTrack('PART DRUMS', 0, { { qn = 4.0, pitch = 96 } })
-
-    RemoveKicksMarkedBy2X()
-
-    local count  = CountNotes(tgt)
-    local status = tostring(S.status)
-    CleanupFixture(base)
-
-    Test.expect(count == 0, 'the one kick should be removed exactly once, got ' .. count)
-    Test.expect(status:find('Removed 1 kick'), 'status: ' .. status)
-end)
-
-----------------------------------------------------------------------
-Test.section('RemoveKicksMarkedBy2X - consistency check against the 2x track')
-----------------------------------------------------------------------
-
-Test.it('reports agreement when the leftover kicks match PART DRUMS_2X', function()
-    ResetStatus()
-    local base = r.CountTracks(0)
-    -- The authoring workflow: PART DRUMS_2X carries the 1x kicks as 96 and the
-    -- double kicks as 95; PART DRUMS starts as a copy of every kick.
-    MakeTrack('PART DRUMS_2X', 0, {
-        { qn = 0, pitch = 96 }, { qn = 0.5, pitch = 95 }, { qn = 1, pitch = 96 },
-    })
-    MakeTrack('PART DRUMS', 0, {
-        { qn = 0, pitch = 96 }, { qn = 0.5, pitch = 96 }, { qn = 1, pitch = 96 },
-    })
-
-    RemoveKicksMarkedBy2X()
-
-    local result = tostring(S.last_result)
-    CleanupFixture(base)
-
-    Test.expect(result:find('consistent'), 'expected a consistency line, got:\n' .. result)
-end)
-
-Test.it('flags a discrepancy when the counts do not line up', function()
-    ResetStatus()
-    local base = r.CountTracks(0)
-    MakeTrack('PART DRUMS_2X', 0, {
-        { qn = 0, pitch = 96 }, { qn = 0.5, pitch = 95 }, { qn = 1, pitch = 96 },
-    })
-    MakeTrack('PART DRUMS', 0, {
-        { qn = 0, pitch = 96 }, { qn = 0.5, pitch = 96 }, { qn = 1, pitch = 96 },
-        { qn = 2, pitch = 96 },   -- a kick PART DRUMS_2X does not know about
-    })
-
-    RemoveKicksMarkedBy2X()
-
-    local result = tostring(S.last_result)
-    CleanupFixture(base)
-
-    Test.expect(result:find('disagree'), 'expected a discrepancy line, got:\n' .. result)
-end)
-
-Test.it('says nothing about consistency when PART DRUMS_2X carries no 96s', function()
-    ResetStatus()
-    local base = r.CountTracks(0)
-    MakeTrack('PART DRUMS_2X', 0, { { qn = 0.5, pitch = 95 } })
-    MakeTrack('PART DRUMS', 0, {
-        { qn = 0, pitch = 96 }, { qn = 0.5, pitch = 96 },
-    })
-
-    RemoveKicksMarkedBy2X()
-
-    local result = tostring(S.last_result)
-    CleanupFixture(base)
-
-    Test.expect(not result:find('consistent') and not result:find('disagree'),
-        'the check must be skipped, not guessed at:\n' .. result)
 end)
 
 end  -- project-already-has-a-drums-track guard
@@ -615,6 +492,78 @@ Test.it('a 1/8 tail past the closing bar line is not part of the line either', f
     -- after it; that last kick stays a plain kick.
     local qns = { 3.0, 3.25, 3.5, 3.75, 4.0, 4.5 }
     Test.expect(PlanStr(qns) == 'oXoXoo', PlanStr(qns))
+end)
+
+Test.it('a lone 1/8 leaning on a 1/16 burst is not part of it', function()
+    -- The reference chart at m62 beat 3: one kick on the half beat, then a 1/16
+    -- pair. The lone 1/8 is a separate hit, so the pair alternates on its own and
+    -- the half beat - the stronger position - stays a plain kick.
+    local qns = { 2.0, 2.5, 2.75 }
+    Test.expect(PlanStr(qns) == 'ooX', PlanStr(qns))
+end)
+
+Test.it('but a line that merely starts with a stretch of 1/8s keeps them', function()
+    -- The trim must not walk the whole 1/8 lead-in off a long mixed line: here
+    -- only the last two kicks are 1/16s, so no single kick is "the lone one at
+    -- the wider spacing" and every eighth stays in the alternation.
+    local qns = { 1.0, 1.5, 2.0, 2.5, 3.0, 3.25 }
+    Test.expect(PlanStr(qns) == 'oXoXoX', PlanStr(qns))
+end)
+
+Test.it('a lone 1/8 trailing off the end of a 1/16 burst is dropped too', function()
+    local qns = { 2.0, 2.25, 2.5, 3.0 }
+    Test.expect(PlanStr(qns) == 'oXoo', PlanStr(qns))
+end)
+
+-- A bar of 1/16 kicks from one downbeat to the next, with the kick on `hole_qn`
+-- missing. This is the m14 shape: 16 kicks, so the line is even-length AND
+-- bounded by two downbeats, which no alternation phase can satisfy.
+local function BarWithHole(hole_qn)
+    local qns = {}
+    for i = 0, 16 do
+        local qn = 4.0 + i * 0.25
+        if math.abs(qn - hole_qn) > 1e-9 then qns[#qns + 1] = qn end
+    end
+    return qns
+end
+
+Test.it('a bar-long 1/16 line with a hole keeps both downbeats primary', function()
+    -- The reference chart at m14: no kick on beat 3. Counting played notes would
+    -- flip the feet after the hole and leave the closing downbeat to the second
+    -- foot; reading the line as a continuous grid does not.
+    local qns = BarWithHole(6.0)
+    Test.expect(#qns == 16, 'fixture should be 16 kicks, got ' .. #qns)
+    Test.expect(PlanStr(qns) == 'oXoXoXoXXoXoXoXo', PlanStr(qns))
+    -- Stated as the properties that matter, so a future rule change that still
+    -- passes the literal string above cannot quietly lose them.
+    local marks = DoubleBassPlan(qns, Bar4)
+    Test.expect(not marks[1], 'the opening downbeat must stay a primary kick')
+    Test.expect(not marks[#qns], 'the closing downbeat must stay a primary kick')
+end)
+
+Test.it('the same bar with no hole is untouched by the grid tie-break', function()
+    -- 17 kicks: odd, so alternating from the 2nd already avoids both downbeats
+    -- and the grid branch never runs. Guards the property that makes it safe.
+    local qns = {}
+    for i = 0, 16 do qns[#qns + 1] = 4.0 + i * 0.25 end
+    Test.expect(PlanStr(qns) == 'oXoXoXoXoXoXoXoXo', PlanStr(qns))
+end)
+
+Test.it('a hole does not trigger the tie-break when a phase is already clean', function()
+    -- Same kind of gap, but the line neither starts nor ends on a downbeat, so
+    -- the ordinary phase rule applies and the answer counts played notes.
+    local qns = { 4.25, 4.5, 4.75, 5.25, 5.5, 5.75 }
+    Test.expect(PlanStr(qns) == 'oXoXoX', PlanStr(qns))
+end)
+
+Test.it('an off-grid kick falls back to plain alternation, not to nonsense', function()
+    -- Same bar, but one kick is nudged off the 1/16 grid, so slot numbers cannot
+    -- be trusted. The tie-break must decline rather than round to a wrong slot.
+    local qns = BarWithHole(6.0)
+    for i, qn in ipairs(qns) do
+        if math.abs(qn - 6.25) < 1e-9 then qns[i] = 6.20 end
+    end
+    Test.expect(PlanStr(qns) == 'oXoXoXoXoXoXoXoX', PlanStr(qns))
 end)
 
 Test.it('a lone kick, and an empty chart, plan to nothing', function()
@@ -790,17 +739,21 @@ Test.it('reports when there are fewer than two kicks', function()
     Test.expect(status:find('fewer than two kicks'), 'status: ' .. status)
 end)
 
-Test.it('the two buttons compose: mark, then remove from PART DRUMS', function()
+Test.it('Remove2XKicks repairs a chart the old Mark button produced', function()
+    -- The migration path. MarkDoubleBassKicks leaves PART DRUMS_2X carrying 95s
+    -- that Rock Band 3 discards, so its 2x chart plays FEWER kicks than the 1x
+    -- one. Remove2XKicks must undo that: every kick back to 96 on the 2x track,
+    -- and the second foot taken out of PART DRUMS instead.
     ResetStatus()
     local base = r.CountTracks(0)
     local qns  = { 4.0, 4.25, 4.5, 4.75 }
-    -- The authoring workflow: every kick on both tracks, then mark, then remove.
     local _, _, _, x2  = MakeTrack('PART DRUMS_2X', 0, KicksAt(qns))
     local _, _, _, tgt = MakeTrack('PART DRUMS', 0, KicksAt(qns))
 
     MarkDoubleBassKicks()
+    local marked = TrackPattern(x2, qns)
     ResetStatus()
-    RemoveKicksMarkedBy2X()
+    Remove2XKicks()
 
     local x2_pat = TrackPattern(x2, qns)
     local left   = CountNotes(tgt)
@@ -808,9 +761,10 @@ Test.it('the two buttons compose: mark, then remove from PART DRUMS', function()
     local result = tostring(S.last_result)
     CleanupFixture(base)
 
-    Test.expect(x2_pat == 'oXoX', 'PART DRUMS_2X: ' .. x2_pat)
+    Test.expect(marked == 'oXoX', 'the old button should have written 95s: ' .. marked)
+    Test.expect(x2_pat == 'oooo', 'PART DRUMS_2X must end up all 96: ' .. x2_pat)
     Test.expect(left == 2, 'PART DRUMS should keep the 2 first-foot kicks, got ' .. left)
-    Test.expect(kept, 'the surviving kicks should be the unmarked ones')
+    Test.expect(kept, 'the surviving kicks should be the first-foot ones')
     Test.expect(result:find('consistent'), 'the counts should agree:\n' .. result)
 end)
 

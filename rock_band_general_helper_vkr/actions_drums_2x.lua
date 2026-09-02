@@ -1,11 +1,28 @@
 -- Drums 2x kick action functions (General tab)
 -- Requires: S, r (globals)
 -- Requires: FindTrackByName, GetTakePPQPerQN (from helpers.lua)
+--
+-- THE MODEL. PART DRUMS_2X is a COMPLETE alternate drum chart, not a set of
+-- markers: the build swaps the whole track in as the song's 2x version, so every
+-- kick on it - the double-bass hits included - is a plain 96. PART DRUMS is the
+-- same chart with the drummer's second foot taken out.
+--
+-- WHY ALL-96 RATHER THAN MARKING THE DOUBLES WITH 95. What a build tool does with
+-- pitch 95 is not settled here, and this template is meant to serve several games
+-- with different tools: some may read it, some may drop it. An all-96 track plays
+-- every kick under either behaviour, because there is no 95 for a tool to have an
+-- opinion about. A 95-marked track is only correct if the tool converts it. That
+-- is the whole argument - it does not depend on any one game's behaviour, and it
+-- is the reason not to reintroduce a 95-writing step here.
+--
+-- MarkDoubleBassKicks still writes 95 and is deliberately NOT reachable from the
+-- UI - see ui.lua. It is kept, and kept tested, for a game whose tools want that
+-- convention, and belongs behind a target selector rather than in the RB3 path.
 
 local TRACK_2X = 'PART DRUMS_2X'
 local TRACK_1X = 'PART DRUMS'
-local MARK_2X  = 95   -- 2x kick marker on PART DRUMS_2X
-local KICK     = 96   -- Expert kick gem on both drum tracks
+local MARK_2X  = 95   -- ignored by Rock Band 3; only ever repaired back to KICK
+local KICK     = 96   -- the kick gem, on both drum tracks
 
 -- Matching guards, in quarter notes. See the comment above MatchMarkers for why
 -- a nearest-with-ambiguity-guard beats a fixed tolerance.
@@ -131,129 +148,6 @@ local function MatchMarkers(markers, kicks, ppq_per_qn)
     return matched, misses
 end
 
--- Remove every kick on PART DRUMS that lines up with a 2x kick marker on
--- PART DRUMS_2X. Whole track - a time selection does not narrow it.
-function RemoveKicksMarkedBy2X()
-    local src_tr = FindTrackByName(TRACK_2X)
-    if not src_tr then
-        S.status      = 'Error: ' .. TRACK_2X .. ' track not found.'
-        S.last_result = 'Could not find a track named "' .. TRACK_2X .. '".'
-        return
-    end
-    local tgt_tr = FindTrackByName(TRACK_1X)
-    if not tgt_tr then
-        S.status      = 'Error: ' .. TRACK_1X .. ' track not found.'
-        S.last_result = 'Could not find a track named "' .. TRACK_1X .. '".'
-        return
-    end
-    for _, pair in ipairs({ { src_tr, TRACK_2X }, { tgt_tr, TRACK_1X } }) do
-        if r.GetMediaTrackInfo_Value(pair[1], 'B_MUTE') == 1 then
-            S.status      = 'Error: ' .. pair[2] .. ' is muted.'
-            S.last_result = 'Unmute ' .. pair[2] .. ' and run this again.\n' ..
-                            'A muted drum track is treated as not part of the chart.'
-            return
-        end
-    end
-
-    local src_takes = MIDITakesOn(src_tr)
-    if #src_takes == 0 then
-        S.status      = 'Error: ' .. TRACK_2X .. ' has no MIDI item.'
-        S.last_result = TRACK_2X .. ' track has no MIDI item to read markers from.'
-        return
-    end
-    local tgt_takes = MIDITakesOn(tgt_tr)
-    if #tgt_takes == 0 then
-        S.status      = 'Error: ' .. TRACK_1X .. ' has no MIDI item.'
-        S.last_result = TRACK_1X .. ' track has no MIDI item to remove kicks from.'
-        return
-    end
-
-    local markers = NotesAtPitch(src_takes, MARK_2X)
-    if #markers == 0 then
-        S.status      = TRACK_2X .. ' has no 2x kick markers (pitch ' .. MARK_2X .. ').'
-        S.last_result = 'Nothing to do: ' .. TRACK_2X .. ' carries no pitch-' .. MARK_2X ..
-                        ' notes.\nThose are the markers this action reads.'
-        return
-    end
-
-    local kicks   = NotesAtPitch(tgt_takes, KICK)
-    local src_1x  = NotesAtPitch(src_takes, KICK)   -- for the consistency check below
-    local matched, misses = MatchMarkers(markers, kicks,
-                                         GetTakePPQPerQN(tgt_takes[1].take))
-
-    -- Nothing to remove: report and return before any Undo_* call, so a no-op
-    -- run leaves no undo point behind.
-    if #matched == 0 then
-        S.status      = 'Nothing to remove - no kick matched a 2x marker.'
-        S.last_result = ('%s   %d 2x kick marker(s), pitch %d'):format(TRACK_2X, #markers, MARK_2X) ..
-                        '\n\nNo matching notes found - already run, or the 2x markers do not\n' ..
-                        'line up with any kick on ' .. TRACK_1X .. '.'
-        return
-    end
-
-    -- Delete per take, descending by note index: MIDI_DeleteNote shifts the
-    -- indices of everything after it.
-    local by_take = {}
-    for _, k in ipairs(matched) do
-        local slot = by_take[k.take]
-        if not slot then
-            slot = { item = k.item, idx = {} }
-            by_take[k.take] = slot
-        end
-        slot.idx[#slot.idx + 1] = k.idx
-    end
-
-    r.PreventUIRefresh(1)
-    r.Undo_BeginBlock2(0)
-    for take, slot in pairs(by_take) do
-        r.MarkTrackItemsDirty(tgt_tr, slot.item)   -- REQUIRED: MIDI edits do not mark the take dirty
-        table.sort(slot.idx, function(a, b) return a > b end)
-        for _, i in ipairs(slot.idx) do
-            r.MIDI_DeleteNote(take, i)
-        end
-    end
-    r.Undo_EndBlock2(0, ('Remove 2x-marked kicks (%d notes)'):format(#matched), -1)
-    r.PreventUIRefresh(-1)
-    r.UpdateArrange()
-
-    local lines = {
-        ('%s   %d 2x kick marker(s), pitch %d'):format(TRACK_2X, #markers, MARK_2X),
-        ('%s      %d kick(s) removed, pitch %d'):format(TRACK_1X, #matched, KICK),
-    }
-
-    -- PART DRUMS_2X normally carries the 1x kicks as 96 too, so its 96 count is
-    -- what PART DRUMS should be left with. Only a cross-check - the action does
-    -- not require that authoring style, so say nothing when there are no 96s.
-    if #src_1x > 0 then
-        local left = #kicks - #matched
-        lines[#lines + 1] = ''
-        if left == #src_1x then
-            lines[#lines + 1] = ('%s now has %d kick(s), matching %s\'s %d - consistent.')
-                :format(TRACK_1X, left, TRACK_2X, #src_1x)
-        else
-            lines[#lines + 1] = ('%s now has %d kick(s) but %s has %d at pitch %d.')
-                :format(TRACK_1X, left, TRACK_2X, #src_1x, KICK)
-            lines[#lines + 1] = 'The two charts disagree - worth a look.'
-        end
-    end
-
-    if #misses > 0 then
-        lines[#lines + 1] = ''
-        lines[#lines + 1] = 'No kick matched at these markers:'
-        for i, miss in ipairs(misses) do
-            if i > UNMATCHED_LIST_MAX then
-                lines[#lines + 1] = ('  ... and %d more'):format(#misses - UNMATCHED_LIST_MAX)
-                break
-            end
-            lines[#lines + 1] = ('  %-10s %s'):format(MBTAtQN(miss.qn), miss.why)
-        end
-    end
-
-    S.status = ('Removed %d kick%s from %s.'):format(
-        #matched, #matched == 1 and '' or 's', TRACK_1X)
-    S.last_result = table.concat(lines, '\n')
-end
-
 ----------------------------------------------------------------------
 -- Double-bass detection: which kicks in a fast line are the second foot
 ----------------------------------------------------------------------
@@ -263,9 +157,10 @@ end
 -- quarter notes for the same reason the matcher above is - see NotesAtPitch.
 --
 --   1. Kicks no more than a 1/8 apart form one line.
---   2. An edge kick joined to the line by a gap wider than the line's tightest,
---      whose neighbour inside the line is on a bar downbeat, is a pickup into or
---      a tail out of the line rather than part of it - drop it.
+--   2. An edge kick joined to the line by a gap wider than the line's tightest is
+--      a pickup into or a tail out of it - drop it - when EITHER its neighbour
+--      inside the line is on a bar downbeat, OR the tight section starts right at
+--      that neighbour, making the edge kick the only one at the wider spacing.
 --   3. The line is double bass if its tightest gap is a 1/16 or closer (two
 --      back-to-back 1/16 kicks are already two feet), or if it is a straight
 --      run of more than MAX_EIGHTH_RUN 1/8s.
@@ -273,10 +168,15 @@ end
 --      on a bar downbeat is taken. Preferring the 2nd kick and falling back to
 --      the 1st when that would take a downbeat is what produces the "start from
 --      the first" case in an even-length line that ends on a bar line.
+--   5. When neither phase can spare every downbeat - an even-length line bounded
+--      by two of them, which usually means it has a HOLE in it - fall back to
+--      grid position instead of note count, so the feet stay on the same
+--      subdivisions across the gap. See PickAlternating for why this is a
+--      tie-break and must not become the general rule.
 --
--- MAX_EIGHTH_RUN is the one value the reference chart could not settle: its
+-- MAX_EIGHTH_RUN is the one value the reference charts could not settle: their
 -- straight-1/8 runs are 2, 3, 13, 61 and 110 kicks long, so anything from 3 to
--- 12 scores identically on it.
+-- 12 scores identically on them.
 
 local SIXTEENTH_QN   = 0.25
 local EIGHTH_QN      = 0.5
@@ -310,14 +210,29 @@ local function TightestGap(run, qns)
 end
 
 -- Rule 2. Loops because both ends can qualify.
+--
+-- Two things mark an edge kick as hanging off the line rather than belonging to
+-- it, and either is enough. Its neighbour inside the line is on a bar downbeat -
+-- the line starts or lands there, and the edge kick is a pickup into or a tail
+-- out of it. Or the line's tight section begins right at that neighbour, which
+-- makes the edge kick the ONLY one at the wider spacing: a lone 1/8 leaning
+-- against a burst of 1/16s is a separate hit, not the first of the burst.
+--
+-- The second test is what keeps a long line that merely STARTS with a stretch of
+-- 1/8s intact. Trimming on the wider gap alone would strip every one of those
+-- leading eighths off it, one pass at a time.
 local function TrimRunEdges(run, qns, is_downbeat)
     while #run >= 3 do
         local tight = TightestGap(run, qns)
-        local head  = qns[run[2]]  - qns[run[1]]
+        local head  = qns[run[2]]    - qns[run[1]]
         local tail  = qns[run[#run]] - qns[run[#run - 1]]
-        if head > tight + QN_EPS and is_downbeat(qns[run[2]]) then
+        -- Is the tight section adjacent to the edge, i.e. is this the only kick
+        -- sitting at the wider spacing?
+        local head_alone = math.abs((qns[run[3]] - qns[run[2]]) - tight) < QN_EPS
+        local tail_alone = math.abs((qns[run[#run - 1]] - qns[run[#run - 2]]) - tight) < QN_EPS
+        if head > tight + QN_EPS and (is_downbeat(qns[run[2]]) or head_alone) then
             table.remove(run, 1)
-        elseif tail > tight + QN_EPS and is_downbeat(qns[run[#run - 1]]) then
+        elseif tail > tight + QN_EPS and (is_downbeat(qns[run[#run - 1]]) or tail_alone) then
             table.remove(run)
         else
             return run
@@ -332,6 +247,22 @@ local function IsDoubleBassLine(run, qns)
     return TightestGap(run, qns) <= SIXTEENTH_QN + QN_EPS or #run > MAX_EIGHTH_RUN
 end
 
+-- Each kick's slot on the line's own subdivision grid, or nil when the kicks do
+-- not sit on one. Rounding to a grid is meaningless for a hand-played line, so
+-- every kick has to land on a multiple of the tightest gap for this to be usable.
+local function GridSlots(run, qns)
+    local step = TightestGap(run, qns)
+    if step <= 0 then return nil end
+    local slots = {}
+    for i, idx in ipairs(run) do
+        local exact = (qns[idx] - qns[run[1]]) / step
+        local slot  = math.floor(exact + 0.5)
+        if math.abs(exact - slot) * step > QN_EPS then return nil end
+        slots[i] = slot
+    end
+    return slots
+end
+
 -- Rule 4. Returns the run positions to take, 1-based within the run.
 local function PickAlternating(run, qns, is_downbeat)
     for _, phase in ipairs({ 2, 1 }) do
@@ -342,6 +273,40 @@ local function PickAlternating(run, qns, is_downbeat)
         end
         if clean then return picks end
     end
+
+    -- Neither phase could keep every bar downbeat on a primary kick. That happens
+    -- when the line is even-length and starts AND ends on a downbeat - and a line
+    -- like that is usually even-length only because it has a HOLE in it. Counting
+    -- played notes then flips the feet relative to the beat for the rest of the
+    -- line, stranding the primaries on offbeats and leaving the closing downbeat
+    -- to the second foot.
+    --
+    -- So read the line as a continuous grid instead and give each kick the foot
+    -- its slot calls for, ignoring that a slot is empty. The same foot then plays
+    -- either side of the rest, which is what actually happens: the silent slot
+    -- belonged to the other foot.
+    --
+    -- ONLY as a tie-break, never as the general rule. A long line that mixes 1/8s
+    -- and 1/16s has a grid of 1/16s in which every eighth-spaced kick sits on an
+    -- even slot, so grid parity would mark none of them - it scores 974/1080 on
+    -- the first reference chart when applied to every line. As a tie-break it is
+    -- inert on a line with no hole: grid slot and note index are then the same
+    -- sequence, so it re-offers the two sets the loop above already rejected and
+    -- falls through.
+    local slots = GridSlots(run, qns)
+    if slots then
+        for _, parity in ipairs({ 1, 0 }) do
+            local picks, clean = {}, true
+            for i = 1, #run do
+                if slots[i] % 2 == parity then
+                    picks[#picks + 1] = i
+                    if is_downbeat(qns[run[i]]) then clean = false end
+                end
+            end
+            if clean and #picks > 0 then return picks end
+        end
+    end
+
     local picks = {}
     for i = 2, #run, 2 do picks[#picks + 1] = i end
     return picks
@@ -509,5 +474,188 @@ function MarkDoubleBassKicks()
 
     S.status = ('Marked %d double kick%s on %s.'):format(
         #to_mark, #to_mark == 1 and '' or 's', TRACK_2X)
+    S.last_result = table.concat(lines, '\n')
+end
+
+----------------------------------------------------------------------
+-- Actions
+----------------------------------------------------------------------
+
+-- Work out which kicks on PART DRUMS_2X are the drummer's second foot and take
+-- those out of PART DRUMS. Whole track - a time selection does not narrow it.
+--
+-- PART DRUMS_2X IS A COMPLETE CHART, NOT A SET OF MARKERS. The build swaps the
+-- whole track in as the 2x version of the song, so every kick on it - the doubles
+-- included - is a plain 96, and PART DRUMS is the same chart with the second foot
+-- taken out. Nothing is written to record which kicks those are: the plan is
+-- computed here, used, and thrown away. See the file header for why all-96 beats
+-- marking the doubles with 95.
+--
+-- A 95 on PART DRUMS_2X is therefore a kick an earlier version of this tool
+-- mislabelled. It is counted as a kick (or the alternation comes out wrong on a
+-- chart that has them) and put back to 96, which repairs the track.
+function Remove2XKicks()
+    local src_tr = FindTrackByName(TRACK_2X)
+    if not src_tr then
+        S.status      = 'Error: ' .. TRACK_2X .. ' track not found.'
+        S.last_result = 'Could not find a track named "' .. TRACK_2X .. '".'
+        return
+    end
+    local tgt_tr = FindTrackByName(TRACK_1X)
+    if not tgt_tr then
+        S.status      = 'Error: ' .. TRACK_1X .. ' track not found.'
+        S.last_result = 'Could not find a track named "' .. TRACK_1X .. '".'
+        return
+    end
+    for _, pair in ipairs({ { src_tr, TRACK_2X }, { tgt_tr, TRACK_1X } }) do
+        if r.GetMediaTrackInfo_Value(pair[1], 'B_MUTE') == 1 then
+            S.status      = 'Error: ' .. pair[2] .. ' is muted.'
+            S.last_result = 'Unmute ' .. pair[2] .. ' and run this again.\n' ..
+                            'A muted drum track is treated as not part of the chart.'
+            return
+        end
+    end
+
+    local src_takes = MIDITakesOn(src_tr)
+    if #src_takes == 0 then
+        S.status      = 'Error: ' .. TRACK_2X .. ' has no MIDI item.'
+        S.last_result = TRACK_2X .. ' track has no MIDI item to read kicks from.'
+        return
+    end
+    local tgt_takes = MIDITakesOn(tgt_tr)
+    if #tgt_takes == 0 then
+        S.status      = 'Error: ' .. TRACK_1X .. ' has no MIDI item.'
+        S.last_result = TRACK_1X .. ' track has no MIDI item to remove kicks from.'
+        return
+    end
+
+    -- Both pitches: a 95 is a kick this tool mislabelled, and it has to be in the
+    -- line or the alternation comes out wrong on a chart that still has them.
+    local src_kicks = {}
+    for _, n in ipairs(NotesAtPitch(src_takes, KICK)) do    src_kicks[#src_kicks + 1] = n end
+    local stale = NotesAtPitch(src_takes, MARK_2X)
+    for _, n in ipairs(stale) do                            src_kicks[#src_kicks + 1] = n end
+    table.sort(src_kicks, function(a, b) return a.qn < b.qn end)
+    if #src_kicks < 2 then
+        S.status      = TRACK_2X .. ' has fewer than two kicks.'
+        S.last_result = 'Nothing to analyse: a double-bass line needs at least two\n' ..
+                        'kick notes on ' .. TRACK_2X .. '.'
+        return
+    end
+
+    local qns = {}
+    for i, k in ipairs(src_kicks) do qns[i] = k.qn end
+    local marks = DoubleBassPlan(qns, MakeBarDownbeatTest())
+
+    local second_foot = {}
+    for i, k in ipairs(src_kicks) do
+        if marks[i] then second_foot[#second_foot + 1] = k end
+    end
+
+    local kicks = NotesAtPitch(tgt_takes, KICK)
+    local matched, misses = MatchMarkers(second_foot, kicks,
+                                         GetTakePPQPerQN(tgt_takes[1].take))
+
+    -- Nothing to do at all: report and return before any Undo_* call, so a no-op
+    -- run leaves no undo point behind.
+    if #matched == 0 and #stale == 0 then
+        S.status = #second_foot == 0
+            and 'Nothing to remove - no double-bass lines found.'
+            or  'Nothing to remove - already done.'
+        local lines = {
+            ('%s   %d kick(s), %d of them a second foot'):format(
+                TRACK_2X, #src_kicks, #second_foot),
+        }
+        lines[#lines + 1] = ''
+        lines[#lines + 1] = #second_foot == 0
+            and ('No run of kicks on ' .. TRACK_2X .. ' is fast enough to need two feet.')
+            or  ('All %d are already absent from %s.'):format(#second_foot, TRACK_1X)
+        S.last_result = table.concat(lines, '\n')
+        return
+    end
+
+    -- Delete per take, descending by note index: MIDI_DeleteNote shifts the
+    -- indices of everything after it.
+    local by_take = {}
+    for _, k in ipairs(matched) do
+        local slot = by_take[k.take]
+        if not slot then
+            slot = { item = k.item, idx = {} }
+            by_take[k.take] = slot
+        end
+        slot.idx[#slot.idx + 1] = k.idx
+    end
+
+    -- One undo block over both tracks, so a single Ctrl+Z puts everything back.
+    r.PreventUIRefresh(1)
+    r.Undo_BeginBlock2(0)
+    for take, slot in pairs(by_take) do
+        r.MarkTrackItemsDirty(tgt_tr, slot.item)   -- REQUIRED: MIDI edits do not mark the take dirty
+        table.sort(slot.idx, function(a, b) return a > b end)
+        for _, i in ipairs(slot.idx) do
+            r.MIDI_DeleteNote(take, i)
+        end
+    end
+    local dirtied = {}
+    for _, k in ipairs(stale) do
+        if not dirtied[k.item] then
+            r.MarkTrackItemsDirty(src_tr, k.item)
+            dirtied[k.item] = true
+        end
+        -- Pitch only; noSort because the loop holds precomputed note indices.
+        r.MIDI_SetNote(k.take, k.idx, nil, nil, nil, nil, nil, KICK, nil, true)
+    end
+    for _, k in ipairs(stale) do
+        if dirtied[k.item] then
+            r.MIDI_Sort(k.take)
+            dirtied[k.item] = false
+        end
+    end
+    r.Undo_EndBlock2(0, ('Remove 2x kicks (%d notes)'):format(#matched), -1)
+    r.PreventUIRefresh(-1)
+    r.UpdateArrange()
+
+    local lines = {
+        ('%s   %d kick(s), %d of them a second foot'):format(
+            TRACK_2X, #src_kicks, #second_foot),
+        ('%s      %d kick(s) removed'):format(TRACK_1X, #matched),
+    }
+    if #stale > 0 then
+        lines[#lines + 1] = ('%d note(s) on %s were pitch %d, which %s ignores -')
+            :format(#stale, TRACK_2X, MARK_2X, 'Rock Band 3')
+        lines[#lines + 1] = ('put back to %d so the 2x chart plays them.'):format(KICK)
+    end
+
+    -- PART DRUMS should be left with everything on PART DRUMS_2X that is not a
+    -- second foot. Anything else means the two charts hold different kicks.
+    local left     = #kicks - #matched
+    local expected = #src_kicks - #second_foot
+    lines[#lines + 1] = ''
+    if left == expected then
+        lines[#lines + 1] = ('%s now has %d kick(s), which is %s\'s %d less the %d\nsecond-foot kicks - consistent.')
+            :format(TRACK_1X, left, TRACK_2X, #src_kicks, #second_foot)
+    else
+        lines[#lines + 1] = ('%s now has %d kick(s); %s implies %d.')
+            :format(TRACK_1X, left, TRACK_2X, expected)
+        lines[#lines + 1] = 'The two charts hold different kicks - worth a look.'
+    end
+
+    -- Already-absent kicks are normal on a re-run, so they are only worth listing
+    -- when some were removed and others were not.
+    if #misses > 0 and #matched > 0 then
+        lines[#lines + 1] = ''
+        lines[#lines + 1] = ('%d second-foot kick(s) were already absent from %s:')
+            :format(#misses, TRACK_1X)
+        for i, miss in ipairs(misses) do
+            if i > UNMATCHED_LIST_MAX then
+                lines[#lines + 1] = ('  ... and %d more'):format(#misses - UNMATCHED_LIST_MAX)
+                break
+            end
+            lines[#lines + 1] = '  ' .. MBTAtQN(miss.qn)
+        end
+    end
+
+    S.status = ('Removed %d kick%s from %s.'):format(
+        #matched, #matched == 1 and '' or 's', TRACK_1X)
     S.last_result = table.concat(lines, '\n')
 end

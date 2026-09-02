@@ -979,44 +979,76 @@ TIPS = {
                     "the last vocal phrase) for the most natural-sounding cutoff.",
 
     -- General tab - Drums 2x kicks
+    -- Not currently drawn: MarkDoubleBassKicks writes pitch 95, which Rock
+    -- Band 3 discards. Kept for a future version supporting games that do
+    -- read it. See ui.lua, General > Actions > Drums 2x kicks.
     drums_2x_mark_double =
         "Find the double-bass lines on PART DRUMS_2X and move every second foot\n" ..
-        "from pitch 96 to pitch 95. Run this first, then Remove 2x-marked kicks to\n" ..
-        "take those same kicks out of the 1x chart on PART DRUMS.\n\n" ..
+        "from pitch 96 to pitch 95.\n\n" ..
+        "NOT for Rock Band 3, which discards pitch 95 - so this button is not drawn\n" ..
+        "in the UI. Kept for a future version supporting games that do read it.\n\n" ..
         "What counts as a double-bass line:\n" ..
         "  Kicks up to a 1/8 apart form one line.\n" ..
         "  Two back-to-back 1/16 kicks are already two feet, so any line with a\n" ..
         "  1/16 or tighter gap qualifies.\n" ..
         "  A straight run of 1/8s needs more than 4 in a row - four or fewer is\n" ..
         "  playable with one foot.\n" ..
-        "  A kick joined to the line by a wider gap across a bar line is a pickup\n" ..
-        "  or a tail, not part of it, and is left alone.\n\n" ..
+        "  A kick hanging off the line by a wider gap - a lone 1/8 leaning against\n" ..
+        "  a burst of 1/16s, or one across a bar line from the rest - is a separate\n" ..
+        "  hit, not part of the line, and is left alone.\n\n" ..
         "Every other kick in the line becomes the second foot, phased so a kick on\n" ..
         "a bar downbeat is never taken - so a line ending on the downbeat starts\n" ..
         "its alternation on the first kick instead of the second.\n\n" ..
+        "A line with a gap in it is read as one continuous grid rather than by\n" ..
+        "counting the kicks that are actually there, so the feet stay on the same\n" ..
+        "subdivisions across the gap and the downbeats either side stay primary.\n" ..
+        "The same foot plays on both sides of the rest, which is what happens when\n" ..
+        "the silent slot was the other foot's.\n\n" ..
         "Kicks already at pitch 95 count as part of the line, so re-running is\n" ..
         "safe. Any 95 sitting where these rules would not put one is reported and\n" ..
         "left untouched - your own edits are never reverted.\n\n" ..
         "The whole track is processed. A time selection does not change the result.\n\n" ..
+        "Check the result rather than trusting it. The rules come from a small number\n" ..
+        "of hand-charted songs, so an unusual passage can come out wrong - most often\n" ..
+        "where a line has a gap in it, or starts and ends on a downbeat. It is meant\n" ..
+        "to do the bulk of the work on the long passages, not to be the last word.\n\n" ..
         "Fully undoable.",
     drums_2x_remove_kicks =
-        "Remove every kick (pitch 96) on PART DRUMS that lines up with a 2x kick\n" ..
-        "marker (pitch 95) on PART DRUMS_2X.\n\n" ..
-        "Both tracks must exist and be unmuted; a muted drum track is treated as not\n" ..
-        "part of the chart. Nothing else on either track is read or changed - only\n" ..
-        "pitch 95 is matched, and only pitch 96 is removed.\n\n" ..
-        "Matching is by musical position, so a tempo change anywhere in the song\n" ..
-        "does not affect it. Each marker takes the nearest kick, and only when that\n" ..
-        "kick is clearly nearer than the next one along - so on a fast double-kick\n" ..
-        "run it cannot take the neighbouring gem by mistake. A marker whose kick is\n" ..
-        "too far away, or too close to call between two, is reported with the\n" ..
-        "distance rather than guessed at.\n\n" ..
-        "If PART DRUMS_2X also carries the 1x kicks as pitch 96 - the usual way to\n" ..
-        "author this - the result also says whether the kick counts on the two\n" ..
-        "tracks agree afterwards.\n\n" ..
+        "Work out which kicks on PART DRUMS_2X are the drummer's second foot, and\n" ..
+        "remove those from PART DRUMS.\n\n" ..
+        "PART DRUMS_2X is the complete drum chart - every kick, double-bass hits\n" ..
+        "included, all at pitch 96. The build swaps that whole track in as the song's\n" ..
+        "2x version. PART DRUMS is the same chart with the second foot taken out, so\n" ..
+        "it stays playable with one pedal. Author every kick on both tracks, then\n" ..
+        "press this.\n\n" ..
+        "Only PART DRUMS loses notes. PART DRUMS_2X is never thinned - the one thing\n" ..
+        "that can change there is a leftover pitch-95 note being put back to 96.\n" ..
+        "Rock Band 3 ignores 95, so a kick left at that pitch would simply not play.\n\n" ..
+        "What counts as a double-bass line:\n" ..
+        "  Kicks up to a 1/8 apart form one line.\n" ..
+        "  Two back-to-back 1/16 kicks are already two feet, so any line with a\n" ..
+        "  1/16 or tighter gap qualifies.\n" ..
+        "  A straight run of 1/8s needs more than 4 in a row - four or fewer is\n" ..
+        "  playable with one foot.\n" ..
+        "  A kick hanging off the line by a wider gap - a lone 1/8 leaning against\n" ..
+        "  a burst of 1/16s, or one across a bar line from the rest - is a separate\n" ..
+        "  hit, not part of the line, and is left alone.\n\n" ..
+        "Every other kick in the line is the second foot, phased so a kick on a bar\n" ..
+        "downbeat is never taken - so a line ending on the downbeat starts its\n" ..
+        "alternation on the first kick instead of the second. A line with a gap in\n" ..
+        "it is read as one continuous grid rather than by counting the kicks that\n" ..
+        "are there, so the feet stay on the same subdivisions across the gap.\n\n" ..
+        "Matching against PART DRUMS is by musical position, so a tempo change\n" ..
+        "anywhere in the song does not affect it, and on a fast run it will not take\n" ..
+        "a neighbouring gem by mistake.\n\n" ..
         "The whole track is processed. A time selection does not change the result.\n\n" ..
-        "Safe to run twice: if nothing matches it says so and changes nothing.\n\n" ..
-        "Fully undoable.",
+        "Safe to run twice: the second run finds nothing left to remove, says so,\n" ..
+        "and adds no undo point.\n\n" ..
+        "Check the result rather than trusting it. The rules come from a small number\n" ..
+        "of hand-charted songs, so an unusual passage can come out wrong - most often\n" ..
+        "where a line has a gap in it, or starts and ends on a downbeat. It is meant\n" ..
+        "to do the bulk of the work on the long passages, not to be the last word.\n\n" ..
+        "Fully undoable - one step puts both tracks back.",
 
     -- Difficulty tab - Pro Keys
     diff_pk_x       = "Expert Pro Keys track (PART REAL_KEYS_X).\n" ..

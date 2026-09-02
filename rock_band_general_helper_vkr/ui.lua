@@ -125,14 +125,14 @@ local function Loop()
 
                         r.ImGui_Separator(ctx)
                         SectionHeader('Drums 2x kicks')
-                        local bw_2x = BtnGroupWidth({ 'Mark double kicks', 'Remove 2x-marked kicks' })
-                        if Btn('Mark double kicks', BTN_H, bw_2x) then
-                            RunAction(MarkDoubleBassKicks)
-                        end
-                        Tooltip(TIPS.drums_2x_mark_double)
-                        r.ImGui_SameLine(ctx)
-                        if Btn('Remove 2x-marked kicks', BTN_H, bw_2x) then
-                            RunAction(RemoveKicksMarkedBy2X)
+                        -- MarkDoubleBassKicks is deliberately NOT drawn here.
+                        -- It writes pitch 95, which Rock Band 3 discards, so on an
+                        -- RB3 chart it turns real kicks in the 2x track into notes
+                        -- the game never plays. The function and its tests are kept
+                        -- for a future version that supports games which do read 95;
+                        -- it comes back with that multi-game UI, not before.
+                        if Btn('Remove 2x kicks', BTN_H) then
+                            RunAction(Remove2XKicks)
                         end
                         Tooltip(TIPS.drums_2x_remove_kicks)
 
