@@ -9,6 +9,31 @@ over 5. See `CLAUDE.md` → "Changelog / `@about` trimming" for the rule.
 
 `rock_band_general_helper_vkr.lua`
 
+**v0.9.54**
+  - New Metadata tab, with a Difficulty sub-tab: suggested difficulty (Beta).
+    Press Refresh suggestions and it scores every finished Expert chart in
+    the project - Guitar, Bass, Drums, Keys, Pro Keys and Vocals - and
+    suggests a rank and tier for each, from measurements of the charts
+    themselves. Five difficulty dots as the game shows them, the rank, and
+    a ruler showing where the score landed between the tier it earned and
+    the next one up, so a close call is visible as a close call. Under that,
+    up to three plain-language notes on what makes the chart unusual
+    compared with the reference songs, each explaining its own terminology
+    on hover.
+    Read-only: it never writes a rank, a MIDI event or a project setting,
+    and creates no undo point. The whole chart is scored - a time selection
+    does not change the result.
+  - Advisory, and it says so. The suggestion is an estimate from a model
+    fitted to official Rock Band 3 ranks, not the official rank, and
+    official and player judgments differ from each other too. Where a
+    chart scores past the end of what the tool can measure, it says that
+    rather than showing a number it cannot stand behind. Keys, Pro Keys
+    and Vocals are less certain than Guitar, Bass and Drums.
+  - No confidence percentage anywhere, and no list of which measurement
+    "caused" a rank. The measurements are heavily interrelated, so naming
+    one as the reason would be inventing an explanation; what is shown is
+    what was measured.
+
 **v0.9.53**
   - Venue > Themes gen and Section gen no longer re-state a lighting or post
     proc preset that is already running. A blend is authored by writing the
@@ -1055,6 +1080,55 @@ over 5. See `CLAUDE.md` → "Changelog / `@about` trimming" for the rule.
 
 `rock_band_vocal_helper_vkr.lua`
 
+**v1.15**
+
+Pitch detection overhaul. Every figure below is from the synthetic test
+harness in `dev/tests/dsp_algorithms.lua`.
+
+- The difference function now compares every candidate period over the
+  same fixed width, instead of a width that shrank as the period grew -
+  that shrinkage biased the search toward long periods, i.e. octave-down
+  errors. Over 420 cases, octave errors fall ~40% (27 to 16 with a full
+  harmonic series, 56 to 34 when the fundamental is weak). A short window
+  no longer silently narrows the frequency range the detector claims to
+  search, so Min frequency is now honoured exactly.
+- Detections whose best match sits on the edge of the searched period
+  range are now rejected. These are cases where the true pitch most
+  likely lies outside the Min/Max frequency bounds and the search simply
+  ran out of room; they previously produced confident-looking wrong
+  pitches. Leave a little room above your highest note when setting Max
+  frequency - a note landing right on the bound can be rejected.
+- Each note is now sampled at several points and the median taken,
+  instead of trusting one sample 30% in. A consonant or breath landing
+  on that instant used to decide the whole note: with a mid-note
+  consonant, correct detections go from 20% to 100%, and with vibrato
+  from 72% to 85%. New "Samples per note" setting (1 / 3 / 5, default 3);
+  when the first two agree the third is skipped, so most notes cost two
+  windows rather than three. Set it to 1 for the old behaviour.
+- Audio is high-passed below Min frequency before detection. Rumble,
+  plosives and low-end bleed sit under the searched range but still
+  dominated the analysis, causing notes to silently fall back to the
+  Default pitch. Against 45-60 Hz contamination, correct detections go
+  from 122/162 to 159/162 at moderate level and 35/162 to 130/162 at
+  heavy level, with no loss on clean audio.
+- New "Min confidence" setting (Pitch and Tuner tabs): detections report
+  how periodic they are, and readings below the threshold are treated as
+  no detection, so notes fall back to the Default pitch rather than
+  getting a wrong one. This rejects breath and unvoiced consonants
+  ("sss", "shh"), which pass a level gate but carry no pitch. Default
+  0.50 matches how earlier versions behaved. The Tuner readout now shows
+  the confidence percentage, amber below 75%.
+- New "Min RMS level" setting (Pitch tab): notes whose audio is too quiet
+  fall back to the Default pitch instead of taking a pitch from bleed in
+  the gaps. Min confidence cannot do this - the periodicity measure
+  ignores level entirely, so quiet bleed scores just as confident as the
+  vocal itself.
+- Detection now analyses at a reduced sample rate (24 kHz for typical
+  vocal settings), which is roughly 3x faster and was measured to give
+  identical pitches to full rate across the vocal range. A high Max
+  frequency keeps the rate up, so the Piano/keys preset is unaffected.
+- Live tuner and pitch-slide detection share all of the above.
+
 **v1.14**
 - Lyrics tab: new "Create phrases" action writes phrase-marker
   (pitch 105) notes, one per line in the lyrics file, bracketing that
@@ -1178,3 +1252,11 @@ over 5. See `CLAUDE.md` → "Changelog / `@about` trimming" for the rule.
   pitches to find the best-fit settings automatically.
 - Fixed Assign lyrics to always operate on the whole MIDI take,
   ignoring any time selection (required for correct word-to-note order).
+
+## Rock Band Music Theory Helper
+
+`rock_band_music_theory_helper_vkr.lua`
+
+**v0.2**
+- Added Guitar tab (chord-shape reference table, RB lane-combo
+  terminology, live fret-shape search/classifier).

@@ -1,6 +1,6 @@
 -- @description Rock Band General Helper
 -- @author VeeKiraRay
--- @version 0.9.58
+-- @version 0.9.59
 -- @about
 --   Utility actions for Rock Band authoring in REAPER.
 --
@@ -25,6 +25,15 @@
 --
 --   This @about block keeps only the 5 most recent versions.
 --   Full history: CHANGELOG.md in the repo.
+--
+--   v0.9.59
+--     - The window title now carries the script version - "Rock Band General
+--       Helper v0.9.59". A bug report that quotes the title says which version
+--       it came from, with nothing to look up. The version is read from this
+--       file's own header when the script starts, so it can never disagree
+--       with the version entries below.
+--     - Your window size, position and dock state carry over unchanged, and
+--       will survive every future version bump too.
 --
 --   v0.9.58
 --     - General > Actions: new "Mark double kicks" button. Charting a double
@@ -140,30 +149,6 @@
 --       game eras, and the tool that writes your song metadata has its own picker.
 --       Read-only, like Metadata > Difficulty: it never reads or writes the project
 --       and creates no undo point.
---   v0.9.54
---     - New Metadata tab, with a Difficulty sub-tab: suggested difficulty (Beta).
---       Press Refresh suggestions and it scores every finished Expert chart in
---       the project - Guitar, Bass, Drums, Keys, Pro Keys and Vocals - and
---       suggests a rank and tier for each, from measurements of the charts
---       themselves. Five difficulty dots as the game shows them, the rank, and
---       a ruler showing where the score landed between the tier it earned and
---       the next one up, so a close call is visible as a close call. Under that,
---       up to three plain-language notes on what makes the chart unusual
---       compared with the reference songs, each explaining its own terminology
---       on hover.
---       Read-only: it never writes a rank, a MIDI event or a project setting,
---       and creates no undo point. The whole chart is scored - a time selection
---       does not change the result.
---     - Advisory, and it says so. The suggestion is an estimate from a model
---       fitted to official Rock Band 3 ranks, not the official rank, and
---       official and player judgments differ from each other too. Where a
---       chart scores past the end of what the tool can measure, it says that
---       rather than showing a number it cannot stand behind. Keys, Pro Keys
---       and Vocals are less certain than Guitar, Bass and Drums.
---     - No confidence percentage anywhere, and no list of which measurement
---       "caused" a rank. The measurements are heavily interrelated, so naming
---       one as the reason would be inventing an explanation; what is shown is
---       what was measured.
 r = reaper  -- global so all dofile'd modules can use it
 
 if not r.ImGui_CreateContext then
@@ -292,6 +277,12 @@ dofile(_dir  .. 'lib/reaper_difficulty_score_vocals.lua')
 dofile(_dir  .. 'lib/reaper_difficulty_tiers.lua')
 dofile(_dir  .. 'lib/reaper_difficulty_predict.lua')
 dofile(_dir  .. 'lib/reaper_difficulty_models.lua')
+
+-- Window title with this script's own @version, read from the header above.
+-- ui.lua passes it to ImGui_Begin; the "###" id inside keeps saved window
+-- geometry across version bumps. See ScriptWindowTitle.
+WINDOW_TITLE = ScriptWindowTitle('Rock Band General Helper', _script)
+
 dofile(_mdir .. 'defaults.lua')
 dofile(_mdir .. 'settings.lua')
 dofile(_mdir .. 'helpers.lua')

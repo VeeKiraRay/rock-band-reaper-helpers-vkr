@@ -1,6 +1,6 @@
 -- @description Rock Band MIDI Pattern
 -- @author VeeKiraRay
--- @version 0.1
+-- @version 0.2
 -- @about
 --   Standalone window for the MIDI > Pattern sub-tab of the Rock Band General
 --   Helper. Capture a note pattern from a time selection, then find, replace,
@@ -12,6 +12,14 @@
 --
 --   Built with Claude (Anthropic) - https://claude.ai
 --
+--   v0.2
+--     - The window title now carries the script version - "Rock Band MIDI
+--       Pattern v0.2". A bug report that quotes the title says which version
+--       it came from, with nothing to look up. The version is read from this
+--       file's own header when the script starts, so it can never disagree
+--       with the version entries below.
+--     - Your window size, position and dock state carry over unchanged, and
+--       will survive every future version bump too.
 --   v0.1
 --     - Initial release. Reuses the general helper's module files directly
 --       (ui_midi_pattern.lua and its dependencies) - fixes and features land
@@ -82,6 +90,11 @@ for _, _f in ipairs(_files) do
     dofile(_f)
 end
 
+-- Window title with this script's own @version, read from the header above.
+-- The "###" id inside keeps saved window geometry across version bumps.
+-- See ScriptWindowTitle.
+local _title = ScriptWindowTitle('Rock Band MIDI Pattern', _script)
+
 -- No LoadSettings() / SetDefault*Tracks() here, unlike the other two standalone
 -- windows: the Pattern sub-tab has never persisted anything (its S.mr_* fields
 -- are marked session-only in defaults.lua, and settings.lua has no key for
@@ -109,7 +122,7 @@ local function Loop()
     if not S.all_track_list then RefreshTrackLists() end
 
     r.ImGui_SetNextWindowSize(ctx, 560, 540, r.ImGui_Cond_FirstUseEver())
-    local visible, open = r.ImGui_Begin(ctx, 'Rock Band MIDI Pattern', true)
+    local visible, open = r.ImGui_Begin(ctx, _title, true)
     if visible then
         -- The general helper keeps this button in General > Actions, which this
         -- window has no equivalent of. The source-track dropdown is not

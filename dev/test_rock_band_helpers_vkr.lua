@@ -35,7 +35,8 @@ local results = { vocal = nil, general = nil, vocal_midi = nil, general_midi = n
                   venue_labels = nil, workflow = nil,
                   guitar_theory = nil, music_notation = nil,
                   karplus_strong = nil, wav_writer = nil,
-                  script_links = nil, difficulty_score = nil,
+                  script_links = nil, window_title = nil,
+                  difficulty_score = nil,
                   difficulty_bpm = nil, difficulty_suggester = nil,
                   metadata_genres = nil }
 
@@ -213,6 +214,14 @@ function Loop()
         end
         r.ImGui_SameLine(ctx)
         draw_status(results.script_links)
+
+        r.ImGui_Spacing(ctx)
+
+        if r.ImGui_Button(ctx, 'Window Title Tests', 155, 24) then
+            run('run_window_title.lua', 'window_title')
+        end
+        r.ImGui_SameLine(ctx)
+        draw_status(results.window_title)
 
         r.ImGui_Spacing(ctx)
 

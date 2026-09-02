@@ -51,7 +51,7 @@ function Loop()
     local sel_s, sel_e = GetTimeSelection()
 
     r.ImGui_SetNextWindowSize(ctx, 580, 1060, r.ImGui_Cond_FirstUseEver())
-    local visible, open = r.ImGui_Begin(ctx, 'Rock Band Vocal Helper', true)
+    local visible, open = r.ImGui_Begin(ctx, WINDOW_TITLE, true)
     if visible then
         ----------------------------------------------------------------
         -- Global: track selectors (MIDI first, then audio source)

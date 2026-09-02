@@ -77,7 +77,7 @@ local function Loop()
     local midi_tracks  = S.midi_track_list
 
     r.ImGui_SetNextWindowSize(ctx, 560, 660, r.ImGui_Cond_FirstUseEver())
-    local visible, open = r.ImGui_Begin(ctx, 'Rock Band General Helper', true)
+    local visible, open = r.ImGui_Begin(ctx, WINDOW_TITLE, true)
     if visible then
         local _new_tab = ''
 

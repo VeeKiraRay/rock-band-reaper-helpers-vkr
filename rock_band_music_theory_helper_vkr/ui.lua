@@ -349,7 +349,7 @@ local function Loop()
     end
 
     r.ImGui_SetNextWindowSize(ctx, 700, 660, r.ImGui_Cond_FirstUseEver())
-    local visible, open = r.ImGui_Begin(ctx, 'RB Music Theory Helper', true)
+    local visible, open = r.ImGui_Begin(ctx, WINDOW_TITLE, true)
 
     if visible then
         if r.ImGui_BeginTabBar(ctx, '##tabs') then

@@ -37,6 +37,32 @@ function SliderTooltip(text)
     end
 end
 
+-- Visible window title carrying the script's own @version, for ImGui_Begin.
+-- The version is read from the running entry point's header at startup, so it
+-- lives in exactly one place and can't drift from what ReaPack and the release
+-- notes report. Returns just the name if the header can't be read.
+--
+-- The "###" suffix is required, not cosmetic: ImGui derives a window's identity
+-- from its Begin label, so without a stable id every version bump would look
+-- like a brand-new window and reset the user's saved size, position and dock
+-- state. The id is the bare name, which is what the label used to be - existing
+-- windows keep their geometry. Never change it.
+function ScriptWindowTitle(name, script_path)
+    local ver
+    local f = io.open(script_path, 'r')
+    if f then
+        for _ = 1, 12 do   -- the header block; no need to scan the whole file
+            local line = f:read('*l')
+            if not line then break end
+            ver = line:match('^%-%-%s*@version%s+(%S+)')
+            if ver then break end
+        end
+        f:close()
+    end
+    if not ver then return name end
+    return ('%s v%s###%s'):format(name, ver, name)
+end
+
 -- Width a Btn() call would use for this label, without drawing it. Needed
 -- ahead of the draw call for pre-positioning (e.g. right-aligning a button
 -- via SetCursorPosX before it's placed) - the one case Btn() itself can't

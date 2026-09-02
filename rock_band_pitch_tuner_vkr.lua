@@ -1,6 +1,6 @@
 -- @description Rock Band Pitch Tuner
 -- @author VeeKiraRay
--- @version 0.1
+-- @version 0.2
 -- @about
 --   Standalone window for the Tuner tab of the Rock Band Vocal Helper. Reads
 --   audio from the selected source track at the playhead and shows the
@@ -12,6 +12,14 @@
 --
 --   Built with Claude (Anthropic) - https://claude.ai
 --
+--   v0.2
+--     - The window title now carries the script version - "Rock Band Pitch
+--       Tuner v0.2". A bug report that quotes the title says which version
+--       it came from, with nothing to look up. The version is read from this
+--       file's own header when the script starts, so it can never disagree
+--       with the version entries below.
+--     - Your window size, position and dock state carry over unchanged, and
+--       will survive every future version bump too.
 --   v0.1
 --     - Initial release. Reuses the vocal helper's module files directly
 --       (ui_tuner.lua and its dependencies) - fixes and features land in both
@@ -80,6 +88,11 @@ for _, _f in ipairs(_files) do
     dofile(_f)
 end
 
+-- Window title with this script's own @version, read from the header above.
+-- The "###" id inside keeps saved window geometry across version bumps.
+-- See ScriptWindowTitle.
+local _title = ScriptWindowTitle('Rock Band Pitch Tuner', _script)
+
 -- Startup initialisation: pick up saved detection settings (YIN threshold,
 -- frequency range, window, confidence, RMS gate, pitch range). Saving stays
 -- in the vocal helper's General tab; this window never writes settings.
@@ -129,7 +142,7 @@ local function Loop()
     if not S.all_track_list then RefreshTrackLists() end
 
     r.ImGui_SetNextWindowSize(ctx, 560, 640, r.ImGui_Cond_FirstUseEver())
-    local visible, open = r.ImGui_Begin(ctx, 'Rock Band Pitch Tuner', true)
+    local visible, open = r.ImGui_Begin(ctx, _title, true)
     if visible then
         r.ImGui_Text(ctx, 'Audio source track')
         r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)

@@ -35,6 +35,20 @@ Note: the 0.7 floor is nominal — sprite tooltips and image loading already use
 
 **Versioning.** Entry point header carries `@version`. Bump it whenever behavior or UI changes meaningfully. Document changes in the `@about` block.
 
+Each window shows that version in its title bar, so a bug report carries it without the user having to look anything up. The entry point builds the title with `ScriptWindowTitle(name, _script)` (`lib/reaper_imgui_helpers.lua`), which reads the `@version` line out of the running script's own header — the version string is never duplicated into code, so it cannot drift from the header. The result is passed to `ImGui_Begin`, either as the global `WINDOW_TITLE` (helpers whose `Begin` lives in a `ui.lua`) or as a file-local `_title` (standalone windows that draw in the entry point).
+
+The returned string ends in `###<name>`, and that suffix is load-bearing rather than cosmetic: ImGui derives a window's identity from its `Begin` label, so without a stable id after `###` every version bump would read as a brand-new window and reset the user's saved size, position and dock state. The id is the bare window name — exactly what the label used to be, so existing windows keep their geometry. **Never change an existing window's `###` id.** `ImGui_CreateContext` labels stay version-free for the same reason: ReaImGui keys per-context saved state off that name.
+
+**Bumping a helper means checking its standalones.** Three windows ship as their own entry points but own almost no code: `rock_band_preview_vkr.lua` and `rock_band_midi_pattern_vkr.lua` draw modules out of `rock_band_general_helper_vkr/`, and `rock_band_pitch_tuner_vkr.lua` draws them out of `rock_band_vocal_helper_vkr/`. A fix in one of those shared modules changes what the standalone does **without touching the standalone's own file**, so its `@version` silently stops describing the code it runs.
+
+So whenever you bump a helper's `@version` and write its `@about` entry, finish the job:
+
+1. Check each standalone's load list — the `_files` table in its entry point, also written out in `.claude/CLAUDE_general.md` and `.claude/CLAUDE_vocal.md` under "Second/Third entry point". This is a lookup, not a judgment call: if a file you changed is in the list, that standalone is affected.
+2. Bump that standalone's `@version` too, in the same task.
+3. Give it its **own** `@about` entry describing the change from that window's point of view — not a copy of the helper's wording. The helper's entry may say "Venue > Preview sub-tab now ..."; the standalone's says what its window now does. Cross-referencing the helper version it shipped alongside is useful (`rock_band_preview_vkr.lua` v0.4 does this) but is not a substitute for saying what changed.
+
+A change that touches only files outside every standalone's list (a venue generator, a difficulty model, a tab the standalone has no equivalent of) affects none of them, and bumping them anyway would be churn — the entry would have nothing true to say.
+
 **Changelog / `@about` trimming.** Each entry point's `@about` block keeps only its **5 most recent** version entries (newest first, as today). When adding a new version entry pushes the count to 6, move the oldest of the 5 previously-kept entries out to `CHANGELOG.md` at the repo root — don't let `@about` grow unbounded, since it's read in-app (REAPER's script info / ReaPack "about" panel) where a long scroll of old history isn't useful.
 
 - `CHANGELOG.md` has one `##` section per entry-point script (its display name, e.g. `## Rock Band General Helper`), each section's entries in the same newest-first order as `@about`. The entry being moved out goes at the **top** of its script's section (it's the newest entry in that file, even though it's the oldest one leaving `@about`).
@@ -72,7 +86,7 @@ dofile(_mdir .. 'defaults.lua')                   -- script-specific modules
 
 | File | Contents |
 |---|---|
-| `lib/reaper_imgui_helpers.lua` | `PitchName`, `Tooltip`, `SliderTooltip`, `Btn`, `BtnWidth`, `BtnGroupWidth`, `LabelColWidth`, `RadioGroupWidth`, `SectionHeader`, `SortedByLabel`, `ComboGroupHeader`, `GetTrackList`, `TrackCombo`, `FormatTime`, `GetTimeSelection` |
+| `lib/reaper_imgui_helpers.lua` | `PitchName`, `Tooltip`, `SliderTooltip`, `ScriptWindowTitle`, `Btn`, `BtnWidth`, `BtnGroupWidth`, `LabelColWidth`, `RadioGroupWidth`, `SectionHeader`, `SortedByLabel`, `ComboGroupHeader`, `GetTrackList`, `TrackCombo`, `FormatTime`, `GetTimeSelection` |
 | `lib/reaper_dsp.lua` | `ComputeRMSContour`, `OpenYINContext`, `YINWindowSize`, `ReadMonoWindow`, `QuickRMS`, `ComputeCMND`, `SearchYINTau`, `MedianVote`, `DetectPitchYIN`, `SampleYINAt`, `GateAndSplit`, `ApplyMinOffset` |
 | `lib/reaper_midi_helpers.lua` | `FindMIDIItem`, `FindFirstMIDIItem`, `ReadAllMIDINotesOnTrack`, `ClearNotesAtPitchesInRange`, `InsertNotes`, … |
 | `lib/reaper_guitar_theory.lua` | `GuitarShapeToPitches`, `GuitarNormalizeIntervals`, `GuitarClassifyChordType`, `GuitarSuggestRBMapping`, `GuitarAnalyzeShape`, `GuitarParseFretInput`, `GuitarAnalyzeShapeAllTunings` — pure, no `r`/`ctx`/`S` |

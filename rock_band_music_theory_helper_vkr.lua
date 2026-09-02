@@ -1,6 +1,6 @@
 -- @description Rock Band Music Theory Helper
 -- @author VeeKiraRay
--- @version 0.5
+-- @version 0.6
 -- @about
 --   In-DAW reference guide for Rock Band custom charters.
 --   Covers drum notation, RB lane mappings, common patterns, a Guitar
@@ -15,6 +15,17 @@
 --   separate optional download (see resources/INSTALLATION_GUIDE.md) and
 --   is only used by the Drums tab; the Guitar and Piano tabs need no extra
 --   assets.
+--
+--   This @about block keeps only the 5 most recent versions.
+--   Full history: CHANGELOG.md in the repo.
+--
+--   v0.6: The window title now carries the script version -- "RB Music Theory
+--         Helper v0.6". A bug report that quotes the title says which version
+--         it came from, with nothing to look up. The version is read from this
+--         file's own header when the script starts, so it can never disagree
+--         with the version entries below. Your window size, position and dock
+--         state carry over unchanged, and will survive every future version
+--         bump too.
 --   v0.5: New Piano tab -- an interactive grand staff for reading sheet
 --         music. Pick the clef for each staff and the key signature, then
 --         click the staff wherever a note head is printed. Six clefs: treble
@@ -67,8 +78,6 @@
 --   v0.3: Guitar tab can now play chords back (synthesized preview tone,
 --         no extra assets required) from both the reference table and
 --         Shape Search.
---   v0.2: Added Guitar tab (chord-shape reference table, RB lane-combo
---         terminology, live fret-shape search/classifier).
 
 r = reaper
 
@@ -124,6 +133,12 @@ dofile(_dir  .. 'lib/reaper_guitar_theory.lua')
 dofile(_dir  .. 'lib/reaper_music_notation.lua')
 dofile(_dir  .. 'lib/reaper_karplus_strong.lua')
 dofile(_dir  .. 'lib/reaper_wav_writer.lua')
+
+-- Window title with this script's own @version, read from the header above.
+-- ui.lua passes it to ImGui_Begin; the "###" id inside keeps saved window
+-- geometry across version bumps. See ScriptWindowTitle.
+WINDOW_TITLE = ScriptWindowTitle('RB Music Theory Helper', _script)
+
 dofile(_mdir .. 'defaults.lua')
 
 -- Seed the RNG once with real entropy so KarplusStrongVoice's noise burst

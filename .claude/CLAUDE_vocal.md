@@ -251,6 +251,10 @@ track combo. Consequences when editing those files:
   never `SaveSettings()` (saving stays in the vocal helper's General tab).
 - It pins `S.tuner_tab_active = true` every frame — see the Tab-navigation stop
   note below.
+- **A fix to any file in that subset changes this window too, so it needs its own
+  `@version` bump and its own `@about` entry** in the same task as the vocal
+  helper's — otherwise its version silently stops describing the code it runs.
+  See `CLAUDE.md` → "Bumping a helper means checking its standalones".
 
 ---
 

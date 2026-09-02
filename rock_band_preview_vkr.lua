@@ -1,6 +1,6 @@
 -- @description Rock Band Venue Preview
 -- @author VeeKiraRay
--- @version 0.4
+-- @version 0.5
 -- @about
 --   Standalone window for the Venue > Preview sub-tab of the Rock Band
 --   General Helper. Shows previous / current / next VENUE events (camera,
@@ -10,6 +10,14 @@
 --   this entry point offers the same UI in its own window so it can sit
 --   next to the generation tabs (e.g. Manual) without tab switching.
 --
+--   v0.5
+--     - The window title now carries the script version - "Rock Band Venue
+--       Preview v0.5". A bug report that quotes the title says which version
+--       it came from, with nothing to look up. The version is read from this
+--       file's own header when the script starts, so it can never disagree
+--       with the version entries below.
+--     - Your window size, position and dock state carry over unchanged, and
+--       will survive every future version bump too.
 --   v0.4
 --     - The preview now understands blends. A blend is authored by writing the
 --       running lighting or post proc preset a second time just before the
@@ -103,6 +111,11 @@ for _, _f in ipairs(_files) do
     dofile(_f)
 end
 
+-- Window title with this script's own @version, read from the header above.
+-- The "###" id inside keeps saved window geometry across version bumps.
+-- See ScriptWindowTitle.
+local _title = ScriptWindowTitle('Rock Band Venue Preview', _script)
+
 -- Startup initialisation: pick up saved preview settings (scale, animate,
 -- players combo, show mode). Saving stays in the general helper's General
 -- tab; this window never writes settings.
@@ -120,7 +133,7 @@ local function Loop()
     end
 
     r.ImGui_SetNextWindowSize(ctx, 700, 720, r.ImGui_Cond_FirstUseEver())
-    local visible, open = r.ImGui_Begin(ctx, 'Rock Band Venue Preview', true)
+    local visible, open = r.ImGui_Begin(ctx, _title, true)
     if visible then
         DrawVenuePreviewTab()
         DrawActivePlayersRow()
