@@ -1,6 +1,6 @@
 -- @description Rock Band Venue Preview
 -- @author VeeKiraRay
--- @version 0.5
+-- @version 0.6
 -- @about
 --   Standalone window for the Venue > Preview sub-tab of the Rock Band
 --   General Helper. Shows previous / current / next VENUE events (camera,
@@ -10,6 +10,14 @@
 --   this entry point offers the same UI in its own window so it can sit
 --   next to the generation tabs (e.g. Manual) without tab switching.
 --
+--   This @about block keeps only the 5 most recent versions.
+--   Full history: CHANGELOG.md in the repo.
+--
+--   v0.6
+--     - No change to this window. It loads the general helper's settings files,
+--       which gained the new Overdrive tab's options in general helper v0.9.60;
+--       this window reads past them and behaves exactly as before. Bumped so its
+--       version keeps describing the code it runs.
 --   v0.5
 --     - The window title now carries the script version - "Rock Band Venue
 --       Preview v0.5". A bug report that quotes the title says which version
@@ -44,10 +52,6 @@
 --       instrument shows its state at the playhead - active (green), idle
 --       (blue), track muted or missing (red), or no play-state events
 --       (orange) - matching the general helper's Venue tab.
---   v0.1
---     - Initial release. Reuses the general helper's module files directly
---       (ui_venue_preview.lua and its dependencies) - fixes and features
---       land in both the sub-tab and this window automatically.
 
 r = reaper  -- global so all dofile'd modules can use it
 

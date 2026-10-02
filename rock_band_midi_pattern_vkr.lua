@@ -1,6 +1,6 @@
 -- @description Rock Band MIDI Pattern
 -- @author VeeKiraRay
--- @version 0.2
+-- @version 0.3
 -- @about
 --   Standalone window for the MIDI > Pattern sub-tab of the Rock Band General
 --   Helper. Capture a note pattern from a time selection, then find, replace,
@@ -12,6 +12,11 @@
 --
 --   Built with Claude (Anthropic) - https://claude.ai
 --
+--   v0.3
+--     - No change to this window. It loads the general helper's defaults file,
+--       which gained the new Overdrive tab's settings in general helper v0.9.60;
+--       nothing here uses them. Bumped so its version keeps describing the code
+--       it runs.
 --   v0.2
 --     - The window title now carries the script version - "Rock Band MIDI
 --       Pattern v0.2". A bug report that quotes the title says which version

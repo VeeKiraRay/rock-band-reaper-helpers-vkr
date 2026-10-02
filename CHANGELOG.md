@@ -9,6 +9,25 @@ over 5. See `CLAUDE.md` → "Changelog / `@about` trimming" for the rule.
 
 `rock_band_general_helper_vkr.lua`
 
+**v0.9.55**
+  - New Metadata > Genre sub-tab: a genre converter. Rock Band accepts 29 major
+    genres and 126 subgenres, and finding the right one is a chore when your song
+    is something the list has no name for. Pick the genre you would actually call
+    the song from a family-narrowed dropdown and it reports the closest supported
+    pair, with a plain-language reason for each.
+    Over 200 genres are offered, deliberately wider than the supported list, so
+    styles with no category of their own - Djent, Easycore, Synthwave, Deathcore,
+    Post-Hardcore, Blackgaze - resolve to something real instead of leaving you
+    guessing.
+  - Some genres map more than one way, and the tab says so rather than pretending
+    otherwise. Where the released-song catalogue genuinely filed a style two ways,
+    both are offered, best first, and each says what would tip the choice. Where
+    the catalogue is consistent, one answer is given.
+  - Names only, never internal metadata strings. Those spellings drift between
+    game eras, and the tool that writes your song metadata has its own picker.
+    Read-only, like Metadata > Difficulty: it never reads or writes the project
+    and creates no undo point.
+
 **v0.9.54**
   - New Metadata tab, with a Difficulty sub-tab: suggested difficulty (Beta).
     Press Refresh suggestions and it scores every finished Expert chart in
@@ -1260,3 +1279,12 @@ harness in `dev/tests/dsp_algorithms.lua`.
 **v0.2**
 - Added Guitar tab (chord-shape reference table, RB lane-combo
   terminology, live fret-shape search/classifier).
+
+## Rock Band Venue Preview
+
+`rock_band_preview_vkr.lua`
+
+**v0.1**
+  - Initial release. Reuses the general helper's module files directly
+    (ui_venue_preview.lua and its dependencies) - fixes and features
+    land in both the sub-tab and this window automatically.

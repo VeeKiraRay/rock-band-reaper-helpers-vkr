@@ -101,7 +101,7 @@ Items 1 and 2 are covered by `dev/tests/script_links.lua`, which checks the regi
 | `lib/reaper_music_notation.lua` | Staff notation model: `NOTATION_CLEFS`, `KEY_SIGNATURES`, `NotationStepToNatural`, `NotationStepToPitch`, `NotationNoteName`, `NotationKeySigAlteration(s)`, `NotationSoundingStep`, `NotationKeySigSlots`, `RBPitchName`, `PianoKeyLayout` — pure, no `r`/`ctx`/`S` |
 | `lib/reaper_script_links.lua` | `SCRIPT_LINK_GROUPS`, `ScriptLinkBasename`, `IsRunningScriptLink`, `FilterScriptLinkGroups`, `LaunchReaScript`, `DrawGeneralLinksTab` — the General > Other tools sub-tab, shared by both helpers |
 | `lib/reaper_karplus_strong.lua` | `KarplusStrongVoice`, `SynthesizeChordSamples`, `SYNTH_TONES`, `SYNTH_TONE_ORDER`, `SynthToneOpts`, `SynthTonesInFamily` — struck/plucked-string synthesis and its per-instrument tone presets, for chord audition |
-| `lib/reaper_difficulty_score.lua` | `ScoreChart`, `SCORE_FACTOR_KEYS`, `NormalizeSpans`, `EventsInSegments`, `DeriveSpansFromEvents`, `ProRemapEvents`, `Percentile`, `TotalSpanSeconds`, `SpanOverlapSeconds` — chart difficulty factors for guitar/bass/drums/keys/Pro Keys. Pure, no `r`/`ctx`/`S` |
+| `lib/reaper_difficulty_score.lua` | `ScoreChart`, `SCORE_FACTOR_KEYS`, `NormalizeSpans`, `EventsInSegments`, `DeriveSpansFromEvents`, `ProRemapEvents`, `Percentile`, `TotalSpanSeconds`, `SpanOverlapSeconds`, `DIFFICULTY_PRIMITIVES` — chart difficulty factors for guitar/bass/drums/keys/Pro Keys. Pure, no `r`/`ctx`/`S`. `DIFFICULTY_PRIMITIVES` exports four per-event building blocks (`PitchSetChanged`, `ShapeKey`, `MotionKey`, `ConditionalEntropy`) for the general helper's Overdrive tab, which scores single bars. Exported rather than copied, so the models stay tied to one implementation |
 | `lib/reaper_difficulty_score_vocals.lua` | `ScoreVocalChart`, `NormalizeVocalPhrases`, `VocalClassifyLyric`, `VocalPitchClassDistance`, `VocalNoteIsPitched`, `VocalSubtractPercussion` — the vocal factor set. Pure. **Load after `reaper_difficulty_score.lua`**: it uses that file's span helpers and appends its columns to `SCORE_FACTOR_KEYS` |
 | `lib/reaper_difficulty_tiers.lua` | `RANK_TIER_THRESHOLDS`, `TIER_NAMES`, `TierForRank`, `TierName`, `TierBand`, `TierPosition` — rank to displayed tier (0 Warmup … 6 Impossible), from `_external_docs/InstrumentDifficulty.ts`. Pure. **Both open-ended bands are closed by the model, not the tier table**: tier 6 by `rank_hi`, tier 0 by `rank_lo`. Measured from rank 1 instead, every floor-clamped Warmup chart computed 0.85–0.97 and read as almost-Apprentice while having fallen off the *bottom* of the scale (drums: 97% of a 1–124 band whose model floor is 120). Both args are optional and omitting them keeps the tier table's own 1-and-infinity |
 | `lib/reaper_difficulty_predict.lua` | `DIFFICULTY_SCALE_INV`, `DifficultyModelInputs`, `DifficultyPredictRank`, `DifficultyFactorZ`, `DifficultyOutOfRange` — how to apply a frozen model. Pure. Coefficients are in **standardized** units, so nothing may apply them by hand |
@@ -444,6 +444,13 @@ that dofiles the code under test and the set.
     metadata_genres_lookup.lua                 vocabulary + mapping, and the lookup
     ui_metadata_genre.lua                    ← Metadata > Genre tab body
     ui_metadata.lua                          ← Metadata tab shell (Genre + Difficulty)
+    overdrive_read.lua                       ← Overdrive tab: song model (QN), per-bar
+    overdrive_interest.lua                     interest score, the fill / vocal /
+    actions_overdrive_fills.lua                instrument planners (pure) with the
+    actions_overdrive_vocals.lua               Generate action, the validator, and
+    actions_overdrive.lua                      the tab body
+    actions_overdrive_validate.lua
+    ui_overdrive.lua
 
   rock_band_music_theory_helper_vkr.lua      ← entry point (only file users run)
   rock_band_music_theory_helper_vkr/

@@ -1547,3 +1547,19 @@ SCORE_LEAN_SETS = {
     { name = 'solo concentration',     keys = { 'total_changes', 'density_peak',
                                                 'tight_p10', 'solo_change_ratio' } },
 }
+
+-- A few of the per-event building blocks above, exported for the general helper's
+-- Overdrive tab, which ranks individual bars by how eventful they are rather than
+-- scoring a whole chart.
+--
+-- EXPORTED, NOT COPIED. These are the same functions ScoreChart calls; nothing about
+-- them changes by being reachable from outside, so the fitted models and their
+-- coefficients are unaffected. A second copy elsewhere would be free to drift, which is
+-- the one thing this file must never allow. Collected in one table so the shared
+-- global environment gains one name, not four generic ones.
+DIFFICULTY_PRIMITIVES = {
+    PitchSetChanged    = PitchSetChanged,
+    ShapeKey           = ShapeKey,
+    MotionKey          = MotionKey,
+    ConditionalEntropy = ConditionalEntropy,
+}

@@ -8,7 +8,9 @@ Read `CLAUDE.md` first for shared architecture, conventions, and Lua specifics.
 
 ## How the script is used
 
-Six stable tabs are always visible: **General | Difficulty | Tab Input | MIDI | Venue | Metadata**
+Seven stable tabs are always visible: **General | Difficulty | Overdrive | Tab Input | MIDI | Venue | Metadata**
+
+**Overdrive tab** — generates overdrive phrases (116), unisons, drum fills (120-124) and vocal overdrive for the whole song, and validates what is already authored (read-only, with an overview strip). One page: an Instrument dropdown (All / Drums / Bass / Guitar / Keys / Vocals — groups, so tracks that must match are always written together), one settings block per generator with an include checkbox, one **Generate** button, then **Validate**. A time selection is ignored. See "Feature: Overdrive" below.
 
 **Metadata tab** has two sub-tabs. **Genre** converts a real-world genre into the closest supported major genre and subgenre; it is a pure lookup over two static tables and is listed first because it works with no project open at all. Like Difficulty it states outright that it is advisory - but for a different reason, and the two wordings should not be merged: Difficulty's inputs are measurements of the author's own MIDI, whereas every genre mapping is a hand-made judgment call, so only Genre invites the reader to push back on it. **Difficulty** estimates what rank a finished Expert chart should carry. Both are read-only.
 
@@ -279,6 +281,13 @@ The section's **keyframes are emitted either way** — only the lighting event i
 | `rock_band_general_helper_vkr/difficulty_explain.lua` | `DIFFICULTY_FACTOR_INFO`, `DIFFICULTY_FACTOR_ORDER`, `DIFFICULTY_STATUS_BADGE`, `DIFFICULTY_STATUS_NOTE`, `DifficultyPositionText`, `DifficultyRulerBand`, `DifficultyFactorRows`, `DifficultyExplanations`, `DifficultyWarnings`, `DifficultyAnnotate` (global); `FormatValue` (local) — turns a suggestion into words. Pure, so `dev/tests` drives it with hand-built factor tables. **Never shows regression coefficients**: the factors are near-collinear, so a large coefficient says which of a correlated pair the solver loaded, not what the chart demands. It reports what was *measured* — the ≤3 properties on which this chart is unusual versus the training corpus (|z| ≥ 1.0), which is a claim about the chart and the corpus with no causal content. **A candidate that merely restates a bullet already chosen is skipped** (`COLLINEAR_R = 0.70` against the artifact's `model.corr`), because picking by |z| alone spent two of three slots on one observation on 20% of corpus rows. The loop *continues* rather than breaks, so the slot goes to the next distinct factor; where every remaining notable factor restates one already shown, the card correctly ends up with fewer than three bullets rather than a padded three. `model.corr` is optional and its absence degrades to the old behaviour. `DifficultyFactorRows` is deliberately **not** filtered — the Details table is a complete list, and comparing two charts needs every row. Interval factors (`tight_p10`, `tight_med`) are spacings, so **low is the hard direction** and their wording is inverted. Warning thresholds: tier position ≤ 0.15 / ≥ 0.85, concentration against the model's own per-instrument training p90 (bass and drums never mark a solo, so only the density-ratio branch can fire there; vocals has neither and never warns). **Out-of-range measurements are not a card warning** — they ride on `factor_rows[].out_of` and are shown beside the number in the Details view. Out of range means *unusual*, not *responsible*: a near-empty keys chart carried the corpus's largest average chord size (a sustained two-note pad — unusual and easy for unrelated reasons), and naming it beside a floor-clamped rank read as "it is easy because its chords are large". The clamped note therefore states the bound and stops. Model maturity is **not** a warning — it is a property of the model, not the chart, so it would repeat identically on every card forever; it lives in `DIFFICULTY_STATUS_NOTE` and is shown as the badge's tooltip. Warning wording avoids "calibrated", "extrapolation" and the like: the reader is an author looking at their own MIDI, so the notes say what the number means ("the rank is capped at 488 - the true figure is probably higher") rather than describing the statistics. No confidence percentage anywhere — the regressions produce no calibrated per-song probability. The **Details table is ordered by `DIFFICULTY_FACTOR_ORDER`, not by |z|** — a per-song order put a different factor in every position, so two charts on the same instrument could not be read side by side, which is the only reason that table exists; most-unusual-first still picks the ≤3 bullets, where a ranking is the point. A factor's `tip` is **optional and most do not need one**: it explains the *sentence*, not the measurement, so it earns its place only where the wording uses a term the reader cannot map onto their own MIDI. Requiring one per factor produced tooltips describing the hidden number under a bullet that shows no number, and tooltips explaining game mechanics to the author who wrote the markers. `dev/tests` asserts quality (no tip under 40 chars) rather than coverage, and asserts `DIFFICULTY_FACTOR_ORDER` and `DIFFICULTY_FACTOR_INFO` hold exactly the same keys. `DifficultyRulerBand` supplies the tier ruler's band, its two end labels and a `pinned` flag; the ends with no neighbouring tier are labelled `min <rank_lo>` / `max <rank_hi>` rather than inventing a seventh tier name. **`DifficultyAnnotate` currently forces `rec.badge = nil`** — the maturity chip is switched off for the first release to keep the card plain while authors see it for the first time; the mapping and its tooltip text are still asserted by the tests so the one-line change that restores it stays safe. |
 | `rock_band_general_helper_vkr/difficulty_report.lua` | `DifficultyReportText(recs, opts)` (global); `Wrap`, `Pad` (local) — the Copy details button's output. **Pure**, and consumes only what `DifficultyAnnotate` already built (`factor_rows` is pre-formatted and pre-ordered), so it needs none of `difficulty_explain.lua`'s locals and `dev/tests` drives it directly. Split out rather than appended because that file was at 633 lines, in CLAUDE.md's "evaluate splitting before adding more" band. **Aligned plain text, not markdown** — this gets pasted into forum posts, text files and REAPER's console, where a markdown table is pipe-and-dash noise. Column widths are measured across **all** blocks so instruments line up with each other. It **always includes the full factor table**, ignoring `S.diff_show_factors`: producing those numbers for someone else to read is the entire point, and the hand-copied 26-row drum table that prompted the feature had silently lost a row. Each block names its candidate, scale and the artifact schema, because the keys model changed twice in one week and a pasted report has to be identifiable as pre- or post-change. The uncapped score appears only when the clamp actually moved the rank. |
 | `rock_band_general_helper_vkr/difficulty_suggester.lua` | `SuggestProjectDifficulties`, `CountVocalParts`, `HasAnyChartTrack` (global); `Unavailable`, `NoContent`, `SuggestOne` (local) — the read-only Metadata > Difficulty adapter. Returns one record per instrument (`rank`, `tier`, `tier_position`, `factors`, or `ok = false` with a `reason`); never touches `S`, never writes, never creates an undo point. Scores the **whole** chart — a time selection is deliberately not consulted, because the models were calibrated on whole songs. `CountVocalParts` derives `vocal_parts` from HARM2/HARM3 carrying notes, which reproduces the `songs.dta` field on all 203 corpus vocal songs. Reports "absent" and "muted" separately rather than calling `GetMutedInstruments`, which conflates them (see the comment there). |
+| `rock_band_general_helper_vkr/overdrive_read.lua` | `OD_PITCH`, `OD_FILL_LO/HI`, `OD_PHRASE_PITCH`, `OD_SOLO_PITCH`, `OD_QN_EPS`, `OD_INST_GROUPS`, `OD_VOCAL_TRACK`, `OD_HARM_TRACK`, `OD_GROUP_CHOICES`, `OdInstGroup`, span helpers (`OdSpansOverlap`, `OdSameQN`, `OdSameSpan`, `OdAnyOverlap`, `OdSpanListsEqual`), bar helpers (`OdCountedBeats`, `OdReadBars`, `OdBarAt`, `OdBarStartingAt`, `OdBarsOfSpan`, `OdBarActivity`), `OD_TOM_MARKERS`, `OdCrashBars`, `OdTrackTakes`, `OdReadPitchNotes`, `OdBuildModel`, `OdFinishModel`, `OdWhere` (global); `PitchSpans`, `FillSpans`, `ReadEventsTrack` (local) — the Overdrive tab's song model, all in quarter notes. Reads through `difficulty_read.lua`'s `FindTrackExact` / `ReadGemEvents` rather than a second reader |
+| `rock_band_general_helper_vkr/overdrive_interest.lua` | `OdBarInterest`, `OdBandTogetherness` (global); `PercentileRanks`, `WindowTerms`, `BarSignature`, weights (local) — per-bar "eventfulness" from `DIFFICULTY_PRIMITIVES`. Pure |
+| `rock_band_general_helper_vkr/actions_overdrive_fills.lua` | `OD_FILL_PACINGS`, `OdAutoFillPacing`, `OdPlanFills`, `OdActivationQN`, `OdSplitEarlyFills` (global) — drum fill planner. Pure |
+| `rock_band_general_helper_vkr/actions_overdrive_vocals.lua` | `OdPlanVocals` (global) — vocal overdrive planner (cadence + HARM1 match). Pure |
+| `rock_band_general_helper_vkr/actions_overdrive.lua` | `OdUnisonGroups`, `OdPlanInstruments` (pure), `OdJobs`, `OdFillAvoidSpans`, `OdVocalNoGo`, `OdDrumPhrasesForActivation`, `GenerateOverdrive` (global); `TakeAtQN`, `InsertQN`, `ClearPitches`, `GroupTracks` (local) — instrument/unison planner and the Generate action (replace confirmation, writing, report) |
+| `rock_band_general_helper_vkr/actions_overdrive_validate.lua` | `OdValidateModel` (pure), `OdBuildOverview`, `ValidateOverdrive` (global) — read-only checks and the overview strip's data |
+| `rock_band_general_helper_vkr/ui_overdrive.lua` | `DrawOverdriveTab` (global); `DrawOverview` (local) — tab body, overview strip, replace-confirmation modal (`ConfirmOverdriveReplace`) |
 | `rock_band_general_helper_vkr/tempomap.lua` | `ComputeTempoRMSContour`, `DetectOnsets`, `EstimateBPM`, `GuessTimeSig`, `GetSourcesForRange`, `FitBeatGrid`, `RmsToOnsetFlux`, `FindLocalPeak` |
 | `rock_band_general_helper_vkr/actions.lua` | `AlignAudioTracks`, `AlignAllAudio`, `AlignCountIn`, `CreateSongFadeOut`; `CountInBeatSlots` (local) |
 | `rock_band_general_helper_vkr/actions_tempomap.lua` | `ShowTempoContext`, `EstimateInitialBPM`, `AutoTuneThreshold`, `ClearGeneratedTempoMarkers`, `GenerateTempoMap`; `BPM_MIN`, `BPM_MAX` (locals) |
@@ -444,6 +453,17 @@ actions_difficulty.lua         → CopyProKeysDiff, ValidateProKeysDiff, Validat
 actions_difficulty_5k.lua      → ValidateKeys5Diff, ValidateAllKeys5, CopyKeys5Diff
 actions_difficulty_gtrbass.lua → CopyGtrBassDiff, ValidateGtrBassDiff, ValidateAllGtrBass
 actions_difficulty_drums.lua   → CopyDrumsDiff, ValidateDrumsDiff, ValidateAllDrums
+overdrive_read.lua             → OD_* constants, OdBuildModel, Od* span/bar helpers
+                                  (needs difficulty_read.lua's FindTrackExact/ReadGemEvents
+                                  at call time)
+overdrive_interest.lua         → OdBarInterest, OdBandTogetherness
+actions_overdrive_fills.lua    → OD_FILL_PACINGS, OdAutoFillPacing, OdPlanFills,
+                                  OdActivationQN, OdSplitEarlyFills
+actions_overdrive_vocals.lua   → OdPlanVocals
+actions_overdrive.lua          → OdUnisonGroups, OdPlanInstruments, OdJobs,
+                                  OdFillAvoidSpans, OdVocalNoGo, OdDrumPhrasesForActivation,
+                                  GenerateOverdrive
+actions_overdrive_validate.lua → OdValidateModel, OdBuildOverview, ValidateOverdrive
 actions_venue_manual.lua       → InsertVenueEventAtPlayhead, AdvanceCameraPacing,
                                   GenerateManualKeyframes, RemoveVenueEventsByType,
                                   FindManualLightingAtPpq, FindNextVocalPhraseStartPpq,
@@ -466,6 +486,7 @@ ui_common.lua                  → TrackCombo, MidiEditorTrackWarning,
                                  DrawStatusResultPanel
 ui_keys.lua                    → DrawKeysTab
 ui_difficulty.lua              → DrawDifficultyTab
+ui_overdrive.lua               → DrawOverdriveTab (reads OD_FILL_PACINGS at load time)
 ui_midi_pattern.lua            → DrawMIDIPatternTab, ResetMIDIPatternState
 ui_midi.lua                    → DrawTabInputTab, DrawMIDITab
 ui_venue.lua                   → DrawVenueTab, RenderCamPacingRow, RenderKeyframeAlignCombo
@@ -506,7 +527,7 @@ ui.lua                         → Loop (also calls r.defer(Loop))
 
 Section `RBHelperVKR`, key `settings_v1`. Auto-loads on script open.
 
-**Saved:** all tempo map sliders — primary source (`tm_rms_threshold`, `tm_rms_window_ms`, `tm_search_window_ms`, `tm_drift_threshold_ms`, `tm_bpm_failsafe`, `tm_first_measure`, `tm_timesig_num`, `tm_override_failsafe`), fallback source (`tm_fb_rms_threshold`, `tm_fb_rms_window_ms`, `tm_fb_use_flux`), auto-tune (`tm_autotune_density`), the Difficulty tab's Guitar/Bass instrument radio (`diff_gb_instrument`), the Keys sub-tab's "Reduce using Pro Keys" checkbox (`diff_5k_pk_reduce`), and the Workflow sub-tab's selected template name (`workflow_file_name`) and "Show completion timestamp" checkbox (`workflow_show_ts`).
+**Saved:** all tempo map sliders — primary source (`tm_rms_threshold`, `tm_rms_window_ms`, `tm_search_window_ms`, `tm_drift_threshold_ms`, `tm_bpm_failsafe`, `tm_first_measure`, `tm_timesig_num`, `tm_override_failsafe`), fallback source (`tm_fb_rms_threshold`, `tm_fb_rms_window_ms`, `tm_fb_use_flux`), auto-tune (`tm_autotune_density`), the Difficulty tab's Guitar/Bass instrument radio (`diff_gb_instrument`), the Keys sub-tab's "Reduce using Pro Keys" checkbox (`diff_5k_pk_reduce`), and the Workflow sub-tab's selected template name (`workflow_file_name`) and "Show completion timestamp" checkbox (`workflow_show_ts`), and every Overdrive tab setting (`od_group`, the three include checkboxes, `od_beats_per_phrase`, `od_unison_share`, `od_keepout_start`, `od_together`, `od_vocal_overlap`, `od_keepout_od`, `od_keepout_unison`, `od_fill_pacing`, `od_fill_sections`, `od_fill_skip_early`, `od_fill_keepout_end`, `od_vocal_every`). `od_pending` and `od_overview` are session-only and cleared on project switch.
 **Not saved:** track indices — positional, brittle. `SetDefaultTempoTracks` re-detects tempo map tracks by name; `SetDefaultMIDITracks` re-detects PART DRUMS and PART GUITAR target tracks by name; `SetDefaultDifficultyTracks` re-detects all Difficulty-tab tracks (Pro Keys, Keys, Guitar/Bass, Drums) by name. All only assign fields that are still -1 (do not override saved state).
 
 **Own ExtState keys, guarded through `SaveSettings`/`LoadSettings`:** the Section gen sub-tab's per-section configs (`vsec_v1`, `actions_venue_section.lua`) and the Workflow sub-tab's checklist state (`workflow_v1`, `actions_workflow.lua`) each live under their own key rather than the `settings_v1` scalar blob — both hold a variable-length, dynamically-keyed collection rather than a small fixed set of fields.
@@ -881,6 +902,153 @@ Event sections: 8 total
 ```
 
 The `(N parts)` annotation appears only for lettered groups with `sub_count > 1`.
+
+---
+
+## Feature: Overdrive
+
+Generates and validates overdrive for the whole song. Sources: the RBN/C3 "Overdrive and Big Rock Endings" page, plus the drum and vocal authoring pages for fills and vocal phrases. Defaults were checked against reference charts: 581 official RB3 DLC songs and 147 RBN songs, aggregate figures only.
+
+### Notes and tracks
+
+| What | Note | Tracks |
+|---|---|---|
+| Overdrive / unison phrase | 116 | PART DRUMS, PART DRUMS_2X, PART BASS, PART GUITAR, PART KEYS, PART REAL_KEYS_X, PART VOCALS, HARM1 |
+| Drum fill | 120-124, all five lanes, one span | PART DRUMS + PART DRUMS_2X |
+| Big Rock Ending lanes | 120-124 from `[coda]` on (Pro Keys: 120 only) | read only — never generated, never cleared |
+| Vocal phrase | 105 | PART VOCALS, HARM1 |
+
+The groups in `OD_INST_GROUPS` write their tracks together: PART DRUMS with PART DRUMS_2X, and PART KEYS with PART REAL_KEYS_X. The game needs the keys pair to match, and 2X is the same chart as PART DRUMS. PART VOCALS and HARM1 are written together too: Rock Band 3 has a visual bug in harmonies if the parts differ, so only vocal phrase markers that are identical on both parts are used.
+
+### Rules the generator enforces
+
+- About one phrase per **40 counted beats** of the part's *playing* bars. Counted beats are not quarter notes: 7/8 counts 3 and 6/8 counts 2 (`OdCountedBeats`). A phrase is one measure long.
+- Unisons are about **half** the median phrase count. A unison is an identical span on every instrument. A subset without keys is allowed when keys is not playing; never fewer than 3 instruments (or all of them, if there are only 2).
+- No two instruments share a bar outside a unison, and phrases never overlap.
+- Nothing in the last **8** measures, and no unison in the last **12**. Both count back from `[coda]` when there is one, otherwise from `[end]`. When there is no `[end]` either, the last note is used and Validate says the end checks are approximate.
+- **Start keep-out** (`od_keepout_start`, default **5**): no phrase or unison until the band has played that many measures, counted from the first measure *any* present instrument plays. Joining an existing unison ignores it. This is not a doc rule. Official charts put the first instrument phrase a median of 5 measures into the playing (p10 2, p90 9; song-level first OD at median measure 8), and put it in the very first playing measure in only 2% (RB3 DLC) to 14% (RBN) of songs. Without the rule the generator did that in 27%. The singles' spacing is measured from the keep-out, so the part's phrases are spread over the bars they can actually use. Validate reports the lead-in as a summary line, not a warning: at the default, half the official charts would trip it.
+- Vocals are never part of a unison. Whether instrument phrases may also sit *under* vocal overdrive is the **Over vocal OD** setting (`od_vocal_overlap`, `OdVocalNoGo`):
+  - **Overlap anywhere** (default): what official charts do. 24% of their instrument phrases overlap vocal OD, in 59 of 60 reference songs, and the song build tool accepted it in two deliberate tests. It never makes vocals part of a unison: vocal OD follows the phrase markers, and 0 of 483 official vocal phrases share a unison's span.
+  - **Avoid its first measure:** keep the measure the vocal phrase starts in clear; the rest of a long phrase may be overlapped. 96% of vocal OD spans more than one measure, and 62% of official overlaps fall only in the later measures.
+  - **Avoid vocal overdrive:** v0.9.60's original behaviour. Every measure a vocal phrase touches is off-limits.
+- **Band playing together** (`od_together`, default on, All only), for unisons. Across 60 reference songs, official unisons sit on the **last measure before a section** 5.8× as often as chance (20.6% of unisons vs 3.6% of bars). That's the doc's "pickup, build-up to a chorus". They also sit where guitar and bass share rhythm and contour (`OdBandTogetherness`, lift 1.14; none on guitar-only phrases). The fill grid ends fills on exactly that pre-section measure, and fills are planned first, so the best unison spot was always taken. With the option on:
+  - a unison may take the measure before a section when the only thing in the way is the fill leading into it, and that fill gives way (`plan.yielded`, reported);
+  - togetherness is added to the unison score, at weight 2 per member.
+
+  Generated unisons on an official unison measure rise from 4.4% to 13.1%, and within one measure from 14.0% to 22.7%. About 1 fill in 10 gives way, which leaves fill counts slightly *below* the official charts rather than above.
+
+  Don't chase much more. Charters aren't consistent with themselves: a chorus with a unison has one in the same spot of the next chorus only 19% of the time. The remaining signals are weak: density rising into a measure (lift 1.21) or dropping (1.35), and section type (riff/interlude 1.44, breakdown/build about 1.7 but rare).
+- Drums and unisons stay out of fill bars and never start on a fill's closing crash. A drum phrase in the bar before a fill ends a 32nd short, so it does not touch the fill (the CARV rule).
+- A drum solo (a `[prc_drum_solo...]` section or a 103 span on PART DRUMS) holds at most 4 drum phrases, or 2 when a unison leads straight in. It has no fills.
+- **Fill end keep-out** (`od_fill_keepout_end`, default **2**): a fill's crash must land at least that many measures before the drums' last measure with a gem. A fill leading into the final hit has nothing left to deploy overdrive for. Official charts put the last fill a median of 4 measures before the drums end. It lands on the final measure in 1% (RB3 DLC) / 0% (RBN) of songs, and within 2 measures in 25% / 6%.
+- Vocal OD is an exact copy of a 105 phrase, one per **5** sung phrases. A phrase is only eligible when HARM1 has a 105 with an identical start and end. When the cadence lands on a mismatch it tries one phrase earlier, then one later, and continues from the phrase chosen. When neither works, the slot is reported with measure and time.
+
+### Order: vocals, then fills, then instruments
+
+Each step fences off the next:
+
+1. **Vocals** go first. They are the least flexible, since they are tied to phrase markers and to HARM1. Under the two "avoid" modes of Over vocal OD, their spans also fence off the instruments.
+2. **Fills** go second. They are a grid built from the drum part and the sections, which is the order drum authoring happens in anyway.
+3. **Instrument phrases** are placed last, around both.
+
+Fills were originally planned last, and every drum phrase then knocked out one or two fill slots: across 60 reference songs that lost 30% of the fills (1256 generated vs 1755 official). Planned first, the count matches the official charts (1790 vs 1755), and the drum phrases still reach their targets.
+
+One fill step runs after the instruments: **dropping early fills** (`od_fill_skip_early`, on by default). A fill before the drummer can have enough overdrive to activate is never usable. Activation takes two single drum phrases, or one unison, which counts double. `OdActivationQN` finds the end of the arming phrase, and `OdSplitEarlyFills` removes every fill that starts before it. This needs the drum phrases, which is why it can't happen during fill planning. The docs never mention a use for early fills. Official RB3 DLC leaves at least one in 56% of songs (6% of all fills); RBN charts do in 26% (1.6%). So it's an option, and Validate only reports early fills in the summary.
+
+### Where fills end (`OdPlanFills`, "End fills at section changes / crashes")
+
+The grid places a fill every N measures. Within reach of each grid slot:
+1. A `[prc_*]` section start moves the fill to it.
+2. Otherwise a **drum crash** does, nearest the slot first. A crash is a blue or green *cymbal* on a downbeat (`OdCrashBars`). Pro Drums tom markers 111/112 turn those gems into toms, and yellow is left out because it's the hi-hat.
+3. Otherwise the fill stays on the grid.
+
+**Sections come first because of measurement, not preference.** Across 60 reference songs:
+
+| Order | Fills ending where the official fill ends |
+|---|---|
+| Plain grid | 34% |
+| Crashes first, sections as fallback | 61% |
+| Sections first, crashes as fallback (shipped) | 76% |
+
+Drummers crash in plenty of places that aren't phrase starts, so a crash inside a phrase pulls fills off correct sections. In the spots where a section start had no crash but its neighbour did, the official fill followed the section 32 times and the crash 10 times.
+
+The crash is still used as a **check**. When a fill follows a section start with no crash of its own, but the neighbouring downbeat has one, the Generate report says the section event may be a measure off. That usually means the event was placed by the vocal line rather than the band. Moving the event moves the fill: the case that prompted this was a final chorus marked one measure short, where the section events followed the singer.
+
+### How phrases are placed (`OdPlanInstruments`)
+
+- **Fresh unisons** only happen when every present instrument is being generated (All). A kept track's phrases are not the generator's to line up with. The unison targets are evenly spaced; each is placed on the bar within reach that has the highest summed interest where all core instruments play.
+- **Join mode.** When some tracks are kept (a single part is selected, or **Keep existing** was chosen), their identical spans shared by 2 or more parts count as existing unisons. Generated parts join those unisons, and the rest of the kept tracks' bars are simply occupied.
+- **Singles** go into the widest remaining gap first. Gaps are measured in the part's own playing-beat space, so a rest never looks like a gap that needs a phrase. A single may move up to a sixth of the gap from its middle, to a more interesting free measure, but pays a spacing penalty of 0.5 × (distance / reach) against its 0–1 interest, so spacing wins most ties. The first version (a quarter of the gap, penalty 0.15) let a section-start bonus pull a phrase 3 measures off target. It left 6.3% of gaps under 0.6× the song's average gap, where official charts have 3.6%. The current values give 4.0%, with the same official-measure hit rate for singles (13.1% vs 13.6%). For single phrases, interest barely predicts official placement, while even spacing is what the doc asks for.
+- **Phrase span.** A phrase runs from the barline to the next barline. When the downbeat is empty it starts on the first gem instead, but only if that gem falls within the first beat; a later start would leave a sub-half-measure phrase.
+
+### What the interest score does not do
+
+`OdBarInterest` ranks bars by eventfulness: chord changes, shape variety and motion entropy, reusing the difficulty scorer's primitives. Density has the lowest weight, so a bar of one repeated power chord loses to a bar with palm-muted single notes threaded between the chords.
+
+Measured against the official charts, **none of the note-content terms predicts where official overdrive goes**. Their lift over an average playing bar is 1.01–1.05, and a generator using the score hits an official OD bar about as often as a random pick inside the same spacing window (about 10% exact, about 30% within ±1 bar). Several weightings made no difference. Official placement is explained by:
+- spacing;
+- keeping drums out of fill bars (lift 0.07);
+- one structural cue: the bar just before a section change (lift 1.39 on guitar), i.e. pickups and build-ups.
+
+So the context term carries the most weight, and the bar before a section outranks the section's own first bar. Do not present the tool as reproducing charter judgment. The `@about` entry says so, and so should any future wording.
+
+### Validation severities
+
+**Errors:** only the rules the docs tie to a bug or a chart that does not work:
+- overdrive overlapping a fill;
+- a fill inside a drum solo;
+- a unison sharing a measure with a fill;
+- vocal OD that is not exactly a phrase marker;
+- HARM1 ≠ PART VOCALS (a visual bug in harmonies);
+- a mismatched mirror pair (KEYS vs REAL_KEYS_X, DRUMS vs DRUMS_2X);
+- overdrive in the Big Rock Ending.
+
+**Warnings:** everything else. That includes two rules the docs state firmly but official charts, community RBN charts included, break in 3–8% of fills: a drum phrase ending exactly where a fill starts (CARV) and one starting on a fill's crash. As errors they buried the real problems — the first version reported 177 errors across 60 official songs.
+
+**Summary counts:** instrument phrases under vocal overdrive are counted in the summary rather than listed, because official charts do it about 9 times per song.
+
+### Corpus figures behind the defaults
+
+| Measure | RB3 DLC | RBN |
+|---|---|---|
+| Quarter-note beats per phrase (over the playing span) | median 43 | median 43 |
+| Phrase length | median 1.0 bar | 1.0 bar |
+| Phrase starts on a barline | 76–87% | 85–88% |
+| First gem offset from the phrase start | median 0 | 0 |
+| Unisons as a share of phrases | ~1/3 | ~1/2 |
+| Measures from last OD to `[end]` | p10 = 11 | p10 = 11 |
+| Measures from last unison to `[end]` | p10 = 23 | p10 = 26 |
+| KEYS OD == REAL_KEYS_X OD | 97% | 93% |
+| Fill length / ends on a barline | median 4 beats / 93% | 4 beats / 93% |
+| Measures between fills | median 4 | median 4 |
+| Vocal phrases per vocal OD | 4.6 | 4.8 |
+| Vocal OD exactly a 105 phrase | 96% | 95% |
+| HARM1 phrase markers identical to PART VOCALS' | 20–40% of songs | — |
+
+No reference song carries PART DRUMS_2X, so mirroring it is a design decision rather than a measured one.
+
+### Authoring tips coverage
+
+A set of drum-fill and overdrive authoring tips, checked against the original plan and the v0.9.60 code:
+
+| Tip | In the plan | Implemented |
+|---|---|---|
+| A fill every 4 measures; very fast: 2 measures every 8; very slow (< 75–80 BPM): half a measure every 2 | Yes | Yes — `OdAutoFillPacing`, with an override combo. Slow switches at ≤ 75 BPM, the bottom of the tip's range. The fast threshold (170) is our own; no source gives one. Tempo is read at the song's midpoint only |
+| End a fill at an important transition (a verse with 2 extra bars → the fill ends at the chorus) | Yes | Yes — a `[prc_*]` start within reach replaces the grid slot and the grid re-anchors. Without a section in reach, a drum crash does. A section start with no crash beside a crash is reported. See "Where fills end" |
+| If the band pauses before the next section, end the fill at the start of the pause | No | No |
+| Avoid a fill right before a long rest | Yes (8+ measures of rest) | Partly — a slot is skipped only when its landing measure has no drum gems. There is no look-ahead for a long rest |
+| No fills in drum solos | Yes | Yes — `[prc_drum_solo…]` sections and 103 spans on PART DRUMS. Validate reports a fill in a solo as an error |
+| A fill is a good way to end a long drum rest | No | No — the grid ignores rests, and no fill is placed before the drums first come in |
+| (Not in the tips) Fills before overdrive can first be activated are unusable | No | Yes — dropped by default ("Skip fills before overdrive can be activated"); Validate reports them in the summary |
+| Start OD / unisons with guitar | Implicitly | Yes — guitar is first in `OD_INST_GROUPS`, so it gets first pick of contested bars for singles. Unison bars are chosen on all parts' summed interest, so order does not affect them |
+| Unisons where the whole band plays something interesting together (lead line, breakdown, pickup, build-up to a chorus or solo) | Partly | Mostly — with "Prefer measures where the band plays together": the pickup measure before a section (the fill there gives way), and guitar and bass sharing rhythm and contour, with drums on the same beats. Breakdowns aren't detected, and solo-marker starts don't count as section changes |
+
+### Testing
+
+`dev/tests/general_overdrive.lua` (runner `run_general_overdrive.lua`, launcher button "Overdrive Tests"):
+- Most of the suite drives the planners and the validator with **hand-built models** in the `OdBuildModel` shape.
+- The last section builds real tracks and runs Generate and Validate end to end, including the check that nothing is written while the replace confirmation is pending.
+- That section **skips itself** when the project already has a PART or EVENTS track, so it never touches a real song.
 
 ---
 

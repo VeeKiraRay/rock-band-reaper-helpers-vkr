@@ -258,6 +258,28 @@ S = {
     workflow_state      = {},   -- persisted via workflow_v1; keyed by CompositeKey(section, label)
     workflow_show_ts    = false, -- persisted (scalar blob): show "Completed on ..." under checked items
     workflow_hide_done  = false, -- persisted (scalar blob): hide checked items (and fully-checked sections)
+    -- Overdrive tab (persisted unless noted)
+    od_group            = 0,     -- index into OD_GROUP_CHOICES, 0-based: 0 = All
+    od_inc_phrases      = true,
+    od_inc_fills        = true,
+    od_inc_vocals       = true,
+    od_beats_per_phrase = 40,    -- the doc's rate: one phrase per 40 counted beats
+    od_unison_share     = 50,    -- percent of the median phrase count; the doc says about half
+    od_keepout_od       = 8,     -- measures at the end with no overdrive
+    od_keepout_unison   = 12,    -- measures at the end with no unison
+    od_keepout_start    = 5,     -- measures the band plays before the first phrase (official median 5)
+    od_together         = true,  -- unisons prefer the pre-section measure and the band playing together
+    od_vocal_overlap    = 2,     -- instrument OD vs vocal OD: 0 avoid, 1 avoid its first measure, 2 overlap anywhere
+    od_fill_pacing      = 0,     -- 0 = Auto from tempo, else an OD_FILL_PACINGS index
+    od_fill_sections    = true,  -- end a fill on a nearby section start, else a nearby drum crash
+    od_fill_skip_early  = true,  -- leave out fills before drum overdrive can first be activated
+    od_fill_keepout_end = 2,     -- a fill's crash lands at least this many measures before the drums' last measure
+    od_vocal_every      = 5,     -- vocal phrases per vocal overdrive phrase
+    -- Session only: { message, can_keep, on_replace, on_keep } while the replace
+    -- confirmation is open; the overview strip's data from the last Generate/Validate.
+    -- Both describe the current project and are cleared on a project switch.
+    od_pending          = nil,
+    od_overview         = nil,
 }
 
 ----------------------------------------------------------------------
@@ -1225,4 +1247,117 @@ TIPS = {
     workflow_hide_done   = "Hide checked items so you can focus on what's left.\n\n" ..
                            "A section whose every item is checked is hidden entirely.\n" ..
                            "Nothing is lost - unchecking this shows everything again.",
+    -- Overdrive tab
+    od_group             = "Which part to generate for.\n\n" ..
+                           "All generates every part, including unisons across the band.\n" ..
+                           "A single part is generated on its own: it joins unisons the\n" ..
+                           "other parts already have and keeps out of their phrases.\n\n" ..
+                           "Tracks that must match are always written together:\n" ..
+                           "Drums = PART DRUMS + PART DRUMS_2X, Keys = PART KEYS +\n" ..
+                           "PART REAL_KEYS_X, Vocals = PART VOCALS + HARM1.",
+    od_inc_phrases       = "Generate overdrive phrases (note 116) on the instrument parts.\n\n" ..
+                           "Each phrase is one measure, spaced evenly over the bars the part\n" ..
+                           "is actually playing. Among nearby bars it prefers the one just\n" ..
+                           "before a section change, then the most eventful one - chord\n" ..
+                           "changes and varied shapes rather than one repeated chord.\n\n" ..
+                           "Never in the first or last measures (the keep-outs below),\n" ..
+                           "and on drums never in a fill's measure or on a fill's\n" ..
+                           "crash. Whether phrases may sit under vocal overdrive is set\n" ..
+                           "below.",
+    od_together          = "Place unisons where the band plays together, as official\n" ..
+                           "charts do:\n\n" ..
+                           "- on the last measure before a new section (a pickup or\n" ..
+                           "  build-up into it). The drum fill leading into that section\n" ..
+                           "  gives way to the unison.\n" ..
+                           "- where guitar and bass hit the same notes and move the same\n" ..
+                           "  way - GR RY YB BO on guitar against G R Y B on bass counts,\n" ..
+                           "  as does the whole band hitting the same beats.\n\n" ..
+                           "Measured on official charts, this puts about 2.5x as many\n" ..
+                           "unisons where the charter put one, at the cost of about 1 fill\n" ..
+                           "in 10. Only used with All; untick it if a song comes out worse.",
+    od_vocal_overlap     = "May instrument overdrive sit under vocal overdrive?\n\n" ..
+                           "Overlap anywhere      -  yes, as official charts do. Vocals are\n" ..
+                           "                         still never part of a unison.\n" ..
+                           "Avoid its first measure -  keep the measure where a vocal phrase\n" ..
+                           "                         starts clear; the rest of a long phrase\n" ..
+                           "                         may be overlapped.\n" ..
+                           "Avoid vocal overdrive  -  keep every measure a vocal phrase\n" ..
+                           "                         touches clear.",
+    od_beats_per_phrase  = "How much playing time each overdrive phrase covers, in counted\n" ..
+                           "beats. The RBN guideline is one phrase per 40 beats: about 10\n" ..
+                           "measures in 4/4.\n\n" ..
+                           "Beats are counted, not quarter notes: 7/8 counts 3 and 6/8\n" ..
+                           "counts 2, as the doc's time-signature table does. Bars where\n" ..
+                           "the part rests are not counted.",
+    od_unison_share      = "How many unisons to make, as a share of the phrase count.\n" ..
+                           "The doc asks for about half.\n\n" ..
+                           "A unison is the same phrase on every instrument at once. Keys\n" ..
+                           "may be left out of one where it is not playing.\n\n" ..
+                           "Only used with All: a single part joins the unisons the other\n" ..
+                           "parts already have instead.",
+    od_keepout_od        = "No overdrive in this many measures at the end of the song.\n" ..
+                           "The doc says roughly 8. Counted back from [end], or from\n" ..
+                           "[coda] when the song has a Big Rock Ending.",
+    od_keepout_unison    = "No unison in this many measures at the end of the song.\n" ..
+                           "The doc says roughly 12.",
+    od_keepout_start     = "How many measures the band plays before the first overdrive\n" ..
+                           "phrase or unison, counted from the first measure any\n" ..
+                           "instrument plays.\n\n" ..
+                           "Official charts put their first phrase a median of 5 measures\n" ..
+                           "in (most between 2 and 9). With the band starting at measure 3\n" ..
+                           "and the default of 5, the first phrase lands at measure 8 or\n" ..
+                           "later. Vocal overdrive is not affected.",
+    od_inc_fills         = "Generate drum fills (notes 120-124, all five lanes) on PART\n" ..
+                           "DRUMS and PART DRUMS_2X. A fill is where the drummer can\n" ..
+                           "deploy overdrive.\n\n" ..
+                           "Fills are laid out before the instrument phrases, so drum\n" ..
+                           "phrases and unisons keep clear of them. None in a drum solo,\n" ..
+                           "over a drum roll, before a rest, or in a Big Rock Ending - its\n" ..
+                           "lanes after [coda] are never touched.",
+    od_fill_pacing       = "How often fills come and how long they are.\n\n" ..
+                           "Auto follows the RBN drum doc: half a measure every 2 for very\n" ..
+                           "slow songs, 2 measures every 8 for very fast ones, and one\n" ..
+                           "measure every 4 otherwise.",
+    od_fill_sections     = "Line fills up with the song instead of keeping strictly to the\n" ..
+                           "grid - e.g. a verse with two extra measures gets its fill\n" ..
+                           "into the chorus.\n\n" ..
+                           "A fill ends on a [prc_*] section start (EVENTS track) within\n" ..
+                           "reach of the grid slot. Where there is none, it ends on a drum\n" ..
+                           "crash (a blue or green cymbal on a downbeat) instead.\n\n" ..
+                           "If a section start has no crash but the next or previous\n" ..
+                           "measure does, the result points it out: the section event may\n" ..
+                           "be a measure off, and moving it moves the fill with it.",
+    od_fill_keepout_end  = "No fill in the last measures of the drum part: a fill's crash\n" ..
+                           "must land at least this many measures before the drums' last\n" ..
+                           "measure. A fill leading straight into the final hit has no\n" ..
+                           "overdrive left to be useful for.\n\n" ..
+                           "Official charts put their last fill a median of 4 measures\n" ..
+                           "before the drums end, and almost never on the final measure.",
+    od_fill_skip_early   = "Leave out fills that come before the drummer can have enough\n" ..
+                           "overdrive to activate - two drum phrases, or one unison. The\n" ..
+                           "drummer can never use them.\n\n" ..
+                           "Untick to keep the full grid from the start of the song, as\n" ..
+                           "many official charts do.",
+    od_inc_vocals        = "Generate vocal overdrive (note 116) on PART VOCALS and HARM1.\n\n" ..
+                           "Each one copies a phrase marker (105) exactly. Only phrases\n" ..
+                           "with an identical phrase marker on HARM1 are used: Rock Band 3\n" ..
+                           "has a visual bug in harmonies if the parts differ. If the cadence\n" ..
+                           "lands on a phrase that differs, it moves one phrase earlier or\n" ..
+                           "later; if neither works, the result says where.\n\n" ..
+                           "Generated first; whether instrument phrases may sit under it\n" ..
+                           "is the \"Over vocal OD\" setting above.",
+    od_vocal_every       = "Vocal phrases per overdrive phrase. The doc recommends one\n" ..
+                           "overdrive for every 5 phrases.",
+    od_generate          = "Generate for the whole song. A time selection is ignored.\n\n" ..
+                           "If a target already has overdrive or fill notes you are asked\n" ..
+                           "first. Everything is one undo step.",
+    od_validate          = "Check the overdrive already in the song against the RBN rules:\n" ..
+                           "phrase counts and spacing, unisons, fill collisions, matching\n" ..
+                           "tracks (Keys/Pro Keys, Drums/Drums 2x, Vocals/HARM1) and the\n" ..
+                           "end-of-song keep-outs. Read-only.",
+    od_replace           = "Delete the existing notes on the listed tracks and generate\n" ..
+                           "new ones. One undo step puts everything back.",
+    od_keep              = "Leave the listed tracks as they are and generate only the\n" ..
+                           "rest. Kept overdrive is worked around: new phrases join its\n" ..
+                           "unisons and stay out of its bars.",
 }

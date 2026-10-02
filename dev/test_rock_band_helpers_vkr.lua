@@ -28,7 +28,7 @@ local _dir    = _script:match('^(.+[\\/])')
 local _tdir   = _dir .. 'tests/'
 
 local results = { vocal = nil, general = nil, vocal_midi = nil, general_midi = nil,
-                  general_drums_2x = nil,
+                  general_drums_2x = nil, general_overdrive = nil,
                   dsp_algo = nil, vocal_algo = nil, general_algo = nil,
                   quick_actions = nil, spritesheet = nil, venue_events = nil,
                   venue_subtracks = nil, venue_phrase_pacing = nil,
@@ -118,6 +118,12 @@ function Loop()
         end
         r.ImGui_SameLine(ctx)
         draw_status(results.general_drums_2x)
+
+        if r.ImGui_Button(ctx, 'Overdrive Tests', 155, 24) then
+            run('run_general_overdrive.lua', 'general_overdrive')
+        end
+        r.ImGui_SameLine(ctx)
+        draw_status(results.general_overdrive)
 
         r.ImGui_Spacing(ctx)
         r.ImGui_Separator(ctx)

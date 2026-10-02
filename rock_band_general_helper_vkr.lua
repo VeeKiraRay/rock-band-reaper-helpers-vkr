@@ -1,6 +1,6 @@
 -- @description Rock Band General Helper
 -- @author VeeKiraRay
--- @version 0.9.59
+-- @version 0.9.60
 -- @about
 --   Utility actions for Rock Band authoring in REAPER.
 --
@@ -13,6 +13,8 @@
 --     Keys       - hand split, Pro Keys conversion + animation, 5-Lane Keys conversion
 --     Guitar     - convert raw MIDI to Expert Guitar gems, tab guide, validate
 --     Difficulty - copy and validate Pro Keys + Keys + Guitar/Bass + Drums difficulty tiers
+--     Overdrive  - generate overdrive phrases, unisons, drum fills and vocal
+--                  overdrive; validate what is already authored
 --     Tab Input  - guitar/keys/vocal tab entry guide
 --     MIDI       - MIDI alignment, length sync, pattern replace
 --     Venue      - list, validate, and generate VENUE and EVENTS track events
@@ -25,6 +27,56 @@
 --
 --   This @about block keeps only the 5 most recent versions.
 --   Full history: CHANGELOG.md in the repo.
+--
+--   v0.9.60
+--     - New Overdrive tab. Generates overdrive phrases, unisons, drum fills and
+--       vocal overdrive for the whole song, following the RBN authoring rules:
+--       about one one-measure phrase per 40 counted beats of each part's playing
+--       time, about half as many unisons, even spacing, nothing in the last 8
+--       measures and no unison in the last 12. The first phrase waits until the
+--       band has played 5 measures (adjustable) - official charts put it a median
+--       of 5 measures in. Pick All or a single part. Tracks
+--       that must match are always written together: PART DRUMS + PART DRUMS_2X,
+--       PART KEYS + PART REAL_KEYS_X, PART VOCALS + HARM1.
+--     - The order matters. Vocal overdrive comes first, copied exactly from the
+--       phrase markers, and only where HARM1 has an identical phrase. Rock Band 3
+--       has a visual bug in harmonies if the parts differ. To avoid this we avoid
+--       vocal phrase markers that are different between PART VOCALS and HARM1:
+--       where they differ, it moves one phrase earlier or later, or tells you
+--       where it could not. Then drum fills,
+--       one measure every 4 by default, ending at section changes - or on a drum
+--       crash where no section is near. Then the instrument phrases, which keep
+--       clear of fill measures and of a fill's closing crash.
+--     - Unisons go where the band plays together, as official charts do: on the
+--       measure just before a new section (the fill there gives way to it), and
+--       where guitar and bass play the same rhythm and move the same way. Checked
+--       against official charts, this puts about 2.5x as many unisons where the
+--       charter put one. Untick "Prefer measures where the band plays together"
+--       if a song comes out worse.
+--     - "Over vocal OD" sets whether instrument phrases may sit under vocal
+--       overdrive: anywhere (the default, as official charts do), everywhere but
+--       the measure a vocal phrase starts in, or not at all. Vocals are never
+--       part of a unison either way.
+--     - Fills before the drummer can first activate overdrive (two drum phrases,
+--       or one unison) are left out, since they can never be used. Untick "Skip
+--       fills before overdrive can be activated" to keep them. Likewise no fill
+--       leads into the drums' last 2 measures (adjustable) - there is nothing left
+--       to deploy overdrive for at the final hit.
+--     - If a fill ends on a section start that the drums do not mark with a crash,
+--       while the measure beside it has one, the result says so: that section
+--       event is probably a measure off. Move it and generate again.
+--     - A single part joins the unisons the other parts already have. If a track
+--       already has overdrive or fills you are asked before anything is replaced,
+--       and can keep it instead. One undo step reverts a whole run. A time
+--       selection is ignored, and a Big Rock Ending is never written into.
+--     - Validate checks what is already authored: counts and spacing, unisons,
+--       fill collisions, matching tracks and the end-of-song keep-outs, reports
+--       how far into the song the first phrase comes, and draws an overview strip
+--       of the whole song. Read-only.
+--     - Which of several nearby measures gets a phrase is a suggestion, not a copy
+--       of what an official charter would pick. Official charters are not
+--       consistent with themselves either, so treat the result as a starting
+--       point to adjust.
 --
 --   v0.9.59
 --     - The window title now carries the script version - "Rock Band General
@@ -124,24 +176,6 @@
 --       era, origin or subject matter, so entries like J-Rock and K-Pop stop looking
 --       inconsistent, and no longer claims the reference catalogue proves more than it
 --       does.
---   v0.9.55
---     - New Metadata > Genre sub-tab: a genre converter. Rock Band accepts 29 major
---       genres and 126 subgenres, and finding the right one is a chore when your song
---       is something the list has no name for. Pick the genre you would actually call
---       the song from a family-narrowed dropdown and it reports the closest supported
---       pair, with a plain-language reason for each.
---       Over 200 genres are offered, deliberately wider than the supported list, so
---       styles with no category of their own - Djent, Easycore, Synthwave, Deathcore,
---       Post-Hardcore, Blackgaze - resolve to something real instead of leaving you
---       guessing.
---     - Some genres map more than one way, and the tab says so rather than pretending
---       otherwise. Where the released-song catalogue genuinely filed a style two ways,
---       both are offered, best first, and each says what would tip the choice. Where
---       the catalogue is consistent, one answer is given.
---     - Names only, never internal metadata strings. Those spellings drift between
---       game eras, and the tool that writes your song metadata has its own picker.
---       Read-only, like Metadata > Difficulty: it never reads or writes the project
---       and creates no undo point.
 r = reaper  -- global so all dofile'd modules can use it
 
 if not r.ImGui_CreateContext then
@@ -234,9 +268,16 @@ for _, _f in ipairs({
     _mdir .. 'metadata_genres.lua',
     _mdir .. 'metadata_genres_ext.lua',
     _mdir .. 'metadata_genres_lookup.lua',
+    _mdir .. 'overdrive_read.lua',
+    _mdir .. 'overdrive_interest.lua',
+    _mdir .. 'actions_overdrive_fills.lua',
+    _mdir .. 'actions_overdrive_vocals.lua',
+    _mdir .. 'actions_overdrive.lua',
+    _mdir .. 'actions_overdrive_validate.lua',
     _mdir .. 'ui_common.lua',
     _mdir .. 'ui_keys.lua',
     _mdir .. 'ui_difficulty.lua',
+    _mdir .. 'ui_overdrive.lua',
     _mdir .. 'ui_midi_pattern.lua',
     _mdir .. 'ui_midi.lua',
     _mdir .. 'ui_venue.lua',
@@ -326,9 +367,20 @@ dofile(_mdir .. 'difficulty_suggester.lua')
 dofile(_mdir .. 'metadata_genres.lua')
 dofile(_mdir .. 'metadata_genres_ext.lua')
 dofile(_mdir .. 'metadata_genres_lookup.lua')
+-- Overdrive tab: the song model first (it reads through difficulty_read.lua's
+-- FindTrackExact / ReadGemEvents), then the per-bar interest score, the fill and vocal
+-- planners, the instrument planner and Generate action that calls them, and the
+-- validator. ui_overdrive.lua reads OD_FILL_PACINGS at load time.
+dofile(_mdir .. 'overdrive_read.lua')
+dofile(_mdir .. 'overdrive_interest.lua')
+dofile(_mdir .. 'actions_overdrive_fills.lua')
+dofile(_mdir .. 'actions_overdrive_vocals.lua')
+dofile(_mdir .. 'actions_overdrive.lua')
+dofile(_mdir .. 'actions_overdrive_validate.lua')
 dofile(_mdir .. 'ui_common.lua')
 dofile(_mdir .. 'ui_keys.lua')
 dofile(_mdir .. 'ui_difficulty.lua')
+dofile(_mdir .. 'ui_overdrive.lua')
 dofile(_mdir .. 'ui_midi_pattern.lua')
 dofile(_mdir .. 'ui_midi.lua')
 dofile(_mdir .. 'ui_venue.lua')

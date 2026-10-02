@@ -68,6 +68,23 @@ local function SerializeSettings()
         'wffn=' .. S.workflow_file_name,
         'wfsts=' .. (S.workflow_show_ts and '1' or '0'),
         'wfhd=' .. (S.workflow_hide_done and '1' or '0'),
+        -- Overdrive tab
+        'odgrp=' .. S.od_group,
+        'odiph=' .. (S.od_inc_phrases and '1' or '0'),
+        'odifl=' .. (S.od_inc_fills and '1' or '0'),
+        'odivo=' .. (S.od_inc_vocals and '1' or '0'),
+        'odbpp=' .. S.od_beats_per_phrase,
+        'odush=' .. S.od_unison_share,
+        'odkod=' .. S.od_keepout_od,
+        'odkun=' .. S.od_keepout_unison,
+        'odkst=' .. S.od_keepout_start,
+        'odtog=' .. (S.od_together and '1' or '0'),
+        'odvol=' .. S.od_vocal_overlap,
+        'odfpc=' .. S.od_fill_pacing,
+        'odfsc=' .. (S.od_fill_sections and '1' or '0'),
+        'odfse=' .. (S.od_fill_skip_early and '1' or '0'),
+        'odfke=' .. S.od_fill_keepout_end,
+        'odvev=' .. S.od_vocal_every,
     }, ';')
 end
 
@@ -139,6 +156,29 @@ local function DeserializeSettings(str)
         elseif k == 'wffn'   then S.workflow_file_name      = v
         elseif k == 'wfsts'  then S.workflow_show_ts        = (v == '1')
         elseif k == 'wfhd'   then S.workflow_hide_done      = (v == '1')
+        -- Overdrive tab
+        elseif k == 'odgrp' then
+            local g = tonumber(v)
+            if g and g >= 0 and g < 6 then S.od_group = math.floor(g) end
+        elseif k == 'odiph' then S.od_inc_phrases      = (v == '1')
+        elseif k == 'odifl' then S.od_inc_fills        = (v == '1')
+        elseif k == 'odivo' then S.od_inc_vocals       = (v == '1')
+        elseif k == 'odbpp' then S.od_beats_per_phrase = tonumber(v) or S.od_beats_per_phrase
+        elseif k == 'odush' then S.od_unison_share     = tonumber(v) or S.od_unison_share
+        elseif k == 'odkod' then S.od_keepout_od       = tonumber(v) or S.od_keepout_od
+        elseif k == 'odkun' then S.od_keepout_unison   = tonumber(v) or S.od_keepout_unison
+        elseif k == 'odkst' then S.od_keepout_start    = tonumber(v) or S.od_keepout_start
+        elseif k == 'odtog' then S.od_together         = (v == '1')
+        elseif k == 'odvol' then
+            local m = tonumber(v)
+            if m and m >= 0 and m <= 2 then S.od_vocal_overlap = math.floor(m) end
+        elseif k == 'odfpc' then
+            local p = tonumber(v)
+            if p and p >= 0 and p <= 3 then S.od_fill_pacing = math.floor(p) end
+        elseif k == 'odfsc' then S.od_fill_sections    = (v == '1')
+        elseif k == 'odfse' then S.od_fill_skip_early  = (v == '1')
+        elseif k == 'odfke' then S.od_fill_keepout_end = tonumber(v) or S.od_fill_keepout_end
+        elseif k == 'odvev' then S.od_vocal_every      = tonumber(v) or S.od_vocal_every
         end
     end
 end

@@ -49,6 +49,10 @@ local function Loop()
         -- Metadata > Difficulty results describe the PREVIOUS project's charts. Leaving
         -- them on screen after a switch would attribute one song's ranks to another.
         S.diff_suggestions   = nil
+        -- Overdrive: a pending replace confirmation and the overview strip both
+        -- describe the previous project's tracks.
+        S.od_pending         = nil
+        S.od_overview        = nil
         local loaded = LoadSettings()
         S.status = loaded and 'Project switched: loaded saved settings.'
                            or 'Project switched.'
@@ -242,6 +246,15 @@ local function Loop()
             if r.ImGui_BeginTabItem(ctx, 'Difficulty') then
                 _new_tab = 'Difficulty'
                 DrawDifficultyTab(ctx)
+                r.ImGui_EndTabItem(ctx)
+            end
+
+            ------------------------------------------------------------
+            -- Overdrive tab
+            ------------------------------------------------------------
+            if r.ImGui_BeginTabItem(ctx, 'Overdrive') then
+                _new_tab = 'Overdrive'
+                DrawOverdriveTab(ctx)
                 r.ImGui_EndTabItem(ctx)
             end
 
