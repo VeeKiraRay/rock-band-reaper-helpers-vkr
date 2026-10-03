@@ -9,6 +9,38 @@ over 5. See `CLAUDE.md` → "Changelog / `@about` trimming" for the rule.
 
 `rock_band_general_helper_vkr.lua`
 
+**v0.9.56**
+  - Metadata > Genre: an editorial pass over the mapping after a peer review.
+    Four calls were checked against outside sources rather than settled by taste.
+    Screamo now leads with Emo, since it is an offshoot of emo rather than of
+    metal - the old answer leaned on "screamed vocals", which describes half the
+    list. Viking Metal keeps Black, which is where the style actually came from,
+    and both it and Folk Metal now offer melodic death metal, the branch that was
+    missing and the one Amon Amarth-shaped songs need.
+  - Big Band, Swing and Bebop no longer file as Jazz / Contemporary. Contemporary
+    means modern jazz, so sending historic jazz there quietly misdated it;
+    Jazz / Other is the honest answer and the entries say why.
+  - Suggestions that really meant "you may have picked the wrong genre" are no
+    longer mixed in with the genuine alternatives. Post-Grunge suggested Grunge as
+    though it were another home for post-grunge, when it was telling you to pick a
+    different genre entirely. Those now appear separately, unnumbered, below the
+    suggestions.
+  - Reasons that claimed "Exact match" where the two names do not actually match
+    now say "closest supported category" instead. Teen Pop is not Teen Rock, and
+    Hardcore Techno is not Hardcore Dance.
+  - 19 more genres, covering the ones that previously returned nothing at all:
+    Trap, Drill, Boom Bap, Jazz Rap, Lo-fi Hip-Hop, Electropop, Dance-Pop, Art
+    Pop, Alternative R&B, Post-Metal, Industrial Rock, Melodic Metalcore, Jungle,
+    UK Garage, Glitch, Cumbia, Bachata, Merengue and Mariachi. 227 genres in all.
+  - The tab now says it is advisory, the way Metadata > Difficulty does. Where a
+    style belongs is a judgment call rather than a measurement, so if a suggestion
+    looks plainly wrong it is worth saying so - the mappings are meant to be
+    corrected.
+  - The file now states which dimension wins when a genre could be filed by sound,
+    era, origin or subject matter, so entries like J-Rock and K-Pop stop looking
+    inconsistent, and no longer claims the reference catalogue proves more than it
+    does.
+
 **v0.9.55**
   - New Metadata > Genre sub-tab: a genre converter. Rock Band accepts 29 major
     genres and 126 subgenres, and finding the right one is a chore when your song

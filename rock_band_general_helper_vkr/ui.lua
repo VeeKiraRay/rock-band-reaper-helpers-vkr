@@ -109,7 +109,12 @@ local function Loop()
                         r.ImGui_Separator(ctx)
                         SectionHeader('Audio alignment')
 
-                        local bw_align = BtnGroupWidth({ 'Align all audio', 'Align count-in' })
+                        local bw_align = BtnGroupWidth({ 'Import stems', 'Align all audio', 'Align count-in' })
+                        if Btn('Import stems', BTN_H, bw_align) then
+                            RunAction(ImportStems)
+                        end
+                        Tooltip(TIPS.import_stems)
+                        r.ImGui_SameLine(ctx)
                         if Btn('Align all audio', BTN_H, bw_align) then
                             RunAction(AlignAllAudio)
                         end

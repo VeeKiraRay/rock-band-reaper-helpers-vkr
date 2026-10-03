@@ -1,11 +1,11 @@
 -- @description Rock Band General Helper
 -- @author VeeKiraRay
--- @version 0.9.60
+-- @version 0.9.61
 -- @about
 --   Utility actions for Rock Band authoring in REAPER.
 --
 --   Tabs:
---     General    - audio alignment, count-in positioning, song fade out, settings,
+--     General    - stem import, audio alignment, count-in positioning, song fade out, settings,
 --                  per-project authoring workflow checklist, buttons that open
 --                  the other tools in this set
 --     Tempo Map  - audio-driven tempo map generation from drum stems
@@ -27,6 +27,23 @@
 --
 --   This @about block keeps only the 5 most recent versions.
 --   Full history: CHANGELOG.md in the repo.
+--
+--   v0.9.61
+--     - General > Actions: new "Import stems" button. Pick a folder of stems and
+--       each one lands on its template track, lined up with the SONG AUDIO item.
+--       Files are matched by keyword in the filename, ignoring case: kick, snare,
+--       bass, guitar, drum (KIT AUDIO), vocal (VOCAL AUDIO, a "lead" file
+--       preferred), vocal + back (DRYVOX2), and piano, keys or accordion (KEYS
+--       AUDIO, in that order). When several files fit, the shortest name wins,
+--       and each file goes to one track only.
+--     - KIT AUDIO skips single-piece files such as drums_hh, drums_toms or
+--       drums_cymbals, and BASS AUDIO skips bassdrum, so a kit piece is never
+--       mistaken for the full kit or the bass.
+--     - A track that already holds audio is left alone. The result lists what was
+--       imported, what was skipped and why, and any audio file that matched no
+--       track. One undo removes the whole import.
+--     - With the js_ReaScriptAPI extension a folder dialog opens; without it, pick
+--       any file inside the stem folder and that folder is used.
 --
 --   v0.9.60
 --     - New Overdrive tab. Generates overdrive phrases, unisons, drum fills and
@@ -144,38 +161,6 @@
 --       cleared, so it keeps its Beta badge; adding easy and hard keys charts
 --       twice failed to close that gap, which suggests the limit is the model
 --       rather than the number of songs behind it.
---
---   v0.9.56
---     - Metadata > Genre: an editorial pass over the mapping after a peer review.
---       Four calls were checked against outside sources rather than settled by taste.
---       Screamo now leads with Emo, since it is an offshoot of emo rather than of
---       metal - the old answer leaned on "screamed vocals", which describes half the
---       list. Viking Metal keeps Black, which is where the style actually came from,
---       and both it and Folk Metal now offer melodic death metal, the branch that was
---       missing and the one Amon Amarth-shaped songs need.
---     - Big Band, Swing and Bebop no longer file as Jazz / Contemporary. Contemporary
---       means modern jazz, so sending historic jazz there quietly misdated it;
---       Jazz / Other is the honest answer and the entries say why.
---     - Suggestions that really meant "you may have picked the wrong genre" are no
---       longer mixed in with the genuine alternatives. Post-Grunge suggested Grunge as
---       though it were another home for post-grunge, when it was telling you to pick a
---       different genre entirely. Those now appear separately, unnumbered, below the
---       suggestions.
---     - Reasons that claimed "Exact match" where the two names do not actually match
---       now say "closest supported category" instead. Teen Pop is not Teen Rock, and
---       Hardcore Techno is not Hardcore Dance.
---     - 19 more genres, covering the ones that previously returned nothing at all:
---       Trap, Drill, Boom Bap, Jazz Rap, Lo-fi Hip-Hop, Electropop, Dance-Pop, Art
---       Pop, Alternative R&B, Post-Metal, Industrial Rock, Melodic Metalcore, Jungle,
---       UK Garage, Glitch, Cumbia, Bachata, Merengue and Mariachi. 227 genres in all.
---     - The tab now says it is advisory, the way Metadata > Difficulty does. Where a
---       style belongs is a judgment call rather than a measurement, so if a suggestion
---       looks plainly wrong it is worth saying so - the mappings are meant to be
---       corrected.
---     - The file now states which dimension wins when a genre could be filed by sound,
---       era, origin or subject matter, so entries like J-Rock and K-Pop stop looking
---       inconsistent, and no longer claims the reference catalogue proves more than it
---       does.
 r = reaper  -- global so all dofile'd modules can use it
 
 if not r.ImGui_CreateContext then
@@ -245,6 +230,7 @@ for _, _f in ipairs({
     _mdir .. 'actions_workflow.lua',
     _mdir .. 'tempomap.lua',
     _mdir .. 'actions.lua',
+    _mdir .. 'actions_stem_import.lua',
     _mdir .. 'actions_tempomap.lua',
     _mdir .. 'actions_drums.lua',
     _mdir .. 'actions_drums_2x.lua',
@@ -341,6 +327,7 @@ dofile(_mdir .. 'workflow.lua')
 dofile(_mdir .. 'actions_workflow.lua')
 dofile(_mdir .. 'tempomap.lua')
 dofile(_mdir .. 'actions.lua')
+dofile(_mdir .. 'actions_stem_import.lua')
 dofile(_mdir .. 'actions_tempomap.lua')
 dofile(_mdir .. 'actions_drums.lua')
 dofile(_mdir .. 'actions_drums_2x.lua')

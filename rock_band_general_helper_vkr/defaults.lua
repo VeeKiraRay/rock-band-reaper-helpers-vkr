@@ -358,6 +358,25 @@ TIPS = {
         "many standard deviations it sits from the average charted song.",
 
     -- General tab
+    import_stems    = "Pick a folder of stems and place each one on its template track,\n" ..
+                      "at the same position as the SONG AUDIO item.\n\n" ..
+                      "Only the folder itself is scanned, not folders inside it. Filenames are\n" ..
+                      "matched by keyword, ignoring case (wav, mp3, ogg, flac, aif, m4a, wma, opus):\n" ..
+                      "  vocal + back            -> DRYVOX2\n" ..
+                      "  kick                    -> KICK AUDIO\n" ..
+                      "  snare                   -> SNARE AUDIO\n" ..
+                      "  piano, else keys, else accordion -> KEYS AUDIO\n" ..
+                      "  bass (not drum)         -> BASS AUDIO\n" ..
+                      "  guitar                  -> GUITAR AUDIO\n" ..
+                      "  vocal (lead preferred)  -> VOCAL AUDIO\n" ..
+                      "  drum                    -> KIT AUDIO\n" ..
+                      "KIT AUDIO ignores single-piece files that also name crash, cymbal, hh,\n" ..
+                      "kick, ride, snare, toms or bass. When several files fit, the shortest\n" ..
+                      "name wins. Each file goes to one track only.\n\n" ..
+                      "A track that already holds audio is skipped. Missing tracks, tracks with\n" ..
+                      "no matching file, and files that matched nothing are listed in the result.\n\n" ..
+                      "With the js_ReaScriptAPI extension a folder dialog opens; without it, pick\n" ..
+                      "any file inside the stem folder. Requires SONG AUDIO. Fully undoable.",
     align_all_audio = "Align every single-item audio track in the project to the SONG AUDIO start position.\n\n" ..
                       "Tracks with zero audio items (MIDI tracks, empty tracks) are silently skipped.\n" ..
                       "Tracks with multiple audio items are skipped and listed in the result.\n" ..
