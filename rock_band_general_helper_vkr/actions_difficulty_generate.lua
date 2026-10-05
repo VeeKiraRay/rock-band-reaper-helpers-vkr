@@ -22,6 +22,19 @@ GEN_INSTRUMENTS = {
 GEN_ALL_KEY = 'all'
 
 local DIFF_NAMES = { X = 'Expert', H = 'Hard', M = 'Medium', E = 'Easy' }
+
+-- How a tier is written. 'bulk' (ReplaceNotesBulk): the take is read in one call, the
+-- tier's old notes dropped and the new ones added in Lua, and written back in one call.
+-- 'batched': ClearNotesInRange + InsertNotes with sorting off and one MIDI_Sort.
+-- 'per_note': the same with REAPER sorting after every note.
+-- Timed on chronosp_brutal_decay (Guitar + Bass, Hard > Medium > Easy): per_note froze the
+-- window for about 10 s, batched took 3.6 s, nearly all of it writing - deleting notes one
+-- at a time shifts the whole take on every delete. Kept switchable only so the modes can
+-- be timed against each other with the result's timing line.
+local WRITE_MODE = 'bulk'
+-- A run longer than this (seconds) lists its phases on the result's last line. A full
+-- All instruments Hard > Medium > Easy takes 0.1-0.3 s with bulk writes.
+local SLOW_RUN_S = 2.0
 local UPPER      = { H = 'X', M = 'H', E = 'M' }
 local MAX_LISTED = 8   -- unresolved Validate lines listed per tier in the result
 
@@ -235,6 +248,75 @@ local function RetimedLines(retimed)
     }
 end
 
+-- Replace the notes of pitches lo..hi that overlap [clear_s, clear_e] (seconds) with
+-- `notes` ({ s, e, pitch } in seconds, written on channel 1 at velocity vel), in one
+-- MIDI_GetAllEvts / MIDI_SetAllEvts round trip. The same notes go as with
+-- ClearNotesInRange: a note is removed when it starts before clear_e and ends after
+-- clear_s. Every other event - other pitches, CCs, text, sysex, the take's end marker -
+-- is written back unchanged and in its original order.
+-- Buffer format (ReaScript API): per event an int32 offset in ticks from the previous
+-- event, a flag byte, an int32 length and the message bytes.
+-- Returns false when the take could not be read (the caller falls back to batched).
+local function ReplaceNotesBulk(take, clear_s, clear_e, lo, hi, notes, vel)
+    local ok, buf = r.MIDI_GetAllEvts(take, '')
+    if not ok or type(buf) ~= 'string' then return false end
+    local s_ppq = r.MIDI_GetPPQPosFromProjTime(take, clear_s)
+    local e_ppq = r.MIDI_GetPPQPosFromProjTime(take, clear_e)
+
+    local evs, open, drop = {}, {}, {}
+    local pos, ppq, n = 1, 0, #buf
+    while pos <= n do
+        local off, flag, msg
+        off, flag, msg, pos = string.unpack('<i4Bs4', buf, pos)
+        ppq = ppq + off
+        local k = #evs + 1
+        evs[k] = { ppq = ppq, flag = flag, msg = msg, cls = 1, ord = k }
+        if #msg >= 3 then
+            local st = msg:byte(1)
+            local typ, pitch, v = st & 0xF0, msg:byte(2), msg:byte(3)
+            if (typ == 0x90 or typ == 0x80) and pitch >= lo and pitch <= hi then
+                local key = (st & 0x0F) * 128 + pitch
+                if typ == 0x90 and v > 0 then
+                    open[key] = open[key] or {}
+                    table.insert(open[key], k)
+                else
+                    -- First on, first off - the pairing REAPER's note list uses.
+                    local q = open[key]
+                    local on = q and table.remove(q, 1)
+                    if on and evs[on].ppq < e_ppq and ppq > s_ppq then drop[on], drop[k] = true, true end
+                end
+            end
+        end
+    end
+
+    local out = {}
+    for k, ev in ipairs(evs) do if not drop[k] then out[#out + 1] = ev end end
+    -- New notes: at one tick, a new note-off goes before the old events there and a new
+    -- note-on after them, so a new note never swallows an old one's end or start.
+    local m = #evs
+    for _, nt in ipairs(notes) do
+        local sp = math.floor(r.MIDI_GetPPQPosFromProjTime(take, nt.s) + 0.5)
+        local ep = math.floor(r.MIDI_GetPPQPosFromProjTime(take, nt.e) + 0.5)
+        m = m + 1
+        out[#out + 1] = { ppq = sp, flag = 0, msg = string.char(0x90, nt.pitch, vel), cls = 2, ord = m }
+        m = m + 1
+        out[#out + 1] = { ppq = ep, flag = 0, msg = string.char(0x80, nt.pitch, 0), cls = 0, ord = m }
+    end
+    table.sort(out, function(a, b)
+        if a.ppq ~= b.ppq then return a.ppq < b.ppq end
+        if a.cls ~= b.cls then return a.cls < b.cls end
+        return a.ord < b.ord
+    end)
+
+    local parts, last = {}, 0
+    for i, ev in ipairs(out) do
+        parts[i] = string.pack('<i4Bs4', ev.ppq - last, ev.flag, ev.msg)
+        last = ev.ppq
+    end
+    r.MIDI_SetAllEvts(take, table.concat(parts))
+    return true
+end
+
 -- One marker pitch's notes in a take as spans { { qn, qn_e }... }, inside [sel_s, sel_e]
 -- (seconds) when given.
 local function MarkerSpans(take, pitch, sel_s, sel_e)
@@ -337,6 +419,16 @@ function GenerateDifficulties(inst_key, tiers, force)
     end
     local sel_s, sel_e = GetTimeSelection()
 
+    -- Seconds per phase, reported on the result's last line (see WRITE_MODE).
+    local T = { read = 0, ref = 0, plan = 0, write = 0, validate = 0, finish = 0 }
+    local t_start = r.time_precise()
+    local clock = t_start
+    local function Lap(key)
+        local now = r.time_precise()
+        T[key] = T[key] + (now - clock)
+        clock = now
+    end
+
     -- Read every source before writing anything, and find what would be overwritten.
     local jobs, replaced = {}, {}
     for _, t in ipairs(targets) do
@@ -386,6 +478,7 @@ function GenerateDifficulties(inst_key, tiers, force)
 
     local lines, total_errors = {}, 0
     local scope = sel_s and ' [time selection]' or ''
+    Lap('read')
 
     -- 'auto' (or anything else) leaves busy_drop unset: the planner decides from the tempo
     -- at the first note.
@@ -399,6 +492,7 @@ function GenerateDifficulties(inst_key, tiers, force)
             break
         end
     end
+    Lap('ref')
 
     r.PreventUIRefresh(1)
     r.Undo_BeginBlock2(0)
@@ -406,6 +500,7 @@ function GenerateDifficulties(inst_key, tiers, force)
         local inst = job.inst
         r.MarkTrackItemsDirty(job.track, job.item)
         local zero_before = ZeroLengthNotes(job.take)   -- see RemovedZeroLengthLines
+        Lap('read')
         local clear_s = sel_s or 0
         local clear_e = sel_e or (r.GetMediaItemInfo_Value(job.item, 'D_POSITION')
                                   + r.GetMediaItemInfo_Value(job.item, 'D_LENGTH'))
@@ -414,6 +509,7 @@ function GenerateDifficulties(inst_key, tiers, force)
         for _, dl in ipairs(tiers) do
             local guide = inst.kind == 'k5'
                 and ProKeysGuide(dl, sel_s, sel_e, inst_key == GEN_ALL_KEY) or nil
+            Lap('read')
             local out, log = Gen5PlanTier(inst.kind, dl, upper, {
                 guide = guide, busy_drop = busy_drop,
                 busy_ref   = inst.key ~= 'gtr' and dl == 'H' and refs.H or nil,
@@ -425,22 +521,41 @@ function GenerateDifficulties(inst_key, tiers, force)
                 local e = r.TimeMap2_QNToTime(0, ev.qn_e)
                 for _, o in ipairs(ev.offs) do notes[#notes + 1] = { s = s, e = e, pitch = lo + o } end
             end
-            ClearNotesInRange(job.take, clear_s, clear_e, lo, lo + 4)
-            InsertNotes(job.take, notes, 100)
             -- Guitar/Bass Hard: force-HOPO markers (lo + 5) where Expert hammered on and Hard
             -- would not. They replace Hard's old ones, which belonged to the notes just
             -- replaced. Force-strum markers (lo + 6) are left alone.
-            local hopo_spans = {}
-            if inst.kind == 'gb' and dl == 'H' then
+            local hopo_spans, marks = {}, {}
+            local with_marks = inst.kind == 'gb' and dl == 'H'
+            if with_marks then
                 hopo_spans = Gen5ForceHopoSpans(out)
-                local marks = {}
                 for _, sp in ipairs(hopo_spans) do
                     marks[#marks + 1] = { s = r.TimeMap2_QNToTime(0, sp.qn), e = r.TimeMap2_QNToTime(0, sp.qn_e),
                                           pitch = lo + 5 }
                 end
-                ClearNotesInRange(job.take, clear_s, clear_e, lo + 5, lo + 5)
-                if #marks > 0 then InsertNotes(job.take, marks, 100) end
             end
+            Lap('plan')
+            local written_bulk = false
+            if WRITE_MODE == 'bulk' then
+                local all = notes
+                if with_marks then
+                    all = {}
+                    for _, nt in ipairs(notes) do all[#all + 1] = nt end
+                    for _, mk in ipairs(marks) do all[#all + 1] = mk end
+                end
+                written_bulk = ReplaceNotesBulk(job.take, clear_s, clear_e, lo, with_marks and lo + 5 or lo + 4, all, 100)
+            end
+            if not written_bulk then
+                if WRITE_MODE ~= 'per_note' then r.MIDI_DisableSort(job.take) end
+                ClearNotesInRange(job.take, clear_s, clear_e, lo, lo + 4)
+                InsertNotes(job.take, notes, 100)
+                if with_marks then
+                    ClearNotesInRange(job.take, clear_s, clear_e, lo + 5, lo + 5)
+                    if #marks > 0 then InsertNotes(job.take, marks, 100) end
+                end
+            end
+            -- Sorted before anything reads the take back.
+            r.MIDI_Sort(job.take)
+            Lap('write')
 
             -- Validate what was written, with Validate's own checks.
             local written = ReadTier(inst, job.track, dl, sel_s, sel_e)
@@ -456,6 +571,7 @@ function GenerateDifficulties(inst_key, tiers, force)
                 end
             end
             total_errors = total_errors + errors
+            Lap('validate')
 
             local parts = {}
             if log.chords_reduced > 0 then parts[#parts + 1] = ('%d chords reduced'):format(log.chords_reduced) end
@@ -512,6 +628,7 @@ function GenerateDifficulties(inst_key, tiers, force)
         end
         for _, l in ipairs(RemovedZeroLengthLines(job.take, zero_before, replaced)) do lines[#lines + 1] = l end
         lines[#lines + 1] = ''
+        Lap('validate')
     end
     local tier_str = table.concat(tiers, '-')
     local what = inst_key == GEN_ALL_KEY and 'all instruments' or GenInstrumentByKey(inst_key).label
@@ -525,5 +642,12 @@ function GenerateDifficulties(inst_key, tiers, force)
     end
     S.status = ('Generate %s %s: done, %s.'):format(what, tier_str,
         total_errors == 0 and 'no Validate errors' or (total_errors .. ' Validate errors left'))
+    Lap('finish')   -- closing the undo block and refreshing the arrange view
+    -- The phases only when the run was slow (SLOW_RUN_S): a slow run's report then says
+    -- where the time went, and a normal one stays a single short line.
+    local took = r.time_precise() - t_start
+    lines[#lines + 1] = took < SLOW_RUN_S and ('Done in %.1f s'):format(took)
+        or ('Done in %.1f s - read %.1f, guitar reference %.1f, plan %.1f, write %.1f, validate %.1f, undo %.1f'):format(
+            took, T.read, T.ref, T.plan, T.write, T.validate, T.finish)
     S.last_result = table.concat(lines, '\n')
 end

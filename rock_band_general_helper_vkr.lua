@@ -97,7 +97,9 @@
 --       has notes, so a Pro Keys reduction you already made carries over.
 --     - The result is checked with Validate's own rules and anything left to
 --       fix is listed with its time. It asks before replacing notes, one undo
---       reverts the whole run, and a time selection limits it.
+--       reverts the whole run, and a time selection limits it. The result
+--       ends with how long the run took (and, for a slow run, where the
+--       time went).
 --     - It is a starting point, not a finished chart. Official charters make
 --       judgement calls no rule captures - play it through and adjust.
 --

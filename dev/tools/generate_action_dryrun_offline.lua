@@ -97,6 +97,62 @@ local api = {
         return true
     end,
     MIDI_DeleteNote = function(take, i) table.remove(take.notes, i + 1); return true end,
+    -- The whole take as REAPER's packed event buffer (int32 tick offset, flag byte, int32
+    -- length, message), notes only plus an end-of-take CC 123, and back. Pairs note-ons
+    -- with note-offs first on, first off, like REAPER. Lets the action's bulk write
+    -- (ReplaceNotesBulk) run here.
+    MIDI_GetAllEvts = function(take)
+        local evs = {}
+        local last_tick = 0
+        for i, n in ipairs(take.notes) do
+            local ch = n.chan or 0
+            evs[#evs + 1] = { t = n.tick, k = 1, i = i, msg = string.char(0x90 | ch, n.pitch, n.vel or 100) }
+            evs[#evs + 1] = { t = n.tick + n.len, k = 0, i = i, msg = string.char(0x80 | ch, n.pitch, 0) }
+            if n.tick + n.len > last_tick then last_tick = n.tick + n.len end
+        end
+        table.sort(evs, function(a, b)
+            if a.t ~= b.t then return a.t < b.t end
+            if a.k ~= b.k then return a.k < b.k end
+            return a.i < b.i
+        end)
+        evs[#evs + 1] = { t = last_tick, msg = string.char(0xB0, 123, 0) }
+        local parts, prev = {}, 0
+        for i, ev in ipairs(evs) do
+            parts[i] = string.pack('<i4Bs4', ev.t - prev, 0, ev.msg)
+            prev = ev.t
+        end
+        return true, table.concat(parts)
+    end,
+    MIDI_SetAllEvts = function(take, buf)
+        local notes, open, pos, tick = {}, {}, 1, 0
+        while pos <= #buf do
+            local off, _, msg
+            off, _, msg, pos = string.unpack('<i4Bs4', buf, pos)
+            tick = tick + off
+            if #msg >= 3 then
+                local st = msg:byte(1)
+                local typ, ch, pitch, vel = st & 0xF0, st & 0x0F, msg:byte(2), msg:byte(3)
+                local key = ch * 128 + pitch
+                if typ == 0x90 and vel > 0 then
+                    open[key] = open[key] or {}
+                    table.insert(open[key], { tick = tick, pitch = pitch, vel = vel, chan = ch })
+                elseif typ == 0x80 or typ == 0x90 then
+                    local on = open[key] and table.remove(open[key], 1)
+                    if on then
+                        on.len = tick - on.tick
+                        notes[#notes + 1] = on
+                    end
+                end
+            end
+        end
+        table.sort(notes, function(a, b) return a.tick < b.tick end)
+        take.notes = notes
+        return true
+    end,
+    -- The stand-in sorts on every insert anyway, so batching is a no-op here.
+    MIDI_DisableSort = function() end,
+    MIDI_Sort = function() end,
+    time_precise = function() return os.clock() end,
     TimeMap2_timeToQN = function(_, t) return TimeToQN(t) end,
     TimeMap2_QNToTime = function(_, qn) return QNToTime(qn) end,
     TimeMap_GetDividedBpmAtTime = function(t) return SegBy('t', t).bpm end,
