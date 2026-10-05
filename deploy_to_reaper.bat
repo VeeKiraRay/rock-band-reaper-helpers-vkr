@@ -16,9 +16,10 @@ if "%DST%"=="C:\path\to\your\REAPER\Scripts\rock-band-helpers" (
 echo Deploying to %DST%
 echo.
 
+rem Tests are not deployed. Register dev\test_rock_band_helpers_vkr.lua from the repo
+rem checkout instead (Actions > Load ReaScript): several suites read files a deployed
+rem copy does not carry (dev\calibration, .github\workflows\release.yml).
 robocopy "%SRC%lib"                                     "%DST%\lib"                                      *.lua    /MIR /NJH /NJS
-robocopy "%SRC%dev\tests"                               "%DST%\dev\tests"                            *.lua    /MIR /NJH /NJS
-robocopy "%SRC%dev\tests\midi"                          "%DST%\dev\tests\midi"                       *.mid *.txt /MIR /NJH /NJS
 robocopy "%SRC%rock_band_vocal_helper_vkr"              "%DST%\rock_band_vocal_helper_vkr"           *.lua    /MIR /NJH /NJS
 robocopy "%SRC%rock_band_general_helper_vkr"            "%DST%\rock_band_general_helper_vkr"         *.lua    /MIR /NJH /NJS
 robocopy "%SRC%resources\themes"                        "%DST%\resources\themes"                     *.rbtheme /MIR /NJH /NJS
@@ -37,7 +38,6 @@ copy /Y  "%SRC%rock_band_midi_pattern_vkr.lua"          "%DST%\rock_band_midi_pa
 copy /Y  "%SRC%rock_band_music_theory_helper_vkr.lua"   "%DST%\rock_band_music_theory_helper_vkr.lua" >nul
 copy /Y  "%SRC%dev\rock_band_venue_demo_vkr.lua"        "%DST%\dev\rock_band_venue_demo_vkr.lua"      >nul
 copy /Y  "%SRC%dev\venue_sprite_tester_vkr.lua"         "%DST%\dev\venue_sprite_tester_vkr.lua"       >nul
-copy /Y  "%SRC%dev\test_rock_band_helpers_vkr.lua"      "%DST%\dev\test_rock_band_helpers_vkr.lua"    >nul
 
 rem robocopy exit codes 0-7 are informational (success); 8+ means a real error
 if %ERRORLEVEL% GTR 7 (
