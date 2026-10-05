@@ -64,6 +64,12 @@ dofile(_mdir .. 'actions_difficulty.lua')
 dofile(_mdir .. 'actions_difficulty_5k.lua')
 dofile(_mdir .. 'actions_difficulty_gtrbass.lua')
 dofile(_mdir .. 'actions_difficulty_drums.lua')
+dofile(_mdir .. 'difficulty_generate_retime.lua')
+dofile(_mdir .. 'difficulty_generate_colors.lua')
+dofile(_mdir .. 'difficulty_generate_5lane.lua')
+dofile(_mdir .. 'difficulty_generate_hopo.lua')
+dofile(_mdir .. 'actions_difficulty_generate.lua')
+dofile(_mdir .. 'difficulty_read.lua')   -- FindTrackExact, used by Generate
 -- ui*.lua intentionally omitted: it calls r.defer(Loop) which starts the ImGui loop
 
 EnableFixtureAutoCleanup()  -- one aborted test must not poison the rest

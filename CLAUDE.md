@@ -372,10 +372,35 @@ to all REAPER APIs) — there is no headless runner. Launch them via the
 `dev/tests/run_*.lua` directly from the Actions list for an isolated Lua
 context. Results print to the REAPER console.
 
+**Register the launcher from the repo checkout** (Actions > Load ReaScript),
+not from a copy deployed into REAPER's Scripts folder. Suites read files a
+deployed copy does not carry — `dev/calibration/` (the difficulty suites load
+the scorer and stats from there), `.github/workflows/release.yml` (the Script
+Links suite checks the release zip list), and `_external_docs/` for
+corpus-based tools — and fail to load or fail spuriously without them. Running
+from the repo also tests the current code with no deploy step in between.
+
 Structure: `framework.lua` provides `Test.section` / `Test.it` / `Test.expect`
 / `Test.report`; `fixture_helpers.lua` provides fixture loading and temp-track
 helpers; each suite is a `<name>.lua` test set plus a `run_<name>.lua` runner
 that dofiles the code under test and the set.
+
+**Golden charts for Difficulty > Generate** (`run_generate_golden.lua`, also runnable
+offline: `lua dev/tests/run_generate_golden.lua`): every MIDI in the gitignored
+`dev/tests/golden/` holds hand-verified Hard/Medium/Easy. The suite regenerates each
+Guitar/Bass/Keys part from its Expert and fails on any rhythm, color or length difference,
+listed by bar, and on any difference in Guitar/Bass Hard's force-HOPO markers. Run it after every planner change: a failure means a rule change altered
+an approved chart — either regenerate and re-verify the song, or rework the rule. The
+synthetic tests in `general_algorithms.lua` pin individual rules; the golden charts are
+what catch a change's effect on real songs. See `dev/tests/golden/README.md`.
+
+**A runner must dofile everything its modules need at load time** — including
+`lib/` files a module calls while loading (e.g. `venue_camera.lua` and
+`venue_lighting.lua` call `SortedByLabel` from `lib/reaper_imgui_helpers.lua`). The
+launcher runs each suite in its own fresh environment (`NewTestEnv`), exactly as
+if run alone from the Actions list, so a missing dofile fails immediately instead
+of passing because an earlier suite in the session happened to load the file.
+Before that isolation, two runners went unnoticed missing a library for months.
 
 **When adding a new feature, plan quick tests for it in the same task:**
 - Add cases to the matching existing test set when one covers that area.
@@ -400,6 +425,8 @@ that dofiles the code under test and the set.
 - After `MIDI_DeleteNote` / `MIDI_DeleteTextSysexEvt`: indices of remaining events shift — **iterate in reverse** when deleting.
 - Use `noSort=false` on `MIDI_InsertNote` / `MIDI_InsertTextSysexEvt` — no `MIDI_Sort` needed and it avoids breaking undo detection.
 - `format_timestr_pos(tpos, '', 1)` → measures/beats string e.g. `"90.1.00"`. Parse leading integer for the measure number.
+- **Never assume a MIDI tick rate.** Rock Band projects use **480** ticks per quarter note (PPQ); REAPER's own default for new items is 960, and imported files carry their own. Read the real value from the take with `GetTakePPQPerQN(take)` (each helper's `helpers.lua`), or work in quarter notes (`TimeMap2_timeToQN`, `MIDI_GetProjQNFromPPQPos`) and never touch ticks. A hardcoded 960 is only acceptable as a defensive fallback, as a synthetic test value, or as a rounding grid finer than any real tick rate (Difficulty > Generate snaps to 1/960 QN: every tick at 480 or 960 PPQ lies exactly on that grid).
+- **Thresholds on converted times need tolerance.** Seconds → quarter notes through the tempo map leaves float noise around 1e-9. A test like `len < 0.5` (exactly 1/8) then splits identical notes either way. Compare with an epsilon, or snap to a note grid first (both are used in `difficulty_generate_5lane.lua` / `actions_difficulty_generate.lua`).
 - Audio accessor: always free with `DestroyAudioAccessor`. Leaking holds file handles open indefinitely.
 - `CreateTakeAudioAccessor` returns an **item-relative** accessor. `GetAudioAccessorSamples` on such an accessor expects time in seconds from the **start of the take's source media**, not project time. Always convert: `t_off = project_time - item_pos` (where `item_pos = GetMediaItemInfo_Value(item, 'D_POSITION')`). Every function in `lib/reaper_dsp.lua` that reads a take accessor already does this (`DetectPitchYIN`, `SampleYINAt`, `ComputeRMSContour`). Any new audio analysis function must do the same — omitting this reads zeros for items not placed at project time 0, which is always the case for stems (they start at measure 3+). MIDI items are unaffected (their `item_pos` is always 0).
 
@@ -439,6 +466,12 @@ that dofiles the code under test and the set.
     difficulty_explain.lua                     (shared with dev/calibration/), wording,
     difficulty_report.lua                      the pasteable text report, the read-only
     difficulty_suggester.lua                   adapter, and the tab body
+    difficulty_generate_retime.lua           ← Difficulty > Generate: Hard's fast-run
+    difficulty_generate_colors.lua             rewrite, chords and colors, the pure
+    difficulty_generate_5lane.lua              planner (shared with dev/calibration/),
+    difficulty_generate_hopo.lua               Hard's force-HOPO markers, the REAPER
+    actions_difficulty_generate.lua            action, and the sub-tab body
+    ui_difficulty_generate.lua
     metadata_genres.lua                      ← Metadata > Genre: supported vocabulary
     metadata_genres_ext.lua                    (transcribed), the authored extended
     metadata_genres_lookup.lua                 vocabulary + mapping, and the lookup

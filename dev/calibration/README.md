@@ -958,6 +958,61 @@ Order matters: everything downstream reads the CSV the first script writes.
 
     Result: nothing selected on any pair. See the findings section.
 
+11. **`run_difficulty_probe_vkr.lua`** — not part of the rank model. Research for the
+    planned Difficulty > Generate feature (automatic Expert → Hard → Medium → Easy
+    reduction). For Guitar, Bass and 5-lane Keys it runs the Difficulty tab's own
+    validators (`CollectGBChecks` / `CollectK5Checks`) on the **official** Hard, Medium and
+    Easy tiers, and measures what each step down keeps: by beat position, by chord and
+    colour mapping, and by sustain. A rule that official charts break routinely is too
+    strict to be enforced by a generator. Runs inside REAPER, like item 1, and needs a
+    scratch project. Writes `difficulty_probe_report.txt` plus two per-song CSVs, all
+    gitignored.
+
+    Sampling is set at the top of the script: `PROBE_MODE` `'easiest'` (lowest ranks) or
+    `'random'` (seeded), `PROBE_N` songs per instrument. **A fixed hold-out**, one song in
+    `DIFF_HOLDOUT_MOD` by a hash of the shortname (`difficulty_holdout.lua`, shared with
+    the generator's offline evaluation), is never probed in any mode. It was declared
+    before the first run looked at anything, so the generator can later be scored on charts
+    that did not shape its rules. Reads `all_rb3_dlc_reference_songs/` only: those are
+    Harmonix-authored at every tier. It writes nothing to `corpus_scores.csv` and plays no
+    part in the rank model's partitions.
+
+12. **`run_generate_eval_offline.lua`** — scores the Difficulty > Generate planner
+    (`rock_band_general_helper_vkr/difficulty_generate_5lane.lua`, loaded as-is) against the
+    official Guitar, Bass and Keys tiers. Offline, reading `.mid` files through
+    `dev/tools/smf_reader.lua`; about 30 seconds:
+
+    ```
+    lua dev/calibration/run_generate_eval_offline.lua            -- development songs
+    lua dev/calibration/run_generate_eval_offline.lua tune       -- sweep gaps, bonuses, cap
+    lua dev/calibration/run_generate_eval_offline.lua tune_cap   -- the Hard keep cap only
+    lua dev/calibration/run_generate_eval_offline.lua holdout    -- the hold-out, ONCE
+    ```
+
+    Each step is fed the **official** upper tier and compared with the official lower one:
+    onset precision / recall / F1, color agreement on matched onsets, keep rate by beat
+    position, and a count of the errors Validate would raise (must be 0). Plain Copy is
+    printed as the baseline, and a chain row runs Expert > Hard > Medium > Easy on generated
+    tiers only, which is what the button does. The sweeps print the F1 surface and are what
+    `GEN5_PARAMS` was set from. The planner uses **one rhythm model for every
+    instrument** (a product rule: the same Expert rhythm reduces to the same rhythm on
+    every instrument), so `tune` sweeps one gap per tier, scored on Guitar/Bass, and prints
+    Keys beside it so the cost of sharing stays visible. `tune_cap` only reports: the
+    `max_keep` cap is a product choice. The order in which the cap removes bar positions
+    (`CAP_KEEP_RATE` in the planner) was measured from the same development songs:
+    official Expert-to-Hard keep rate by position in the bar, pooled over all three
+    instruments.
+
+    Two companions check a planner change from other angles: `dev/tests/run_generate_golden.lua`
+    (hand-verified songs must regenerate identically) and
+    `dev/tools/generate_action_dryrun_offline.lua` (the real Generate action, with Validate's
+    own checks on its output, run against the fixtures and a corpus sample - or one song,
+    printing the tiers for a range of quarter notes).
+
+    **The hold-out** is `difficulty_holdout.lua`, the same one the probe uses. Run `holdout`
+    once, when the parameters are final, and report that number; re-running it after
+    further tuning turns it into a development set.
+
 Unit tests: **`dev/tests/run_difficulty_score.lua`** for the pure scorers, and
 **`dev/tests/run_difficulty_suggester.lua`** for the tiers, the predictor, and the frozen
 artifact — the latter refits every model from the CSV at its recorded ridge and compares

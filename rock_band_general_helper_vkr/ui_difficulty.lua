@@ -334,21 +334,31 @@ function DrawDifficultyTab(ctx)
             r.ImGui_EndTabItem(ctx)
         end
 
+        ------------------------------------------------
+        -- Difficulty > Generate sub-tab (ui_difficulty_generate.lua)
+        ------------------------------------------------
+        if r.ImGui_BeginTabItem(ctx, 'Generate') then
+            DrawDifficultyGenerateTab(ctx, midi_tracks)
+            r.ImGui_EndTabItem(ctx)
+        end
+
         r.ImGui_EndTabBar(ctx)
     end
 
-    -- Shared "Copy to X" overwrite confirmation, set by any of the four
-    -- Copy*Diff functions when the target already has notes. Rendered once
-    -- here regardless of which sub-tab triggered it.
+    -- Shared overwrite confirmation, set by any of the four Copy*Diff functions
+    -- or by GenerateDifficulties when the target already has notes. Rendered once
+    -- here regardless of which sub-tab triggered it. confirm_label is optional.
     if S.diff_copy_pending then
         r.ImGui_OpenPopup(ctx, 'ConfirmCopyOverwrite')
     end
     if r.ImGui_BeginPopupModal(ctx, 'ConfirmCopyOverwrite', nil, r.ImGui_WindowFlags_AlwaysAutoResize()) then
+        local confirm_label = 'Clear and Copy'
         if S.diff_copy_pending then
             r.ImGui_Text(ctx, S.diff_copy_pending.message)
+            confirm_label = S.diff_copy_pending.confirm_label or confirm_label
         end
         r.ImGui_Spacing(ctx)
-        if Btn('Clear and Copy', BTN_H) then
+        if Btn(confirm_label .. '##confirm_overwrite', BTN_H) then
             if S.diff_copy_pending then RunAction(S.diff_copy_pending.on_confirm) end
             S.diff_copy_pending = nil
             r.ImGui_CloseCurrentPopup(ctx)

@@ -1,6 +1,6 @@
 -- @description Rock Band General Helper
 -- @author VeeKiraRay
--- @version 0.9.61
+-- @version 0.9.63
 -- @about
 --   Utility actions for Rock Band authoring in REAPER.
 --
@@ -12,7 +12,8 @@
 --     Drums      - convert GM MIDI to Rock Band 5-lane drum notation
 --     Keys       - hand split, Pro Keys conversion + animation, 5-Lane Keys conversion
 --     Guitar     - convert raw MIDI to Expert Guitar gems, tab guide, validate
---     Difficulty - copy and validate Pro Keys + Keys + Guitar/Bass + Drums difficulty tiers
+--     Difficulty - copy and validate Pro Keys + Keys + Guitar/Bass + Drums difficulty tiers;
+--                  generate Hard/Medium/Easy automatically for Guitar, Bass and Keys
 --     Overdrive  - generate overdrive phrases, unisons, drum fills and vocal
 --                  overdrive; validate what is already authored
 --     Tab Input  - guitar/keys/vocal tab entry guide
@@ -27,6 +28,100 @@
 --
 --   This @about block keeps only the 5 most recent versions.
 --   Full history: CHANGELOG.md in the repo.
+--
+--   v0.9.63
+--     - New Difficulty > Generate sub-tab. Builds Hard, Medium and Easy for
+--       Guitar, Bass or Keys from the difficulty above, in one click. Pick an
+--       instrument - or All instruments, which uses PART GUITAR, PART BASS and
+--       PART KEYS and skips any that is missing or muted - then generate one
+--       difficulty or the whole Hard > Medium > Easy chain.
+--     - It reduces the way official charts do, not just enough to pass
+--       Validate. It keeps downbeats and beats first; Medium loses most 8ths
+--       and Easy about half the beats. Measured against the official RB3 DLC
+--       charts, the notes it keeps match the official choice far more closely
+--       than a plain copy does.
+--     - One rhythm for the whole band. Which notes stay depends on the rhythm,
+--       never on colors or the instrument, so guitar, bass and keys playing the
+--       same part get the same easier rhythm on every difficulty. In busy bars
+--       on Hard, Bass and Keys follow Guitar: a bar in the same rhythm drops
+--       the notes Guitar drops. Chords and colors are reduced afterwards:
+--       Guitar/Bass lines move down a lane on Medium and Easy.
+--     - Hard always ends up a little easier than Expert. It drops the same
+--       off-beat in every bar - first the "and" of 4, the one official Hard
+--       drops most - so a riff reduces the same way each time it comes round.
+--     - A full bar of 8ths loses one note on Hard (the "and" of 4) or two (also
+--       the "and" of 2, leaving two groups of three). Choose it under "Hard 8th
+--       runs"; Auto drops two when the song starts above 160 BPM, the RBN docs'
+--       "fast". A bar that already rests on one 8th drops one fewer; a bar with
+--       two or more 8th rests keeps every note. Sustains - and chords, in a bar
+--       that mixes chords with single notes - go last.
+--     - Fast runs on fast songs are played one grid slower on Hard instead of
+--       being thinned to 8ths: 16ths become 8th triplets (16 notes -> 12),
+--       8th triplets become 8ths (12 -> 8), 16th triplets become 16ths. The
+--       order of the colors is kept, each half bar starts on its beat, a run
+--       that lands on a beat still lands there, a 16th rest before a note on
+--       the 8th grid stays (the run restarts after it), and a group that runs
+--       into beat 1 or 3 still leads straight into it. A short 16th flourish
+--       from a beat into 8ths is thinned to 8ths instead (G G R R R ->
+--       G R R .), so it keeps its grouping, and a bar of 8ths right after a
+--       run of 16ths still loses its two notes. A 210 BPM solo kept 5 of 14
+--       notes before; now it keeps 12 and its motion. The result lists those
+--       bars to review by hand.
+--     - Medium keeps a lone off-beat note with space around it, as official
+--       Medium almost always does - unless Medium would otherwise keep more
+--       than 95% of Hard: then those notes go first, and only if that is not
+--       enough is it eased by color like Hard (top lane Yellow).
+--     - Medium: a busy bar keeps a note per beat; a chord wins over the single
+--       note next to it, but not over a downbeat; a beat Hard's rewrite moved
+--       comes back where Expert plays it; Bass and Keys follow Guitar's Medium
+--       in bars of the same rhythm. Sustains shorter than official Medium and
+--       Easy ever use become plain notes. Lines move under the top lane note
+--       by note, or a whole bar at a time where moving one note would repeat
+--       a color the tier above changes.
+--     - Guitar/Bass Hard keeps Expert's hammer-ons with force-HOPO markers:
+--       wherever Expert forced one and the note survives, and where 8th
+--       triplets rewritten as 8ths would otherwise turn a hammer-on run into
+--       strums. Assumes Magma's default HOPO threshold (170).
+--     - Fast songs no longer lose whole rhythm levels: Hard keeps its 8ths,
+--       Medium its quarters and Easy beats 1 and 3, as official charts do. A
+--       note with more than a quarter note of space on both sides is never
+--       dropped on Hard; Medium drops it when it is off the beat.
+--       If Hard still keeps almost all of Expert, as on a sparse beginner part,
+--       it is made easier by color instead: each bar moves down until its top
+--       note is Blue (Orange-Blue-Yellow becomes Blue-Yellow-Red).
+--     - Sustains leave room before the next note: Hard an 8th, Medium a
+--       dotted 8th, Easy a quarter (above 160 BPM: Medium a quarter, Easy a
+--       half). A sustain too short to keep that gap becomes a short 1/32 note,
+--       so it clearly reads as a plain note.
+--     - Keys follow the same-difficulty Pro Keys track automatically when it
+--       has notes, so a Pro Keys reduction you already made carries over.
+--     - The result is checked with Validate's own rules and anything left to
+--       fix is listed with its time. It asks before replacing notes, one undo
+--       reverts the whole run, and a time selection limits it.
+--     - It is a starting point, not a finished chart. Official charters make
+--       judgement calls no rule captures - play it through and adjust.
+--
+--   v0.9.62
+--     - Difficulty > Keys and Guitar/Bass: Validate now agrees with official
+--       charts. Every official RB3 DLC chart was run through it, and four rules
+--       flagged Harmonix's own work on most songs. Each now matches what those
+--       charts actually do, so what Validate still reports is worth fixing.
+--     - Colors on Medium and Easy. Keys: all five colors are valid on every
+--       difficulty - official Keys charts use Blue and Orange as much on Easy
+--       as on Expert - and Copy no longer pulls them down a color. Guitar/Bass:
+--       Medium still focuses on Green to Blue and Easy on Green to Yellow, but
+--       the upper colors are allowed, as the RBN docs say. Only heavy use is
+--       reported, as an advisory: a color above 5% of the notes, where a
+--       typical official chart sits near 1%.
+--     - Sustain gaps on Medium and Easy: the next note now needs a 1/8 note gap
+--       after a sustain, not a 1/4 (1/16 on Medium at 100 BPM or slower).
+--       Official charts pull sustains back by an 8th, as the docs describe.
+--     - Keys Medium spacing: notes 1/8 apart are allowed; under a 1/4 is now
+--       an advisory rather than an error. Official Medium Keys uses 1/8 gaps
+--       routinely at moderate tempos.
+--     - Force-HOPO markers on Medium or Easy are an advisory now, not an
+--       error. One official guitar Medium chart in five has some.
+--     - Expert and Hard checks are unchanged; official charts already pass them.
 --
 --   v0.9.61
 --     - General > Actions: new "Import stems" button. Pick a folder of stems and
@@ -103,64 +198,6 @@
 --       with the version entries below.
 --     - Your window size, position and dock state carry over unchanged, and
 --       will survive every future version bump too.
---
---   v0.9.58
---     - General > Actions: new "Remove 2x kicks" button. When a song is charted
---       with a double bass pedal, PART DRUMS_2X holds the complete drum chart -
---       every kick, the double hits included - and PART DRUMS has to be the same
---       chart with the second foot taken out, so one pedal can still play it.
---       Working out by hand which kicks those are is slow and easy to lose track
---       of halfway through a two-bar blast. Author every kick on both tracks and
---       press this instead.
---     - Only PART DRUMS loses notes. PART DRUMS_2X is never thinned, so it stays
---       the complete chart the game expects.
---     - How it decides. Kicks up to a 1/8 apart count as one line. Two back-to-
---       back 1/16 kicks are already two feet, so any line that tight qualifies;
---       a straight run of 1/8s needs more than four in a row, since four or fewer
---       is playable with one foot. A kick hanging off the line by a wider gap - a
---       lone 1/8 leaning against a burst of 1/16s, or one across a bar line from
---       the rest - is a separate hit and is left alone.
---       Every other kick in the line is the second foot, phased so a kick on a
---       bar downbeat is never taken - which is why a line ending on the downbeat
---       alternates from its first kick instead of its second. A line with a gap
---       in it is read as one continuous grid rather than by counting the kicks
---       that are there, so the feet stay on the same subdivisions across the gap
---       and the downbeats either side stay primary.
---     - Matching between the two tracks is by musical position, so a tempo change
---       anywhere in the song does not affect it - which matters on fast songs,
---       where a BPM jump makes a note's position in seconds drift by more than a
---       MIDI tick. On a fast run it will not take a neighbouring gem by mistake.
---       The result says whether the two tracks are left holding consistent kicks.
---     - The whole track is processed - a time selection does not change the
---       result. Safe to run twice: the second run finds nothing left to remove,
---       says so, and creates no undo point. One undo puts both tracks back.
---     - Charts are checked, not trusted. The rules come from a small number of
---       hand-charted songs, so an unusual passage can still come out wrong - most
---       often where a line has a gap in it. It is meant to do the bulk of the work
---       on the long passages, not to be the last word.
---
---   v0.9.57
---     - Metadata > Difficulty: new suggestion models for drums, keys and vocals,
---       refitted against a reference corpus that grew from 205 songs to 394. The
---       earlier corpus was thin at both ends of the scale, which flattered every
---       figure: a model that hedges toward the middle looks good when most of the
---       songs measured against it sit there. Easy and hard songs were added at
---       both ends, so the accuracy numbers went DOWN while becoming honest.
---       Guitar, bass and Pro Keys suggestions are unchanged.
---     - Vocals: the model now measures how long a part stays high, not only how
---       high it reaches. A chart that sits above G4 for much of its singing time
---       reads harder than one that touches the same note once, which is what the
---       official ranks reward. It also counts how often the melody changes note.
---       Vocals remains the weakest instrument and keeps its Experimental badge -
---       it still under-rates the hardest charts, the operatic and wide-ranging
---       ones most of all.
---     - Drums: back to the fuller model, which now wins clearly rather than by a
---       hair. It is the most reliable of the six.
---     - Keys: unchanged factors, fitted on a straight rank scale rather than a
---       log one. Keys sits fractionally under the accuracy bar the other three
---       cleared, so it keeps its Beta badge; adding easy and hard keys charts
---       twice failed to close that gap, which suggests the limit is the model
---       rather than the number of songs behind it.
 r = reaper  -- global so all dofile'd modules can use it
 
 if not r.ImGui_CreateContext then
@@ -247,6 +284,11 @@ for _, _f in ipairs({
     _mdir .. 'actions_difficulty_5k.lua',
     _mdir .. 'actions_difficulty_gtrbass.lua',
     _mdir .. 'actions_difficulty_drums.lua',
+    _mdir .. 'difficulty_generate_retime.lua',
+    _mdir .. 'difficulty_generate_colors.lua',
+    _mdir .. 'difficulty_generate_5lane.lua',
+    _mdir .. 'difficulty_generate_hopo.lua',
+    _mdir .. 'actions_difficulty_generate.lua',
     _mdir .. 'difficulty_read.lua',
     _mdir .. 'difficulty_explain.lua',
     _mdir .. 'difficulty_report.lua',
@@ -262,6 +304,7 @@ for _, _f in ipairs({
     _mdir .. 'actions_overdrive_validate.lua',
     _mdir .. 'ui_common.lua',
     _mdir .. 'ui_keys.lua',
+    _mdir .. 'ui_difficulty_generate.lua',
     _mdir .. 'ui_difficulty.lua',
     _mdir .. 'ui_overdrive.lua',
     _mdir .. 'ui_midi_pattern.lua',
@@ -344,6 +387,14 @@ dofile(_mdir .. 'actions_difficulty.lua')
 dofile(_mdir .. 'actions_difficulty_5k.lua')
 dofile(_mdir .. 'actions_difficulty_gtrbass.lua')
 dofile(_mdir .. 'actions_difficulty_drums.lua')
+-- Difficulty > Generate: the pure planner (its Hard fast-run rewrite first), then the
+-- action that reads and writes tracks. All only touch the rule tables and FindTrackExact
+-- (difficulty_read.lua) at call time.
+dofile(_mdir .. 'difficulty_generate_retime.lua')
+dofile(_mdir .. 'difficulty_generate_colors.lua')
+dofile(_mdir .. 'difficulty_generate_5lane.lua')
+dofile(_mdir .. 'difficulty_generate_hopo.lua')
+dofile(_mdir .. 'actions_difficulty_generate.lua')
 dofile(_mdir .. 'difficulty_read.lua')
 dofile(_mdir .. 'difficulty_explain.lua')
 dofile(_mdir .. 'difficulty_report.lua')   -- consumes DifficultyAnnotate's output
@@ -366,6 +417,7 @@ dofile(_mdir .. 'actions_overdrive.lua')
 dofile(_mdir .. 'actions_overdrive_validate.lua')
 dofile(_mdir .. 'ui_common.lua')
 dofile(_mdir .. 'ui_keys.lua')
+dofile(_mdir .. 'ui_difficulty_generate.lua')
 dofile(_mdir .. 'ui_difficulty.lua')
 dofile(_mdir .. 'ui_overdrive.lua')
 dofile(_mdir .. 'ui_midi_pattern.lua')

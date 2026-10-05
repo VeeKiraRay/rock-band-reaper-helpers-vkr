@@ -1,22 +1,38 @@
 -- Keys (5-Lane) difficulty validation and copy-to-next-tier tools
 -- Requires: S, r, GetTimeSelection, GetTempoContextBefore, FormatTime, PitchName,
---           FindFirstMIDIItem, InsertNotes, ClearNotesInRange (globals)
+--           FindFirstMIDIItem, InsertNotes, ClearNotesInRange,
+--           DiffIssue, BuildDiffCheckReport, CheckDifficultyProgression,
+--           CompressChordOffsets (actions_difficulty_shared.lua) (globals)
 
--- Per-difficulty pitch ranges on PART KEYS
-local K5_RANGE = {
+-- The rule tables below are global (not local) so every consumer reads this
+-- one copy: Validate, the Generate planners and the corpus probe in
+-- dev/calibration/. A second copy would let the generator and the validator
+-- disagree about what passes.
+
+-- Per-difficulty pitch ranges on PART KEYS. All five lanes on every tier: official
+-- Keys charts use Blue and Orange as much on Easy as on Expert (median 20% and 16% of
+-- Easy notes over 352 charts, dev/calibration/run_difficulty_probe_vkr.lua), and the
+-- Keys authoring docs set no color limit by difficulty. Copy therefore keeps colors
+-- as they are rather than compressing them down.
+K5_RANGE = {
     X = { lo = 96, hi = 100 },
     H = { lo = 84, hi = 88  },
-    M = { lo = 72, hi = 75  },
-    E = { lo = 60, hi = 62  },
+    M = { lo = 72, hi = 76  },
+    E = { lo = 60, hi = 64  },
 }
 
 -- Per-difficulty chord limits (max simultaneous notes at the same start time)
-local K5_MAX_CHORD = { X = 5, H = 3, M = 2, E = 1 }
+K5_MAX_CHORD = { X = 5, H = 3, M = 2, E = 1 }
 
--- Per-difficulty minimum start-to-start spacing in beats (nil = no rule)
--- M: 1/4 note hard minimum; E: 1/4 note hard minimum + 1/2 note advisory
-local K5_MIN_SP = { M = 1.0, E = 1.0 }   -- 1 beat = 1/4 note
-local K5_ADV_SP = { E = 2.0 }             -- 2 beats = 1/2 note
+-- Per-difficulty start-to-start spacing in beats: K5_MIN_SP is the error floor,
+-- K5_ADV_SP the advisory target (nil = no rule).
+-- M: 1/8 floor, 1/4 advisory. The docs say to "try to only have playable notes on
+--    strong quarter note beats", and official Medium uses 1/8 gaps routinely at
+--    moderate tempos (13% of gaps at <=100 BPM, 8% at 101-140) - a 1/4 floor fired on
+--    65% of official charts. Gaps under 1/8 are rare (about 1%).
+-- E: 1/4 floor, 1/2 advisory. 96-100% of official Easy gaps are 1/4 or wider.
+K5_MIN_SP = { M = 0.5, E = 1.0 }
+K5_ADV_SP = { M = 1.0, E = 2.0 }
 
 local DIFF_NAMES = { X = 'Expert', H = 'Hard', M = 'Medium', E = 'Easy' }
 
@@ -125,7 +141,8 @@ local function K5Label(pitches)
 end
 
 ----------------------------------------------------------------------
--- Check functions - each returns an array of issue strings
+-- Check functions - each returns an array of DiffIssue records
+-- (actions_difficulty_shared.lua); rec.msg is the report line.
 ----------------------------------------------------------------------
 
 -- Chords exceeding max simultaneous notes for this difficulty.
@@ -134,8 +151,8 @@ local function CheckK5ChordCount(events, max_chord, diff_label)
     for _, ev in ipairs(events) do
         if #ev.pitches > max_chord then
             local limit_str = max_chord == 1 and 'no chords' or ('max ' .. max_chord)
-            issues[#issues + 1] = ('%s: %s has %d notes (%s for %s)'):format(
-                FormatTime(ev.s), K5Label(ev.pitches), #ev.pitches, limit_str, DIFF_NAMES[diff_label])
+            issues[#issues + 1] = DiffIssue(ev.s, ev.pitches, ('%s: %s has %d notes (%s for %s)'):format(
+                FormatTime(ev.s), K5Label(ev.pitches), #ev.pitches, limit_str, DIFF_NAMES[diff_label]))
         end
     end
     return issues
@@ -143,7 +160,9 @@ end
 
 -- Start-to-start spacing below minimum.
 -- min_beats: hard minimum (beats). advisory_beats: softer advisory limit, or nil.
-local function CheckK5Spacing(events, min_beats, advisory_beats)
+-- Both kinds share one report category, so an advisory line is told apart by
+-- rec.advisory rather than by its category.
+local function CheckK5Spacing(events, min_beats, advisory_beats, diff_label)
     local issues = {}
     for i = 2, #events do
         local prev, curr = events[i-1], events[i]
@@ -152,14 +171,15 @@ local function CheckK5Spacing(events, min_beats, advisory_beats)
         local gap     = curr.s - prev.s
         if gap_qn < min_beats * (1 - GRACE) then
             local min_s = r.TimeMap2_QNToTime(0, qn_prev + min_beats) - prev.s
-            local frac_str = min_beats == 1.0 and '1/4 note' or '1/2 note'
-            issues[#issues + 1] = ('%s: %s is %.0f ms after previous (min %s = %.0f ms)'):format(
-                FormatTime(curr.s), K5Label(curr.pitches), gap * 1000, frac_str, min_s * 1000)
+            issues[#issues + 1] = DiffIssue(curr.s, curr.pitches, ('%s: %s is %.0f ms after previous (min %s = %.0f ms)'):format(
+                FormatTime(curr.s), K5Label(curr.pitches), gap * 1000, DiffQNLabel(min_beats), min_s * 1000),
+                { prev_s = prev.s })
         elseif advisory_beats and gap_qn < advisory_beats * (1 - GRACE) then
             local adv_s = r.TimeMap2_QNToTime(0, qn_prev + advisory_beats) - prev.s
-            local adv_str = advisory_beats == 2.0 and '1/2 note' or '1/4 note'
-            issues[#issues + 1] = ('%s: %s is %.0f ms after previous (advisory: %s = %.0f ms recommended for Easy)'):format(
-                FormatTime(curr.s), K5Label(curr.pitches), gap * 1000, adv_str, adv_s * 1000)
+            issues[#issues + 1] = DiffIssue(curr.s, curr.pitches, ('%s: %s is %.0f ms after previous (advisory: %s = %.0f ms recommended for %s)'):format(
+                FormatTime(curr.s), K5Label(curr.pitches), gap * 1000, DiffQNLabel(advisory_beats), adv_s * 1000,
+                DIFF_NAMES[diff_label]),
+                { prev_s = prev.s, advisory = true })
         end
     end
     return issues
@@ -174,8 +194,8 @@ local function CheckK5NoteLength(events)
         if dur_qn < 0.0625 * (1 - GRACE) then  -- 1/64 note = 1/16 of a beat
             local dur   = ev.e - ev.s
             local min_s = r.TimeMap2_QNToTime(0, qn_s + 0.0625) - ev.s
-            issues[#issues + 1] = ('%s: %s is %.1f ms long (min 1/64 note = %.1f ms)'):format(
-                FormatTime(ev.s), K5Label(ev.pitches), dur * 1000, min_s * 1000)
+            issues[#issues + 1] = DiffIssue(ev.s, ev.pitches, ('%s: %s is %.1f ms long (min 1/64 note = %.1f ms)'):format(
+                FormatTime(ev.s), K5Label(ev.pitches), dur * 1000, min_s * 1000))
         end
     end
     return issues
@@ -183,7 +203,8 @@ end
 
 -- Gap between end of a sustained note and the next note start.
 -- Only fires on notes at least 1/8 note long. Overlap is skipped (gap < 0).
--- M/E: 1/4 note gap required for all notes. X/H: 1/16 note (single) or 1/8 note (chord).
+-- M/E: DiffReleaseGapQN (actions_difficulty_shared.lua) - 1/8 note, 1/16 on Medium
+-- at slow tempos. X/H: 1/16 note (single) or 1/8 note (chord).
 local function CheckK5SustainGaps(events, diff_label)
     local issues = {}
     for i = 1, #events - 1 do
@@ -199,7 +220,8 @@ local function CheckK5SustainGaps(events, diff_label)
 
         local min_qn, min_label
         if diff_label == 'M' or diff_label == 'E' then
-            min_qn, min_label = 1.0,  '1/4 note'
+            min_qn = DiffReleaseGapQN(diff_label, 60.0 / GetK5BeatDur(ev.s))
+            min_label = DiffQNLabel(min_qn)
         elseif #ev.pitches > 1 then
             min_qn, min_label = 0.5,  '1/8 note'
         else
@@ -209,9 +231,9 @@ local function CheckK5SustainGaps(events, diff_label)
         if gap_qn < min_qn * (1 - GRACE) then
             local gap   = next_ev.s - ev.e
             local min_s = r.TimeMap2_QNToTime(0, qn_e + min_qn) - ev.e
-            issues[#issues + 1] = ('%s: %s ends %.0f ms before %s (need %s gap = %.0f ms)'):format(
+            issues[#issues + 1] = DiffIssue(next_ev.s, next_ev.pitches, ('%s: %s ends %.0f ms before %s (need %s gap = %.0f ms)'):format(
                 FormatTime(next_ev.s), K5Label(ev.pitches), gap * 1000,
-                K5Label(next_ev.pitches), min_label, min_s * 1000)
+                K5Label(next_ev.pitches), min_label, min_s * 1000), { prev_s = ev.s })
         end
 
         ::k5sg_next::
@@ -232,8 +254,8 @@ local function CheckK5SustainLength(events)
         if dur_qn >= 0.5 - EPS_QN and dur_qn < 0.75 * (1 - GRACE) then
             local dur   = ev.e - ev.s
             local min_s = r.TimeMap2_QNToTime(0, qn_s + 0.75) - ev.s
-            issues[#issues + 1] = ('%s: %s is %.0f ms (need >= 3/16 note = %.0f ms at %.0f BPM, or shorten to hit)'):format(
-                FormatTime(ev.s), K5Label(ev.pitches), dur * 1000, min_s * 1000, bpm)
+            issues[#issues + 1] = DiffIssue(ev.s, ev.pitches, ('%s: %s is %.0f ms (need >= 3/16 note = %.0f ms at %.0f BPM, or shorten to hit)'):format(
+                FormatTime(ev.s), K5Label(ev.pitches), dur * 1000, min_s * 1000, bpm))
         end
         ::k5sl_next::
     end
@@ -256,8 +278,9 @@ local PK_REDUCE_TOLERANCE_QN = 0.125  -- 1/32 note, for the auto-reduce-with-Pro
 -- matched to that Pro Keys event's length rather than the copied source
 -- tier's own length - sustain-gap rules require the two charts to agree on
 -- note length, not just onset placement, since Pro Keys is the master chart
--- both are reduced from.
-local function ReadProKeysEvents(track, t_s, t_e)
+-- both are reduced from. Global: Difficulty > Generate follows the same chart when
+-- generating Keys (actions_difficulty_generate.lua).
+function ReadProKeysEvents(track, t_s, t_e)
     local notes = {}
     for i = 0, r.CountTrackMediaItems(track) - 1 do
         local item = r.GetTrackMediaItem(track, i)
@@ -307,57 +330,27 @@ local function FindNearbyPKEvent(events, target_s, tolerance_qn)
     return best
 end
 
--- Notes with pitches above the valid hi for this difficulty (authoring error).
--- rng_hi: K5_RANGE[diff].hi - the highest valid pitch for the diff being validated.
-local function CheckK5OutOfRange(events, rng_hi)
-    local issues = {}
-    for _, ev in ipairs(events) do
-        for _, p in ipairs(ev.pitches) do
-            if p > rng_hi then
-                issues[#issues + 1] = ('%s: %s (pitch %d) is outside the valid range for this difficulty'):format(
-                    FormatTime(ev.s), K5GemName(p), p)
-            end
-        end
-    end
-    return issues
-end
-
 ----------------------------------------------------------------------
--- Report builder and validation runner
+-- Check collection and validation runner
 ----------------------------------------------------------------------
 
-local function BuildK5Report(header, cats)
-    local lines = { header, '' }
-    local total = 0
-    local ok_cats = {}
-    for _, cat in ipairs(cats) do
-        if #cat.issues > 0 then
-            lines[#lines + 1] = cat.name .. ':'
-            for _, issue in ipairs(cat.issues) do
-                lines[#lines + 1] = '  ' .. issue
-                total = total + 1
-            end
-            lines[#lines + 1] = ''
-        else
-            ok_cats[#ok_cats + 1] = cat.name
-        end
-    end
-    if total == 0 then
-        lines[#lines + 1] = 'No issues found.'
-        lines[#lines + 1] = ''
-    elseif #ok_cats > 0 then
-        lines[#lines + 1] = 'Passed: ' .. table.concat(ok_cats, ', ')
-        lines[#lines + 1] = ''
-    end
-    return table.concat(lines, '\n'), total
+-- Read one tier's gem events from PART KEYS (all 5 gem slots, so out-of-range
+-- notes are included and get flagged). Returns (events, note_count).
+-- Global for the Generate planners and the corpus probe.
+function ReadK5TierEvents(track, diff_label, sel_s, sel_e)
+    local rng   = K5_RANGE[diff_label]
+    local notes = ReadK5Notes(track, rng.lo, rng.lo + 4, sel_s, sel_e)
+    return GroupK5Chords(notes), #notes
 end
 
-local function RunK5Checks(diff_label, events, header, rng_hi)
+-- Every check for one tier, as categories { name, rule, issues }. rule is a
+-- stable id for counting violations per rule; name is the heading Validate
+-- prints. Category order is the report order. Global so callers other than
+-- Validate can count or act on issues without parsing text.
+function CollectK5Checks(diff_label, events)
     local max_ch = K5_MAX_CHORD[diff_label]
     local min_sp = K5_MIN_SP[diff_label]
     local cats   = {}
-
-    cats[#cats + 1] = { name = 'Notes outside valid range', issues = CheckK5OutOfRange(events, rng_hi) }
 
     local chord_name
     if diff_label == 'E' then
@@ -365,28 +358,35 @@ local function RunK5Checks(diff_label, events, header, rng_hi)
     else
         chord_name = ('Max chord (%d notes)'):format(max_ch)
     end
-    cats[#cats + 1] = { name = chord_name, issues = CheckK5ChordCount(events, max_ch, diff_label) }
+    cats[#cats + 1] = { name = chord_name, rule = 'chord_size',
+                        issues = CheckK5ChordCount(events, max_ch, diff_label) }
 
     if min_sp then
         local adv = K5_ADV_SP[diff_label]
-        local sp_name = diff_label == 'E'
-            and 'Note spacing (min 1/4 note, advisory 1/2 note)'
-            or  'Note spacing (min 1/4 note)'
-        cats[#cats + 1] = { name = sp_name, issues = CheckK5Spacing(events, min_sp, adv) }
+        local sp_name = adv
+            and ('Note spacing (min %s, advisory %s)'):format(DiffQNLabel(min_sp), DiffQNLabel(adv))
+            or  ('Note spacing (min %s)'):format(DiffQNLabel(min_sp))
+        cats[#cats + 1] = { name = sp_name, rule = 'spacing',
+                            issues = CheckK5Spacing(events, min_sp, adv, diff_label) }
     end
 
-    cats[#cats + 1] = { name = 'Note length (min 1/64)', issues = CheckK5NoteLength(events) }
+    cats[#cats + 1] = { name = 'Note length (min 1/64)', rule = 'note_length', issues = CheckK5NoteLength(events) }
 
     if diff_label == 'X' or diff_label == 'H' then
-        cats[#cats + 1] = { name = 'Sustain length (min 3/16 at >=100 BPM)', issues = CheckK5SustainLength(events) }
+        cats[#cats + 1] = { name = 'Sustain length (min 3/16 at >=100 BPM)', rule = 'sustain_length',
+                            issues = CheckK5SustainLength(events) }
     end
 
     local sg_name = (diff_label == 'M' or diff_label == 'E')
-        and 'Sustain gaps (min 1/4 note gap to next)'
+        and DiffReleaseGapName(diff_label)
         or  'Sustain gaps (min 1/16 single / 1/8 chord)'
-    cats[#cats + 1] = { name = sg_name, issues = CheckK5SustainGaps(events, diff_label) }
+    cats[#cats + 1] = { name = sg_name, rule = 'sustain_gap', issues = CheckK5SustainGaps(events, diff_label) }
 
-    return BuildK5Report(header, cats)
+    return cats
+end
+
+local function RunK5Checks(diff_label, events, header)
+    return BuildDiffCheckReport(header, CollectK5Checks(diff_label, events))
 end
 
 ----------------------------------------------------------------------
@@ -428,7 +428,7 @@ function ValidateKeys5Diff(diff_label)
     local scope  = sel_s and ' [time selection]' or ''
     local header = ('5-Lane Keys %s Validation  [%s-%s, %d-%d]%s'):format(
         DIFF_NAMES[diff_label], PitchName(rng.lo), PitchName(rng.hi), rng.lo, rng.hi, scope)
-    local report, total = RunK5Checks(diff_label, events, header, rng.hi)
+    local report, total = RunK5Checks(diff_label, events, header)
 
     -- Cross-difficulty progression check (vs the immediately higher tier).
     local higher_dl = ADJACENT_HIGHER[diff_label]
@@ -490,7 +490,7 @@ function ValidateAllKeys5()
             prev_dl, prev_events, prev_count = dl, {}, 0
         else
             local header        = ('=== 5-Lane Keys %s  [%d-%d] ==='):format(DIFF_NAMES[dl], rng.lo, rng.hi)
-            local report, total = RunK5Checks(dl, events, header, rng.hi)
+            local report, total = RunK5Checks(dl, events, header)
 
             if dl ~= 'X' and prev_dl == ADJACENT_HIGHER[dl] then
                 local block, extra = CheckDifficultyProgression(
@@ -514,9 +514,9 @@ function ValidateAllKeys5()
 end
 
 -- Copy notes from the immediately higher tier's range onto diff_label's own
--- range on PART KEYS. Colors above the target tier's ceiling are compressed
--- down via CompressChordOffsets (actions_difficulty_shared.lua) rather than
--- dropped outright or left out-of-range.
+-- range on PART KEYS. Every Keys tier has all five lanes (see K5_RANGE), so
+-- colors copy across unchanged; CompressChordOffsets is still applied but is a
+-- no-op while every tier's ceiling is lo+4.
 -- force: skip the "target already has notes" confirmation and overwrite
 -- directly (set true when called again from the confirm popup).
 function CopyKeys5Diff(diff_label, force)
@@ -632,7 +632,7 @@ function CopyKeys5Diff(diff_label, force)
 
     local reduce_note = ''
     if S.diff_5k_pk_reduce then
-        if pk_qns then
+        if pk_events then
             reduce_note = (' (%d of %d events kept using PART REAL_KEYS_%s as a guide)'):format(
                 kept_events, kept_events + dropped_events, diff_label)
         else

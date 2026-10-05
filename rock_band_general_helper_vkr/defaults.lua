@@ -174,10 +174,17 @@ S = {
     diff_gb_instrument    = 'gtr',  -- 'gtr' or 'bass' (persisted)
     -- Drums difficulty (not persisted - auto-detected by name)
     diff_drums_idx        = -1,
-    -- Difficulty tab: pending "Copy to X" overwrite confirmation (not persisted,
-    -- transient UI state). nil = no popup. Otherwise: { message = string,
-    -- on_confirm = function() ... end } - set by a Copy*Diff call when the
-    -- target already has notes; consumed by the confirm popup in ui_difficulty.lua.
+    -- Difficulty > Generate: instrument dropdown, a GEN_INSTRUMENTS key or 'all'
+    -- (session only - not persisted, starts on Guitar)
+    diff_gen_instrument   = 'gtr',
+    -- Difficulty > Generate: notes a full bar of 8ths loses on Hard - 'auto', 1 or 2
+    -- (session only; Auto decides from the song's tempo, see GEN5_PARAMS.fast_8ths_bpm)
+    diff_gen_busy_drop    = 'auto',
+    -- Difficulty tab: pending overwrite confirmation (not persisted, transient UI
+    -- state). nil = no popup. Otherwise: { message = string, on_confirm = function()
+    -- ... end, confirm_label = string? } - set by a Copy*Diff call or by
+    -- GenerateDifficulties when the target already has notes; consumed by the
+    -- confirm popup in ui_difficulty.lua.
     diff_copy_pending     = nil,
     -- Metadata > Difficulty: the last set of suggestion records from
     -- SuggestProjectDifficulties(). SESSION-ONLY and deliberately never persisted - a
@@ -1125,13 +1132,13 @@ TIPS = {
     -- Difficulty tab - 5-Lane Keys
     diff_5k_track     = "5-Lane Keys track (PART KEYS).\n" ..
                         "All four difficulties live on this single track in separate pitch ranges:\n" ..
-                        "Expert 96-100 | Hard 84-88 | Medium 72-75 | Easy 60-62",
+                        "Expert 96-100 | Hard 84-88 | Medium 72-76 | Easy 60-64\n" ..
+                        "(all five colors on every difficulty, as official Keys charts use them)",
     diff_5k_autodetect = "Search for a track named PART KEYS and assign it.\n" ..
                          "Resets the current selection before scanning.",
     diff_5k_copy      = "Copy notes from the tier above (Expert\xe2\x86\x92Hard, Hard\xe2\x86\x92Medium,\n" ..
                         "Medium\xe2\x86\x92Easy) onto this difficulty's own pitch range. Colors\n" ..
-                        "above this tier's ceiling (e.g. Orange copied down to Medium) are\n" ..
-                        "pulled down a color instead of dropped.\n\n" ..
+                        "copy across unchanged - every Keys difficulty uses all five.\n\n" ..
                         "See \"Reduce using Pro Keys\" below for optional rhythm reduction\n" ..
                         "guided by the same-tier Pro Keys track; with it off, this is a\n" ..
                         "starting point to hand-edit down, not an automatic reduction.\n\n" ..
@@ -1152,6 +1159,9 @@ TIPS = {
     diff_5k_validate  = "Validate the notes in this difficulty's pitch range against\n" ..
                         "5-Lane Keys authoring rules: chord count, note spacing, note\n" ..
                         "length, and sustain gaps.\n\n" ..
+                        "Medium/Easy limits follow what official charts actually do: Medium\n" ..
+                        "notes may be 1/8 apart (1/4 is advised), and a sustain needs a 1/8\n" ..
+                        "note gap before the next note (1/16 on Medium at 100 BPM or slower).\n\n" ..
                         "Read-only - no project changes are made.\n" ..
                         "Respects time selection if active.",
     diff_5k_validate_all = "Validate all four 5-Lane Keys difficulty ranges in one combined report.\n\n" ..
@@ -1165,7 +1175,9 @@ TIPS = {
     diff_gb_track      = "Guitar/Bass difficulty track (PART GUITAR or PART BASS, matching the\n" ..
                          "instrument selected above).\n" ..
                          "All four difficulties live on this single track in separate pitch ranges:\n" ..
-                         "Expert 96-100 | Hard 84-88 | Medium 72-75 | Easy 60-62",
+                         "Expert 96-100 | Hard 84-88 | Medium 72-76 | Easy 60-64\n" ..
+                         "Medium focuses on Green-Blue and Easy on Green-Yellow; the upper\n" ..
+                         "colors are allowed but used sparingly.",
     diff_gb_autodetect = "Search for tracks named PART GUITAR and PART BASS by exact name and\n" ..
                          "assign them. Resets both selections before scanning.",
     diff_gb_copy       = "Copy notes from the tier above (Expert\xe2\x86\x92Hard, Hard\xe2\x86\x92Medium,\n" ..
@@ -1181,13 +1193,77 @@ TIPS = {
     diff_gb_validate   = "Validate the notes in this difficulty's pitch range against RBN\n" ..
                          "Guitar/Bass authoring rules: chord count, chord shape (illegal\n" ..
                          "Green+Orange combinations, span limits), note length, overlap,\n" ..
-                         "sustain gaps, force-HOPO markers (not allowed on Medium/Easy), and\n" ..
-                         "trill/tremolo marker velocity (Hard eligibility).\n\n" ..
+                         "sustain gaps, and trill/tremolo marker velocity (Hard eligibility).\n\n" ..
+                         "Medium/Easy limits follow what official charts actually do: a\n" ..
+                         "sustain needs a 1/8 note gap before the next note (1/16 on Medium\n" ..
+                         "at 100 BPM or slower). Advisories, not errors: Orange on Medium or\n" ..
+                         "Blue/Orange on Easy above 5% of the notes, and force-HOPO markers\n" ..
+                         "on Medium/Easy.\n\n" ..
                          "Read-only - no project changes are made.\n" ..
                          "Respects time selection if active.",
     diff_gb_validate_all = "Validate all four Guitar/Bass difficulty ranges in one combined report.\n\n" ..
                            "Read-only - no project changes are made.\n" ..
                            "Respects time selection if active.",
+
+    -- Difficulty tab - Generate
+    diff_gen_instrument = "Which instrument to generate difficulties for.\n\n" ..
+                          "All instruments uses each instrument's default track (PART GUITAR,\n" ..
+                          "PART BASS, PART KEYS) and skips any that is missing or muted.",
+    diff_gen_track      = "The instrument's track. Shared with that instrument's own\n" ..
+                          "Difficulty sub-tab - changing it here changes it there too.",
+    diff_gen_tier       = "Generate this difficulty from the one above it as it is now\n" ..
+                          "(Hard from Expert, Medium from Hard, Easy from Medium). Useful\n" ..
+                          "after hand-editing a tier, to rebuild only the ones below it.\n\n" ..
+                          "Thins notes the way official charts do - downbeats and beats\n" ..
+                          "first - then reduces chords and colors and shortens sustains.\n" ..
+                          "Which notes are kept depends only on the rhythm, so guitar,\n" ..
+                          "bass and keys playing the same part get the same easier\n" ..
+                          "rhythm (in busy bars Bass and Keys follow Guitar's Hard).\n" ..
+                          "Keys follow the same-difficulty Pro Keys track when it\n" ..
+                          "has notes.\n\n" ..
+                          "On a sparse part, Hard keeps notes that have more than a\n" ..
+                          "quarter note of space around them (Medium drops them when off\n" ..
+                          "the beat); a Hard that keeps almost all of Expert is eased by\n" ..
+                          "moving each bar down a lane so it tops out at Blue.\n\n" ..
+                          "Above 160 BPM, Hard plays fast runs one grid slower instead of\n" ..
+                          "thinning them: 16ths become 8th triplets, 8th triplets become\n" ..
+                          "8ths, keeping the order of the colors. Those bars are listed in\n" ..
+                          "the result to review by hand.\n\n" ..
+                          "Medium keeps a note per beat in busy bars, prefers a chord to a\n" ..
+                          "single note next to it (but not to a downbeat), and puts a beat\n" ..
+                          "Hard's rewrite moved back where Expert plays it. Bass and Keys\n" ..
+                          "follow Guitar's Medium in bars of the same rhythm. Medium and\n" ..
+                          "Easy keep only sustains of a quarter note or more above 160 BPM\n" ..
+                          "(Medium a dotted 8th at or below), as official charts do.\n\n" ..
+                          "Guitar/Bass Hard gets force-HOPO markers where Expert forced\n" ..
+                          "a hammer-on, and where that rewrite pulled Expert's hammer-ons\n" ..
+                          "apart (assumes Magma's default HOPO threshold, 170).\n\n" ..
+                          "Sustains leave a gap before the next note: Hard 1/8, Medium a\n" ..
+                          "dotted 8th, Easy a quarter (above 160 BPM: Medium a quarter,\n" ..
+                          "Easy a half). One that would end up shorter than 1/8 becomes a\n" ..
+                          "short 1/32 note.\n\n" ..
+                          "The result is checked with Validate's rules and anything left\n" ..
+                          "to fix is listed. Asks before replacing existing notes. One\n" ..
+                          "undo reverts it. Respects time selection if active.",
+    diff_gen_busy_drop  = "How many notes a full bar of 8ths loses on Hard.\n\n" ..
+                          "Drop 1: the and of 4 (1 & 2 & 3 & 4).\n" ..
+                          "Drop 2: also the and of 2 - two groups of three\n" ..
+                          "(1 & 2 . 3 & 4 .).\n\n" ..
+                          "Auto drops 2 when the song starts above 160 BPM, else 1. The\n" ..
+                          "RBN docs: \"If the song is fast (over 160 bpm), the player\n" ..
+                          "shouldn't be expected to play continuous 8th notes. Thin the\n" ..
+                          "chart out by removing every fourth note per half measure.\"\n\n" ..
+                          "A bar that already rests on one 8th drops one fewer (at least\n" ..
+                          "one); a bar with two or more 8th rests keeps every note.\n" ..
+                          "Sustains, and chords in a bar that mixes chords with single\n" ..
+                          "notes, go last.\n\n" ..
+                          "Bass and Keys follow Guitar: a bar in the same rhythm as\n" ..
+                          "PART GUITAR's Expert drops the notes Guitar's Hard drops.\n\n" ..
+                          "Official charts use both about equally often, so pick what keeps\n" ..
+                          "the song's feel - keep 1 if its strong beats are the upbeats.",
+    diff_gen_chain      = "Generate Hard from Expert, then Medium from that Hard, then\n" ..
+                          "Easy from that Medium - all three in one go, as one undo step.\n\n" ..
+                          "Asks before replacing existing notes. Respects time selection.",
 
     -- Difficulty tab - Drums
     diff_drums_track      = "Drums difficulty track (PART DRUMS).\n" ..

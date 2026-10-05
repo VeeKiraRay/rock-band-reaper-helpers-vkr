@@ -524,3 +524,674 @@ Test.it('4-note and 6-note fallback shapes share one conflict group', function()
     Test.expect(not shared['40,45,50,55'] and not shared['52,57,62,67,71,76'],
         'neither is marked shared - there was no overflow')
 end)
+
+----------------------------------------------------------------------
+-- Difficulty > Generate planner (difficulty_generate_5lane.lua): the Hard keep cap
+----------------------------------------------------------------------
+Test.section('Generate planner - Hard keep cap')
+
+-- 64 bars of steady 8ths at 80 BPM, two notes per color (G G R R Y Y B B): the Hard
+-- gap admits every 8th, so the 95% cap does all the thinning.
+local function SteadyEighths(bars)
+    local events, colors = {}, { 0, 0, 1, 1, 2, 2, 3, 3 }
+    for b = 0, bars - 1 do
+        for k = 0, 7 do
+            local qn = b * 4 + k * 0.5
+            events[#events + 1] = { qn = qn, qn_e = qn + 0.25, offs = { colors[k + 1] },
+                                    bpm = 80, down = k == 0, bar_qn = k * 0.5 }
+        end
+    end
+    return events
+end
+
+-- bar index -> sorted list of kept bar positions
+local function KeptByBar(out)
+    local by_bar = {}
+    for _, ev in ipairs(out) do
+        local b = math.floor(ev.qn / 4 + 1e-6)
+        by_bar[b] = by_bar[b] or {}
+        table.insert(by_bar[b], ('%.2f'):format(ev.qn - b * 4))
+    end
+    return by_bar
+end
+
+Test.it('the cap thins the same bar positions in every bar, not just the start of the song', function()
+    local events = SteadyEighths(64)
+    local out = Gen5PlanTier('gb', 'H', events)
+    Test.expect(#out < #events, ('Hard kept all %d onsets'):format(#events))
+    Test.expect(#out <= math.floor(0.95 * #events), ('Hard kept %d of %d, above the 95%% cap'):format(#out, #events))
+    local by_bar = KeptByBar(out)
+    local first = table.concat(by_bar[0] or {}, ' ')
+    for b = 1, 63 do
+        local this = table.concat(by_bar[b] or {}, ' ')
+        Test.expect(this == first, ('bar %d keeps [%s] but bar 0 keeps [%s]'):format(b, this, first))
+    end
+end)
+
+Test.it('the cap removes the and of 4 first - the off-beat official Hard drops most', function()
+    local out = Gen5PlanTier('gb', 'H', SteadyEighths(16))
+    local kept = ' ' .. table.concat(KeptByBar(out)[0] or {}, ' ') .. ' '
+    Test.expect(not kept:find(' 3.50 ', 1, true), 'the and of 4 (3.50) survived: [' .. kept .. ']')
+    Test.expect(kept:find(' 0.00 ', 1, true) and kept:find(' 1.00 ', 1, true)
+        and kept:find(' 2.00 ', 1, true) and kept:find(' 3.00 ', 1, true), 'a beat was removed: [' .. kept .. ']')
+end)
+
+local function Ev(qn, len, offs, bpm, bar_start)
+    return { qn = qn, qn_e = qn + len, offs = offs, bpm = bpm,
+             down = math.abs(qn - bar_start) < 1e-6, bar_qn = qn - bar_start }
+end
+
+Test.it('a busy bar of 8ths the gap left whole loses its and of 4, even when the song-wide cap is met', function()
+    -- Four bars of 16ths (the Hard gap thins them, so the song is already far under the
+    -- 95% cap), then the pojat_lemmikkih bar: G O G Y R B R in 8ths at 157 BPM.
+    local events, bpm = {}, 157
+    for b = 0, 3 do
+        for k = 0, 15 do events[#events + 1] = Ev(b * 4 + k * 0.25, 0.2, { k % 5 }, bpm, b * 4) end
+    end
+    local pattern = { { 0, 0 }, { 1, 4 }, { 1.5, 0 }, { 2, 2 }, { 2.5, 1 }, { 3, 3 }, { 3.5, 1 } }
+    for _, p in ipairs(pattern) do events[#events + 1] = Ev(16 + p[1], 0.2, { p[2] }, bpm, 16) end
+    local kept = ' ' .. table.concat(KeptByBar(Gen5PlanTier('gb', 'H', events))[4] or {}, ' ') .. ' '
+    Test.expect(kept == ' 0.00 1.00 1.50 2.00 2.50 3.00 ', 'expected only the and of 4 removed, kept: [' .. kept .. ']')
+end)
+
+Test.it('the same rhythm reduces to the same onsets on guitar, bass and keys', function()
+    -- Eight bars mixing 16ths, 8ths, quarters and a sustain, given three ways: guitar
+    -- single notes, bass on other colors, keys as chords. Only onsets are compared -
+    -- chords and colors are reduced separately and may differ.
+    local rhythm = {}
+    for b = 0, 7 do
+        local base = b * 4
+        if b % 2 == 0 then
+            for k = 0, 7 do rhythm[#rhythm + 1] = { base + k * 0.25, 0.2 } end
+            for k = 2, 3 do rhythm[#rhythm + 1] = { base + k, 0.4 } end
+        else
+            for k = 0, 5 do rhythm[#rhythm + 1] = { base + k * 0.5, 0.4 } end
+            rhythm[#rhythm + 1] = { base + 3, 0.9 }
+        end
+    end
+    local function Build(color_fn)
+        local evs = {}
+        for i, r_ in ipairs(rhythm) do
+            evs[i] = Ev(r_[1], r_[2], color_fn(i), 128, math.floor(r_[1] / 4) * 4)
+        end
+        return evs
+    end
+    local parts = {
+        { 'gb', Build(function(i) return { i % 5 } end) },
+        { 'gb', Build(function(i) return { (i * 3) % 5 } end) },
+        { 'k5', Build(function(i) return i % 3 == 0 and { 0, 2, 4 } or { i % 4, (i % 4) + 1 } end) },
+    }
+    local onsets = {}
+    for p, part in ipairs(parts) do
+        local upper = part[2]
+        onsets[p] = {}
+        for _, dl in ipairs({ 'H', 'M', 'E' }) do
+            upper = Gen5PlanTier(part[1], dl, upper)
+            local qs = {}
+            for _, ev in ipairs(upper) do qs[#qs + 1] = ('%.3f'):format(ev.qn) end
+            onsets[p][dl] = table.concat(qs, ' ')
+        end
+    end
+    for _, dl in ipairs({ 'H', 'M', 'E' }) do
+        Test.expect(onsets[1][dl] == onsets[2][dl], dl .. ': guitar and bass differ\n' .. onsets[1][dl] .. '\n' .. onsets[2][dl])
+        Test.expect(onsets[1][dl] == onsets[3][dl], dl .. ': guitar and keys differ\n' .. onsets[1][dl] .. '\n' .. onsets[3][dl])
+    end
+end)
+
+Test.it('identical repeats keep identical sustains despite tempo-map rounding', function()
+    -- The pojat_lemmikkih intro: a Green held 5/32 then Orange on beat 2, four times.
+    -- The Hard gap leaves the Green exactly 1/8 long, on the cut-back boundary. Converting
+    -- through a tempo map leaves float noise; a few 1e-9 either side used to decide
+    -- whether a bar kept its sustain.
+    local events, noise = {}, { -1e-9, 1e-9, -1e-9, 1e-9 }
+    for b = 0, 3 do
+        local base = b * 4
+        events[#events + 1] = Ev(base, 0.625 + noise[b + 1], { 0 }, 157, base)
+        events[#events + 1] = Ev(base + 1 + noise[4 - b], 0.125, { 4 }, 157, base)
+        events[#events + 1] = Ev(base + 2, 0.125, { 2 }, 157, base)
+    end
+    local out = Gen5PlanTier('gb', 'H', events)
+    local lens = {}
+    for _, ev in ipairs(out) do
+        if ev.down then lens[#lens + 1] = ('%.3f'):format(ev.qn_e - ev.qn) end
+    end
+    Test.expect(table.concat(lens, ' ') == '0.500 0.500 0.500 0.500',
+        'the four repeats differ: ' .. table.concat(lens, ' '))
+end)
+
+Test.it('Easy keeps a held note over a short note when only one fits', function()
+    -- Medium: G on bar 1, short Y on the bar line of bar 2, B held from beat 2, G on bar 3,
+    -- at 157 BPM. The Easy gap fits only one of Y and B; the held B is kept.
+    local events = {
+        Ev(0, 0.125, { 0 }, 157, 0),
+        Ev(4, 0.125, { 2 }, 157, 4),
+        Ev(5, 2.5,   { 3 }, 157, 4),
+        Ev(8, 0.125, { 0 }, 157, 8),
+    }
+    local kept = {}
+    for _, ev in ipairs(Gen5PlanTier('gb', 'E', events)) do kept[#kept + 1] = ('%.0f'):format(ev.qn) end
+    Test.expect(table.concat(kept, ' ') == '0 5 8', 'expected 0 5 8 (held B kept), got ' .. table.concat(kept, ' '))
+end)
+
+-- The pojat_lemmikkih keys part: a held R, then a bar of three short notes a dotted
+-- quarter apart (beat 1, the and of 2, beat 4), then held notes again. top_first = true
+-- gives O B Y, false gives Y B O.
+local function SparseKeys(top_first)
+    local c = top_first and { 4, 3, 2 } or { 2, 3, 4 }
+    return {
+        Ev(0,   3.6,  { 1 },    157, 0),
+        Ev(4,   0.25, { c[1] }, 157, 4),
+        Ev(5.5, 0.25, { c[2] }, 157, 4),
+        Ev(7,   0.25, { c[3] }, 157, 4),
+        Ev(8,   3.6,  { 1 },    157, 8),
+        Ev(12,  3.6,  { 0 },    157, 12),
+    }
+end
+
+local function Shape(out)
+    local C = { [0] = 'G', 'R', 'Y', 'B', 'O' }
+    local parts = {}
+    for _, ev in ipairs(out) do
+        local cs = {}
+        for _, o in ipairs(ev.offs) do cs[#cs + 1] = C[o] end
+        parts[#parts + 1] = ('%g:%s'):format(ev.qn, table.concat(cs))
+    end
+    return table.concat(parts, ' ')
+end
+
+Test.it('a sparse bar keeps its isolated off-beat on Hard; a Medium that would copy Hard drops it', function()
+    -- Nothing here is closer than Medium's quarter-note gap, so Medium would keep every
+    -- onset; above offbeat_fallback_keep it drops its isolated off-beats instead.
+    local hard = Gen5PlanTier('k5', 'H', SparseKeys(true))
+    local med, mlog = Gen5PlanTier('k5', 'M', hard)
+    local h, m = Shape(hard), Shape(med)
+    Test.expect(h:find('5.5:', 1, true) ~= nil, 'Hard lost the isolated and of 2: ' .. h)
+    Test.expect(#hard == 6, 'Hard should keep all 6 onsets: ' .. h)
+    Test.expect(m:find('5.5:', 1, true) == nil, 'Medium kept the isolated and of 2: ' .. m)
+    Test.expect(#med == 5 and mlog.offbeats_dropped == 1, 'Medium should drop only that one: ' .. m)
+end)
+
+Test.it('a Hard that barely thinned moves each bar down to top out at Blue', function()
+    local hard, log = Gen5PlanTier('k5', 'H', SparseKeys(true))
+    Test.expect(log.color_fallback, 'the color fallback did not run')
+    Test.expect(Shape(hard) == '0:R 4:B 5.5:Y 7:R 8:R 12:G', 'O B Y bar: ' .. Shape(hard))
+    local hard2 = Gen5PlanTier('k5', 'H', SparseKeys(false))
+    Test.expect(Shape(hard2) == '0:R 4:R 5.5:Y 7:B 8:R 12:G', 'Y B O bar: ' .. Shape(hard2))
+    -- Medium inherits the shifted colors.
+    Test.expect(Shape(Gen5PlanTier('k5', 'M', hard)) == '0:R 4:B 7:R 8:R 12:G',
+        'Medium: ' .. Shape(Gen5PlanTier('k5', 'M', hard)))
+end)
+
+-- Bars of eight straight 8ths at a given tempo.
+local function Eighths(bars, bpm)
+    local events = {}
+    for b = 0, bars - 1 do
+        for k = 0, 7 do events[#events + 1] = Ev(b * 4 + k * 0.5, 0.25, { k % 5 }, bpm, b * 4) end
+    end
+    return events
+end
+
+-- Every bar's kept positions, checked equal to want (e.g. '0.00 0.50 1.00 ...').
+local function ExpectEveryBar(out, bars, want, what)
+    local by_bar = KeptByBar(out)
+    for b = 0, bars - 1 do
+        local got = table.concat(by_bar[b] or {}, ' ')
+        Test.expect(got == want, ('%s, bar %d: kept [%s], expected [%s]'):format(what, b, got, want))
+    end
+end
+
+Test.it('fast song (210 BPM): Hard keeps two groups of three, not just the beats', function()
+    -- Before the gap cap, 0.15 s exceeded a 1/8 note above 200 BPM and every off-beat
+    -- went (1 . 2 . 3 . 4 .). Official Hard does that to 2-4% of such bars.
+    ExpectEveryBar(Gen5PlanTier('gb', 'H', Eighths(8, 210)), 8,
+        '0.00 0.50 1.00 2.00 2.50 3.00', 'Hard, Auto at 210 BPM')
+    ExpectEveryBar(Gen5PlanTier('gb', 'H', Eighths(8, 210), { busy_drop = 1 }), 8,
+        '0.00 0.50 1.00 1.50 2.00 2.50 3.00', 'Hard, Drop 1 at 210 BPM')
+    ExpectEveryBar(Gen5PlanTier('gb', 'H', Eighths(8, 120)), 8,
+        '0.00 0.50 1.00 1.50 2.00 2.50 3.00', 'Hard, Auto at 120 BPM')
+end)
+
+Test.it('Drop 2 takes the fourth note of each half bar, and nothing from a half bar without one', function()
+    -- Seven 8ths, no and of 4: only the and of 2 goes (the doc's rule), not the and of 1.
+    local events = {}
+    for b = 0, 3 do
+        for k = 0, 6 do events[#events + 1] = Ev(b * 4 + k * 0.5, 0.25, { k % 5 }, 210, b * 4) end
+    end
+    ExpectEveryBar(Gen5PlanTier('gb', 'H', events), 4, '0.00 0.50 1.00 2.00 2.50 3.00',
+        'Hard, Auto at 210 BPM, bar without the and of 4')
+end)
+
+-- One bar from a slot pattern of 8 eighths ('1 1& 2 2& 3 3& 4 4&'): each cell is a color
+-- string ('GR'), '.' for a rest, a trailing '~' for a sustain. Repeated `bars` times at
+-- `bpm`, so the song-wide cap does not interfere.
+local function SlotBars(cells, bars, bpm)
+    local L = { G = 0, R = 1, Y = 2, B = 3, O = 4 }
+    local events = {}
+    for b = 0, bars - 1 do
+        for k, cell in ipairs(cells) do
+            if cell ~= '.' then
+                local offs = {}
+                for c in cell:gmatch('[GRYBO]') do offs[#offs + 1] = L[c] end
+                local qn = b * 4 + (k - 1) * 0.5
+                events[#events + 1] = Ev(qn, cell:find('~', 1, true) and 0.5 or 0.25, offs, bpm, b * 4)
+            end
+        end
+    end
+    return events
+end
+
+local function Removed(cells, out, bar)
+    local names = { '1', '1&', '2', '2&', '3', '3&', '4', '4&' }
+    local kept = {}
+    -- bar: a number, or anything else (callers pass Gen5PlanTier's log through) for bar 0.
+    for _, p in ipairs(KeptByBar(out)[type(bar) == 'number' and bar or 0] or {}) do kept[p] = true end
+    local gone = {}
+    for k, cell in ipairs(cells) do
+        if cell ~= '.' and not kept[('%.2f'):format((k - 1) * 0.5)] then gone[#gone + 1] = names[k] end
+    end
+    return table.concat(gone, ' ')
+end
+
+Test.it('Drop 2: a bar that already rests loses fewer, and keeps an accent chord and a sustain', function()
+    -- The chronosp_brutal_decay guitar at 210 BPM (Auto = Drop 2), bars 44, 45 and 52.
+    local cases = {
+        { { 'GR', '.', 'R', 'R', 'RB', 'RY', 'Y', 'YO' }, '2&',   'bar 44 (rest at 1&, chord on 4&)' },
+        { { 'GR', '.', 'G', 'G', 'Y', 'R', 'G', 'O~' },   '2&',   'bar 52 (sustain on 4&)' },
+        { { 'G', 'R', 'Y', 'B', 'G', 'R', 'Y', 'RB' },    '1& 2&', 'full bar, chord on 4&' },
+        { { 'GR', 'GR', 'RY', 'RY', 'GR', 'GR', 'RY', 'RY' }, '2& 4&', 'all-chord bar' },
+    }
+    for _, c in ipairs(cases) do
+        local got = Removed(c[1], Gen5PlanTier('gb', 'H', SlotBars(c[1], 4, 210)))
+        Test.expect(got == c[2], ('%s: removed [%s], expected [%s]'):format(c[3], got, c[2]))
+    end
+end)
+
+Test.it('a busy bar that already has two 8th rests keeps every note', function()
+    -- Four bars of straight 8ths first: they lose two notes each, so the song-wide cap is
+    -- already met and only the busy-bar rule decides the last bar.
+    local full = { 'G', 'R', 'Y', 'B', 'G', 'R', 'Y', 'B' }
+    for _, c in ipairs({
+        { { '.', 'R', 'R', 'R', 'RB', 'RY', 'YB', '.' }, 'chronosp bar 45' },
+        { { 'O', '.', 'B', 'Y', 'R', 'Y', '.', 'Y' },    'chronosp bar 150' },
+    }) do
+        local events = SlotBars(full, 4, 210)
+        for _, ev in ipairs(SlotBars(c[1], 1, 210)) do
+            ev.qn, ev.qn_e = ev.qn + 16, ev.qn_e + 16
+            events[#events + 1] = ev
+        end
+        local got = Removed(c[1], Gen5PlanTier('gb', 'H', events), 4)
+        Test.expect(got == '', ('%s: removed [%s], expected nothing'):format(c[2], got))
+    end
+end)
+
+Test.it('Drop 1 with a rest already in the bar still takes the and of 4 (pojat_lemmikkih bar 3)', function()
+    local cells = { 'G', '.', 'O', 'G', 'Y', 'R', 'B', 'R' }
+    local got = Removed(cells, Gen5PlanTier('gb', 'H', SlotBars(cells, 4, 157)))
+    Test.expect(got == '4&', 'removed [' .. got .. '], expected [4&]')
+end)
+
+Test.it('bass follows guitar in a bar of the same rhythm, but keeps its own sustain', function()
+    -- Guitar: a full bar with a chord on 4&, so it drops 1& and 2&. Bass plays the same
+    -- rhythm as single notes - on its own it would drop 2& and 4&.
+    local gtr  = { 'G', 'R', 'Y', 'B', 'G', 'R', 'Y', 'RB' }
+    local bass = { 'G', 'G', 'R', 'R', 'Y', 'Y', 'G', 'G' }
+    local _, glog = Gen5PlanTier('gb', 'H', SlotBars(gtr, 4, 210))
+    local alone = Removed(bass, Gen5PlanTier('gb', 'H', SlotBars(bass, 4, 210)))
+    Test.expect(alone == '2& 4&', 'bass alone removed [' .. alone .. '], expected [2& 4&]')
+    local out, blog = Gen5PlanTier('gb', 'H', SlotBars(bass, 4, 210), { busy_ref = glog.busy_bars })
+    local got = Removed(bass, out)
+    Test.expect(got == '1& 2&', 'bass following guitar removed [' .. got .. '], expected [1& 2&]')
+    Test.expect(blog.busy_followed == 4, ('followed %s bars, expected 4'):format(tostring(blog.busy_followed)))
+
+    -- Guitar plays straight 8ths and drops 2& and 4&; bass holds a sustain on 4&. Its own
+    -- rule wins in that bar: the sustain stays and the and of 1 goes instead.
+    local gtr2  = { 'G', 'R', 'Y', 'B', 'G', 'R', 'Y', 'B' }
+    local bass2 = { 'G', 'G', 'R', 'R', 'Y', 'Y', 'G', 'G~' }
+    local gout2, glog2 = Gen5PlanTier('gb', 'H', SlotBars(gtr2, 4, 210))
+    local g2 = Removed(gtr2, gout2)
+    Test.expect(g2 == '2& 4&', 'guitar removed [' .. g2 .. '], expected [2& 4&]')
+    local out2, blog2 = Gen5PlanTier('gb', 'H', SlotBars(bass2, 4, 210), { busy_ref = glog2.busy_bars })
+    local got2 = Removed(bass2, out2)
+    Test.expect(got2 == '1& 2&', 'bass removed [' .. got2 .. '], expected [1& 2&]')
+    Test.expect(blog2.busy_followed == 0, ('followed %s bars, expected 0'):format(tostring(blog2.busy_followed)))
+
+    -- A different rhythm ignores the reference.
+    local bass3 = { 'G', 'G', 'R', 'R', 'Y', 'Y', 'G', '.' }
+    local got3 = Removed(bass3, Gen5PlanTier('gb', 'H', SlotBars(bass3, 4, 210), { busy_ref = glog.busy_bars }))
+    Test.expect(got3 == '2&', 'bass in another rhythm removed [' .. got3 .. '], expected [2&]')
+end)
+
+----------------------------------------------------------------------
+-- Generate planner: fast dense runs rewritten one grid slower on Hard
+-- (difficulty_generate_retime.lua). Cases from the chronosp_brutal_decay solo at 210 BPM,
+-- checked against its hand reduction.
+----------------------------------------------------------------------
+
+-- A bar from 'pos:colors' cells, pos in 1/24 QN from the bar line ('0:O 6:O 12:B').
+-- A trailing '~' on the colors makes it a sustain. Repeated `bars` times, so every copy
+-- reduces alike; Hard of copy 0 is what the tests read.
+local function Bar24(cells, bars, bpm)
+    local L = { G = 0, R = 1, Y = 2, B = 3, O = 4 }
+    local events = {}
+    for b = 0, (bars or 1) - 1 do
+        for pos, cs in cells:gmatch('(%d+):(%S+)') do
+            local offs = {}
+            for c in cs:gmatch('[GRYBO]') do offs[#offs + 1] = L[c] end
+            local qn = b * 4 + tonumber(pos) / 24
+            events[#events + 1] = Ev(qn, cs:find('~', 1, true) and 1.0 or 0.1, offs, bpm or 210, b * 4)
+        end
+    end
+    return events
+end
+
+-- Hard's bar 0 as 'pos:colors' in 1/24 QN.
+local function Hard24(out)
+    local C = { [0] = 'G', 'R', 'Y', 'B', 'O' }
+    local cells = {}
+    for _, ev in ipairs(out) do
+        if ev.qn < 4 - 1e-6 then
+            local cs = {}
+            for _, o in ipairs(ev.offs) do cs[#cs + 1] = C[o] end
+            cells[#cells + 1] = ('%d:%s'):format(math.floor(ev.qn * 24 + 0.5), table.concat(cs))
+        end
+    end
+    return table.concat(cells, ' ')
+end
+
+Test.it('fast runs: 16ths become 8th triplets, keeping the color order (hand-reduced bars)', function()
+    local cases = {
+        { 'bar 158: 16 sixteenths -> 12, the tail of each half goes',
+          '0:B 6:B 12:B 18:B 24:B 30:B 36:B 42:B 48:B 54:Y 60:R 66:Y 72:R 78:Y 84:R 90:Y',
+          '0:B 8:B 16:B 24:B 32:B 40:B 48:B 56:Y 64:R 72:Y 80:R 88:Y' },
+        { 'bar 154: a 16th rest at beat 3&',
+          '0:G 6:R 12:Y 18:G 24:R 30:Y 36:B 42:O 48:B 54:Y 66:R 72:O 78:R 84:O 90:R',
+          '0:G 8:R 16:Y 24:G 32:R 40:Y 48:B 56:Y 64:R 72:O 80:R 88:O' },
+        { 'bar 153: a run that lands on beat 4 keeps landing there, then rests',
+          '0:O 6:O 12:B 18:B 24:O 32:B 40:Y 48:O 54:B 60:Y 66:R 72:G',
+          '0:O 8:O 16:B 24:O 32:B 40:Y 48:O 56:B 64:Y 72:R' },
+        { 'bar 162: a 16th pair before beat 3 moves onto the triplets around it',
+          '0:R~ 36:B 42:R 48:B 54:R~',
+          '0:R 32:B 40:R 48:B 56:R' },
+        { 'bar 20: a 16th rest before a note on the 8th grid stays; the group runs into beat 3',
+          '0:GR 12:G 18:G 24:G 30:G 36:G 42:G 48:Y 60:G 66:G 72:G 78:G 84:R',
+          '0:GR 16:G 24:G 32:G 40:G 48:Y 60:G 68:G 76:G 84:R' },
+        { 'bar 21: a group cut to one note keeps the one that leads into the beat',
+          '0:G 6:G 12:G 18:G 24:B 36:G 42:G 48:Y 60:G 66:G 72:R 84:G 90:G',
+          '0:G 8:G 16:G 24:B 40:G 48:Y 60:G 68:G 76:R 88:G', 4 },
+        { 'bar 165: notes on the 8th grid outside the run stay put',
+          '0:Y 6:Y 12:R 18:R 24:G 30:G 36:R 42:R 48:Y 54:B 60:O 72:O 84:B',
+          '0:Y 8:Y 16:R 24:G 32:G 40:R 48:Y 56:B 64:O 72:O 84:B' },
+        { 'bar 152: a stray tick (37) does not make the bar read as 16th triplets',
+          '0:O 6:O 12:B 18:O 24:B 30:Y 37:R 42:G 48:O 56:B 64:Y 72:B 80:Y 88:R',
+          nil },
+    }
+    for _, c in ipairs(cases) do
+        -- One bar, then a note in the next bar: by default far enough away to end the run,
+        -- or at c[4] (QN) when the case runs into the next downbeat.
+        local events = Bar24(c[2], 1)
+        events[#events + 1] = Ev(c[4] or 5, 0.1, { 0 }, 210, 4)
+        local out, log = Gen5PlanTier('gb', 'H', events)
+        local got = Hard24(out)
+        if c[3] then
+            Test.expect(got == c[3], ('%s:\n           got  %s\n           want %s'):format(c[1], got, c[3]))
+        else
+            local _, n = got:gsub('%d+:', '')
+            Test.expect(n == 12 and log.retimed_bars[1] and math.abs(log.retimed_bars[1].grid - 1 / 3) < 1e-9,
+                ('%s: got %s'):format(c[1], got))
+        end
+    end
+end)
+
+Test.it('fast runs: a short flourish from a beat into 8ths is thinned, not rewritten (bass bar 73)', function()
+    -- G G R (16ths from the beat) then R R (8ths): as triplets G G R R ran on evenly. Thinned
+    -- it is G R R R per half, and the busy-bar rule (Drop 2 at 210) takes 2& and 4&.
+    local x = Bar24('0:G 6:G 12:R 24:R 36:R 48:G 54:G 60:R 72:R 84:R', 1)
+    x[#x + 1] = Ev(5, 0.1, { 0 }, 210, 4)
+    local got = Hard24(Gen5PlanTier('gb', 'H', x))
+    Test.expect(got == '0:G 12:R 24:R 48:G 60:R 72:R', 'bar 73 Hard: ' .. got)
+end)
+
+Test.it('fast runs: a bar of 8ths after a 16th run still loses its two notes (bass bar 85)', function()
+    -- Bar 0: 16ths running into bar 1's downbeat. Bar 1: straight 8ths. The downbeat ends
+    -- bar 0's run, but bar 1 is not rewritten, so the busy-bar rule (Drop 2) applies.
+    local x = Bar24('0:O 6:Y 12:O 18:Y 24:O 30:Y 36:O 42:Y 48:O 54:B 60:O 66:B 72:O 78:B 84:O 90:B', 1)
+    for _, ev in ipairs(Bar24('0:G 12:G 24:G 36:G 48:Y 60:G 72:G 84:R', 1)) do
+        ev.qn, ev.qn_e = ev.qn + 4, ev.qn_e + 4
+        x[#x + 1] = ev
+    end
+    x[#x + 1] = Ev(9, 0.1, { 0 }, 210, 8)
+    local hard = Gen5PlanTier('gb', 'H', x)
+    local kept = KeptByBar(hard)[1] or {}
+    Test.expect(table.concat(kept, ' ') == '0.00 0.50 1.00 2.00 2.50 3.00',
+        'bar 1 Hard kept [' .. table.concat(kept, ' ') .. ']')
+end)
+
+Test.it('fast runs: 8th triplets become 8ths, 16th triplets 16ths', function()
+    local trip8 = '0:O 8:B 16:Y 24:B 32:Y 40:R 48:G 56:Y 64:R 72:Y 80:R 88:G'
+    local events = Bar24(trip8, 1)
+    events[#events + 1] = Ev(5, 0.1, { 0 }, 210, 4)
+    local got = Hard24(Gen5PlanTier('gb', 'H', events))
+    Test.expect(got == '0:O 12:B 24:Y 36:R 48:G 60:Y 72:R 84:G', 'bar 172 (8th triplets): ' .. got)
+
+    local cells = {}
+    for k = 0, 23 do cells[#cells + 1] = ('%d:%s'):format(k * 4, ({ 'G', 'R', 'Y' })[k % 3 + 1]) end
+    events = Bar24(table.concat(cells, ' '), 1)
+    events[#events + 1] = Ev(5, 0.1, { 0 }, 210, 4)
+    local out = Gen5PlanTier('gb', 'H', events)
+    local _, n = Hard24(out):gsub('%d+:', '')
+    Test.expect(n == 16, ('24 sixteenth triplets should become 16 sixteenths, got %d: %s'):format(n, Hard24(out)))
+end)
+
+Test.it('fast runs: not below 160 BPM, and the same rhythm lands on the same positions on every part', function()
+    local sixteenths = '0:B 6:B 12:B 18:B 24:B 30:B 36:B 42:B 48:B 54:Y 60:R 66:Y 72:R 78:Y 84:R 90:Y'
+    local out, log = Gen5PlanTier('gb', 'H', Bar24(sixteenths, 1, 140))
+    Test.expect(#(log.retimed_bars or {}) == 0, 'retimed at 140 BPM: ' .. Hard24(out))
+    local _, n = Hard24(out):gsub('%d+:', '')
+    Test.expect(n <= 8, ('at 140 BPM Hard keeps 8ths, got %d notes: %s'):format(n, Hard24(out)))
+
+    local gtr  = Bar24(sixteenths, 1)
+    local bass = Bar24('0:G 6:G 12:R 18:R 24:G 30:R 36:Y 42:Y 48:G 54:G 60:G 66:G 72:R 78:R 84:B 90:B', 1)
+    local keys = Bar24('0:GY 6:GY 12:RB 18:RB 24:GY 30:RB 36:YO 42:YO 48:GY 54:GY 60:GY 66:GY 72:RB 78:RB 84:BO 90:BO', 1)
+    local function Positions(evs)
+        local q = {}
+        for _, ev in ipairs(Gen5PlanTier(evs == keys and 'k5' or 'gb', 'H', evs)) do q[#q + 1] = ('%.3f'):format(ev.qn) end
+        return table.concat(q, ' ')
+    end
+    local g, b, k = Positions(gtr), Positions(bass), Positions(keys)
+    Test.expect(g == b, 'guitar and bass differ:\n' .. g .. '\n' .. b)
+    Test.expect(g == k, 'guitar and keys differ:\n' .. g .. '\n' .. k)
+end)
+
+----------------------------------------------------------------------
+-- Generate: Expert's hammer-ons kept on Hard (difficulty_generate_hopo.lua)
+----------------------------------------------------------------------
+
+Test.it('auto-HOPO: a single new color within 170 ticks (an 8th triplet hammers on, an 8th does not)', function()
+    local function E(qn, offs) return { qn = qn, qn_e = qn + 0.1, offs = offs } end
+    Test.expect(Gen5IsAutoHopo(E(0, { 0 }), E(1 / 3, { 1 })), '8th triplet, new color: hammer-on')
+    Test.expect(not Gen5IsAutoHopo(E(0, { 0 }), E(0.5, { 1 })), '8th apart: strummed')
+    Test.expect(not Gen5IsAutoHopo(E(0, { 0 }), E(1 / 3, { 0 })), 'same color: strummed')
+    Test.expect(not Gen5IsAutoHopo(E(0, { 0 }), E(1 / 3, { 1, 2 })), 'chord: strummed')
+    Test.expect(not Gen5IsAutoHopo(E(0, { 0, 1 }), E(1 / 3, { 1 })), 'note out of the previous chord: strummed')
+    Test.expect(Gen5IsAutoHopo(E(0, { 0 }), E(0.5, { 1 }), 250), 'Magma threshold 250: an 8th hammers on')
+end)
+
+-- 'pos:colors' cells (1/24 QN) of bar 0 at 210 BPM, plus a note at qn `next_qn`.
+local function HopoChart(cells, next_qn, next_color)
+    local events = Bar24(cells, 1)
+    events[#events + 1] = Ev(next_qn, 0.1, { next_color or 1 }, 210, 4)
+    return events
+end
+
+local function SpanStr(spans)
+    local out = {}
+    for _, sp in ipairs(spans) do out[#out + 1] = ('%d-%d'):format(math.floor(sp.qn * 24 + 0.5), sp.count) end
+    return table.concat(out, ' ')
+end
+
+Test.it('force-HOPO: 8th triplets rewritten as 8ths keep their hammer-ons (chronosp bar 172)', function()
+    -- Expert hammers on every note after the first (new color each, 160 ticks apart); Hard's
+    -- 8ths are 240 apart. One span from the second note through the next bar's downbeat.
+    local x = HopoChart('0:O 8:B 16:Y 24:B 32:Y 40:R 48:G 56:Y 64:R 72:Y 80:R 88:G', 4, 1)
+    Gen5MarkHopos(x, {}, {})
+    local hard = Gen5PlanTier('gb', 'H', x)
+    Test.expect(SpanStr(Gen5ForceHopoSpans(hard)) == '12-8', 'spans (start/24-count): ' .. SpanStr(Gen5ForceHopoSpans(hard)))
+end)
+
+Test.it('force-HOPO: a run of one color, or a hammer-on lost to ordinary thinning, gets none', function()
+    local same = HopoChart('0:O 8:O 16:O 24:O 32:O 40:O 48:O 56:O 64:O 72:O 80:O 88:O', 6, 4)
+    Gen5MarkHopos(same, {}, {})
+    Test.expect(#Gen5ForceHopoSpans((Gen5PlanTier('gb', 'H', same))) == 0, 'one color: no hammer-ons to keep')
+    -- 8th triplets at 140 BPM: not rewritten (not fast), thinned in place - official Hard
+    -- strums such notes almost always, so no markers.
+    local slow = Bar24('0:O 8:B 16:Y 24:B 32:Y 40:R 48:G 56:Y 64:R 72:Y 80:R 88:G', 1, 140)
+    Gen5MarkHopos(slow, {}, {})
+    Test.expect(#Gen5ForceHopoSpans((Gen5PlanTier('gb', 'H', slow))) == 0, '140 BPM thinning: none')
+end)
+
+Test.it("force-HOPO: Expert's own forced hammer-ons are copied where the note survives", function()
+    -- Expert bar 7 of chronosp: forced on the notes at 12 and 24 (/24 QN). Two bars of
+    -- 16ths first, which the Hard gap thins, so the 95% keep cap is met without this bar.
+    local x = Bar24('0:G 6:R 12:G 18:R 24:G 30:R 36:G 42:R 48:G 54:R 60:G 66:R 72:G 78:R 84:G 90:R', 2, 120)
+    for _, ev in ipairs(Bar24('0:G 12:R 24:Y 48:G', 1, 120)) do
+        ev.qn, ev.qn_e = ev.qn + 8, ev.qn_e + 8
+        x[#x + 1] = ev
+    end
+    Gen5MarkHopos(x, { { qn = 8.5, qn_e = 8.625 }, { qn = 9.0, qn_e = 9.125 } }, {})
+    local spans = Gen5ForceHopoSpans((Gen5PlanTier('gb', 'H', x)))
+    Test.expect(SpanStr(spans) == '204-2', 'spans (start/24-count): ' .. SpanStr(spans))
+end)
+
+----------------------------------------------------------------------
+-- Generate: Medium (chronosp_brutal_decay bars 7, 10, 11, 18-20; pojat_lemmikkih bar 3)
+----------------------------------------------------------------------
+
+-- Hard bar 0 from cells, then a single G on the next downbeat; Medium planned from it.
+local function MediumOf(cells, bpm, kind, next_offs)
+    local hard = Bar24(cells, 1, bpm or 210)
+    hard[#hard + 1] = Ev(4, 0.1, next_offs or { 0 }, bpm or 210, 4)
+    return Gen5PlanTier(kind or 'gb', 'M', hard)
+end
+
+local function KeptAt(out, qn)
+    for _, ev in ipairs(out) do if math.abs(ev.qn - qn) < 1e-6 then return ev end end
+end
+
+Test.it('Medium: a busy bar keeps a note per beat - beat 3 and the held 3& note (bar 7)', function()
+    local out = MediumOf('0:B 12:O 24:B 36:Y 48:G 60:B~')
+    Test.expect(Hard24(out) == '0:B 24:B 48:G 60:B', 'bar 7: ' .. Hard24(out))
+    local b = KeptAt(out, 2.5)
+    -- Held into the next bar line, Medium's release gap leaves it 1/8 - under Medium's
+    -- shortest sustain at 210 BPM (1 QN), so a plain note.
+    Test.expect(b and b.qn_e - b.qn < 0.5, '3& note should be plain, length ' .. tostring(b and (b.qn_e - b.qn)))
+end)
+
+Test.it('Medium: a 3& chord beats a beat-3 single, a downbeat single beats a 4& chord (bar 11)', function()
+    local out = MediumOf('0:B 12:O 24:B 48:G 60:GY 84:GY')
+    Test.expect(Hard24(out) == '0:B 24:B 48:G 60:GY', 'bar 11: ' .. Hard24(out))
+    Test.expect(KeptAt(out, 4) ~= nil, 'the next downbeat single was dropped for the 4& chord')
+end)
+
+Test.it('Medium: an all-chord bar gets no chord bonus, so the next downbeat stays (bars 18-19)', function()
+    local out = MediumOf('0:RB 12:RY 36:RY 48:RB 60:RY 84:RY', 210, 'gb', { 2, 3 })
+    Test.expect(KeptAt(out, 4) ~= nil, 'next downbeat chord dropped: ' .. Hard24(out))
+    Test.expect(not Hard24(out):find('36:RY 48:RB 60:RY', 1, true), 'three 8th chords in a row: ' .. Hard24(out))
+end)
+
+Test.it('Medium colors: only notes above Blue move, unless that makes a repeat Hard does not have', function()
+    -- chronosp bar 10: moving only the O made B B -> the bar moves down whole.
+    local out = MediumOf('0:G 12:G 24:Y 48:B 60:G 72:O')
+    Test.expect(Hard24(out) == '0:G 24:R 48:Y 72:B', 'bar 10: ' .. Hard24(out))
+    -- pojat bar 3 (157 BPM): moving only the O makes no repeat -> only the O moves.
+    out = MediumOf('0:G 24:O 36:G 48:Y 60:R 72:B', 157)
+    Test.expect(Hard24(out) == '0:G 24:B 48:Y 72:B', 'pojat bar 3: ' .. Hard24(out))
+    -- A chord keeps its shape: Y+O moves down as R+B, not Y+B.
+    -- (A busy Hard bar, so Medium thins it and no color fallback applies.)
+    out = MediumOf('0:YB 12:YB 24:YB 36:YB 48:YB 60:YB 72:YO', 157, 'gb', { 1, 3 })
+    Test.expect(Hard24(out) == '0:YB 24:YB 48:YB 72:RB', 'chord shape: ' .. Hard24(out))
+end)
+
+Test.it('Medium: a beat Hard\'s rewrite left empty comes back from Expert (bar 20)', function()
+    local x = Bar24('0:GR 12:G 18:G 24:G 30:G 36:G 42:G 48:Y 60:G 66:G 72:G 78:G 84:R', 1)
+    x[#x + 1] = Ev(5, 0.1, { 0 }, 210, 4)
+    local hard = Gen5PlanTier('gb', 'H', x)
+    Test.expect(KeptAt(hard, 3) == nil, 'precondition: Hard has no beat 4: ' .. Hard24(hard))
+    local med = Gen5PlanTier('gb', 'M', hard)
+    Test.expect(Hard24(med) == '0:GR 24:G 48:Y 72:G', 'bar 20 Medium: ' .. Hard24(med))
+end)
+
+Test.it('Medium that keeps nearly all of Hard: off-beats first, then color', function()
+    -- Off-beats are enough: Hard B . Y . R (dotted quarters) repeated; Medium drops the
+    -- 2& notes and no color fallback follows.
+    local hard = {}
+    for b = 0, 7 do
+        local base = b * 4
+        hard[#hard + 1] = Ev(base, 0.25, { 3 }, 157, base)
+        hard[#hard + 1] = Ev(base + 1.5, 0.25, { 2 }, 157, base)
+        hard[#hard + 1] = Ev(base + 3, 0.25, { 1 }, 157, base)
+    end
+    local med, log = Gen5PlanTier('k5', 'M', hard)
+    Test.expect(log.offbeats_dropped == 8 and not log.color_fallback,
+        ('dropped %s, color fallback %s'):format(tostring(log.offbeats_dropped), tostring(log.color_fallback)))
+    -- No off-beats to drop: quarter notes topping at Orange; Medium moves each bar down
+    -- until it tops out at Yellow.
+    hard = {}
+    for b = 0, 7 do
+        for k = 0, 3 do hard[#hard + 1] = Ev(b * 4 + k, 0.25, { k + 1 }, 157, b * 4) end
+    end
+    med, log = Gen5PlanTier('k5', 'M', hard)
+    -- R Y B O moves down two lanes to top out at Yellow (Green stays Green).
+    Test.expect(log.color_fallback and Shape({ med[1], med[2], med[3], med[4] }) == '0:G 1:G 2:R 3:Y',
+        'bar 0 Medium: ' .. Shape({ med[1], med[2], med[3], med[4] }))
+end)
+
+Test.it('Medium shortest sustain: 1 QN above 160 BPM, a dotted 8th at or below', function()
+    -- The held note gets 1.5 QN before the next onset: less Medium's release gap that
+    -- leaves 0.5 at 210 BPM (under 1 QN) and 0.75 at 140 (a dotted 8th, kept). The third
+    -- note keeps the second from counting as isolated (Medium drops those off-beats).
+    for _, c in ipairs({ { 210, false }, { 140, true } }) do
+        local hard = { Ev(0, 1.5, { 0 }, c[1], 0), Ev(1.5, 0.1, { 1 }, c[1], 0), Ev(2.5, 0.1, { 2 }, c[1], 0) }
+        local out = Gen5PlanTier('gb', 'M', hard)
+        local held = out[1] and out[1].qn_e - out[1].qn >= 0.5
+        Test.expect(held == c[2], ('%d BPM: sustain %s, length %.3f'):format(c[1],
+            c[2] and 'should stay' or 'should become a plain note', out[1] and out[1].qn_e - out[1].qn or -1))
+    end
+end)
+
+Test.it('Medium: bass follows guitar in a bar of the same Hard rhythm', function()
+    local gtr_hard = Bar24('0:B 12:O 24:B 48:G 60:GY 84:GY', 1)
+    gtr_hard[#gtr_hard + 1] = Ev(4, 0.1, { 0 }, 210, 4)
+    local bass_hard = Bar24('0:G 12:G 24:G 48:G 60:R 84:R', 1)
+    bass_hard[#bass_hard + 1] = Ev(4, 0.1, { 0 }, 210, 4)
+    local gmed, glog = Gen5PlanTier('gb', 'M', gtr_hard)
+    local bmed, blog = Gen5PlanTier('gb', 'M', bass_hard, { rhythm_ref = glog.rhythm_bars })
+    local function Pos(out) local p = {} for _, ev in ipairs(out) do p[#p + 1] = ('%.3f'):format(ev.qn) end return table.concat(p, ' ') end
+    Test.expect(Pos(bmed) == Pos(gmed), 'bass ' .. Pos(bmed) .. ' / guitar ' .. Pos(gmed))
+    Test.expect((blog.rhythm_followed or 0) >= 1, 'no bar followed')
+end)
+
+Test.it('fast song (210 BPM): Medium keeps quarters, Easy beats 1 and 3', function()
+    local hard = Gen5PlanTier('gb', 'H', Eighths(8, 210))
+    local med  = Gen5PlanTier('gb', 'M', hard)
+    ExpectEveryBar(med, 8, '0.00 1.00 2.00 3.00', 'Medium at 210 BPM')
+    ExpectEveryBar(Gen5PlanTier('gb', 'E', med), 8, '0.00 2.00', 'Easy at 210 BPM')
+end)
+
+Test.it('sustain release gaps: Hard 1/8, Medium dotted 8th / 1/4 fast, Easy 1/4 / 1/2 fast', function()
+    -- A sustain at 0 held for 3 quarter notes, the next note at 2. Expected sustain end
+    -- (quarter notes) per tier and tempo; above 160 BPM is "fast".
+    local expect = {
+        { 'H', 120, 1.5 },  { 'H', 170, 1.5 },
+        { 'M', 120, 1.25 }, { 'M', 170, 1.0 },
+        { 'E', 120, 1.0 },  { 'E', 170, 0.125 },  -- a 1/2 gap leaves no sustain: cut to 1/32
+    }
+    for _, c in ipairs(expect) do
+        local dl, bpm, want = c[1], c[2], c[3]
+        local events = { Ev(0, 3, { 0 }, bpm, 0), Ev(2, 0.2, { 1 }, bpm, 0) }
+        local out = Gen5PlanTier('gb', dl, events)
+        Test.expect(#out == 2, ('%s at %d BPM kept %d of 2 notes'):format(dl, bpm, #out))
+        local got = out[1].qn_e
+        Test.expect(math.abs(got - want) < 1e-6,
+            ('%s at %d BPM: sustain ends at %.3f, expected %.3f'):format(dl, bpm, got, want))
+    end
+end)

@@ -2,11 +2,16 @@
 -- @author VeeKiraRay
 -- @about
 --   Small launcher window with buttons to run tests.
---   Results appear in the REAPER console. For a fully isolated Lua context with no
---   shared globals, run dev/tests/run_vocal.lua or dev/tests/run_general.lua directly from
---   the REAPER Actions list instead.
+--   Results appear in the REAPER console. Each button runs its suite in a fresh,
+--   isolated environment (see NewTestEnv), so running suites in any order gives the
+--   same result as running one directly from the REAPER Actions list.
 
 r = reaper
+
+-- Every global that exists before any suite runs: the standard libraries and reaper.
+-- Captured here, at the top, before the launcher defines anything of its own.
+local PRISTINE = {}
+for k, v in pairs(_G) do PRISTINE[k] = v end
 
 if not r.ImGui_CreateContext then
     r.ShowMessageBox(
@@ -44,17 +49,40 @@ local results = { vocal = nil, general = nil, vocal_midi = nil, general_midi = n
 local COL_OK  = 0x55DD55FF
 local COL_ERR = 0xFF5555FF
 
+-- A fresh global environment for one suite. It can READ the pristine globals (standard
+-- libraries, reaper) and nothing else; everything the suite and the modules it dofile's
+-- define lands in this table and is discarded afterwards.
+--
+-- Why: with a plain dofile every suite shared one global table, so a library loaded by
+-- one suite stayed loaded for every suite run after it. A runner that forgot a dofile
+-- then passed whenever something earlier in the session had loaded the file for it
+-- (run_general_algorithms.lua missed lib/reaper_imgui_helpers.lua for months that way).
+local function NewTestEnv()
+    local env = setmetatable({}, { __index = PRISTINE })
+    env._G = env
+    -- dofile/loadfile/load must bind loaded chunks to THIS environment; the built-ins
+    -- would bind them to the real global table and leak again.
+    env.dofile = function(path)
+        local chunk, err = loadfile(path, 'bt', env)
+        if not chunk then error(err, 2) end
+        return chunk()
+    end
+    env.loadfile = function(path, mode, e) return loadfile(path, mode, e or env) end
+    env.load = function(chunk, name, mode, e) return load(chunk, name, mode, e or env) end
+    return env
+end
+
 local function run(runner_file, result_key)
-    -- Save ctx: runner scripts set ctx = nil (they don't use ImGui),
-    -- which would break our frame loop. Restore after.
-    local _saved_ctx = ctx
-    local ok, err = pcall(dofile, _tdir .. runner_file)
-    ctx = _saved_ctx
-    if not ok then
-        r.ShowConsoleMsg('LOAD ERROR: ' .. tostring(err) .. '\n')
+    -- The suite's own ctx = nil (runners do not use ImGui) now lands in its environment,
+    -- so the launcher's ctx is untouched.
+    local env = NewTestEnv()
+    local ok, err = pcall(env.dofile, _tdir .. runner_file)
+    local T = rawget(env, 'Test')
+    if not ok or not T then
+        r.ShowConsoleMsg('LOAD ERROR: ' .. tostring(err or 'the suite defined no Test table') .. '\n')
         results[result_key] = { load_error = true }
     else
-        results[result_key] = { pass = Test._pass, fail = Test._fail }
+        results[result_key] = { pass = T._pass, fail = T._fail }
     end
 end
 
@@ -163,6 +191,14 @@ function Loop()
         end
         r.ImGui_SameLine(ctx)
         draw_status(results.general_algo)
+
+        r.ImGui_Spacing(ctx)
+
+        if r.ImGui_Button(ctx, 'Generate Golden Tests', 155, 24) then
+            run('run_generate_golden.lua', 'generate_golden')
+        end
+        r.ImGui_SameLine(ctx)
+        draw_status(results.generate_golden)
 
         r.ImGui_Spacing(ctx)
 

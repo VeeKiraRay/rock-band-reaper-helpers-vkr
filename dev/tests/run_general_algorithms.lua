@@ -31,6 +31,7 @@ r.ClearConsole()
 r.ShowConsoleMsg('======  General Helper - algorithm unit tests  ======\n')
 
 dofile(_tdir .. 'framework.lua')
+dofile(_root .. 'lib/reaper_imgui_helpers.lua')  -- SortedByLabel: venue_lighting.lua calls it at load time
 dofile(_root .. 'lib/reaper_dsp.lua')
 dofile(_root .. 'lib/reaper_guitar_theory.lua')  -- GuitarSuggestRBMapping, GuitarClassifyChordType
 dofile(_mdir .. 'defaults.lua')        -- S and constants
@@ -47,5 +48,12 @@ dofile(_mdir .. 'actions_guitar.lua')  -- BuildShapeGemMap, SortedChordPitches (
 dofile(_mdir .. 'actions_guitar_guide.lua')  -- ParseTabHorizontal (pure; GuitarTabGuide
                                              -- itself is not exercised)
 
+dofile(_mdir .. 'actions_difficulty_shared.lua')    -- DiffReleaseGapQN (pure)
+dofile(_mdir .. 'actions_difficulty_gtrbass.lua')   -- GB_* rule tables (r only inside functions)
+dofile(_mdir .. 'actions_difficulty_5k.lua')        -- K5_* rule tables (r only inside functions)
+dofile(_mdir .. 'difficulty_generate_retime.lua')   -- Gen5RetimeDenseRuns (pure)
+dofile(_mdir .. 'difficulty_generate_colors.lua')   -- Gen5ReduceChordSize, Gen5Shift* (pure)
+dofile(_mdir .. 'difficulty_generate_5lane.lua')    -- Gen5PlanTier (pure)
+dofile(_mdir .. 'difficulty_generate_hopo.lua')     -- Gen5MarkHopos, Gen5ForceHopoSpans (pure)
 dofile(_tdir .. 'general_algorithms.lua')
 Test.report()

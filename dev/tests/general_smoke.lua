@@ -104,6 +104,13 @@ smoke('ValidateDrumsDiff M', function() ValidateDrumsDiff('M') end)
 smoke('ValidateDrumsDiff E', function() ValidateDrumsDiff('E') end)
 smoke('ValidateAllDrums',    function() ValidateAllDrums() end)
 
+-- 'all' is deliberately not smoked: it finds tracks by name across the open project,
+-- so it would write to the user's own PART GUITAR/BASS/KEYS. general_midi.lua covers it.
+Test.section('Difficulty - Generate')
+smoke('GenerateDifficulties gtr H',     function() GenerateDifficulties('gtr', { 'H' }) end)
+smoke('GenerateDifficulties bass HME',  function() GenerateDifficulties('bass', { 'H', 'M', 'E' }) end)
+smoke('GenerateDifficulties keys E',    function() GenerateDifficulties('keys', { 'E' }) end)
+
 Test.section('MIDI')
 smoke('AlignMIDI',           function() AlignMIDI() end)
 smoke('ResizeAllMIDI',       function() ResizeAllMIDI() end)

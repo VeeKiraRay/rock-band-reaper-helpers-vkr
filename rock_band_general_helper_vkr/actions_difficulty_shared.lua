@@ -2,6 +2,8 @@
 -- modules (Pro Keys, Keys, Guitar/Bass, Drums). Compares the difficulty
 -- being validated ("lower") against its immediately higher adjacent tier
 -- (Hard vs Expert, Medium vs Hard, Easy vs Medium) - never always-vs-Expert.
+-- Also holds what the per-instrument checks share: the DiffIssue record and
+-- the report builder that turns check categories into Validate's text.
 -- Requires: nothing (pure functions, no S/r access)
 
 -- Same event count, and every event's start/end time within ~5ms and
@@ -58,6 +60,92 @@ function CheckDifficultyProgression(lower_label, higher_label,
 
     if #lines == 0 then return '', 0 end
     return table.concat(lines, '\n') .. '\n\n', extra
+end
+
+-- Minimum gap, in quarter notes, between the end of a sustained note (1/8 note or
+-- longer) and the next note on Medium and Easy - shared by Keys and Guitar/Bass.
+--
+-- Measured, not taken from the RBN docs' "try and leave a quarter note". Over every
+-- official RB3 DLC chart (dev/calibration/run_difficulty_probe_vkr.lua, mode 'all':
+-- 480 guitar, 483 bass, 352 keys) Harmonix follows the docs' method instead - pull
+-- every sustain back by an 8th - so on Medium a 1/8 release gap is the commonest one
+-- and a 1/4 rule fired on 50-88% of official charts. Under 1/8 is rare: about 1-2% of
+-- gaps on Medium and under 1% on Easy, except Medium at 100 BPM or slower, where 1/16
+-- gaps reach 5-8%. A reducer can still aim for the quarter note; this is the floor.
+DIFF_RELEASE_GAP_QN      = { M = 0.5, E = 0.5 }
+DIFF_RELEASE_GAP_SLOW_QN = { M = 0.25 }  -- at or below DIFF_SLOW_BPM
+DIFF_SLOW_BPM            = 100
+
+-- The release gap for diff_label at tempo bpm, or nil when the tier has no such rule.
+function DiffReleaseGapQN(diff_label, bpm)
+    if bpm and bpm <= DIFF_SLOW_BPM and DIFF_RELEASE_GAP_SLOW_QN[diff_label] then
+        return DIFF_RELEASE_GAP_SLOW_QN[diff_label]
+    end
+    return DIFF_RELEASE_GAP_QN[diff_label]
+end
+
+-- A quarter-note length as the note value report lines name it.
+local QN_LABELS = { [0.25] = '1/16 note', [0.5] = '1/8 note', [1.0] = '1/4 note', [2.0] = '1/2 note' }
+function DiffQNLabel(qn)
+    return QN_LABELS[qn] or ('%.2f beats'):format(qn)
+end
+
+-- Category heading for the Medium/Easy sustain-gap rule, built from the table above
+-- so the heading cannot disagree with the threshold.
+function DiffReleaseGapName(diff_label)
+    local name = ('Sustain gaps (min %s gap to next'):format(DiffQNLabel(DIFF_RELEASE_GAP_QN[diff_label]))
+    local slow = DIFF_RELEASE_GAP_SLOW_QN[diff_label]
+    if slow then
+        name = name .. (', %s at <=%d BPM'):format(DiffQNLabel(slow), DIFF_SLOW_BPM)
+    end
+    return name .. ')'
+end
+
+-- One issue found by a difficulty check. Checks return arrays of these rather
+-- than bare strings, so the same rule can be counted per rule (the corpus
+-- probe) or acted on (the Generate planners) without parsing report text.
+--   s       - project time the issue is reported at (also the time in msg)
+--   pitches - the gem pitches involved, sorted ascending
+--   msg     - the report line, exactly as Validate prints it
+--   extra   - optional table of check-specific fields copied onto the record
+--             (e.g. prev_s, the start of the sustain a gap rule measured from)
+function DiffIssue(s, pitches, msg, extra)
+    local rec = { s = s, pitches = pitches, msg = msg }
+    if extra then
+        for k, v in pairs(extra) do rec[k] = v end
+    end
+    return rec
+end
+
+-- Report text for one tier's check categories. Each category is
+-- { name, rule, issues = { DiffIssue... }, advisory = bool? }; rule is a stable
+-- id for counting, name is the heading Validate prints.
+-- Returns (report_text, total_issue_count). Advisory categories still count
+-- toward the total, as they always have.
+function BuildDiffCheckReport(header, cats)
+    local lines = { header, '' }
+    local total = 0
+    local ok_cats = {}
+    for _, cat in ipairs(cats) do
+        if #cat.issues > 0 then
+            lines[#lines + 1] = cat.name .. ':'
+            for _, issue in ipairs(cat.issues) do
+                lines[#lines + 1] = '  ' .. issue.msg
+                total = total + 1
+            end
+            lines[#lines + 1] = ''
+        else
+            ok_cats[#ok_cats + 1] = cat.name
+        end
+    end
+    if total == 0 then
+        lines[#lines + 1] = 'No issues found.'
+        lines[#lines + 1] = ''
+    elseif #ok_cats > 0 then
+        lines[#lines + 1] = 'Passed: ' .. table.concat(ok_cats, ', ')
+        lines[#lines + 1] = ''
+    end
+    return table.concat(lines, '\n'), total
 end
 
 -- Keys and Guitar/Bass narrow their gem count at Medium/Easy (Green/Red/

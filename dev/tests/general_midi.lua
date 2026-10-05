@@ -183,7 +183,7 @@ end)
 
 ----------------------------------------------------------------------
 -- 5-Lane Keys - rb_keys.mid (single track, all difficulties by pitch range)
--- Expert 96-100 | Hard 84-88 | Medium 72-75 | Easy 60-62
+-- Expert 96-100 | Hard 84-88 | Medium 72-76 | Easy 60-64 (five lanes on every tier)
 ----------------------------------------------------------------------
 Test.section('5-Lane Keys - rb_keys.mid')
 
@@ -197,7 +197,7 @@ Test.it('CopyKeys5Diff H: copies Expert notes onto the Hard range', function()
     Test.expect(not S.status:find('^Error'), 'CopyKeys5Diff(H) errored: ' .. S.status)
 end)
 
-Test.it('CopyKeys5Diff M: copies Hard notes onto Medium, exercising color compression', function()
+Test.it('CopyKeys5Diff M: copies Hard notes onto Medium, colors unchanged', function()
     reset()
     local base, n = LoadFixture('rb_keys.mid')
     Test.expect(n > 0, 'rb_keys.mid created no tracks')
@@ -374,6 +374,117 @@ Test.it('ValidateAllDrums: validates all four difficulty pitch ranges', function
     ValidateAllDrums()
     CleanupFixture(base)
     Test.expect(not S.status:find('^Error'), 'ValidateAllDrums errored: ' .. S.status)
+end)
+
+----------------------------------------------------------------------
+-- Difficulty > Generate - rb_guitar.mid / rb_bass.mid / rb_keys.mid
+----------------------------------------------------------------------
+Test.section('Difficulty > Generate')
+
+local function TierNoteCount(kind, track, dl)
+    local _, n
+    if kind == 'gb' then _, n = ReadGBTierEvents(track, dl) else _, n = ReadK5TierEvents(track, dl) end
+    return n
+end
+
+for _, case in ipairs({
+    { file = 'rb_guitar.mid', key = 'gtr',  field = 'diff_gtr_idx', kind = 'gb' },
+    { file = 'rb_bass.mid',   key = 'bass', field = 'diff_bass_idx', kind = 'gb' },
+    { file = 'rb_keys.mid',   key = 'keys', field = 'diff_5k_idx',  kind = 'k5' },
+}) do
+    Test.it('GenerateDifficulties ' .. case.key .. ' H>M>E: thins each tier and leaves no Validate errors', function()
+        reset()
+        local base, n = LoadFixture(case.file)
+        Test.expect(n > 0, case.file .. ' created no tracks')
+        S[case.field] = base
+        local track = r.GetTrack(0, base)
+        -- Expert counted BEFORE generating: writing to the take makes REAPER drop any
+        -- zero-length notes in it (rb_keys.mid has a zero-length Expert chord), so the
+        -- count afterwards is not what Generate read.
+        local x_before = TierNoteCount(case.kind, track, 'X')
+        GenerateDifficulties(case.key, { 'H', 'M', 'E' }, true)  -- force: skip the overwrite popup
+        local counts = { X = x_before }
+        for _, dl in ipairs({ 'H', 'M', 'E' }) do counts[dl] = TierNoteCount(case.kind, track, dl) end
+        local x_after = TierNoteCount(case.kind, track, 'X')
+        CleanupFixture(base)
+        -- Expert notes can only disappear through REAPER dropping zero-length notes, and
+        -- the result must then say so - it is the only trace once they are gone.
+        if x_after < x_before then
+            Test.expect((S.last_result or ''):find('zero-length', 1, true) ~= nil,
+                ('Expert went from %d to %d notes but the result does not report removed zero-length notes:\n%s')
+                    :format(x_before, x_after, tostring(S.last_result)))
+        end
+        -- Every failure below prints all four counts and Generate's own result, so a
+        -- REAPER-only failure can be diagnosed from the console line alone.
+        local detail = ('X=%s H=%s M=%s E=%s | %s\n%s'):format(tostring(counts.X), tostring(counts.H),
+            tostring(counts.M), tostring(counts.E), tostring(S.status), tostring(S.last_result))
+        Test.expect(S.status:find('no Validate errors', 1, true) ~= nil, 'expected no Validate errors: ' .. detail)
+        -- Never more notes than the tier above. Strictly fewer is not asserted for Hard:
+        -- a fixture of plain quarter notes has nothing the planner may take out.
+        Test.expect((counts.H or 0) > 0, 'Hard is empty: ' .. detail)
+        Test.expect(counts.H <= counts.X, 'Hard has more notes than Expert: ' .. detail)
+        Test.expect((counts.M or 0) > 0 and counts.M < counts.H, 'Medium not below Hard: ' .. detail)
+        Test.expect((counts.E or 0) > 0 and counts.E <= counts.M, 'Easy above Medium: ' .. detail)
+    end)
+end
+
+Test.it('GenerateDifficulties: one undo restores the generated tiers', function()
+    reset()
+    local base, n = LoadFixture('rb_guitar.mid')
+    Test.expect(n > 0, 'rb_guitar.mid created no tracks')
+    S.diff_gtr_idx = base
+    local track = r.GetTrack(0, base)
+    local before = {}
+    for _, dl in ipairs({ 'H', 'M', 'E' }) do before[dl] = TierNoteCount('gb', track, dl) end
+    GenerateDifficulties('gtr', { 'H', 'M', 'E' }, true)
+    r.Undo_DoUndo2(0)
+    local after = {}
+    for _, dl in ipairs({ 'H', 'M', 'E' }) do after[dl] = TierNoteCount('gb', track, dl) end
+    CleanupFixture(base)
+    for _, dl in ipairs({ 'H', 'M', 'E' }) do
+        Test.expect(after[dl] == before[dl], ('%s: %d notes before, %d after undo'):format(dl, before[dl], after[dl]))
+    end
+end)
+
+Test.it('GenerateDifficulties: asks before overwriting a tier that has notes', function()
+    reset()
+    local base, n = LoadFixture('rb_guitar.mid')
+    Test.expect(n > 0, 'rb_guitar.mid created no tracks')
+    S.diff_gtr_idx = base
+    local track = r.GetTrack(0, base)
+    local before = TierNoteCount('gb', track, 'H')
+    GenerateDifficulties('gtr', { 'H' })   -- no force
+    local pending = S.diff_copy_pending
+    local after = TierNoteCount('gb', track, 'H')
+    S.diff_copy_pending = nil
+    CleanupFixture(base)
+    if before > 0 then
+        Test.expect(pending ~= nil, 'expected an overwrite confirmation')
+        Test.expect(after == before, 'Hard changed before confirmation')
+    end
+end)
+
+Test.it('GenerateDifficulties all: skips a muted track', function()
+    reset()
+    -- All instruments looks tracks up by name across the whole project. If the open
+    -- project has its own, this test would write to them - so it only runs in a project
+    -- without them.
+    if FindTrackExact('PART GUITAR') or FindTrackExact('PART BASS') or FindTrackExact('PART KEYS') then
+        r.ShowConsoleMsg('    (skipped: the open project has its own PART GUITAR/BASS/KEYS track)\n')
+        return
+    end
+    local base, n = LoadFixture('rb_guitar.mid')
+    Test.expect(n > 0, 'rb_guitar.mid created no tracks')
+    -- An empty, muted PART BASS rather than a second fixture: a single-track MIDI file
+    -- imported while another fixture is loaded lands on the existing track instead of a
+    -- new one. Muting is checked before any notes are read, so empty is enough.
+    local bass = r.GetTrack(0, CreateEmptyFixtureTrack('PART BASS'))
+    r.SetMediaTrackInfo_Value(bass, 'B_MUTE', 1)
+    GenerateDifficulties('all', { 'H' }, true)
+    local result = S.last_result or ''
+    CleanupFixture(base)
+    Test.expect(result:find('PART BASS is muted', 1, true) ~= nil, 'muted bass not reported as skipped:\n' .. result)
+    Test.expect(result:find('Guitar', 1, true) ~= nil, 'guitar not generated:\n' .. result)
 end)
 
 ----------------------------------------------------------------------
