@@ -30,6 +30,8 @@ r.ShowConsoleMsg('======  Venue Phrase Pacing - tests  ======\n')
 
 dofile(_tdir .. 'framework.lua')
 dofile(_tdir .. 'fixture_helpers.lua')
+dofile(_root .. 'lib/reaper_imgui_helpers.lua')   -- SortedByLabel: venue_camera.lua and
+                                                  -- venue_lighting.lua call it at load time
 dofile(_gdir .. 'defaults.lua')                   -- S
 dofile(_gdir .. 'helpers.lua')                    -- FindTrackByName
 dofile(_gdir .. 'venue.lua')                      -- IsBlendAnchor (actions_venue_manual reads it)
