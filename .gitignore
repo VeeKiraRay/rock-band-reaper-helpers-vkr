@@ -74,4 +74,16 @@ dev/calibration/calibration_protocol_report.lock
 dev/calibration/*_rating_worksheet.txt
 dev/calibration/*_rating_key.txt
 
+# Difficulty probe output (run_difficulty_probe_vkr.lua). Exploratory research for the
+# Difficulty > Generate feature, regenerated on every run with whatever sample settings
+# were in force, so a committed copy would describe one sample and look like a result.
+dev/calibration/difficulty_probe_*.txt
+dev/calibration/difficulty_probe_*.csv
+dev/calibration/generate_eval_report.txt
+
+# Difficulty > Generate golden charts (dev/tests/run_generate_golden.lua): the author's own
+# hand-verified charts, kept local. Only the README that explains the folder is tracked.
+dev/tests/golden/*
+!dev/tests/golden/README.md
+
 *.zip
