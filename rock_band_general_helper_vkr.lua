@@ -31,10 +31,11 @@
 --
 --   v0.9.63
 --     - New Difficulty > Generate sub-tab. Builds Hard, Medium and Easy for
---       Guitar, Bass or Keys from the difficulty above, in one click. Pick an
---       instrument - or All instruments, which uses PART GUITAR, PART BASS and
---       PART KEYS and skips any that is missing or muted - then generate one
---       difficulty or the whole Hard > Medium > Easy chain.
+--       Guitar, Bass, Pro Keys or Keys from the difficulty above, in one click.
+--       Pick an instrument - or All instruments, which uses PART GUITAR, PART
+--       BASS, PART REAL_KEYS_X/H/M/E and PART KEYS and skips any that is
+--       missing or muted - then generate one difficulty or the whole
+--       Hard > Medium > Easy chain.
 --     - It reduces the way official charts do, not just enough to pass
 --       Validate. It keeps downbeats and beats first; Medium loses most 8ths
 --       and Easy about half the beats. Measured against the official RB3 DLC
@@ -93,11 +94,41 @@
 --       dotted 8th, Easy a quarter (above 160 BPM: Medium a quarter, Easy a
 --       half). A sustain too short to keep that gap becomes a short 1/32 note,
 --       so it clearly reads as a plain note.
---     - Keys follow the same-difficulty Pro Keys track automatically when it
---       has notes, so a Pro Keys reduction you already made carries over.
+--     - Pro Keys gets the same rhythm as the other instruments, with its own
+--       pitch rules, measured on the official charts: chords lose notes from
+--       the bottom, so the top (melody) note stays; Hard keeps Expert's notes
+--       and the lane shifts it still needs; Medium and Easy show one range for
+--       the whole song - Hard's, when Hard keeps one range all song, else
+--       the one that fits the most notes. Notes outside
+--       it move by an octave; notes inside never move. Sustains leave the RBN
+--       gaps (Hard 1/16 or 1/8, Medium and Easy a quarter). Big interval
+--       jumps are left as they are, as official charts mostly do. When Expert
+--       is so simple that Hard would be an exact copy, Generate asks first:
+--       shorten Hard's sustains a little (as some official charters do), or
+--       keep Hard as Expert. The result says which was chosen.
+--     - Keys and Pro Keys: a lick that starts on an "and" and moves on its
+--       "and"s while its beats repeat a note keeps the "and"s on Medium, so
+--       the line keeps moving instead of repeating; Easy goes back to Hard's
+--       downbeats there. The result lists those bars.
+--     - Keys follow the same-difficulty Pro Keys automatically when it has
+--       notes, so a Pro Keys reduction you already made carries over. All
+--       instruments generates Pro Keys first, and Keys then follows it. One
+--       Keys note per Pro Keys note: a grace note just before a beat no
+--       longer survives next to the beat.
+--     - Pro Keys Validate: note spacing on Medium and Easy now works like
+--       Keys - an error under an 8th (Medium) or a quarter (Easy), an
+--       advisory under the RBN doc's quarter and half. Interval jumps are
+--       advisories. Official charts break both doc rules often (Easy: 42% of
+--       gaps under a half note), so as errors they flagged nearly every chart.
+--       "Unchanged copy" and "NOT REDUCED" are advisories on Pro Keys too.
+--     - Validate, every instrument: a difficulty that keeps every note but
+--       holds some sustains shorter is no longer "NOT REDUCED"; it reports
+--       "only sustain lengths differ".
 --     - The result is checked with Validate's own rules and anything left to
 --       fix is listed with its time. It asks before replacing notes, one undo
---       reverts the whole run, and a time selection limits it. The result
+--       reverts the whole run, and a time selection limits it to the notes
+--       that start inside it (a note on its first downbeat is replaced, one
+--       on the downbeat where it ends is left alone). The result
 --       ends with how long the run took (and, for a slow run, where the
 --       time went).
 --     - It is a starting point, not a finished chart. Official charters make
@@ -286,9 +317,12 @@ for _, _f in ipairs({
     _mdir .. 'actions_difficulty_5k.lua',
     _mdir .. 'actions_difficulty_gtrbass.lua',
     _mdir .. 'actions_difficulty_drums.lua',
+    _mdir .. 'difficulty_generate_params.lua',
     _mdir .. 'difficulty_generate_retime.lua',
     _mdir .. 'difficulty_generate_colors.lua',
+    _mdir .. 'difficulty_generate_rhythm.lua',
     _mdir .. 'difficulty_generate_5lane.lua',
+    _mdir .. 'difficulty_generate_prokeys.lua',
     _mdir .. 'difficulty_generate_hopo.lua',
     _mdir .. 'actions_difficulty_generate.lua',
     _mdir .. 'difficulty_read.lua',
@@ -392,9 +426,12 @@ dofile(_mdir .. 'actions_difficulty_drums.lua')
 -- Difficulty > Generate: the pure planner (its Hard fast-run rewrite first), then the
 -- action that reads and writes tracks. All only touch the rule tables and FindTrackExact
 -- (difficulty_read.lua) at call time.
+dofile(_mdir .. 'difficulty_generate_params.lua')
 dofile(_mdir .. 'difficulty_generate_retime.lua')
 dofile(_mdir .. 'difficulty_generate_colors.lua')
+dofile(_mdir .. 'difficulty_generate_rhythm.lua')
 dofile(_mdir .. 'difficulty_generate_5lane.lua')
+dofile(_mdir .. 'difficulty_generate_prokeys.lua')
 dofile(_mdir .. 'difficulty_generate_hopo.lua')
 dofile(_mdir .. 'actions_difficulty_generate.lua')
 dofile(_mdir .. 'difficulty_read.lua')

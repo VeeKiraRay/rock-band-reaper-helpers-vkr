@@ -1,7 +1,7 @@
 -- Difficulty > Generate: fast dense runs rewritten one grid slower on Hard.
 --
--- PURE: no r, no S. Called by Gen5PlanTier (difficulty_generate_5lane.lua) for Hard, and
--- loaded before it. Reads GEN5_PARAMS at call time.
+-- PURE: no r, no S. Called by Gen5SelectOnsets (difficulty_generate_rhythm.lua) for Hard,
+-- and loaded before it. Reads GEN5_PARAMS at call time.
 --
 -- On a fast song the Hard gap is a whole 1/8 note, so a run of 16ths thinned in place keeps
 -- at most 8 notes a bar and loses its color motion (a 210 BPM solo kept 5 of 14 notes).

@@ -1,24 +1,32 @@
 -- Difficulty > Generate: build Hard, Medium and Easy automatically from the tier above.
 --
 -- The REAPER side of the generator. Reads tiers off the instrument tracks, hands them to
--- the pure planner (difficulty_generate_5lane.lua), writes the result back, and re-runs
--- Validate's own checks on what it wrote. One undo block covers a whole run, every
--- instrument and tier included.
+-- the pure planners (difficulty_generate_5lane.lua, difficulty_generate_prokeys.lua),
+-- writes the result back, and re-runs Validate's own checks on what it wrote. One undo
+-- block covers a whole run, every instrument and tier included.
 --
 -- Requires (globals): S, r, GetTimeSelection, FindFirstMIDIItem, ClearNotesInRange,
---   InsertNotes, FindTrackExact (difficulty_read.lua), Gen5PlanTier,
---   GB_RANGE / K5_RANGE, ReadGBTierEvents / ReadK5TierEvents, CollectGBChecks /
---   CollectK5Checks, ReadProKeysEvents (actions_difficulty_5k.lua), Gen5MarkHopos /
+--   InsertNotes, FindTrackExact (difficulty_read.lua), Gen5PlanTier, GenPKPlanTier,
+--   GEN_PK_WINDOWS, GB_RANGE / K5_RANGE, ReadGBTierEvents / ReadK5TierEvents,
+--   CollectGBChecks / CollectK5Checks / CollectPKChecks, ReadPKTierEvents
+--   (actions_difficulty.lua), ReadProKeysEvents (actions_difficulty_5k.lua), Gen5MarkHopos /
 --   Gen5ForceHopoSpans (difficulty_generate_hopo.lua).
 
--- The instruments Generate supports, in dropdown order. Adding one (Drums, Pro Keys) is
--- one entry here plus its planner. idx_field is the track field the instrument's own
--- Difficulty sub-tab uses, so the selection is shared rather than duplicated.
+-- The instruments Generate supports, in dropdown order - which is also the run order of
+-- All instruments, so Pro Keys comes before Keys (Keys follows the Pro Keys this run
+-- generated). Adding one (Drums) is one entry here plus its planner. idx_field is the
+-- track field the instrument's own Difficulty sub-tab uses, so the selection is shared
+-- rather than duplicated. Pro Keys has a track per tier: tier_fields instead.
 GEN_INSTRUMENTS = {
     { key = 'gtr',  label = 'Guitar', track_name = 'PART GUITAR', idx_field = 'diff_gtr_idx',  kind = 'gb' },
     { key = 'bass', label = 'Bass',   track_name = 'PART BASS',   idx_field = 'diff_bass_idx', kind = 'gb' },
+    { key = 'pk',   label = 'Pro Keys', track_name = 'PART REAL_KEYS_X', kind = 'pk',
+      tier_fields = { X = 'diff_pk_x_idx', H = 'diff_pk_h_idx', M = 'diff_pk_m_idx', E = 'diff_pk_e_idx' } },
     { key = 'keys', label = 'Keys',   track_name = 'PART KEYS',   idx_field = 'diff_5k_idx',   kind = 'k5' },
 }
+-- Pro Keys pitches a tier owns: the lane-shift markers and the playable keys.
+local PK_RANGES = { { 0, 0 }, { 2, 2 }, { 4, 5 }, { 7, 7 }, { 9, 9 }, { 48, 72 } }
+local PK_WINDOW_NAMES = { [0] = 'C2-E3', [2] = 'D2-F3', [4] = 'E2-G3', [5] = 'F2-A3', [7] = 'G2-B3', [9] = 'A2-C4' }
 GEN_ALL_KEY = 'all'
 
 local DIFF_NAMES = { X = 'Expert', H = 'Hard', M = 'Medium', E = 'Easy' }
@@ -45,18 +53,36 @@ function GenInstrumentByKey(key)
     return nil
 end
 
+-- Pro Keys planner events carry real pitches (offs = pitch - 0).
 local function RangeLo(inst, dl)
+    if inst.kind == 'pk' then return 0 end
     return (inst.kind == 'gb' and GB_RANGE or K5_RANGE)[dl].lo
 end
 
+-- One tier's events. track is that tier's own track for Pro Keys, the instrument's track
+-- otherwise. Pro Keys also returns its lane-shift markers.
 local function ReadTier(inst, track, dl, sel_s, sel_e)
+    if inst.kind == 'pk' then
+        local shifts, events = ReadPKTierEvents(track, sel_s, sel_e)
+        return events, shifts
+    end
     if inst.kind == 'gb' then return ReadGBTierEvents(track, dl, sel_s, sel_e) end
     return ReadK5TierEvents(track, dl, sel_s, sel_e)
 end
 
-local function CheckTier(inst, track, dl, events, sel_s, sel_e)
+-- ctx: { shifts, exp_events } for Pro Keys (its checks need the markers and Expert).
+local function CheckTier(inst, track, dl, events, sel_s, sel_e, ctx)
+    if inst.kind == 'pk' then return CollectPKChecks(dl, events, ctx.shifts, ctx.exp_events, sel_s) end
     if inst.kind == 'gb' then return CollectGBChecks(dl, events, track, sel_s, sel_e) end
     return CollectK5Checks(dl, events)
+end
+
+-- The pitch ranges a tier's write replaces: { { lo, hi }... }.
+local function TierRanges(inst, dl)
+    if inst.kind == 'pk' then return PK_RANGES end
+    local lo = RangeLo(inst, dl)
+    -- Guitar/Bass Hard also replaces its force-HOPO markers (lo + 5).
+    return { { lo, (inst.kind == 'gb' and dl == 'H') and lo + 5 or lo + 4 } }
 end
 
 -- Validate's events ({ s, e, pitches }, project time) -> planner input.
@@ -79,10 +105,14 @@ local ZERO_LEN_S = 0.001
 local SNAP = 960
 local function SnapQN(qn) return math.floor(qn * SNAP + 0.5) / SNAP end
 
-local function ToPlannerEvents(events, lo)
+-- keep_zero: Pro Keys. Its tiers are separate tracks, so writing one never touches
+-- Expert's take and its zero-length notes stay - and Validate still counts them. They are
+-- used like any note (the planner gives every written note its minimum length), or the
+-- lower tiers would miss a measure Expert plays (rb_pro_keys.mid's last chord).
+local function ToPlannerEvents(events, lo, keep_zero)
     local out = {}
     for _, ev in ipairs(events) do
-        if ev.e - ev.s < ZERO_LEN_S then goto next_ev end
+        if ev.e - ev.s < ZERO_LEN_S and not keep_zero then goto next_ev end
         local qn = SnapQN(r.TimeMap2_timeToQN(0, ev.s))
         -- Bar start and end in quarter notes, so time signature changes are honoured.
         local _, bar_s, bar_e = r.TimeMap_QNToMeasures(0, qn)
@@ -183,7 +213,14 @@ end
 --   so Keys never follows a track the user did not pick.
 -- by_name true (All instruments): the default track name, like every other track in
 --   that mode.
-local function ProKeysGuide(dl, sel_s, sel_e, by_name)
+-- generated: this run's Pro Keys output per tier ({ [dl] = planner events }), which wins
+--   over the track - Keys follows the Pro Keys the same run just built.
+local function ProKeysGuide(dl, sel_s, sel_e, by_name, generated)
+    if generated and generated[dl] then
+        local guide = {}
+        for _, ev in ipairs(generated[dl]) do guide[#guide + 1] = { qn = ev.qn, qn_e = ev.qn_e } end
+        return #guide > 0 and guide or nil
+    end
     local track
     if by_name then
         track = FindTrackExact('PART REAL_KEYS_' .. dl)
@@ -248,22 +285,39 @@ local function RetimedLines(retimed)
     }
 end
 
--- Replace the notes of pitches lo..hi that overlap [clear_s, clear_e] (seconds) with
--- `notes` ({ s, e, pitch } in seconds, written on channel 1 at velocity vel), in one
--- MIDI_GetAllEvts / MIDI_SetAllEvts round trip. The same notes go as with
--- ClearNotesInRange: a note is removed when it starts before clear_e and ends after
--- clear_s. Every other event - other pitches, CCs, text, sysex, the take's end marker -
--- is written back unchanged and in its original order.
+-- Replace the notes of the pitch ranges ({ { lo, hi }... }) that START in [clear_s,
+-- clear_e) (seconds) - or, with clear_s nil, every such note in the take - with `notes` ({ s, e, pitch } in seconds, written on channel 1 at
+-- velocity vel), in one MIDI_GetAllEvts / MIDI_SetAllEvts round trip. By start, not by
+-- overlap (ClearNotesInRange's rule): the selection rule in GenerateDifficulties, so a
+-- sustain from before the selection is kept rather than deleted and never regenerated.
+-- Every other event - other pitches, CCs, text, sysex, the take's end marker - is written
+-- back unchanged and in its original order. (The 'batched' / 'per_note' timing modes
+-- still clear by overlap.)
 -- Buffer format (ReaScript API): per event an int32 offset in ticks from the previous
 -- event, a flag byte, an int32 length and the message bytes.
 -- Returns false when the take could not be read (the caller falls back to batched).
-local function ReplaceNotesBulk(take, clear_s, clear_e, lo, hi, notes, vel)
+local function ReplaceNotesBulk(take, clear_s, clear_e, ranges, notes, vel)
     local ok, buf = r.MIDI_GetAllEvts(take, '')
     if not ok or type(buf) ~= 'string' then return false end
-    local s_ppq = r.MIDI_GetPPQPosFromProjTime(take, clear_s)
-    local e_ppq = r.MIDI_GetPPQPosFromProjTime(take, clear_e)
+    local whole = clear_s == nil
+    local s_ppq = not whole and r.MIDI_GetPPQPosFromProjTime(take, clear_s) or 0
+    local e_ppq = not whole and r.MIDI_GetPPQPosFromProjTime(take, clear_e) or 0
+    local owned = {}
+    for _, rg in ipairs(ranges) do
+        for p = rg[1], rg[2] do owned[p] = true end
+    end
+
+    -- Half a tick each way: a note exactly on the selection's start is in, one exactly on
+    -- its end is out, whatever the float rounding.
+    local function InWindow(at) return whole or (at >= s_ppq - 0.5 and at < e_ppq - 0.5) end
 
     local evs, open, drop = {}, {}, {}
+    -- A zero-length note is stored with its note-off FIRST, at the note-on's own tick, so
+    -- first-on-first-off pairing never matched it: the old note stayed, and the new one
+    -- written at that position doubled every pitch (rb_pro_keys.mid's last chord, in
+    -- REAPER: [E2+E2+G2+G2+B2+B2]). An off with nothing open waits here for an on at the
+    -- same tick.
+    local early_off = {}
     local pos, ppq, n = 1, 0, #buf
     while pos <= n do
         local off, flag, msg
@@ -274,19 +328,35 @@ local function ReplaceNotesBulk(take, clear_s, clear_e, lo, hi, notes, vel)
         if #msg >= 3 then
             local st = msg:byte(1)
             local typ, pitch, v = st & 0xF0, msg:byte(2), msg:byte(3)
-            if (typ == 0x90 or typ == 0x80) and pitch >= lo and pitch <= hi then
+            if (typ == 0x90 or typ == 0x80) and owned[pitch] then
                 local key = (st & 0x0F) * 128 + pitch
                 if typ == 0x90 and v > 0 then
-                    open[key] = open[key] or {}
-                    table.insert(open[key], k)
+                    local eo = early_off[key]
+                    if eo and evs[eo].ppq == ppq then
+                        -- The zero-length note this early off belongs to.
+                        early_off[key] = nil
+                        if InWindow(ppq) then drop[eo], drop[k] = true, true end
+                    else
+                        open[key] = open[key] or {}
+                        table.insert(open[key], k)
+                    end
                 else
                     -- First on, first off - the pairing REAPER's note list uses.
                     local q = open[key]
                     local on = q and table.remove(q, 1)
-                    if on and evs[on].ppq < e_ppq and ppq > s_ppq then drop[on], drop[k] = true, true end
+                    if on then
+                        if InWindow(evs[on].ppq) then drop[on], drop[k] = true, true end
+                    else
+                        early_off[key] = k
+                    end
                 end
             end
         end
+    end
+    -- A note-on that never closed, inside the window: nothing may stay behind to pair with
+    -- a note-off written below.
+    for _, q in pairs(open) do
+        for _, k in ipairs(q) do if InWindow(evs[k].ppq) then drop[k] = true end end
     end
 
     local out = {}
@@ -380,7 +450,9 @@ local function GuitarRefs(sel_s, sel_e, by_name, busy_drop, first_tier)
     return refs
 end
 
--- The tracks a run covers: { { inst, track }... } plus skip notes for the result.
+-- The tracks a run covers: { { inst, track, tracks }... } plus skip notes for the result.
+-- tracks: Pro Keys only, its tier tracks { X, H, M, E } (any may be nil; the run checks
+-- the ones it needs).
 local function ResolveTargets(inst_key)
     local targets, skipped = {}, {}
     if inst_key == GEN_ALL_KEY then
@@ -392,32 +464,74 @@ local function ResolveTargets(inst_key)
             elseif r.GetMediaTrackInfo_Value(track, 'B_MUTE') == 1 then
                 skipped[#skipped + 1] = ('%s: %s is muted'):format(inst.label, inst.track_name)
             else
-                targets[#targets + 1] = { inst = inst, track = track }
+                local t = { inst = inst, track = track }
+                if inst.tier_fields then
+                    t.tracks = {}
+                    for dl in pairs(inst.tier_fields) do t.tracks[dl] = FindTrackExact('PART REAL_KEYS_' .. dl) end
+                end
+                targets[#targets + 1] = t
             end
         end
     else
         local inst = GenInstrumentByKey(inst_key)
-        local idx  = inst and S[inst.idx_field]
-        local track = idx and idx >= 0 and r.GetTrack(0, idx) or nil
-        if not track then
-            return nil, nil, ('Select the %s track first.'):format(inst and inst.track_name or '?')
+        if inst and inst.tier_fields then
+            local tracks = {}
+            for dl, field in pairs(inst.tier_fields) do
+                local idx = S[field]
+                tracks[dl] = idx and idx >= 0 and r.GetTrack(0, idx) or nil
+            end
+            targets[1] = { inst = inst, track = tracks.X, tracks = tracks }
+        else
+            local idx  = inst and S[inst.idx_field]
+            local track = idx and idx >= 0 and r.GetTrack(0, idx) or nil
+            if not track then
+                return nil, nil, ('Select the %s track first.'):format(inst and inst.track_name or '?')
+            end
+            targets[1] = { inst = inst, track = track }
         end
-        targets[1] = { inst = inst, track = track }
     end
     return targets, skipped
+end
+
+-- A tier's track: Pro Keys' own tier track, otherwise the instrument's one track.
+local function TierTrack(t, dl)
+    if t.tracks then return t.tracks[dl] end
+    return t.track
+end
+
+-- Planner events from Validate's lane-shift notes ({ s, e, pitch }).
+local function ToPlannerShifts(shifts)
+    local out = {}
+    for _, sh in ipairs(shifts or {}) do
+        out[#out + 1] = { qn = SnapQN(r.TimeMap2_timeToQN(0, sh.s)), qn_e = SnapQN(r.TimeMap2_timeToQN(0, sh.e)),
+                          pitch = sh.pitch }
+    end
+    table.sort(out, function(a, b) return a.qn < b.qn end)
+    return out
 end
 
 -- Generate tiers (an ordered list such as { 'H' } or { 'H', 'M', 'E' }) for one
 -- instrument key, or GEN_ALL_KEY for every supported instrument. Each tier is built from
 -- the tier above it - the one just generated, when the run made it.
 -- force: skip the overwrite confirmation (set when called again from the popup).
-function GenerateDifficulties(inst_key, tiers, force)
+-- answers: the user's answers to questions this run asked, so the run that follows the
+--   popup does not ask again. pk_pull_back: true / false once asked whether to shorten
+--   Pro Keys Hard's sustains because Hard would equal Expert; nil = not asked yet.
+function GenerateDifficulties(inst_key, tiers, force, answers)
+    answers = answers or {}
     local targets, skipped, err = ResolveTargets(inst_key)
     if not targets then
         S.status, S.last_result = 'Generate: ' .. err, err
         return
     end
     local sel_s, sel_e = GetTimeSelection()
+    -- A time selection covers the notes that START in it: its start inclusive (a note on
+    -- the selection's first downbeat is replaced), its end exclusive (a note on the
+    -- downbeat where it ends belongs to the next section). The tier readers keep notes up
+    -- to 1 ms past the end, as Validate wants; Generate reads to 2 ms before it, so it
+    -- never regenerates a note it does not clear - that wrote a second note on top of the
+    -- old one. ReplaceNotesBulk clears by the same rule.
+    local read_e = sel_e and (sel_e - 0.002)
 
     -- Seconds per phase, reported on the result's last line (see WRITE_MODE).
     local T = { read = 0, ref = 0, plan = 0, write = 0, validate = 0, finish = 0 }
@@ -433,28 +547,56 @@ function GenerateDifficulties(inst_key, tiers, force)
     local jobs, replaced = {}, {}
     for _, t in ipairs(targets) do
         local src_dl = UPPER[tiers[1]]
-        local src = ReadTier(t.inst, t.track, src_dl, sel_s, sel_e)
-        if #src == 0 then
+        local src_track = TierTrack(t, src_dl)
+        -- Every tier this run writes needs a track with a MIDI item (one track for 5-lane).
+        local dest, missing = {}, nil
+        for _, dl in ipairs(tiers) do
+            local tr = TierTrack(t, dl)
+            local item, take
+            if tr then item, take = FindFirstMIDIItem(tr) end
+            if not tr then
+                missing = ('%s: no %s track - select it on the Pro Keys sub-tab'):format(t.inst.label, 'PART REAL_KEYS_' .. dl)
+                break
+            elseif not item then
+                missing = ('%s: %s has no MIDI item'):format(t.inst.label,
+                    t.tracks and ('PART REAL_KEYS_' .. dl) or t.inst.track_name)
+                break
+            end
+            dest[dl] = { track = tr, item = item, take = take }
+        end
+        local src, src_shifts = {}, nil
+        if src_track then src, src_shifts = ReadTier(t.inst, src_track, src_dl, sel_s, read_e) end
+        if not src_track then
+            skipped[#skipped + 1] = ('%s: no %s track - select it on the Pro Keys sub-tab'):format(
+                t.inst.label, 'PART REAL_KEYS_' .. src_dl)
+        elseif #src == 0 then
             skipped[#skipped + 1] = ('%s: %s has no notes to generate from'):format(t.inst.label, DIFF_NAMES[src_dl])
+        elseif missing then
+            skipped[#skipped + 1] = missing
         else
-            local item, take = FindFirstMIDIItem(t.track)
-            if not item then
-                skipped[#skipped + 1] = ('%s: %s has no MIDI item'):format(t.inst.label, t.inst.track_name)
-            else
-                local job = { inst = t.inst, track = t.track, item = item, take = take,
-                              src = ToPlannerEvents(src, RangeLo(t.inst, src_dl)) }
-                -- Guitar/Bass Hard from Expert: which Expert notes hammer on (automatic or
-                -- forced), so Hard can keep them (difficulty_generate_hopo.lua).
-                if t.inst.kind == 'gb' and src_dl == 'X' then
-                    local lo = RangeLo(t.inst, 'X')
-                    Gen5MarkHopos(job.src, MarkerSpans(take, lo + 5, sel_s, sel_e),
-                                  MarkerSpans(take, lo + 6, sel_s, sel_e))
-                end
-                jobs[#jobs + 1] = job
-                for _, dl in ipairs(tiers) do
-                    if #ReadTier(t.inst, t.track, dl, sel_s, sel_e) > 0 then
-                        replaced[#replaced + 1] = ('%s %s'):format(t.inst.label, DIFF_NAMES[dl])
-                    end
+            local job = { inst = t.inst, track = t.track, tracks = t.tracks, dest = dest,
+                          src = ToPlannerEvents(src, RangeLo(t.inst, src_dl), t.inst.kind == 'pk') }
+            if t.inst.kind == 'pk' then
+                -- The upper tier's lane shifts over the WHOLE track, even in a time
+                -- selection: the window showing at the selection's start was set before it.
+                job.src_shifts = ToPlannerShifts((ReadPKTierEvents(src_track)))
+                -- Expert, for Validate's cross-difficulty checks of the written tiers.
+                if t.tracks.X then job.exp_events = select(1, ReadTier(t.inst, t.tracks.X, 'X', sel_s, read_e)) end
+            end
+            -- Guitar/Bass Hard from Expert: which Expert notes hammer on (automatic or
+            -- forced), so Hard can keep them (difficulty_generate_hopo.lua).
+            if t.inst.kind == 'gb' and src_dl == 'X' then
+                local lo, take = RangeLo(t.inst, 'X'), dest[tiers[1]].take
+                Gen5MarkHopos(job.src, MarkerSpans(take, lo + 5, sel_s, sel_e),
+                              MarkerSpans(take, lo + 6, sel_s, sel_e))
+            end
+            jobs[#jobs + 1] = job
+            for _, dl in ipairs(tiers) do
+                -- Pro Keys: markers alone count too (the second value is a note count for
+                -- the 5-lane readers).
+                local evs, shifts = ReadTier(t.inst, dest[dl].track, dl, sel_s, read_e)
+                if #evs > 0 or (t.inst.kind == 'pk' and #shifts > 0) then
+                    replaced[#replaced + 1] = ('%s %s'):format(t.inst.label, DIFF_NAMES[dl])
                 end
             end
         end
@@ -484,36 +626,132 @@ function GenerateDifficulties(inst_key, tiers, force)
     -- at the first note.
     local busy = S.diff_gen_busy_drop
     local busy_drop = (busy == 1 or busy == 2) and busy or nil
-    -- Guitar leads Bass and Keys on Hard's busy bars and Medium's rhythm (GuitarRefs).
+    -- Guitar leads Bass, Keys and Pro Keys on Hard's busy bars and Medium's rhythm (GuitarRefs).
     local refs = {}
     for _, job in ipairs(jobs) do
         if job.inst.key ~= 'gtr' then
-            refs = GuitarRefs(sel_s, sel_e, inst_key == GEN_ALL_KEY, busy_drop, tiers[1])
+            refs = GuitarRefs(sel_s, read_e, inst_key == GEN_ALL_KEY, busy_drop, tiers[1])
             break
         end
     end
     Lap('ref')
 
+    -- Pro Keys Hard that would come out as Expert exactly (a simple Expert: the RBN doc has
+    -- no rule that Hard must differ, and official Hard sometimes is Expert as it is). Ask
+    -- BEFORE writing anything, so Medium and Easy are built from the Hard the user picks
+    -- and the run stays one undo step. The same planning runs again below.
+    if answers.pk_pull_back == nil and tiers[1] == 'H' then
+        for _, job in ipairs(jobs) do
+            if job.inst.kind == 'pk' then
+                local out = GenPKPlanTier('H', job.src, { busy_drop = busy_drop, busy_ref = refs.H,
+                                                          shifts = job.src_shifts })
+                if #out > 0 and GenPKSameAsUpper(out, job.src) then
+                    S.diff_copy_pending = {
+                        message = 'Pro Keys Expert is already easy enough to meet the Hard rules,\n'
+                                  .. 'so Hard would be an exact copy of Expert.\n\n'
+                                  .. 'Shorten the sustains on Hard so it differs slightly?\n'
+                                  .. '(Some official charters reduce a simple Hard this way.)',
+                        confirm_label = 'Shorten sustains',
+                        on_confirm = function() GenerateDifficulties(inst_key, tiers, true, { pk_pull_back = true }) end,
+                        alt_label = 'Keep as Expert',
+                        on_alt = function() GenerateDifficulties(inst_key, tiers, true, { pk_pull_back = false }) end,
+                    }
+                    return
+                end
+            end
+        end
+    end
+
+    -- This run's Pro Keys tiers, for Keys to follow (ProKeysGuide).
+    local pk_generated = {}
+
     r.PreventUIRefresh(1)
     r.Undo_BeginBlock2(0)
     for _, job in ipairs(jobs) do
         local inst = job.inst
-        r.MarkTrackItemsDirty(job.track, job.item)
-        local zero_before = ZeroLengthNotes(job.take)   -- see RemovedZeroLengthLines
+        -- Zero-length notes per take, before this job writes to it (RemovedZeroLengthLines).
+        local takes, zero_before = {}, {}
+        for _, dl in ipairs(tiers) do
+            local d = job.dest[dl]
+            r.MarkTrackItemsDirty(d.track, d.item)
+            if not zero_before[d.take] then
+                zero_before[d.take] = ZeroLengthNotes(d.take)
+                takes[#takes + 1] = d
+            end
+        end
         Lap('read')
-        local clear_s = sel_s or 0
-        local clear_e = sel_e or (r.GetMediaItemInfo_Value(job.item, 'D_POSITION')
-                                  + r.GetMediaItemInfo_Value(job.item, 'D_LENGTH'))
-        local upper = job.src
+        local upper, upper_shifts = job.src, job.src_shifts
+        -- Each tier's planner events as this run has them (Easy's "and" phrases look at Hard).
+        local tier_events = { [UPPER[tiers[1]]] = job.src }
         lines[#lines + 1] = ('%s  (%s)%s'):format(inst.label, inst.track_name, scope)
         for _, dl in ipairs(tiers) do
+            local d = job.dest[dl]
+            -- No time selection: the whole take, not 0 .. the item's end. An imported item
+            -- ends at its last note, and a zero-length chord there sits exactly ON that end,
+            -- outside [0, end): it was never cleared and the new chord doubled every pitch
+            -- (rb_pro_keys.mid bar 11). whole_take also covers a Pro Keys tier generated
+            -- as new in a time selection (below).
+            local whole_take = not sel_s
+            local clear_s = sel_s or 0
+            local clear_e = sel_e or (r.GetMediaItemInfo_Value(d.item, 'D_POSITION')
+                                      + r.GetMediaItemInfo_Value(d.item, 'D_LENGTH'))
             local guide = inst.kind == 'k5'
-                and ProKeysGuide(dl, sel_s, sel_e, inst_key == GEN_ALL_KEY) or nil
+                and ProKeysGuide(dl, sel_s, read_e, inst_key == GEN_ALL_KEY, pk_generated) or nil
+            local opts = { guide = guide, busy_drop = busy_drop,
+                           busy_ref   = inst.key ~= 'gtr' and dl == 'H' and refs.H or nil,
+                           rhythm_ref = inst.key ~= 'gtr' and dl == 'M' and refs.M or nil }
+            -- Pro Keys in a time selection. A tier with no notes outside the selection is
+            -- generated as a new one: its lane shifts are cleared over the whole item, as a
+            -- template's default C2-E3 marker must be (it was kept as "the window this tier
+            -- shows" and turned an A2-C4 song's Medium to C2-E3 - pojat_lemmikkih). A tier
+            -- with notes elsewhere keeps its markers outside the selection, and Medium/Easy
+            -- keep the window set before the selection.
+            if inst.kind == 'pk' then
+                opts.shifts = upper_shifts
+                if sel_s then
+                    local tier_shifts, tier_events = ReadPKTierEvents(d.track)
+                    local outside = false
+                    for _, ev in ipairs(tier_events) do
+                        if ev.s < sel_s - 0.001 or ev.s >= sel_e then outside = true; break end
+                    end
+                    if not outside then
+                        whole_take = true
+                        clear_s = 0
+                        clear_e = r.GetMediaItemInfo_Value(d.item, 'D_POSITION')
+                                  + r.GetMediaItemInfo_Value(d.item, 'D_LENGTH')
+                    elseif dl ~= 'H' then
+                        -- Medium/Easy have one window: the tier's first marker, wherever it
+                        -- is - the notes outside the selection are drawn in it, even when
+                        -- the selection covers the marker itself.
+                        local first = tier_shifts[1]
+                        for _, sh in ipairs(tier_shifts) do if sh.s < first.s then first = sh end end
+                        if first and GEN_PK_WINDOWS[first.pitch] then opts.window = first.pitch end
+                    end
+                end
+            end
+            -- Keys / Pro Keys Easy: the Hard events, so a lick Medium reduced on the "and"s
+            -- goes back to Hard's downbeats (GEN5_PARAMS.and_phrase). Hard from this run, or
+            -- read from its track when the run starts below it.
+            if dl == 'E' and (inst.kind == 'k5' or inst.kind == 'pk') then
+                local hard = tier_events.H
+                if not hard then
+                    local htrack = inst.kind == 'pk' and (job.tracks or {}).H or job.track
+                    if htrack then
+                        hard = ToPlannerEvents((ReadTier(inst, htrack, 'H', sel_s, read_e)), RangeLo(inst, 'H'),
+                                               inst.kind == 'pk')
+                    end
+                end
+                opts.and_source = hard
+            end
             Lap('read')
-            local out, log = Gen5PlanTier(inst.kind, dl, upper, {
-                guide = guide, busy_drop = busy_drop,
-                busy_ref   = inst.key ~= 'gtr' and dl == 'H' and refs.H or nil,
-                rhythm_ref = inst.key ~= 'gtr' and dl == 'M' and refs.M or nil })
+            local out, log
+            if inst.kind == 'pk' then
+                opts.pull_back = dl == 'H' and answers.pk_pull_back or nil
+                out, log = GenPKPlanTier(dl, upper, opts)
+                pk_generated[dl] = out
+            else
+                out, log = Gen5PlanTier(inst.kind, dl, upper, opts)
+            end
 
             local lo, notes = RangeLo(inst, dl), {}
             for _, ev in ipairs(out) do
@@ -521,46 +759,53 @@ function GenerateDifficulties(inst_key, tiers, force)
                 local e = r.TimeMap2_QNToTime(0, ev.qn_e)
                 for _, o in ipairs(ev.offs) do notes[#notes + 1] = { s = s, e = e, pitch = lo + o } end
             end
-            -- Guitar/Bass Hard: force-HOPO markers (lo + 5) where Expert hammered on and Hard
-            -- would not. They replace Hard's old ones, which belonged to the notes just
-            -- replaced. Force-strum markers (lo + 6) are left alone.
+            -- Markers written with the notes: Guitar/Bass Hard's force-HOPO markers (lo + 5)
+            -- where Expert hammered on and Hard would not - they replace Hard's old ones,
+            -- which belonged to the notes just replaced; force-strum markers (lo + 6) are left
+            -- alone. Pro Keys' lane-shift markers, inside the cleared range only.
             local hopo_spans, marks = {}, {}
-            local with_marks = inst.kind == 'gb' and dl == 'H'
-            if with_marks then
+            if inst.kind == 'gb' and dl == 'H' then
                 hopo_spans = Gen5ForceHopoSpans(out)
                 for _, sp in ipairs(hopo_spans) do
                     marks[#marks + 1] = { s = r.TimeMap2_QNToTime(0, sp.qn), e = r.TimeMap2_QNToTime(0, sp.qn_e),
                                           pitch = lo + 5 }
                 end
+            elseif inst.kind == 'pk' then
+                for _, sh in ipairs(log.shifts or {}) do
+                    local s = r.TimeMap2_QNToTime(0, sh.qn)
+                    if whole_take or (s >= clear_s - 0.001 and s < clear_e) then
+                        marks[#marks + 1] = { s = s, e = r.TimeMap2_QNToTime(0, sh.qn_e), pitch = sh.pitch }
+                    end
+                end
+            end
+            local all = notes
+            if #marks > 0 then
+                all = {}
+                for _, nt in ipairs(notes) do all[#all + 1] = nt end
+                for _, mk in ipairs(marks) do all[#all + 1] = mk end
             end
             Lap('plan')
-            local written_bulk = false
-            if WRITE_MODE == 'bulk' then
-                local all = notes
-                if with_marks then
-                    all = {}
-                    for _, nt in ipairs(notes) do all[#all + 1] = nt end
-                    for _, mk in ipairs(marks) do all[#all + 1] = mk end
-                end
-                written_bulk = ReplaceNotesBulk(job.take, clear_s, clear_e, lo, with_marks and lo + 5 or lo + 4, all, 100)
-            end
+            local ranges = TierRanges(inst, dl)
+            local written_bulk = WRITE_MODE == 'bulk'
+                and ReplaceNotesBulk(d.take, not whole_take and clear_s or nil, clear_e, ranges, all, 100)
             if not written_bulk then
-                if WRITE_MODE ~= 'per_note' then r.MIDI_DisableSort(job.take) end
-                ClearNotesInRange(job.take, clear_s, clear_e, lo, lo + 4)
-                InsertNotes(job.take, notes, 100)
-                if with_marks then
-                    ClearNotesInRange(job.take, clear_s, clear_e, lo + 5, lo + 5)
-                    if #marks > 0 then InsertNotes(job.take, marks, 100) end
+                if WRITE_MODE ~= 'per_note' then r.MIDI_DisableSort(d.take) end
+                for _, rg in ipairs(ranges) do
+                    ClearNotesInRange(d.take, whole_take and -math.huge or clear_s, whole_take and math.huge or clear_e,
+                                      rg[1], rg[2])
                 end
+                if #all > 0 then InsertNotes(d.take, all, 100) end
             end
             -- Sorted before anything reads the take back.
-            r.MIDI_Sort(job.take)
+            r.MIDI_Sort(d.take)
             Lap('write')
 
             -- Validate what was written, with Validate's own checks.
-            local written = ReadTier(inst, job.track, dl, sel_s, sel_e)
+            local written, written_shifts = ReadTier(inst, d.track, dl, sel_s, read_e)
             local errors, listed = 0, {}
-            for _, cat in ipairs(CheckTier(inst, job.track, dl, written, sel_s, sel_e)) do
+            local checks = CheckTier(inst, d.track, dl, written, sel_s, read_e,
+                                     { shifts = written_shifts, exp_events = job.exp_events })
+            for _, cat in ipairs(checks) do
                 if not cat.advisory then
                     for _, rec in ipairs(cat.issues) do
                         if not rec.advisory then
@@ -587,6 +832,32 @@ function GenerateDifficulties(inst_key, tiers, force)
                 100 * log.kept / math.max(1, log.upper),
                 log.guided and (', following PART REAL_KEYS_' .. dl) or '')
             if #parts > 0 then lines[#lines + 1] = '    ' .. table.concat(parts, ', ') end
+            -- The "Hard equals Expert" question: what was asked, what the user chose, what
+            -- was done.
+            if inst.kind == 'pk' and dl == 'H' and answers.pk_pull_back ~= nil then
+                lines[#lines + 1] = '    Hard would have been an exact copy of Expert (Expert is already simple).'
+                if answers.pk_pull_back then
+                    lines[#lines + 1] = ('    You chose to shorten sustains: %d pulled back%s.'):format(log.pulled or 0,
+                        (log.pull_cut or 0) > 0 and (', %d of them to a 1/16 note'):format(log.pull_cut) or '')
+                else
+                    lines[#lines + 1] = '    You chose to keep it as Expert (Validate lists this as an advisory).'
+                end
+            end
+            if inst.kind == 'pk' then
+                if dl == 'H' and log.shift_added then
+                    lines[#lines + 1] = ('    %s has no lane shift: added one before the first note (%s)'):format(
+                        DIFF_NAMES[UPPER[dl]], PK_WINDOW_NAMES[log.shifts[1].pitch] or '?')
+                elseif dl == 'H' then
+                    lines[#lines + 1] = ('    %d lane shift%s kept from %s%s'):format(#(log.shifts or {}),
+                        #(log.shifts or {}) == 1 and '' or 's', DIFF_NAMES[UPPER[dl]],
+                        log.shifts_dropped > 0 and (', %d no longer needed and left out'):format(log.shifts_dropped) or '')
+                elseif log.window then
+                    lines[#lines + 1] = ('    one range for the whole tier: %s%s%s'):format(PK_WINDOW_NAMES[log.window] or '?',
+                        opts.window and ' (the range this tier already shows)' or '',
+                        log.folded > 0 and (', %d note%s moved by octaves to fit'):format(
+                            log.folded, log.folded == 1 and '' or 's') or '')
+                end
+            end
             if dl == 'H' then
                 local why = log.busy_auto
                     and ('Auto: song starts at %.0f BPM, %s %d'):format(log.first_bpm or 0,
@@ -601,7 +872,24 @@ function GenerateDifficulties(inst_key, tiers, force)
                     lines[#lines + 1] = ('    %d busy bar%s in the same rhythm as Guitar: dropped the same notes'):format(
                         log.busy_followed, log.busy_followed == 1 and '' or 's')
                 end
-            elseif dl == 'M' then
+            end
+            -- Phrases reduced on the "and" grid (Medium) and the downbeats Easy took back.
+            if log.and_phrases and #log.and_phrases > 0 then
+                local bars = {}
+                for _, sp in ipairs(log.and_phrases) do
+                    local a, b = MeasureAt(sp.qn_s), MeasureAt(sp.qn_e)
+                    if a then for m = a, b or a do bars[#bars + 1] = m end end
+                end
+                local n = #log.and_phrases
+                if dl == 'M' then
+                    lines[#lines + 1] = ('    %d phrase%s starting on an "and" reduced on the "and"s, so the line keeps moving (%s)'):format(
+                        n, n == 1 and '' or 's', MeasureRanges(bars))
+                elseif dl == 'E' then
+                    lines[#lines + 1] = ("    in %d such phrase%s Easy keeps Hard's downbeats (%s)"):format(
+                        n, n == 1 and '' or 's', MeasureRanges(bars))
+                end
+            end
+            if dl == 'M' then
                 if (log.filled or 0) > 0 then
                     lines[#lines + 1] = ('    %d note%s kept so busy bars keep a note per beat'):format(
                         log.filled, log.filled == 1 and '' or 's')
@@ -618,15 +906,22 @@ function GenerateDifficulties(inst_key, tiers, force)
                 lines[#lines + 1] = ('      ... and %d more (run Validate for the full list)'):format(errors - #listed)
             end
 
-            upper = out   -- the next tier is built from this one
+            upper, upper_shifts = out, log.shifts   -- the next tier is built from this one
+            tier_events[dl] = out
         end
-        local replaced = {}
-        for _, dl in ipairs(tiers) do
-            local lo = RangeLo(inst, dl)
-            -- Guitar/Bass Hard also replaces its force-HOPO markers (lo + 5).
-            replaced[#replaced + 1] = { lo, (inst.kind == 'gb' and dl == 'H') and lo + 5 or lo + 4 }
+        -- Zero-length notes REAPER dropped from each take this job wrote, outside the
+        -- tiers the job regenerated.
+        for _, d in ipairs(takes) do
+            local replaced_ranges = {}
+            for _, dl in ipairs(tiers) do
+                if job.dest[dl].take == d.take then
+                    for _, rg in ipairs(TierRanges(inst, dl)) do replaced_ranges[#replaced_ranges + 1] = rg end
+                end
+            end
+            for _, l in ipairs(RemovedZeroLengthLines(d.take, zero_before[d.take], replaced_ranges)) do
+                lines[#lines + 1] = l
+            end
         end
-        for _, l in ipairs(RemovedZeroLengthLines(job.take, zero_before, replaced)) do lines[#lines + 1] = l end
         lines[#lines + 1] = ''
         Lap('validate')
     end

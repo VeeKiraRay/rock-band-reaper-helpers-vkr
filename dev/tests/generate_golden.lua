@@ -195,12 +195,15 @@ for _, name in ipairs(files) do
                 if #upper == 0 then
                     r.ShowConsoleMsg(('  SKIP  %s: no Expert notes\n'):format(part.label))
                 else
+                    local hard   -- this chain's Hard: Easy's "and" phrases look at it
                     for _, dl in ipairs({ 'H', 'M', 'E' }) do
                         local guide = part.kind == 'k5' and ProKeysGuide(song, dl) or nil
                         local follower = part.track ~= 'PART GUITAR'
                         local gen = Gen5PlanTier(part.kind, dl, upper, { guide = guide,
                             busy_ref   = follower and dl == 'H' and refs.H or nil,
-                            rhythm_ref = follower and dl == 'M' and refs.M or nil })
+                            rhythm_ref = follower and dl == 'M' and refs.M or nil,
+                            and_source = dl == 'E' and hard or nil })
+                        if dl == 'H' then hard = gen end
                         local want = SmfTierEvents(trk, LO[dl], song.tpqn, timing)
                         Test.it(('%s %s'):format(part.label, ({ H = 'Hard', M = 'Medium', E = 'Easy' })[dl]), function()
                             local c, lines = Compare(gen, want, song, timing)

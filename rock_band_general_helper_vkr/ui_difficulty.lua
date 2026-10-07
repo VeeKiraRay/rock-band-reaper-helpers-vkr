@@ -358,10 +358,24 @@ function DrawDifficultyTab(ctx)
             confirm_label = S.diff_copy_pending.confirm_label or confirm_label
         end
         r.ImGui_Spacing(ctx)
+        -- The pending entry is cleared BEFORE its callback runs: a callback may ask the
+        -- next question (Generate: overwrite, then "Hard equals Expert"), and clearing
+        -- afterwards would drop it.
+        local pending = S.diff_copy_pending
         if Btn(confirm_label .. '##confirm_overwrite', BTN_H) then
-            if S.diff_copy_pending then RunAction(S.diff_copy_pending.on_confirm) end
             S.diff_copy_pending = nil
             r.ImGui_CloseCurrentPopup(ctx)
+            if pending then RunAction(pending.on_confirm) end
+        end
+        -- Optional second answer (alt_label / on_alt): a question where both answers
+        -- go ahead, with Cancel still stopping everything.
+        if pending and pending.alt_label then
+            r.ImGui_SameLine(ctx)
+            if Btn(pending.alt_label .. '##alt_overwrite', BTN_H) then
+                S.diff_copy_pending = nil
+                r.ImGui_CloseCurrentPopup(ctx)
+                RunAction(pending.on_alt)
+            end
         end
         r.ImGui_SameLine(ctx)
         if Btn('Cancel', BTN_H) then

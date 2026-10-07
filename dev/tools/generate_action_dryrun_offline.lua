@@ -4,9 +4,10 @@
 --   lua dev/tools/generate_action_dryrun_offline.lua
 --       the test fixtures (verbose) + every 6th development song of the RB3 DLC corpus
 --       (summary: runs that leave Validate errors)
---   lua dev/tools/generate_action_dryrun_offline.lua <song.mid> [gtr|bass|keys] [from_qn to_qn]
+--   lua dev/tools/generate_action_dryrun_offline.lua <song.mid> [gtr|bass|keys|pk|all] [from_qn to_qn]
 --       one song, one part (default gtr): the result text, then X/H/M/E for the range
---       (default: 16 QN from the first Expert note)
+--       (default: 16 QN from the first Expert note). 'all' runs All instruments (Pro Keys
+--       first, then Keys following it) and dumps Pro Keys and Keys.
 --
 -- A minimal REAPER stand-in: InsertMedia parses the file with dev/tools/smf_reader.lua
 -- into in-memory tracks, the project tempo map is the file's own, and notes can be read,
@@ -81,7 +82,14 @@ local api = {
     GetTrackMediaItem = function(tr) return tr end,
     GetActiveTake = function(item) return item end,
     TakeIsMIDI = function() return true end,
-    GetMediaItemInfo_Value = function(_, k) return k == 'D_LENGTH' and 100000 or 0 end,
+    -- The item ends at its last event, as an imported MIDI item does in REAPER: a
+    -- zero-length chord at the end of a track sits exactly ON the item's end.
+    GetMediaItemInfo_Value = function(item, k)
+        if k ~= 'D_LENGTH' then return 0 end
+        local last = 0
+        for _, n in ipairs(item.notes or {}) do last = math.max(last, n.tick + n.len) end
+        return QNToTime(last / (item.tpqn or 480))
+    end,
     MIDI_CountEvts = function(take) return true, #take.notes, 0, 0 end,
     MIDI_GetNote = function(take, j)
         local n = take.notes[j + 1]
@@ -144,6 +152,11 @@ local api = {
                     end
                 end
             end
+        end
+        -- A note-on never closed stays a (zero-length) note, as in REAPER: a stale one left
+        -- in the buffer shows up as a duplicate of the note written over it.
+        for _, q in pairs(open) do
+            for _, on in ipairs(q) do on.len = 0; notes[#notes + 1] = on end
         end
         table.sort(notes, function(a, b) return a.tick < b.tick end)
         take.notes = notes
@@ -220,9 +233,12 @@ for _, f in ipairs({
     _root .. 'lib/reaper_guitar_theory.lua', _root .. 'lib/reaper_difficulty_score.lua',
     _root .. 'lib/reaper_difficulty_score_vocals.lua',
     M .. 'defaults.lua', M .. 'helpers.lua', M .. 'actions_guitar.lua', M .. 'actions_guitar_validate.lua',
-    M .. 'actions_difficulty_shared.lua', M .. 'actions_difficulty_5k.lua', M .. 'actions_difficulty_gtrbass.lua',
-    M .. 'difficulty_generate_retime.lua', M .. 'difficulty_generate_colors.lua',
-    M .. 'difficulty_generate_5lane.lua', M .. 'difficulty_generate_hopo.lua', M .. 'actions_difficulty_generate.lua', M .. 'difficulty_read.lua',
+    M .. 'actions_difficulty_shared.lua', M .. 'actions_difficulty.lua', M .. 'actions_difficulty_5k.lua',
+    M .. 'actions_difficulty_gtrbass.lua',
+    M .. 'difficulty_generate_params.lua', M .. 'difficulty_generate_retime.lua',
+    M .. 'difficulty_generate_colors.lua', M .. 'difficulty_generate_rhythm.lua',
+    M .. 'difficulty_generate_5lane.lua', M .. 'difficulty_generate_prokeys.lua',
+    M .. 'difficulty_generate_hopo.lua', M .. 'actions_difficulty_generate.lua', M .. 'difficulty_read.lua',
     _root .. 'dev/calibration/difficulty_holdout.lua',
 }) do dofile(f) end
 
@@ -230,20 +246,60 @@ local PARTS = {
     gtr  = { field = 'diff_gtr_idx',  track = 'PART GUITAR', read = ReadGBTierEvents, range = GB_RANGE },
     bass = { field = 'diff_bass_idx', track = 'PART BASS',   read = ReadGBTierEvents, range = GB_RANGE },
     keys = { field = 'diff_5k_idx',   track = 'PART KEYS',   read = ReadK5TierEvents, range = K5_RANGE },
+    -- A track per tier; the dump reads each tier's own track.
+    pk   = { field = 'diff_pk_x_idx', track = 'PART REAL_KEYS_X', pk = true },
 }
+local PK_FIELDS = { X = 'diff_pk_x_idx', H = 'diff_pk_h_idx', M = 'diff_pk_m_idx', E = 'diff_pk_e_idx' }
 
--- Load a song and generate one part H>M>E. Returns the track (nil if the part is absent).
+-- Load a song and generate one part (or 'all') H>M>E. Returns the part's track (nil if
+-- the part is absent).
 local function Run(path, key)
     P.tracks = {}
     reaper.InsertMedia(path)
-    local part = PARTS[key]
+    local part = PARTS[key == 'all' and 'pk' or key]
     S.diff_gtr_idx, S.diff_bass_idx, S.diff_5k_idx = -1, -1, -1
-    for i, tr in ipairs(P.tracks) do if tr.name == part.track then S[part.field] = i - 1 end end
+    for _, f in pairs(PK_FIELDS) do S[f] = -1 end
+    for i, tr in ipairs(P.tracks) do
+        for k, pt in pairs(PARTS) do if tr.name == pt.track then S[pt.field] = i - 1 end end
+        for dl, f in pairs(PK_FIELDS) do if tr.name == 'PART REAL_KEYS_' .. dl then S[f] = i - 1 end end
+    end
     if S[part.field] < 0 then return nil end
     S.diff_copy_pending = nil
-    local ok, err = pcall(GenerateDifficulties, key, { 'H', 'M', 'E' }, true)
+    local ok, err = pcall(GenerateDifficulties, key == 'all' and GEN_ALL_KEY or key, { 'H', 'M', 'E' }, true)
+    -- A question after the overwrite one (Pro Keys Hard equal to Expert): take the
+    -- second answer, "Keep as Expert", so the run writes what the planner made.
+    local pending = S.diff_copy_pending
+    if ok and pending and pending.on_alt then
+        S.diff_copy_pending = nil
+        ok, err = pcall(pending.on_alt)
+    end
     if not ok then S.status, S.last_result = 'ERROR ' .. tostring(err), nil end
     return reaper.GetTrack(0, S[part.field])
+end
+
+-- Pro Keys: each tier's own track, pitch names, lane shifts as [marker].
+local function DumpProKeys(q0, q1)
+    for _, dl in ipairs({ 'X', 'H', 'M', 'E' }) do
+        local tr = S[PK_FIELDS[dl]] >= 0 and reaper.GetTrack(0, S[PK_FIELDS[dl]])
+        local cells = {}
+        if tr then
+            local shifts, events = ReadPKTierEvents(tr)
+            for _, sh in ipairs(shifts) do
+                local qn = reaper.TimeMap2_timeToQN(0, sh.s)
+                if qn < q1 then cells[#cells + 1] = ('%g:[%d]'):format(qn, sh.pitch) end
+            end
+            for _, ev in ipairs(events) do
+                local qn = reaper.TimeMap2_timeToQN(0, ev.s)
+                if qn >= q0 and qn < q1 then
+                    local ps = {}
+                    for _, p in ipairs(ev.pitches) do ps[#ps + 1] = PitchName(p) end
+                    local len = reaper.TimeMap2_timeToQN(0, ev.e) - qn
+                    cells[#cells + 1] = ('%g:%s%s'):format(qn, table.concat(ps, '+'), len >= 0.49 and '~' or '')
+                end
+            end
+        end
+        print('  ' .. dl, table.concat(cells, ' '))
+    end
 end
 
 local COLORS = { [0] = 'G', 'R', 'Y', 'B', 'O' }
@@ -267,15 +323,25 @@ end
 if arg[1] then
     local key = arg[2] or 'gtr'
     local track = Run(arg[1], key)
-    if not track then print(('no %s track in %s'):format(PARTS[key].track, arg[1])); return end
+    local part = PARTS[key == 'all' and 'pk' or key]
+    if not track then print(('no %s track in %s'):format(part.track, arg[1])); return end
     print(S.status)
     print(S.last_result or '')
     local q0 = tonumber(arg[3])
     if not q0 then
-        local x = PARTS[key].read(track, 'X')
+        local x = part.pk and select(2, ReadPKTierEvents(track)) or part.read(track, 'X')
         q0 = x[1] and math.floor(reaper.TimeMap2_timeToQN(0, x[1].s)) or 0
     end
-    DumpTiers(track, key, q0, tonumber(arg[4]) or (q0 + 16))
+    local q1 = tonumber(arg[4]) or (q0 + 16)
+    if part.pk then
+        DumpProKeys(q0, q1)
+        if key == 'all' and S.diff_5k_idx >= 0 then
+            print('  Keys:')
+            DumpTiers(reaper.GetTrack(0, S.diff_5k_idx), 'keys', q0, q1)
+        end
+    else
+        DumpTiers(track, key, q0, q1)
+    end
 else
     for _, f in ipairs({ { 'rb_guitar.mid', 'gtr' }, { 'rb_bass.mid', 'bass' }, { 'rb_keys.mid', 'keys' } }) do
         Run(_root .. 'dev/tests/midi/' .. f[1], f[2])
@@ -286,7 +352,7 @@ else
     for i, path in ipairs(files) do
         local name = SmfShortname(path)
         if i % 6 == 0 and not name:find('%(') and not DiffIsHeldOut(name) then
-            for _, key in ipairs({ 'gtr', 'bass', 'keys' }) do
+            for _, key in ipairs({ 'gtr', 'bass', 'keys', 'pk' }) do
                 if Run(path, key) then
                     n = n + 1
                     if not S.status:find('no Validate errors', 1, true) then

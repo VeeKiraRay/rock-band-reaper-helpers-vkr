@@ -61,6 +61,42 @@ function SmfSongTiming(song)
     return timing
 end
 
+-- One Pro Keys tier track (PART REAL_KEYS_X/H/M/E): playable events with real pitches in
+-- offs (48-72, the shape difficulty_generate_prokeys.lua takes), and the lane-shift
+-- markers { qn, qn_e, pitch } (pitches 0-9). Returns (events, shifts).
+function SmfProKeysEvents(trk, tpqn, timing, opts)
+    opts = opts or {}
+    local events, tol = {}, tpqn / 96
+    local notes = {}
+    for _, n in ipairs(SmfNotesInRange(trk, 48, 72)) do
+        if not (opts.skip_zero and n.len <= 0) then notes[#notes + 1] = n end
+    end
+    local i = 1
+    while i <= #notes do
+        local n0 = notes[i]
+        local ev = { tick = n0.tick, qn = n0.tick / tpqn, qn_e = (n0.tick + n0.len) / tpqn, offs = { n0.pitch } }
+        local j = i + 1
+        while j <= #notes and notes[j].tick - n0.tick <= tol do
+            ev.offs[#ev.offs + 1] = notes[j].pitch
+            ev.qn_e = math.max(ev.qn_e, (notes[j].tick + notes[j].len) / tpqn)
+            j = j + 1
+        end
+        table.sort(ev.offs)
+        ev.bpm = timing.Bpm(n0.tick)
+        ev.bar_qn, ev.down = timing.BarPos(n0.tick)
+        ev.bar_len = timing.BarLen(n0.tick)
+        events[#events + 1] = ev
+        i = j
+    end
+    local shifts, marker = {}, { [0] = true, [2] = true, [4] = true, [5] = true, [7] = true, [9] = true }
+    for _, n in ipairs(SmfNotesInRange(trk, 0, 9)) do
+        if marker[n.pitch] then
+            shifts[#shifts + 1] = { qn = n.tick / tpqn, qn_e = (n.tick + n.len) / tpqn, pitch = n.pitch }
+        end
+    end
+    return events, shifts
+end
+
 -- One tier's gem events: notes in [lo, lo + 4], grouped into chords by shared onset.
 -- opts.skip_zero: drop zero-length notes, as the REAPER action does (REAPER deletes them
 -- from a take on the next edit, so Generate never builds from them).

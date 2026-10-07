@@ -12,7 +12,7 @@ function DrawDifficultyGenerateTab(ctx, midi_tracks)
         .. 'with the same rules Validate uses.')
 
     SectionHeader('Instrument')
-    local lbl_col = LabelColWidth({ 'Instrument', 'Track', 'Hard 8th runs' })
+    local lbl_col = LabelColWidth({ 'Instrument', 'Track', 'Expert track', 'Medium track', 'Hard 8th runs' })
 
     local cur_key  = S.diff_gen_instrument
     local cur_inst = GenInstrumentByKey(cur_key)
@@ -35,7 +35,19 @@ function DrawDifficultyGenerateTab(ctx, midi_tracks)
     -- Re-read after the combo: a pick this frame should show its own track row now.
     cur_inst = GenInstrumentByKey(S.diff_gen_instrument)
     local no_track = false
-    if cur_inst then
+    if cur_inst and cur_inst.tier_fields then
+        -- Pro Keys: a track per tier, the same selection as the Pro Keys sub-tab.
+        for _, row in ipairs({ { 'X', 'Expert track' }, { 'H', 'Hard track' },
+                               { 'M', 'Medium track' }, { 'E', 'Easy track' } }) do
+            local field = cur_inst.tier_fields[row[1]]
+            r.ImGui_Text(ctx, row[2])
+            r.ImGui_SameLine(ctx, lbl_col)
+            r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
+            S[field] = TrackCombo('##diff_gen_pk_' .. row[1], S[field], midi_tracks)
+            Tooltip(TIPS.diff_gen_track)
+        end
+        no_track = S[cur_inst.tier_fields.X] < 0
+    elseif cur_inst then
         r.ImGui_Text(ctx, 'Track')
         r.ImGui_SameLine(ctx, lbl_col)
         r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
@@ -44,8 +56,9 @@ function DrawDifficultyGenerateTab(ctx, midi_tracks)
         no_track = S[cur_inst.idx_field] < 0
     else
         r.ImGui_TextWrapped(ctx,
-            'Uses each instrument\'s default track (PART GUITAR, PART BASS, PART KEYS) and '
-            .. 'skips any that is missing or muted.')
+            'Uses each instrument\'s default track (PART GUITAR, PART BASS, PART REAL_KEYS_X/H/M/E, '
+            .. 'PART KEYS) and skips any that is missing or muted. Pro Keys runs before Keys, '
+            .. 'and Keys follows the Pro Keys it just generated.')
     end
 
     -- One row of radios, so plain SameLine flow (RadioGroupWidth is for aligning

@@ -26,9 +26,12 @@ dofile(_root .. 'dev/tools/smf_chart_events.lua')
 dofile(M .. 'actions_difficulty_shared.lua')
 dofile(M .. 'actions_difficulty_gtrbass.lua')
 dofile(M .. 'actions_difficulty_5k.lua')
+dofile(M .. 'difficulty_generate_params.lua')
 dofile(M .. 'difficulty_generate_retime.lua')
 dofile(M .. 'difficulty_generate_colors.lua')
+dofile(M .. 'difficulty_generate_rhythm.lua')
 dofile(M .. 'difficulty_generate_5lane.lua')
+dofile(M .. 'difficulty_generate_prokeys.lua')
 dofile(M .. 'difficulty_generate_hopo.lua')
 
 local PARTS = {

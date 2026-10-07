@@ -428,6 +428,29 @@ for _, case in ipairs({
     end)
 end
 
+Test.it('GenerateDifficulties pk H>M>E: a track per tier, one range on Medium/Easy, no Validate errors', function()
+    reset()
+    local base, n = LoadFixture('rb_pro_keys.mid')
+    Test.expect(n > 0, 'rb_pro_keys.mid created no tracks')
+    local fields = { X = 'diff_pk_x_idx', H = 'diff_pk_h_idx', M = 'diff_pk_m_idx', E = 'diff_pk_e_idx' }
+    for dl, f in pairs(fields) do S[f] = FindFixtureTrack('REAL_KEYS_' .. dl, base) or -1 end
+    Test.expect(S.diff_pk_x_idx >= 0 and S.diff_pk_e_idx >= 0, 'rb_pro_keys.mid: a PART REAL_KEYS_ track is missing')
+    GenerateDifficulties('pk', { 'H', 'M', 'E' }, true)  -- force: skip the overwrite popup
+    local counts, shifts = {}, {}
+    for dl, f in pairs(fields) do
+        local sh, evs = ReadPKTierEvents(r.GetTrack(0, S[f]))
+        counts[dl], shifts[dl] = #evs, #sh
+    end
+    CleanupFixture(base)
+    local detail = ('X=%d H=%d M=%d E=%d, shifts H=%d M=%d E=%d | %s\n%s'):format(counts.X, counts.H, counts.M,
+        counts.E, shifts.H, shifts.M, shifts.E, tostring(S.status), tostring(S.last_result))
+    Test.expect(S.status:find('no Validate errors', 1, true) ~= nil, 'expected no Validate errors: ' .. detail)
+    Test.expect(counts.H > 0 and counts.H <= counts.X, 'Hard empty or above Expert: ' .. detail)
+    Test.expect(counts.M > 0 and counts.M < counts.H, 'Medium not below Hard: ' .. detail)
+    Test.expect(counts.E > 0 and counts.E <= counts.M, 'Easy above Medium: ' .. detail)
+    Test.expect(shifts.H >= 1 and shifts.M == 1 and shifts.E == 1, 'lane shifts: ' .. detail)
+end)
+
 Test.it('GenerateDifficulties: one undo restores the generated tiers', function()
     reset()
     local base, n = LoadFixture('rb_guitar.mid')

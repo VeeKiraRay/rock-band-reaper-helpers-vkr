@@ -1195,3 +1195,222 @@ Test.it('sustain release gaps: Hard 1/8, Medium dotted 8th / 1/4 fast, Easy 1/4 
             ('%s at %d BPM: sustain ends at %.3f, expected %.3f'):format(dl, bpm, got, want))
     end
 end)
+
+----------------------------------------------------------------------
+-- Difficulty > Generate: the Pro Keys planner (difficulty_generate_prokeys.lua)
+----------------------------------------------------------------------
+Test.section('Generate planner - Pro Keys')
+
+local function Pitches(ev) return table.concat(ev.offs, ',') end
+
+Test.it('chords lose notes from the bottom: the top note stays', function()
+    local cases = {
+        { { 48, 52, 55, 60 }, 'H', '52,55,60' },
+        { { 48, 52, 55, 60 }, 'M', '55,60' },
+        { { 48, 52, 55, 60 }, 'E', '60' },
+        { { 48, 60, 64 },     'H', '60,64' },     -- 48 is 16 below the top: past Hard's 11
+        { { 55, 67 },         'M', '67' },        -- an octave is past Medium's 9
+    }
+    for _, c in ipairs(cases) do
+        local got = table.concat(GenPKReduceChord(c[1], c[2]), ',')
+        Test.expect(got == c[3], ('%s of %s: got %s, expected %s'):format(c[2], table.concat(c[1], ','), got, c[3]))
+    end
+end)
+
+Test.it('Pro Keys keeps the same onsets as Keys for the same rhythm', function()
+    -- The one-rhythm rule: pitches never decide which onsets survive.
+    local pk, k5 = {}, {}
+    for b = 0, 3 do
+        for k = 0, 15 do
+            local qn = b * 4 + k * 0.25
+            pk[#pk + 1] = Ev(qn, 0.2, { 48 + (k * 5) % 24 }, 120, b * 4)
+            k5[#k5 + 1] = Ev(qn, 0.2, { k % 5 }, 120, b * 4)
+        end
+    end
+    local function Pos(out) local p = {} for _, ev in ipairs(out) do p[#p + 1] = ('%.3f'):format(ev.qn) end return table.concat(p, ' ') end
+    local ph, kh = GenPKPlanTier('H', pk), Gen5PlanTier('k5', 'H', k5)
+    Test.expect(Pos(ph) == Pos(kh), 'Hard: Pro Keys ' .. Pos(ph) .. ' / Keys ' .. Pos(kh))
+    local pm, km = GenPKPlanTier('M', ph), Gen5PlanTier('k5', 'M', kh)
+    Test.expect(Pos(pm) == Pos(km), 'Medium: Pro Keys ' .. Pos(pm) .. ' / Keys ' .. Pos(km))
+end)
+
+Test.it('Medium shows one window: the best fit, notes outside move by an octave', function()
+    -- Half notes C2 E2 G2 C3 E3 G3 C4: C2-E3 (48-64) and E2-G3 (52-67) hold five of the
+    -- seven each; C wins the tie. The upper tier shows two windows (A, then F), so none of
+    -- its own is simply kept.
+    local events = {}
+    for k, p in ipairs({ 48, 52, 55, 60, 64, 67, 72 }) do
+        local qn = (k - 1) * 2
+        events[#events + 1] = Ev(qn, 0.2, { p }, 120, math.floor(qn / 4) * 4)
+    end
+    local out, log = GenPKPlanTier('M', events, { shifts = { { qn = 0, qn_e = 0.25, pitch = 9 },
+                                                             { qn = 4, qn_e = 4.25, pitch = 5 } } })
+    Test.expect(log.window == 0, 'window ' .. tostring(log.window) .. ', expected 0 (C2-E3)')
+    Test.expect(#log.shifts == 1 and log.shifts[1].pitch == 0 and log.shifts[1].qn == 0,
+        'expected one C2-E3 marker at the upper marker position')
+    local got = {}
+    for _, ev in ipairs(out) do got[#got + 1] = Pitches(ev) end
+    -- G3 (67) folds to G2 (55), C4 (72) to C3 (60): the octave that fits, nothing else moves.
+    Test.expect(table.concat(got, ' ') == '48 52 55 60 64 55 60', 'got ' .. table.concat(got, ' '))
+    Test.expect(log.folded == 2, 'folded ' .. log.folded .. ', expected 2')
+end)
+
+Test.it('Medium keeps the upper tier\'s single window, preferred or not', function()
+    -- Notes F2 and C3 fit C, D, E and F alike. An upper tier showing A2-C4 all song keeps
+    -- it (the C3 fits, the F2 folds up to F3); one showing D2-F3 keeps D2-F3 too.
+    local events = { Ev(0, 0.2, { 53 }, 120, 0), Ev(2, 0.2, { 60 }, 120, 0) }
+    local out, log = GenPKPlanTier('M', events, { shifts = { { qn = 0, qn_e = 0.25, pitch = 9 } } })
+    Test.expect(log.window == 9, 'A upper: window ' .. tostring(log.window) .. ', expected 9')
+    Test.expect(Pitches(out[1]) == '65' and Pitches(out[2]) == '60', 'A upper: got ' .. Pitches(out[1]) .. ' ' .. Pitches(out[2]))
+    local _, log2 = GenPKPlanTier('M', events, { shifts = { { qn = 0, qn_e = 0.25, pitch = 2 } } })
+    Test.expect(log2.window == 2, 'D upper: window ' .. tostring(log2.window) .. ', expected 2')
+end)
+
+Test.it('a note that fits the window never moves, so the same note always lands on the same key', function()
+    -- pojat_lemmikkih: D3 F3 C3 D3 in C2-E3. F3 is outside and folds to F2; the D3s and the
+    -- C3 fit and stay - choosing the octave nearest the previous note moved them down
+    -- after F2 but not the first D3.
+    local events = {}
+    for k, p in ipairs({ 62, 65, 60, 62 }) do
+        local qn = (k - 1) * 2
+        events[#events + 1] = Ev(qn, 0.2, { p }, 120, math.floor(qn / 4) * 4)
+    end
+    local out = GenPKPlanTier('M', events, { window = 0 })
+    local got = {}
+    for _, ev in ipairs(out) do got[#got + 1] = Pitches(ev) end
+    Test.expect(table.concat(got, ' ') == '62 53 60 62', 'got ' .. table.concat(got, ' '))
+end)
+
+Test.it('Hard keeps the lane shifts it needs and drops the rest', function()
+    -- C range from 0, F range at 8 (notes up to A3 = 69 follow), C range again at 16 with
+    -- notes inside C2-E3, then a repeat of C at 24.
+    local events = {
+        Ev(1, 0.2, { 50 }, 120, 0), Ev(9, 0.2, { 69 }, 120, 8), Ev(17, 0.2, { 52 }, 120, 16), Ev(25, 0.2, { 55 }, 120, 24),
+    }
+    local shifts = { { qn = 0, qn_e = 0.25, pitch = 0 }, { qn = 8, qn_e = 8.25, pitch = 5 },
+                     { qn = 16, qn_e = 16.25, pitch = 0 }, { qn = 24, qn_e = 24.25, pitch = 0 } }
+    local _, log = GenPKPlanTier('H', events, { shifts = shifts })
+    local got = {}
+    for _, sh in ipairs(log.shifts) do got[#got + 1] = ('%g:%d'):format(sh.qn, sh.pitch) end
+    -- The F shift is needed (A3 = 69 is past E3), and so is the C shift at 16 (E2 = 52 is
+    -- under F2 = 53). The repeat of C at 24 shows nothing new and is dropped.
+    Test.expect(table.concat(got, ' ') == '0:0 8:5 16:0', 'kept ' .. table.concat(got, ' '))
+    Test.expect(log.shifts_dropped == 1, 'dropped ' .. log.shifts_dropped .. ', expected 1')
+end)
+
+Test.it('sustains: Medium leaves a quarter, a stub under 3/16 becomes a 1/16 note', function()
+    -- Held from 0 for 3 QN, next note at 2: Medium ends it at 1.0. Held from 4, next at 5.5:
+    -- the quarter gap leaves 0.5 QN, under 3/16 (0.75), so it becomes 0.25. (The note at
+    -- 6.5 keeps 5.5 from being an isolated off-beat, which Medium's fallback would drop.)
+    local events = { Ev(0, 3, { 60 }, 120, 0), Ev(2, 0.2, { 62 }, 120, 0),
+                     Ev(4, 3, { 60 }, 120, 4), Ev(5.5, 0.2, { 62 }, 120, 4), Ev(6.5, 0.2, { 64 }, 120, 4) }
+    local out = GenPKPlanTier('M', events)
+    Test.expect(#out == 5, 'kept ' .. #out .. ' of 5')
+    Test.expect(math.abs(out[1].qn_e - 1.0) < 1e-6, ('first sustain ends at %.3f, expected 1.000'):format(out[1].qn_e))
+    Test.expect(math.abs(out[3].qn_e - 4.25) < 1e-6, ('stub ends at %.3f, expected 4.250'):format(out[3].qn_e))
+end)
+
+Test.it('Keys following Pro Keys keeps one onset per Pro Keys onset', function()
+    -- A 32nd grace note before each beat on Keys; Pro Keys has only the beats. Both Keys
+    -- notes sit within 1/32 of the beat; only the beat itself follows it.
+    local keys, guide = {}, {}
+    for b = 0, 3 do
+        keys[#keys + 1] = Ev(b - 0.125, 0.1, { 0 }, 120, 0)
+        keys[#keys + 1] = Ev(b, 0.2, { 1 }, 120, 0)
+        guide[#guide + 1] = { qn = b, qn_e = b + 0.2 }
+    end
+    table.remove(keys, 1)   -- no grace note before the song's first beat
+    local out = Gen5PlanTier('k5', 'H', keys, { guide = guide })
+    local p = {}
+    for _, ev in ipairs(out) do p[#p + 1] = ('%g'):format(ev.qn) end
+    Test.expect(table.concat(p, ' ') == '0 1 2 3', 'kept ' .. table.concat(p, ' '))
+end)
+
+Test.it('Hard that equals Expert is detected, and pull_back shortens every sustain by a 1/16 or a 1/8', function()
+    -- Single notes every half note, each held a quarter: Hard keeps them as they are.
+    -- Pulled back, each loses a 1/16 (simple single -> single; the last at a phrase end)
+    -- and stays a 3/16 sustain. A chord held a quarter before a different chord (complex)
+    -- loses a 1/8, and as a 1/8 tail - under 3/16, "stubby" - becomes a 1/16 note.
+    local events = {}
+    for k = 0, 3 do events[#events + 1] = Ev(k * 2, 1.0, { 60 + k }, 100, math.floor(k / 2) * 4) end
+    local out = GenPKPlanTier('H', events)
+    Test.expect(GenPKSameAsUpper(out, events), 'Hard should equal Expert')
+    local pulled, log = GenPKPlanTier('H', events, { pull_back = true })
+    Test.expect(not GenPKSameAsUpper(pulled, events), 'pull_back left Hard equal to Expert')
+    Test.expect(log.pulled == 4, 'pulled ' .. tostring(log.pulled) .. ', expected 4')
+    for i, ev in ipairs(pulled) do
+        Test.expect(math.abs((ev.qn_e - ev.qn) - 0.75) < 1e-6, ('note %d is %.3f QN, expected 0.75'):format(i, ev.qn_e - ev.qn))
+    end
+    local chords = { Ev(0, 1.0, { 60, 64 }, 100, 0), Ev(2, 0.2, { 62, 65 }, 100, 0) }
+    local c, clog = GenPKPlanTier('H', chords, { pull_back = true })
+    Test.expect(math.abs((c[1].qn_e - c[1].qn) - 0.25) < 1e-6 and clog.pull_cut == 1,
+        ('complex: %.3f QN, cut %s; expected a 1/16 note'):format(c[1].qn_e - c[1].qn, tostring(clog.pull_cut)))
+end)
+
+Test.it('progression: same notes with shorter sustains is a reduction; advisory never counts', function()
+    local function E(s, e, p) return { s = s, e = e, pitches = { p } } end
+    local upper = { E(0, 0.5, 60), E(1, 1.5, 62) }
+    local same  = { E(0, 0.5, 60), E(1, 1.5, 62) }
+    local short = { E(0, 0.3, 60), E(1, 1.5, 62) }
+    local block, extra = CheckDifficultyProgression('Hard', 'Expert', same, upper, 48, 48, 2, 2)
+    Test.expect(extra == 2 and block:find('NOT REDUCED', 1, true), 'copy: expected 2 issues, got ' .. extra)
+    block, extra = CheckDifficultyProgression('Hard', 'Expert', short, upper, 48, 48, 2, 2)
+    Test.expect(extra == 0 and block:find('only sustain lengths differ (1 sustain shorter)', 1, true),
+        'shorter sustain: expected no issue, got ' .. extra .. ': ' .. block)
+    block, extra = CheckDifficultyProgression('Hard', 'Expert', same, upper, 48, 48, 2, 2, { advisory = true })
+    Test.expect(extra == 0 and block:find('Advisory: Hard appears', 1, true), 'advisory: got ' .. extra .. ': ' .. block)
+end)
+
+----------------------------------------------------------------------
+-- Difficulty > Generate: a keys lick that starts on an "and" (GEN5_PARAMS.and_phrase)
+----------------------------------------------------------------------
+Test.section('Generate planner - "and" phrases')
+
+-- The korpiklaani_juo_viinaa lick as Hard has it, at 120 BPM: a pickup on the and of 4,
+-- then three bars of straight 8ths whose beats repeat a note (B B C C) and whose "and"s
+-- move (B G C A). beats / ands: the notes on beats 1-4 and on their "and"s, as offs.
+local function Lick(beats, ands)
+    local events = { Ev(3.5, 0.2, { ands[4] }, 120, 0) }
+    for b = 1, 3 do
+        for k = 0, 3 do
+            events[#events + 1] = Ev(b * 4 + k, 0.2, { beats[k + 1] }, 120, b * 4)
+            events[#events + 1] = Ev(b * 4 + k + 0.5, 0.2, { ands[k + 1] }, 120, b * 4)
+        end
+    end
+    return events
+end
+local function Positions(out)
+    local p = {}
+    for _, ev in ipairs(out) do p[#p + 1] = ('%g'):format(ev.qn) end
+    return table.concat(p, ' ')
+end
+local AND_LINE = '3.5 4.5 5.5 6.5 7.5 8.5 9.5 10.5 11.5 12.5 13.5 14.5 15.5'
+
+Test.it('Keys and Pro Keys Medium keep the "and"s of a lick that enters on one and moves there', function()
+    local k5 = Gen5PlanTier('k5', 'M', Lick({ 1, 1, 2, 2 }, { 1, 0, 2, 3 }))
+    Test.expect(Positions(k5) == AND_LINE, 'Keys: ' .. Positions(k5))
+    local pk, log = GenPKPlanTier('M', Lick({ 59, 59, 60, 60 }, { 59, 55, 60, 57 }))
+    Test.expect(Positions(pk) == AND_LINE, 'Pro Keys: ' .. Positions(pk))
+    Test.expect(#(log.and_phrases or {}) == 1, 'expected one "and" phrase')
+end)
+
+Test.it('no shift when the beats move more than the "and"s, on Guitar, or when the lick enters on a beat', function()
+    local beats_move = Gen5PlanTier('k5', 'M', Lick({ 1, 0, 2, 3 }, { 1, 1, 2, 2 }))
+    Test.expect(not Positions(beats_move):find('4.5', 1, true), 'beats moving: ' .. Positions(beats_move))
+    local gtr = Gen5PlanTier('gb', 'M', Lick({ 1, 1, 2, 2 }, { 1, 0, 2, 3 }))
+    Test.expect(not Positions(gtr):find('4.5', 1, true), 'Guitar: ' .. Positions(gtr))
+    local lick = Lick({ 1, 1, 2, 2 }, { 1, 0, 2, 3 })
+    table.remove(lick, 1)   -- no pickup: the phrase enters on the downbeat
+    local on_beat = Gen5PlanTier('k5', 'M', lick)
+    Test.expect(not Positions(on_beat):find('4.5', 1, true), 'beat entry: ' .. Positions(on_beat))
+end)
+
+Test.it('Easy goes back to Hard\'s downbeats inside an "and" phrase', function()
+    local hard = Lick({ 59, 59, 60, 60 }, { 59, 55, 60, 57 })
+    local med = GenPKPlanTier('M', hard)
+    local easy, log = GenPKPlanTier('E', med, { and_source = hard })
+    Test.expect((log.easy_from_hard or 0) > 0, 'Easy took no Hard notes')
+    -- Beats 1 and 3 from Hard: B on 1, C on 3, in every bar of the lick.
+    Test.expect(Positions(easy) == '4 6 8 10 12 14', 'Easy: ' .. Positions(easy))
+    Test.expect(Pitches(easy[1]) == '59' and Pitches(easy[2]) == '60', 'Easy pitches: ' .. Pitches(easy[1]) .. ' ' .. Pitches(easy[2]))
+end)

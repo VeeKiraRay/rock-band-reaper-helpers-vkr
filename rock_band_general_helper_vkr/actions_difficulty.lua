@@ -9,11 +9,24 @@ local PK_MAX = 72  -- C4 (Rock Band convention) = MIDI 72
 local PK_LANE_SHIFT_PITCHES = { [0]=true,[2]=true,[4]=true,[5]=true,[7]=true,[9]=true }
 
 -- Per-difficulty rule limits
-local PK_MAX_CHORD = { X=4, H=3, M=2, E=1 }
-local PK_MAX_SPAN  = { X=12, H=11, M=9 }  -- E has no chords so no span limit
+PK_MAX_CHORD = { X=4, H=3, M=2, E=1 }      -- global: Generate's Pro Keys planner reads these
+PK_MAX_SPAN  = { X=12, H=11, M=9 }  -- E has no chords so no span limit
+-- Interval jumps are ADVISORY: official RB3 DLC charts leave 72-89% of the jumps over
+-- these limits as they are (an octave move fixes most of the rest), so as errors they
+-- flagged nearly every official chart.
 local PK_MAX_JUMP  = { H=11, M=9, E=7 }   -- X has no jump restriction
-local PK_MIN_SP    = { M=1.0, E=2.0 }     -- min spacing in beats: 1.0=1/4 note, 2.0=1/2 note
+-- Start-to-start spacing in beats, the same split as 5-lane Keys (K5_MIN_SP / K5_ADV_SP):
+-- an error under the floor, an advisory under the doc's target. The RBN doc asks for a
+-- 1/4 note on Medium and a 1/2 note on Easy, but official Pro Keys Medium has 13.8% of
+-- its gaps under a quarter (22% under 100 BPM) and Easy 41.9% under a half; under half of
+-- those targets it is 0.8% and 3.0%.
+local PK_MIN_SP    = { M=0.5, E=1.0 }
+local PK_ADV_SP    = { M=1.0, E=2.0 }
 local PK_ALLOW_SH  = { X=true, H=true, M=false, E=false }  -- allow mid-song lane shifts
+-- "Unchanged copy" and "NOT REDUCED" are advisories on Pro Keys: on a simple Expert an
+-- official Hard is sometimes Expert as it is (3 of 352 RB3 DLC songs exactly, 13 at 95%+
+-- of the notes), and the RBN doc has no rule that Hard must differ.
+local PK_PROGRESSION = { advisory = true }
 
 -- Three primary range positions (easiest to read in-game): C range, F range, A range.
 -- Non-primary positions (D=2, E=4, G=7) are technically valid but harder to read.
@@ -292,20 +305,25 @@ local function CheckIntervalJumps(events, max_jump)
     return issues
 end
 
--- Spacing check: start-to-start gap between consecutive events must be >= min_beat_frac beats.
-local function CheckSpacing(events, min_beat_frac)
+-- Spacing check: start-to-start gap between consecutive events. Under min_beats is an
+-- error; under adv_beats an advisory (rec.advisory), in the same category - as
+-- CheckK5Spacing does for 5-lane Keys. Returns DiffIssue records.
+local function CheckSpacing(events, min_beats, adv_beats, diff_label)
     local issues = {}
     for i = 2, #events do
         local prev, curr = events[i-1], events[i]
         local qn_prev = QNAt(prev.s)
         local gap_qn  = QNAt(curr.s) - qn_prev
-        if gap_qn < min_beat_frac * (1 - GRACE) then
-            local gap   = curr.s - prev.s
-            local min_s = r.TimeMap2_QNToTime(0, qn_prev + min_beat_frac) - prev.s
-            local frac_str = min_beat_frac == 1.0 and '1/4 note' or '1/2 note'
-            issues[#issues + 1] = ('%s: %s is %.0f ms after previous note (min %s = %.0f ms)'):format(
-                FormatTime(curr.s), EventLabel(curr.pitches),
-                gap * 1000, frac_str, min_s * 1000)
+        local gap     = curr.s - prev.s
+        if gap_qn < min_beats * (1 - GRACE) then
+            local min_s = r.TimeMap2_QNToTime(0, qn_prev + min_beats) - prev.s
+            issues[#issues + 1] = DiffIssue(curr.s, curr.pitches, ('%s: %s is %.0f ms after previous note (min %s = %.0f ms)'):format(
+                FormatTime(curr.s), EventLabel(curr.pitches), gap * 1000, DiffQNLabel(min_beats), min_s * 1000))
+        elseif adv_beats and gap_qn < adv_beats * (1 - GRACE) then
+            local adv_s = r.TimeMap2_QNToTime(0, qn_prev + adv_beats) - prev.s
+            issues[#issues + 1] = DiffIssue(curr.s, curr.pitches, ('%s: %s is %.0f ms after previous note (advisory: %s = %.0f ms recommended for %s)'):format(
+                FormatTime(curr.s), EventLabel(curr.pitches), gap * 1000, DiffQNLabel(adv_beats), adv_s * 1000,
+                DIFF_NAMES[diff_label]), { advisory = true })
         end
     end
     return issues
@@ -570,7 +588,7 @@ local function BuildReport(header, categories)
         else
             lines[#lines + 1] = ('%s:  %d issue%s'):format(cat.name, n, n == 1 and '' or 's')
             for _, issue in ipairs(cat.issues) do
-                lines[#lines + 1] = '  \xe2\x80\xa2 ' .. issue
+                lines[#lines + 1] = '  \xe2\x80\xa2 ' .. issue.msg
             end
         end
         lines[#lines + 1] = ''
@@ -579,64 +597,98 @@ local function BuildReport(header, categories)
 end
 
 ----------------------------------------------------------------------
--- Shared validation kernel - used by both Suggest and Validate
+-- Shared validation kernel - used by Validate and Difficulty > Generate
 ----------------------------------------------------------------------
 
--- Run all rule checks for diff_label against events/lane_shifts.
--- exp_events: Expert events for cross-diff check (nil = skip that check).
--- sel_s: time selection start, or nil (controls lane-shift initial-marker check).
--- header: first line of the report.
--- Returns (report_text, total_issue_count)
-local function RunPKValidation(diff_label, events, lane_shifts, exp_events, sel_s, header)
+-- Report strings -> DiffIssue records (msg only), so every category has one shape.
+local function Records(strings)
+    local out = {}
+    for i, s in ipairs(strings) do out[i] = DiffIssue(nil, nil, s) end
+    return out
+end
+
+-- Every check for one Pro Keys tier, as categories { name, rule, issues = { DiffIssue...
+-- }, advisory = bool? }, in report order - the shape CollectK5Checks returns, so
+-- Generate counts errors the same way for every instrument. A category marked advisory,
+-- or an issue with rec.advisory, is not an error.
+-- exp_events: Expert events for the cross-diff checks (nil = skip them).
+-- sel_s: time selection start, or nil (controls the initial-marker check).
+function CollectPKChecks(diff_label, events, lane_shifts, exp_events, sel_s)
     local cats = {}
 
     local clabel = diff_label == 'E' and 'Chord count (single notes only)'
                 or ('Chord count (max ' .. PK_MAX_CHORD[diff_label] .. ')')
-    cats[#cats + 1] = { name = clabel, issues = CheckChordCount(events, PK_MAX_CHORD[diff_label], PK_MAX_SPAN[diff_label]) }
+    cats[#cats + 1] = { name = clabel, rule = 'chord_size',
+                        issues = Records(CheckChordCount(events, PK_MAX_CHORD[diff_label], PK_MAX_SPAN[diff_label])) }
 
     if PK_MAX_SPAN[diff_label] then
         cats[#cats + 1] = {
             name    = ('Chord span (max %d semitones)'):format(PK_MAX_SPAN[diff_label]),
-            issues  = CheckChordSpan(events, PK_MAX_SPAN[diff_label]),
+            rule    = 'chord_span',
+            issues  = Records(CheckChordSpan(events, PK_MAX_SPAN[diff_label])),
         }
     end
 
     if PK_MAX_JUMP[diff_label] then
         cats[#cats + 1] = {
-            name    = ('Interval jumps (max %d semitones)'):format(PK_MAX_JUMP[diff_label]),
-            issues  = CheckIntervalJumps(events, PK_MAX_JUMP[diff_label]),
+            name     = ('Interval jumps (advisory, max %d semitones)'):format(PK_MAX_JUMP[diff_label]),
+            rule     = 'jump',
+            advisory = true,
+            issues   = Records(CheckIntervalJumps(events, PK_MAX_JUMP[diff_label])),
         }
     end
 
     if PK_MIN_SP[diff_label] then
-        local slabel = PK_MIN_SP[diff_label] == 1.0
-            and 'Note spacing (min 1/4 note start-to-start)'
-            or  'Note spacing (min 1/2 note start-to-start)'
-        cats[#cats + 1] = { name = slabel, issues = CheckSpacing(events, PK_MIN_SP[diff_label]) }
+        cats[#cats + 1] = {
+            name   = ('Note spacing (min %s, advisory %s)'):format(
+                DiffQNLabel(PK_MIN_SP[diff_label]), DiffQNLabel(PK_ADV_SP[diff_label])),
+            rule   = 'spacing',
+            issues = CheckSpacing(events, PK_MIN_SP[diff_label], PK_ADV_SP[diff_label], diff_label),
+        }
     end
 
     cats[#cats + 1] = {
         name   = 'Lane range markers',
-        issues = CheckLaneShifts(lane_shifts, events, PK_ALLOW_SH[diff_label], sel_s),
+        rule   = 'lane_shift',
+        issues = Records(CheckLaneShifts(lane_shifts, events, PK_ALLOW_SH[diff_label], sel_s)),
     }
 
     -- Advisory: preferred ranges (C/F/A) only relevant when lane shifts are allowed
     if PK_ALLOW_SH[diff_label] and #lane_shifts > 0 then
         cats[#cats + 1] = {
-            name   = 'Lane shift ranges (prefer C, F, A)',
-            issues = CheckPreferredRanges(lane_shifts),
+            name     = 'Lane shift ranges (prefer C, F, A)',
+            rule     = 'preferred_range',
+            advisory = true,
+            issues   = Records(CheckPreferredRanges(lane_shifts)),
         }
     end
 
-    cats[#cats + 1] = { name = 'Overlapping gems', issues = CheckOverlappingGems(events, diff_label) }
-    cats[#cats + 1] = { name = 'Sustain gaps',     issues = CheckSustainGaps(events, diff_label) }
+    cats[#cats + 1] = { name = 'Overlapping gems', rule = 'overlap',
+                        issues = Records(CheckOverlappingGems(events, diff_label)) }
+    cats[#cats + 1] = { name = 'Sustain gaps', rule = 'sustain_gap',
+                        issues = Records(CheckSustainGaps(events, diff_label)) }
 
     if diff_label ~= 'X' and exp_events and #exp_events > 0 then
-        cats[#cats + 1] = { name = 'Notes not in Expert', issues = CheckNotesAboveExpert(exp_events, events) }
-        cats[#cats + 1] = { name = 'Missing measures',    issues = CheckMissingMeasures(exp_events, events) }
+        cats[#cats + 1] = { name = 'Notes not in Expert', rule = 'not_in_expert',
+                            issues = Records(CheckNotesAboveExpert(exp_events, events)) }
+        cats[#cats + 1] = { name = 'Missing measures', rule = 'missing_measures',
+                            issues = Records(CheckMissingMeasures(exp_events, events)) }
     end
 
-    return BuildReport(header, cats)
+    return cats
+end
+
+-- One Pro Keys tier track's lane-shift markers and playable events (chords grouped),
+-- inside [sel_s, sel_e] when given: (lane_shifts { s, e, pitch }, events { s, e, pitches }).
+-- Global for Difficulty > Generate.
+function ReadPKTierEvents(track, sel_s, sel_e)
+    return GroupIntoEvents(ReadPKNotes(track, sel_s, sel_e))
+end
+
+-- Run all rule checks for diff_label against events/lane_shifts.
+-- header: first line of the report. Returns (report_text, total_issue_count).
+local function RunPKValidation(diff_label, events, lane_shifts, exp_events, sel_s, header)
+    return BuildReport(header, CollectPKChecks(diff_label, events, lane_shifts, exp_events, sel_s))
 end
 
 ----------------------------------------------------------------------
@@ -793,7 +845,7 @@ function ValidateProKeysDiff(diff_label)
         local block, extra = CheckDifficultyProgression(
             DIFF_NAMES[diff_label], DIFF_NAMES[higher_dl],
             events, higher_events, PK_MIN, PK_MIN,
-            CountNotes(events), higher_count)
+            CountNotes(events), higher_count, PK_PROGRESSION)
         report = block .. report
         total  = total + extra
     end
@@ -860,7 +912,7 @@ function ValidateAllProKeys()
                         local block, extra = CheckDifficultyProgression(
                             DIFF_NAMES[dl], DIFF_NAMES[prev_dl],
                             evs, prev_events, PK_MIN, PK_MIN,
-                            CountNotes(evs), prev_count)
+                            CountNotes(evs), prev_count, PK_PROGRESSION)
                         report = block .. report
                         total  = total + extra
                     end

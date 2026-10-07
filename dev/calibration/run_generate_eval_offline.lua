@@ -33,9 +33,13 @@ dofile(_dir  .. 'difficulty_holdout.lua')
 dofile(_root .. 'rock_band_general_helper_vkr/actions_difficulty_shared.lua')
 dofile(_root .. 'rock_band_general_helper_vkr/actions_difficulty_gtrbass.lua')
 dofile(_root .. 'rock_band_general_helper_vkr/actions_difficulty_5k.lua')
+dofile(_root .. 'rock_band_general_helper_vkr/actions_difficulty.lua')   -- PK_MAX_CHORD / PK_MAX_SPAN
+dofile(_root .. 'rock_band_general_helper_vkr/difficulty_generate_params.lua')
 dofile(_root .. 'rock_band_general_helper_vkr/difficulty_generate_retime.lua')
 dofile(_root .. 'rock_band_general_helper_vkr/difficulty_generate_colors.lua')
+dofile(_root .. 'rock_band_general_helper_vkr/difficulty_generate_rhythm.lua')
 dofile(_root .. 'rock_band_general_helper_vkr/difficulty_generate_5lane.lua')
+dofile(_root .. 'rock_band_general_helper_vkr/difficulty_generate_prokeys.lua')
 
 local CORPUS = _root .. '_external_docs/all_rb3_dlc_reference_songs/'
 local OUT    = _dir .. 'generate_eval_report.txt'
@@ -44,6 +48,8 @@ local INSTRUMENTS = {
     { key = 'guitar', track = 'PART GUITAR', kind = 'gb', label = 'Guitar' },
     { key = 'bass',   track = 'PART BASS',   kind = 'gb', label = 'Bass'   },
     { key = 'keys',   track = 'PART KEYS',   kind = 'k5', label = 'Keys'   },
+    -- One track per tier (PART REAL_KEYS_X/H/M/E), real pitches, lane-shift markers.
+    { key = 'prokeys', track = 'PART REAL_KEYS_', kind = 'pk', label = 'ProKeys' },
 }
 local LO    = { X = 96, H = 84, M = 72, E = 60 }
 local UPPER = { H = 'X', M = 'H', E = 'M' }
@@ -76,8 +82,52 @@ local function SameOffs(a, b)
     return true
 end
 
+-- Pro Keys rule violations Validate reports as errors (CollectPKChecks), in quarter
+-- notes. Spacing floors are the 5-lane ones (PK_MIN_SP = K5_MIN_SP); jumps and the
+-- preferred ranges are advisories and not counted. Medium/Easy: one lane-shift marker,
+-- every note inside its window. Shifts: the tier's markers (log.shifts).
+local PK_SP = { M = 0.5, E = 1.0 }
+local function CountPKViolations(dl, gen, shifts)
+    local v = 0
+    for i, ev in ipairs(gen) do
+        if #ev.offs > PK_MAX_CHORD[dl] then v = v + 1 end
+        if PK_MAX_SPAN[dl] and #ev.offs >= 2 and ev.offs[#ev.offs] - ev.offs[1] > PK_MAX_SPAN[dl] then v = v + 1 end
+        local nx = gen[i + 1]
+        if nx then
+            if nx.qn < ev.qn_e - 0.005 then v = v + 1 end                         -- overlap
+            if PK_SP[dl] and nx.qn - ev.qn < PK_SP[dl] * 0.95 then v = v + 1 end  -- spacing
+            if ev.qn_e - ev.qn >= 0.49 and nx.qn >= ev.qn_e then
+                local need = (dl == 'M' or dl == 'E') and 1.0 or 0.5
+                if dl == 'H' then
+                    local a, b = ev.offs, nx.offs
+                    local simple = #a == 1 and #b == 1
+                    if not simple and (#a == 1 or #b == 1) then
+                        local one, many = #a == 1 and a[1] or b[1], #a == 1 and b or a
+                        for _, p in ipairs(many) do if p == one then simple = true end end
+                    elseif not simple and #a == #b then
+                        simple = table.concat(a, ',') == table.concat(b, ',')
+                    end
+                    if simple then need = 0.25 end
+                end
+                if nx.qn - ev.qn_e < need * 0.95 then v = v + 1 end              -- sustain gap
+            end
+        end
+    end
+    if dl == 'M' or dl == 'E' then
+        if #shifts ~= 1 then v = v + 1 end
+        local win = shifts[1] and GEN_PK_WINDOWS[shifts[1].pitch]
+        for _, ev in ipairs(gen) do
+            for _, p in ipairs(ev.offs) do
+                if not win or p < win.lo or p > win.hi then v = v + 1 end         -- outside window
+            end
+        end
+    end
+    return v
+end
+
 -- Rule violations Validate reports as errors, in quarter notes.
-local function CountViolations(kind, dl, gen)
+local function CountViolations(kind, dl, gen, shifts)
+    if kind == 'pk' then return CountPKViolations(dl, gen, shifts or {}) end
     local v = 0
     local max_n = kind == 'gb' and GB_MAX_CHORD[dl] or K5_MAX_CHORD[dl]
     for i, ev in ipairs(gen) do
@@ -150,7 +200,15 @@ for _, path in ipairs(files) do
                 local timing = SmfSongTiming(song)
                 for _, inst in ipairs(INSTRUMENTS) do
                     local trk = SmfFindTrack(song, inst.track)
-                    if trk then
+                    if inst.kind == 'pk' then
+                        local tiers, shifts, ok = {}, {}, true
+                        for dl in pairs(LO) do
+                            local t = SmfFindTrack(song, inst.track .. dl)
+                            if not t then ok = false; break end
+                            tiers[dl], shifts[dl] = SmfProKeysEvents(t, song.tpqn, timing)
+                        end
+                        if ok then DATA[#DATA + 1] = { inst = inst, tiers = tiers, shifts = shifts, song = n_songs } end
+                    elseif trk then
                         local tiers = {}
                         for dl in pairs(LO) do tiers[dl] = SmfTierEvents(trk, LO[dl], song.tpqn, timing) end
                         DATA[#DATA + 1] = { inst = inst, tiers = tiers, song = n_songs }
@@ -184,34 +242,53 @@ local function Evaluate(with_chain, only_kind, only_dl)
     for _, d in ipairs(DATA) do
         local inst, tiers = d.inst, d.tiers
         local ref = inst.key ~= 'guitar' and refs[d.song] or {}
-        local function Opts(dl, chain)
+        -- hard: Easy only, the Hard its "and" phrases look at (GEN5_PARAMS.and_phrase).
+        local function Opts(dl, chain, shifts, hard)
             return { busy_ref = dl == 'H' and ref.H or nil,
-                     rhythm_ref = dl == 'M' and (chain and ref.M_chain or ref.M) or nil }
+                     rhythm_ref = dl == 'M' and (chain and ref.M_chain or ref.M) or nil,
+                     shifts = shifts, and_source = dl == 'E' and hard or nil }
         end
+        -- Pro Keys has its own planner; its upper tier's lane-shift markers go with it.
+        local function Plan(dl, upper, opts)
+            if inst.kind == 'pk' then return GenPKPlanTier(dl, upper, opts) end
+            return Gen5PlanTier(inst.kind, dl, upper, opts)
+        end
+        local sh = d.shifts or {}
         if not only_kind or inst.kind == only_kind then
-            local chain = tiers.X
+            local chain, chain_shifts, chain_hard = tiers.X, sh.X, nil
             for _, dl in ipairs({ 'H', 'M', 'E' }) do
                 local upper, off = tiers[UPPER[dl]], tiers[dl]
                 if #upper > 0 and #off > 0 and (not only_dl or dl == only_dl) then
                     local a = Acc(inst.key, dl)
-                    local gen = Gen5PlanTier(inst.kind, dl, upper, Opts(dl, false))
+                    local gen, glog = Plan(dl, upper, Opts(dl, false, sh[UPPER[dl]], tiers.H))
                     local m = MatchOnsets(gen, off)
                     a.songs = a.songs + 1
                     a.gen, a.off, a.hit = a.gen + #gen, a.off + #off, a.hit + #m
                     for _, p in ipairs(m) do
                         if SameOffs(gen[p[1]].offs, off[p[2]].offs) then a.color = a.color + 1 end
                     end
-                    a.viol = a.viol + CountViolations(inst.kind, dl, gen)
+                    a.viol = a.viol + CountViolations(inst.kind, dl, gen, glog.shifts)
+                    if inst.kind == 'pk' and (dl == 'M' or dl == 'E') and sh[dl] and sh[dl][1] then
+                        a.win_n = (a.win_n or 0) + 1
+                        if glog.window == sh[dl][1].pitch then a.win_same = (a.win_same or 0) + 1 end
+                    end
+                    if inst.kind == 'pk' and dl == 'H' then
+                        a.shifts_gen = (a.shifts_gen or 0) + #glog.shifts
+                        a.shifts_off = (a.shifts_off or 0) + #(sh.H or {})
+                    end
                     local cm = MatchOnsets(upper, off)
                     a.copy_gen, a.copy_hit = a.copy_gen + #upper, a.copy_hit + #cm
                     KeptByClass(a, upper, gen, off)
                     if with_chain and chain and #chain > 0 then
-                        chain = Gen5PlanTier(inst.kind, dl, chain, Opts(dl, true))
+                        local clog
+                        chain, clog = Plan(dl, chain, Opts(dl, true, chain_shifts, chain_hard))
+                        chain_shifts = clog.shifts
+                        if dl == 'H' then chain_hard = chain end
                         local chm = MatchOnsets(chain, off)
                         a.chain_gen = a.chain_gen + #chain
                         a.chain_off = a.chain_off + #off
                         a.chain_hit = a.chain_hit + #chm
-                        a.viol = a.viol + CountViolations(inst.kind, dl, chain)
+                        a.viol = a.viol + CountViolations(inst.kind, dl, chain, clog.shifts)
                     end
                 elseif #upper == 0 or #off == 0 then
                     chain = nil
@@ -324,6 +401,23 @@ for _, inst in ipairs(INSTRUMENTS) do
             L(('%-7s  %s   %5d  %5.1f%% %5.1f%% %5.1f%%  %6.1f%%  %7.1f%%  %5.1f%%  %5d'):format(
                 inst.label, dl, a.songs, 100 * p, 100 * rc, 100 * F1(p, rc), 100 * F1(cp, cr),
                 100 * F1(hp, hr), 100 * a.color / math.max(1, a.hit), a.viol))
+        end
+    end
+end
+do
+    local a = AGG.prokeys
+    if a then
+        L()
+        L('Pro Keys: color = matched onsets with exactly the official pitches.')
+        for _, dl in ipairs({ 'M', 'E' }) do
+            local t = a[dl]
+            if t and t.win_n then
+                L(('  %s window = official window: %d of %d songs (%.1f%%)'):format(
+                    dl, t.win_same or 0, t.win_n, 100 * (t.win_same or 0) / t.win_n))
+            end
+        end
+        if a.H then
+            L(('  H lane-shift markers: generated %d, official %d'):format(a.H.shifts_gen or 0, a.H.shifts_off or 0))
         end
     end
 end

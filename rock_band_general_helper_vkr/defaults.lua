@@ -1208,7 +1208,9 @@ TIPS = {
     -- Difficulty tab - Generate
     diff_gen_instrument = "Which instrument to generate difficulties for.\n\n" ..
                           "All instruments uses each instrument's default track (PART GUITAR,\n" ..
-                          "PART BASS, PART KEYS) and skips any that is missing or muted.",
+                          "PART BASS, PART REAL_KEYS_X/H/M/E, PART KEYS) and skips any that\n" ..
+                          "is missing or muted. Pro Keys runs before Keys, and Keys follows\n" ..
+                          "the Pro Keys it just generated.",
     diff_gen_track      = "The instrument's track. Shared with that instrument's own\n" ..
                           "Difficulty sub-tab - changing it here changes it there too.",
     diff_gen_tier       = "Generate this difficulty from the one above it as it is now\n" ..
@@ -1242,6 +1244,21 @@ TIPS = {
                           "dotted 8th, Easy a quarter (above 160 BPM: Medium a quarter,\n" ..
                           "Easy a half). One that would end up shorter than 1/8 becomes a\n" ..
                           "short 1/32 note.\n\n" ..
+                          "Pro Keys keeps the same rhythm. Chords lose notes from the\n" ..
+                          "bottom, so the top (melody) note stays. Hard keeps Expert's\n" ..
+                          "lane shifts it still needs. Medium and Easy show one range for\n" ..
+                          "the whole song: Hard's, when Hard shows one range all song,\n" ..
+                          "else the one that fits the most notes. Notes outside it move\n" ..
+                          "by an octave; notes inside never move, so the same note\n" ..
+                          "always lands on the same key. Sustains\n" ..
+                          "leave the RBN gaps (Hard 1/16 or 1/8, Medium and Easy a\n" ..
+                          "quarter); one cut under 3/16 becomes a 1/16 note. If Expert is so\n" ..
+                          "simple that Hard would be an exact copy, it asks first whether to\n" ..
+                          "shorten Hard's sustains a little or keep Hard as Expert.\n\n" ..
+                          "Keys and Pro Keys: a lick that starts on an \"and\" and moves\n" ..
+                          "on its \"and\"s (while its beats repeat a note) keeps the\n" ..
+                          "\"and\"s on Medium, so the line keeps moving; Easy goes back to\n" ..
+                          "Hard's downbeats there.\n\n" ..
                           "The result is checked with Validate's rules and anything left\n" ..
                           "to fix is listed. Asks before replacing existing notes. One\n" ..
                           "undo reverts it. Respects time selection if active.",

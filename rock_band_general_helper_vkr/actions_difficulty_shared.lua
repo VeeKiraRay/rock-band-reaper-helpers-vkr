@@ -28,33 +28,57 @@ end
 -- lower_lo/higher_lo: pitch offset to subtract before comparing shape
 --   (pass the same constant for both, e.g. PK_MIN, when a module's range
 --   doesn't shift between difficulties; range.lo otherwise).
+-- Sustains the lower tier holds for less time than the higher one, matching events by
+-- start time (within 5 ms). A shorter sustain is a reduction too.
+local function ShorterSustains(lower_events, higher_events)
+    local n, j = 0, 1
+    for _, ev in ipairs(lower_events) do
+        while j <= #higher_events and higher_events[j].s < ev.s - 0.005 do j = j + 1 end
+        local up = higher_events[j]
+        if up and math.abs(up.s - ev.s) <= 0.005 and ev.e < up.e - 0.005 then n = n + 1 end
+    end
+    return n
+end
+
 -- lower_count/higher_count: total individual note count (sum of chord sizes
 --   across all events - not chord/event count).
+-- opts.advisory: report both findings without counting them as issues. Pro Keys: an
+--   official Hard is sometimes Expert as it is (3 of 352 RB3 DLC songs exactly, about 10
+--   with every note kept) when Expert is already simple.
 -- Returns (block_text, extra_issues): block_text is 0-2 lines ending in a
 -- blank line, meant to be prepended right after the report header;
 -- extra_issues is how much to add to the caller's issue total.
 function CheckDifficultyProgression(lower_label, higher_label,
                                      lower_events, higher_events,
                                      lower_lo, higher_lo,
-                                     lower_count, higher_count)
+                                     lower_count, higher_count, opts)
     local lines, extra = {}, 0
+    local advisory = opts and opts.advisory
+    local tag = advisory and 'Advisory: ' or ''
 
     if #higher_events > 0 and #lower_events > 0 then
         if ChartsAreIdentical(lower_events, higher_events, lower_lo, higher_lo) then
-            lines[#lines + 1] = ('%s appears to be an unchanged copy of %s (%d identical notes, same timing and shape) - some reduction is expected between difficulties'):format(
-                lower_label, higher_label, lower_count)
-            extra = extra + 1
+            lines[#lines + 1] = ('%s%s appears to be an unchanged copy of %s (%d identical notes, same timing and shape) - some reduction is expected between difficulties'):format(
+                tag, lower_label, higher_label, lower_count)
+            if not advisory then extra = extra + 1 end
         end
     end
 
     if higher_count > 0 then
+        local shorter = lower_count >= higher_count and ShorterSustains(lower_events, higher_events) or 0
         if lower_count < higher_count then
             lines[#lines + 1] = ('%s has %d notes and %s has %d notes: OK'):format(
                 higher_label, higher_count, lower_label, lower_count)
+        elseif shorter > 0 then
+            -- Every note kept, but sustains shortened: reduced by length only. Official
+            -- charters do this on a simple Expert (about 1 song in 7 pulls back nearly
+            -- every Hard sustain), so it is reported, not counted.
+            lines[#lines + 1] = ('%s has %d notes and %s has %d notes: only sustain lengths differ (%d sustain%s shorter)'):format(
+                higher_label, higher_count, lower_label, lower_count, shorter, shorter == 1 and '' or 's')
         else
-            lines[#lines + 1] = ('%s has %d notes and %s has %d notes: NOT REDUCED (expected fewer than %s)'):format(
-                higher_label, higher_count, lower_label, lower_count, higher_label)
-            extra = extra + 1
+            lines[#lines + 1] = ('%s%s has %d notes and %s has %d notes: NOT REDUCED (expected fewer than %s)'):format(
+                tag, higher_label, higher_count, lower_label, lower_count, higher_label)
+            if not advisory then extra = extra + 1 end
         end
     end
 

@@ -466,9 +466,12 @@ Before that isolation, two runners went unnoticed missing a library for months.
     difficulty_explain.lua                     (shared with dev/calibration/), wording,
     difficulty_report.lua                      the pasteable text report, the read-only
     difficulty_suggester.lua                   adapter, and the tab body
-    difficulty_generate_retime.lua           ← Difficulty > Generate: Hard's fast-run
-    difficulty_generate_colors.lua             rewrite, chords and colors, the pure
-    difficulty_generate_5lane.lua              planner (shared with dev/calibration/),
+    difficulty_generate_params.lua           ← Difficulty > Generate: shared parameters,
+    difficulty_generate_retime.lua             Hard's fast-run rewrite, chords and
+    difficulty_generate_colors.lua             colors, which onsets every planner keeps,
+    difficulty_generate_rhythm.lua             the pure 5-lane and Pro Keys planners
+    difficulty_generate_5lane.lua              (shared with dev/calibration/),
+    difficulty_generate_prokeys.lua
     difficulty_generate_hopo.lua               Hard's force-HOPO markers, the REAPER
     actions_difficulty_generate.lua            action, and the sub-tab body
     ui_difficulty_generate.lua
