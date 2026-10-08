@@ -510,6 +510,34 @@ Test.it('GenerateDifficulties all: skips a muted track', function()
     Test.expect(result:find('Guitar', 1, true) ~= nil, 'guitar not generated:\n' .. result)
 end)
 
+Test.it('GenToPlannerEvents: quarter-note tempo and the dotted-quarter beat in 6/8', function()
+    -- REAPER's TimeMap_GetDividedBpmAtTime is 2x in /8 signatures; Generate once read it,
+    -- and a 6/8 song at 105 BPM got every rule meant for songs over 160.
+    -- 6/8 at 105 for two bars (6 QN), then 4/4 at 120.
+    EnsureDefaultTempoMarker()
+    local snap = SnapshotTempoMap()
+    local ok, err = pcall(function()
+        for i = r.CountTempoTimeSigMarkers(0) - 1, 1, -1 do r.DeleteTempoTimeSigMarker(0, i) end
+        r.SetTempoTimeSigMarker(0, 0, 0, -1, -1, 105, 6, 8, false)
+        r.AddTempoTimeSigMarker(0, r.TimeMap2_QNToTime(0, 6), 120, 4, 4, false)
+        r.UpdateTimeline()
+        local t1, t2 = r.TimeMap2_QNToTime(0, 1.5), r.TimeMap2_QNToTime(0, 7)
+        local evs = GenToPlannerEvents({ { s = t1, e = t1 + 0.1, pitches = { 96 } },
+                                         { s = t2, e = t2 + 0.1, pitches = { 96 } } }, 96)
+        Test.expect(#evs == 2, ('expected 2 events, got %d'):format(#evs))
+        local a, b = evs[1], evs[2]
+        Test.expect(math.abs(a.bpm - 105) < 1e-6, ('6/8: bpm %s, expected 105 (quarter notes)'):format(tostring(a.bpm)))
+        Test.expect(a.pulse == 1.5 and math.abs(a.bar_len - 3) < 1e-6 and math.abs(a.bar_qn - 1.5) < 1e-6,
+            ('6/8: pulse %s bar_len %s bar_qn %s, expected 1.5 3 1.5'):format(tostring(a.pulse), tostring(a.bar_len), tostring(a.bar_qn)))
+        Test.expect(math.abs(b.bpm - 120) < 1e-6 and b.pulse == 1 and math.abs(b.bar_len - 4) < 1e-6
+            and math.abs(b.bar_qn - 1) < 1e-6,
+            ('4/4: bpm %s pulse %s bar_len %s bar_qn %s, expected 120 1 4 1'):format(tostring(b.bpm),
+                tostring(b.pulse), tostring(b.bar_len), tostring(b.bar_qn)))
+    end)
+    RestoreTempoMap(snap)
+    Test.expect(ok, tostring(err))
+end)
+
 ----------------------------------------------------------------------
 -- Pattern Replace difficulty filter - GetPatternPitchRange + SetSearchPattern
 ----------------------------------------------------------------------

@@ -10,7 +10,8 @@
 --   GEN_PK_WINDOWS, GB_RANGE / K5_RANGE, ReadGBTierEvents / ReadK5TierEvents,
 --   CollectGBChecks / CollectK5Checks / CollectPKChecks, ReadPKTierEvents
 --   (actions_difficulty.lua), ReadProKeysEvents (actions_difficulty_5k.lua), Gen5MarkHopos /
---   Gen5ForceHopoSpans (difficulty_generate_hopo.lua).
+--   Gen5ForceHopoSpans (difficulty_generate_hopo.lua), Gen5PulseQN
+--   (difficulty_generate_params.lua), GetBPMAt (actions_guitar.lua).
 
 -- The instruments Generate supports, in dropdown order - which is also the run order of
 -- All instruments, so Pro Keys comes before Keys (Keys follows the Pro Keys this run
@@ -109,7 +110,7 @@ local function SnapQN(qn) return math.floor(qn * SNAP + 0.5) / SNAP end
 -- Expert's take and its zero-length notes stay - and Validate still counts them. They are
 -- used like any note (the planner gives every written note its minimum length), or the
 -- lower tiers would miss a measure Expert plays (rb_pro_keys.mid's last chord).
-local function ToPlannerEvents(events, lo, keep_zero)
+function GenToPlannerEvents(events, lo, keep_zero)
     local out = {}
     for _, ev in ipairs(events) do
         if ev.e - ev.s < ZERO_LEN_S and not keep_zero then goto next_ev end
@@ -117,15 +118,21 @@ local function ToPlannerEvents(events, lo, keep_zero)
         -- Bar start and end in quarter notes, so time signature changes are honoured.
         local _, bar_s, bar_e = r.TimeMap_QNToMeasures(0, qn)
         bar_s, bar_e = SnapQN(bar_s), SnapQN(bar_e)
+        local num, den = r.TimeMap_GetTimeSigAtTime(0, ev.s)
         local offs = {}
         for i, p in ipairs(ev.pitches) do offs[i] = p - lo end
         out[#out + 1] = {
             qn     = qn,
             qn_e   = SnapQN(r.TimeMap2_timeToQN(0, ev.e)),
             offs   = offs,
-            bpm    = select(1, r.TimeMap_GetDividedBpmAtTime(ev.s)) or 120,
+            -- The tempo marker in effect (GetBPMAt, actions_guitar.lua): quarter notes per
+            -- minute, what Validate's rules and the offline tools read. NOT
+            -- TimeMap_GetDividedBpmAtTime, which is "2x in /8 signatures" - a 6/8 song at
+            -- 105 read as 210, and every rule for songs over 160 BPM fired.
+            bpm    = GetBPMAt(ev.s),
             bar_qn  = qn - bar_s,
             bar_len = bar_e - bar_s,
+            pulse   = Gen5PulseQN(num or 4, den or 4),
             down    = qn - bar_s <= 0.02 or bar_e - qn <= 0.02,
         }
         ::next_ev::
@@ -439,7 +446,7 @@ local function GuitarRefs(sel_s, sel_e, by_name, busy_drop, first_tier, fast_run
     local src_dl = first_tier == 'H' and 'X' or 'H'
     local src = ReadTier(inst, track, src_dl, sel_s, sel_e)
     if #src == 0 then return refs end
-    local upper = ToPlannerEvents(src, RangeLo(inst, src_dl))
+    local upper = GenToPlannerEvents(src, RangeLo(inst, src_dl))
     if first_tier == 'H' then
         local log
         upper, log = Gen5PlanTier('gb', 'H', upper, { busy_drop = busy_drop, fast_runs = fast_runs })
@@ -575,7 +582,7 @@ function GenerateDifficulties(inst_key, tiers, force, answers)
             skipped[#skipped + 1] = missing
         else
             local job = { inst = t.inst, track = t.track, tracks = t.tracks, dest = dest,
-                          src = ToPlannerEvents(src, RangeLo(t.inst, src_dl), t.inst.kind == 'pk') }
+                          src = GenToPlannerEvents(src, RangeLo(t.inst, src_dl), t.inst.kind == 'pk') }
             if t.inst.kind == 'pk' then
                 -- The upper tier's lane shifts over the WHOLE track, even in a time
                 -- selection: the window showing at the selection's start was set before it.
@@ -739,7 +746,7 @@ function GenerateDifficulties(inst_key, tiers, force, answers)
                 if not hard then
                     local htrack = inst.kind == 'pk' and (job.tracks or {}).H or job.track
                     if htrack then
-                        hard = ToPlannerEvents((ReadTier(inst, htrack, 'H', sel_s, read_e)), RangeLo(inst, 'H'),
+                        hard = GenToPlannerEvents((ReadTier(inst, htrack, 'H', sel_s, read_e)), RangeLo(inst, 'H'),
                                                inst.kind == 'pk')
                     end
                 end

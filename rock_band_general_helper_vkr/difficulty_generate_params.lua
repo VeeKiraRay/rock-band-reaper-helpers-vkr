@@ -185,21 +185,46 @@ local EPS        = GEN5_EPS
 
 local function NearInt(x, tol) return math.abs(x - math.floor(x + 0.5)) <= tol end
 
--- Beat position of an onset: down (bar line), beat, 8th, 16th, trip, other.
+-- The beat of a time signature, in quarter notes - an event's `pulse`. Compound meters
+-- (6/8, 9/8, 12/8) count in dotted quarters: the strong beats of a 6/8 bar are its 1st and
+-- 4th 8ths, 1.5 QN apart. Everything else counts quarter notes from the bar line, odd /8
+-- bars (5/8, 7/8) included - they have no even beat to count instead. Official charts in
+-- 6/8 (RB3 DLC, 12 songs, hold-out excluded) show the beat: Medium keeps 97% of the onsets
+-- at 0 and 1.5 QN and 41-48% of the other 8ths; Easy keeps 0 and 1.5 (97%, 94%) and
+-- about 20% of the rest. Counted in quarter notes, Medium kept 0, 1 and 2 instead - three
+-- notes against the bar's two beats.
+function Gen5PulseQN(num, den)
+    if den == 8 and num >= 6 and num % 3 == 0 then return 1.5 end
+    return 1
+end
+
+-- A bar in 4/4: the meter the measured position tables (CAP_KEEP_RATE, the RBN "every
+-- fourth note per half measure" positions) describe. Events without meter data are 4/4.
+function Gen5Is44(ev)
+    return math.abs((ev.bar_len or 4) - 4) <= EPS and (ev.pulse or 1) == 1
+end
+
+-- Beat position of an onset: down (bar line), beat, 8th, 16th, trip, other. Counted from
+-- the bar line (bar_qn), in the bar's own beat (pulse): a 6/8 bar's beats are 0 and 1.5,
+-- and a bar after a 7/8 bar starts on an off-beat quarter note.
 function Gen5BeatClass(ev)
     if ev.down then return 'down' end
-    local qn = ev.qn
-    if NearInt(qn, EPS)         then return 'beat' end
+    local qn = ev.bar_qn or ev.qn
+    if NearInt(qn / (ev.pulse or 1), EPS) then return 'beat' end
     if NearInt(qn * 2, EPS * 2) then return '8th'  end
     if NearInt(qn * 4, EPS * 4) then return '16th' end
     if NearInt(qn * 3, EPS * 3) or NearInt(qn * 6, EPS * 6) then return 'trip' end
     return 'other'
 end
 
--- Minimum onset-to-onset gap tier dl keeps at this tempo (GEN5_PARAMS.gap).
-function Gen5MinGapQN(dl, bpm)
+-- Minimum onset-to-onset gap tier dl keeps at this tempo (GEN5_PARAMS.gap). A grid of a
+-- beat or more (Medium, Easy) is counted in the bar's beat (pulse): in 6/8 Medium's beat
+-- grid is a dotted quarter, so it keeps the two beats rather than three quarter notes
+-- across them. Hard's 8th grid is an 8th in every meter.
+function Gen5MinGapQN(dl, bpm, pulse)
     local g = GEN5_PARAMS.gap[dl]
-    return math.min(math.max(g.grid, g.sec * (bpm or 120) / 60), g.cap or math.huge)
+    local grid = g.grid >= 1 and g.grid * (pulse or 1) or g.grid
+    return math.min(math.max(grid, g.sec * (bpm or 120) / 60), math.max(g.cap or math.huge, grid))
 end
 
 -- Shortest sustain tier dl keeps at this tempo (GEN5_PARAMS.min_sustain).

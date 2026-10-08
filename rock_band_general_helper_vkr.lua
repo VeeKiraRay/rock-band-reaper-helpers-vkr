@@ -133,6 +133,12 @@
 --     - Validate, every instrument: a difficulty that keeps every note but
 --       holds some sustains shorter is no longer "NOT REDUCED"; it reports
 --       "only sustain lengths differ".
+--     - Songs not in 4/4: the tempo is read in quarter notes, as Validate
+--       reads it (a 6/8 song at 105 BPM was treated as 210, so every rule
+--       for fast songs fired). In 6/8, 9/8 and 12/8 Medium and Easy keep the
+--       bar's dotted-quarter beats instead of three quarter notes across
+--       them. Outside 4/4, a full bar of 8ths on Hard loses the 8th before
+--       the next bar line first (in 3/4 the "and" of 3, not the "and" of 2).
 --     - The result is checked with Validate's own rules and anything left to
 --       fix is listed with its time. It asks before replacing notes, one undo
 --       reverts the whole run, and a time selection limits it to the notes

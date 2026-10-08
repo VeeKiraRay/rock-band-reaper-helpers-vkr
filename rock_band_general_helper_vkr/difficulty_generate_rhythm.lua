@@ -5,7 +5,7 @@
 --
 -- PURE: no r, no S. Load after difficulty_generate_params.lua.
 --
--- Input event: { qn, qn_e, offs, bpm, down, bar_qn, bar_len } as described in
+-- Input event: { qn, qn_e, offs, bpm, down, bar_qn, bar_len, pulse } as described in
 -- difficulty_generate_5lane.lua. offs is read only for its size (a chord or a single):
 -- Medium's chord bonus and the busy-bar accent rule. Pitches or colors never matter.
 --
@@ -75,8 +75,8 @@ local CAP_KEEP_RATE = {
     ['1.667'] = 0.42, ['1.333'] = 0.42, ['0.667'] = 0.43, ['2.667'] = 0.45, ['0.833'] = 0.46,
     ['3.500'] = 0.49, ['1.500'] = 0.73, ['0.500'] = 0.84, ['2.500'] = 0.85,
 }
--- For a position the table does not list (an odd meter, a rare position): the beat
--- class's typical official keep rate, so it still sorts sensibly.
+-- For a position the table does not list (a rare position, or any bar not in 4/4): the
+-- beat class's typical official keep rate, so it still sorts sensibly.
 local CAP_CLASS_RATE = { ['8th'] = 0.6, ['16th'] = 0.25, trip = 0.4, other = 0.15 }
 
 -- An onset's bar position, as CAP_KEEP_RATE keys it. bar_qn is optional (4/4 assumed).
@@ -84,8 +84,35 @@ local function BarPosKey(ev)
     return ('%.3f'):format(math.floor((ev.bar_qn or ev.qn % 4) * 12 + 0.5) / 12)
 end
 
+-- CAP_KEEP_RATE was measured on 4/4 bars only. In any other bar an 8th off-beat goes
+-- sooner the stronger the beat it leads into: into the next bar line first, then into a
+-- beat, then into another 8th. That is the order the 4/4 table itself shows (the and of
+-- 4, then of 2, then of 1 and 3), and the order official charts use elsewhere (RB3 DLC,
+-- hold-out excluded): 3/4 Hard keeps the and of 3 least (fast 11%, slow 38%) and the and
+-- of 2 next (slow 56%, and of 1 87%); 6/8 Hard turns a bar of six 8ths into 0 0.5 1.5 2
+-- most often (77 of 129 bars) - the 8ths before the bar line and before the second beat
+-- go. Ties go to the later off-beat, as in the busy-bar rule.
+local function MeterRate(ev)
+    local c = Gen5BeatClass(ev)
+    local rate = CAP_CLASS_RATE[c] or 0.5
+    if c == '8th' and ev.bar_qn and ev.bar_len then
+        local nx = ev.bar_qn + 0.5
+        if nx >= ev.bar_len - EPS then return rate - 0.3 end
+        if NearInt(nx / (ev.pulse or 1), EPS) then return rate - 0.1 end
+    end
+    return rate
+end
+
 local function PosRate(ev)
+    if not Gen5Is44(ev) then return MeterRate(ev) end
     return CAP_KEEP_RATE[BarPosKey(ev)] or CAP_CLASS_RATE[Gen5BeatClass(ev)] or 0.5
+end
+
+-- The song-wide cap's group for an onset: its bar position, and in a bar not in 4/4 its
+-- meter too, so 6/4's "and" of 2 is not removed along with 4/4's.
+local function CapGroupKey(ev)
+    if Gen5Is44(ev) then return BarPosKey(ev) end
+    return ('%s@%g/%g'):format(BarPosKey(ev), ev.bar_len or 4, ev.pulse or 1)
 end
 
 -- Retimed notes (Gen5RetimeDenseRuns) are already the reduction: never removed again.
@@ -127,7 +154,7 @@ local function CapKeep(events, keep, cap, protect_isolated, n_upper)
         if keep[i] then
             kept = kept + 1
             if IsCandidate(ev) and not (protect_isolated and IsIsolated(events, i)) then
-                local key = BarPosKey(ev)
+                local key = CapGroupKey(ev)
                 local g = groups[key]
                 if not g then
                     g = { key = key, members = {}, rate = PosRate(ev) }
@@ -193,10 +220,11 @@ end
 -- already leaves empty, at least one - unless two or more slots are empty already, then
 -- none: Drop 2 on a bar of straight 8ths takes two, on a bar with one rest one, on a bar
 -- with two rests nothing. Which notes go:
---   1. the RBN doc positions first - "remove every fourth note per half measure", the and
---      of 2 and the and of 4 (with Drop 1 the and of 4 wins: official Hard drops it most);
---   2. then the other off-beats, least-kept bar position first (CAP_KEEP_RATE), the later
---      one on a tie;
+--   1. in 4/4, the RBN doc positions first - "remove every fourth note per half measure",
+--      the and of 2 and the and of 4 (with Drop 1 the and of 4 wins: official Hard drops it
+--      most);
+--   2. then the other off-beats, least-kept bar position first (PosRate: CAP_KEEP_RATE in
+--      4/4, MeterRate in other meters), the later one on a tie;
 --   3. protected notes (ProtectedSet) last, whatever their position.
 -- Rhythm, length and chord size only - never colors.
 --
@@ -257,9 +285,12 @@ local function ThinBusyBars(events, keep, min_onsets, protect_isolated, n_drop, 
                     local cands = {}
                     for _, i in ipairs(b.idx) do
                         if keep[i] and IsCandidate(events[i]) and not (protect_isolated and IsIsolated(events, i)) then
+                            -- The doc's positions are halves of a 4/4 bar; any other bar goes
+                            -- by PosRate alone (in 3/4 the and of 3, not the and of 2).
                             local key = BarPosKey(events[i])
+                            local doc = Gen5Is44(events[i]) and (key == '1.500' or key == '3.500')
                             cands[#cands + 1] = { i = i, r = PosRate(events[i]), p = prot[i] and 1 or 0,
-                                                  doc = (key == '1.500' or key == '3.500') and 0 or 1 }
+                                                  doc = doc and 0 or 1 }
                         end
                     end
                     table.sort(cands, function(a, c)
@@ -326,9 +357,12 @@ end
 -- A keys lick that starts on an "and" (GEN5_PARAMS.and_phrase)
 ----------------------------------------------------------------------
 
+-- "And" and beat are quarter-note ideas: in a compound meter (6/8) the 8th after a beat is
+-- not an "and", and 1.5 QN is a beat, so no onset there counts as either and the rule
+-- stays out of those bars.
 local function BarPos(ev) return ev.bar_qn or ev.qn % 4 end
-local function OnAnd(ev) return NearInt(BarPos(ev) - 0.5, EPS) end
-local function OnBeat(ev) return NearInt(BarPos(ev), EPS) end
+local function OnAnd(ev) return (ev.pulse or 1) == 1 and NearInt(BarPos(ev) - 0.5, EPS) end
+local function OnBeat(ev) return (ev.pulse or 1) == 1 and NearInt(BarPos(ev), EPS) end
 
 -- How often a line of notes changes note, per step (0 = one note repeated, 1 = a new
 -- note every time). Colours on Keys, pitches on Pro Keys.
@@ -375,7 +409,7 @@ end
 -- The beat class of an onset in a phrase reduced on the "and" grid: classed as if half a
 -- beat earlier, so the "and" of 4 that opens it counts as the downbeat.
 local function ShiftedClass(ev)
-    return Gen5BeatClass({ qn = ev.qn - 0.5, down = math.abs(BarPos(ev) - 0.5) <= EPS })
+    return Gen5BeatClass({ qn = ev.qn - 0.5, bar_qn = BarPos(ev) - 0.5, down = math.abs(BarPos(ev) - 0.5) <= EPS })
 end
 
 -- The class an onset weighs as: shifted inside an "and" phrase, else its own.
@@ -408,7 +442,7 @@ local function Weights(kind, dl, events, shifted)
                 -- Only against a single note it competes with (within the tier's gap): a
                 -- bonus on every chord of an all-chord passage only rewarded keeping more
                 -- of them, off-beats over the downbeat (chronosp bars 18-19).
-                local gap = MinGapQN(dl, ev.bpm)
+                local gap = MinGapQN(dl, ev.bpm, ev.pulse)
                 for j = i - 1, i + 1, 2 do
                     local o = events[j]
                     if o and #o.offs == 1 and math.abs(o.qn - ev.qn) < gap - EPS then
@@ -430,7 +464,7 @@ local function Bars(events)
         local key = ('%.3f'):format(start)
         local b = bars[key]
         if not b then
-            b = { key = key, start = start, len = ev.bar_len or 4, idx = {} }
+            b = { key = key, start = start, len = ev.bar_len or 4, pulse = ev.pulse or 1, idx = {} }
             bars[key] = b
             order[#order + 1] = b
         end
@@ -465,7 +499,7 @@ local function FillBeats(events, keep, w, shifted)
         return not (near_l and near_r)
     end
     for _, b in ipairs(Bars(events)) do
-        local beats = math.floor(b.len + EPS)
+        local beats = math.floor(b.len / b.pulse + EPS)   -- a 6/8 bar has two
         local n = 0
         for _, i in ipairs(b.idx) do if keep[i] then n = n + 1 end end
         if #b.idx > beats and n < beats then
@@ -516,7 +550,7 @@ local function SnapRewrittenToBeats(events)
                 local bar_qn = ev.bar_qn + d
                 ev = { qn = src, qn_e = ev.qn_e + d, qn_e_full = (ev.qn_e_full or ev.qn_e) + d,
                        offs = ev.offs, bpm = ev.bpm, bar_qn = bar_qn,
-                       bar_len = ev.bar_len, down = math.abs(bar_qn) <= EPS, hopo = ev.hopo, src_qn = src }
+                       bar_len = ev.bar_len, pulse = ev.pulse, down = math.abs(bar_qn) <= EPS, hopo = ev.hopo, src_qn = src }
                 moved = true
             end
         end
@@ -700,7 +734,7 @@ function Gen5SelectOnsets(kind, dl, events, opts, log)
         weights = Weights(kind, dl, events, shifted)
         keep = SelectByGap(events, function(ev, earlier)
             if ev.retimed or earlier.retimed then return MIN_LEN_QN end
-            return MinGapQN(dl, ev.bpm)
+            return MinGapQN(dl, ev.bpm, ev.pulse)
         end, weights)
     end
 

@@ -1548,3 +1548,94 @@ Test.it('at or below 160 BPM a shorter run is thinned as before, with no busy-ba
     Test.expect(#(llog.retimed_bars or {}) == 0, 'the lick was rewritten')
     for _, ev in ipairs(lick) do Test.expect(not ev.flourish, ('flourish marked at %g at 120 BPM'):format(ev.qn)) end
 end)
+
+Test.section('Generate planner - time signatures')
+
+-- `bars` bars of straight 8ths, each bar_len QN long with the given pulse (Gen5PulseQN).
+local function MeterBars(bars, bar_len, pulse, bpm)
+    local events = {}
+    for b = 0, bars - 1 do
+        for k = 0, bar_len * 2 - 1 do
+            local qn = b * bar_len + k * 0.5
+            events[#events + 1] = { qn = qn, qn_e = qn + 0.25, offs = { k % 4 }, bpm = bpm, down = k == 0,
+                                    bar_qn = k * 0.5, bar_len = bar_len, pulse = pulse }
+        end
+    end
+    return events
+end
+
+-- Bar b's kept positions (QN from its bar line) as text.
+local function BarKept(out, b, bar_len)
+    local pos = {}
+    for _, ev in ipairs(out) do
+        local q = ev.qn - b * bar_len
+        if q >= -1e-6 and q < bar_len - 1e-6 then pos[#pos + 1] = ('%g'):format(q) end
+    end
+    return table.concat(pos, ' ')
+end
+
+Test.it('the beat of a time signature: a dotted quarter in 6/8, 9/8 and 12/8, else a quarter note', function()
+    for _, c in ipairs({ { 4, 4, 1 }, { 3, 4, 1 }, { 6, 4, 1 }, { 2, 2, 1 }, { 6, 8, 1.5 }, { 9, 8, 1.5 },
+                         { 12, 8, 1.5 }, { 3, 8, 1 }, { 5, 8, 1 }, { 7, 8, 1 } }) do
+        local got = Gen5PulseQN(c[1], c[2])
+        Test.expect(got == c[3], ('%d/%d: pulse %s, expected %s'):format(c[1], c[2], tostring(got), tostring(c[3])))
+    end
+end)
+
+Test.it('beat classes count from the bar line, in the bar\'s own beat', function()
+    -- A 7/8 bar is 3.5 QN, so the next bar's beats fall on whole-QN "ands" of the song.
+    Test.expect(Gen5BeatClass({ qn = 4.5, bar_qn = 1, bar_len = 4 }) == 'beat', 'beat 2 after a 7/8 bar')
+    Test.expect(Gen5BeatClass({ qn = 5, bar_qn = 1.5, bar_len = 4 }) == '8th', 'its "and" of 2')
+    -- 6/8: the second beat is 1.5 QN; 1 and 2 QN are 8ths.
+    Test.expect(Gen5BeatClass({ qn = 1.5, bar_qn = 1.5, bar_len = 3, pulse = 1.5 }) == 'beat', '6/8 beat 2')
+    Test.expect(Gen5BeatClass({ qn = 1, bar_qn = 1, bar_len = 3, pulse = 1.5 }) == '8th', '6/8 third 8th')
+end)
+
+Test.it('6/8: Medium and Easy keep the bar\'s two beats, not three quarter notes across them', function()
+    -- vm_loiri_sydameeni_joulu_teen: counted in quarter notes, Medium kept 0, 1 and 2 of
+    -- each bar. Official 6/8 Medium keeps 0 and 1.5 in 97% of cases.
+    local hard = MeterBars(8, 3, 1.5, 105)
+    for _, dl in ipairs({ 'M', 'E' }) do
+        local out = Gen5PlanTier('gb', dl, hard)
+        for b = 0, 7 do
+            local got = BarKept(out, b, 3)
+            Test.expect(got == '0 1.5', ('%s bar %d keeps [%s], expected [0 1.5]'):format(dl, b, got))
+        end
+    end
+end)
+
+Test.it('6/8 and 3/4: a Hard bar of six 8ths loses the 8th before the bar line first', function()
+    -- Drop 1: 6/8 and 3/4 alike lose 2.5. Drop 2: 6/8 also loses the 8th before its second
+    -- beat (official 6/8 Hard: 0 0.5 1.5 2 in 77 of 129 such bars); 3/4 the and of 2 (official
+    -- slow 3/4 Hard: 0 0.5 1 2 in 15 of 16) - never 4/4's half-bar position by mistake.
+    for _, c in ipairs({ { 1.5, 1, '0 0.5 1 1.5 2' }, { 1.5, 2, '0 0.5 1.5 2' },
+                         { 1,   1, '0 0.5 1 1.5 2' }, { 1,   2, '0 0.5 1 2' } }) do
+        local out = Gen5PlanTier('gb', 'H', MeterBars(8, 3, c[1], 105), { busy_drop = c[2] })
+        for b = 0, 7 do
+            local got = BarKept(out, b, 3)
+            Test.expect(got == c[3], ('%s Drop %d bar %d keeps [%s], expected [%s]')
+                :format(c[1] == 1 and '3/4' or '6/8', c[2], b, got, c[3]))
+        end
+    end
+end)
+
+Test.it('6/8: no keys "and" phrase - the 8th after a beat is not an "and" there', function()
+    -- A line from the bar's 2nd 8th whose 0.5/1.5/2.5 notes change and whose 0/1/2 notes
+    -- repeat: counted in quarter notes it read as a lick on the "and"s, with 1.5 - a 6/8
+    -- beat - among them.
+    local events = {}
+    for b = 0, 3 do
+        for k = 0, 5 do
+            if b > 0 or k > 0 then
+                local q = k * 0.5
+                local offs = (k % 2 == 1) and { (b * 3 + k) % 5 } or { 0 }
+                events[#events + 1] = { qn = b * 3 + q, qn_e = b * 3 + q + 0.25, offs = offs, bpm = 105,
+                                        down = k == 0, bar_qn = q, bar_len = 3, pulse = 1.5 }
+            end
+        end
+    end
+    Test.expect(#Gen5AndPhrases(events, 'k5') == 0, 'a 6/8 line was read as an "and" phrase')
+    -- The control: the same line in 3/4 IS one, so the test exercises the rule.
+    for _, ev in ipairs(events) do ev.pulse = 1 end
+    Test.expect(#Gen5AndPhrases(events, 'k5') == 1, 'the 3/4 control is no "and" phrase - the test proves nothing')
+end)

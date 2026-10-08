@@ -5,7 +5,7 @@
 -- evaluation like the 5-lane planner.
 --
 -- Input event:  { qn, qn_e, offs = { MIDI pitches 48-72, ascending }, bpm, down, bar_qn,
---   bar_len } - the 5-lane planner's event with real pitches in offs (the action reads
+--   bar_len, pulse } - the 5-lane planner's event with real pitches in offs (the action reads
 --   Pro Keys with a range low of 0). Output events have the same shape, so the next tier
 --   of a chain is built from them.
 --
@@ -294,7 +294,7 @@ function GenPKPlanTier(dl, events, opts)
             local offs = GenPKReduceChord(ev.offs, dl)
             if #offs ~= #ev.offs then log.chords_reduced = log.chords_reduced + 1 end
             out[#out + 1] = { qn = ev.qn, qn_e = ev.qn_e, qn_e_full = ev.qn_e_full or ev.qn_e, offs = offs,
-                              bpm = ev.bpm, down = ev.down, bar_qn = ev.bar_qn, bar_len = ev.bar_len,
+                              bpm = ev.bpm, down = ev.down, bar_qn = ev.bar_qn, bar_len = ev.bar_len, pulse = ev.pulse,
                               rewritten = ev.retimed or ev.joined, beat_qn = ev.beat_qn }
         end
     end

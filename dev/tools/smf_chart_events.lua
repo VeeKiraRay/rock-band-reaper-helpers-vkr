@@ -8,13 +8,15 @@
 --   local timing = SmfSongTiming(song)
 --   local events = SmfTierEvents(SmfFindTrack(song, 'PART GUITAR'), 96, song.tpqn, timing)
 --
--- Event: { tick, qn, qn_e, offs (gem offsets from lo, ascending), bpm, bar_qn, bar_len, down }.
+-- Event: { tick, qn, qn_e, offs (gem offsets from lo, ascending), bpm, bar_qn, bar_len, pulse, down }.
+-- pulse is the bar's beat (Gen5PulseQN, difficulty_generate_params.lua - load that first).
 -- Positions are tick / tpqn, so they are exact - the REAPER action reaches the same values
 -- by snapping its seconds-based reads (actions_difficulty_generate.lua, SnapQN).
 
 -- Tempo, bar position and bar number for any tick.
 -- Returns { Bpm(tick), BarPos(tick) -> bar_qn, is_downbeat, BarLen(tick) -> QN,
---   BarNumber(tick) -> 1-based }.
+--   Sig(tick) -> num, den, BarNumber(tick) -> 1-based }. Bpm is quarter notes per minute
+--   in every time signature, as the file stores it.
 function SmfSongTiming(song)
     local tempo = SmfTempoMap(song)
     local sigs = {}
@@ -45,6 +47,10 @@ function SmfSongTiming(song)
         return pos / tpqn, pos <= tol or meas - pos <= tol
     end
     function timing.BarLen(tick) return MeasTicks(Seg(sigs, tick)) / tpqn end
+    function timing.Sig(tick)
+        local sig = Seg(sigs, tick)
+        return sig.num, sig.den
+    end
     function timing.BarNumber(tick)
         local bars = 0
         for i, sig in ipairs(sigs) do
@@ -85,6 +91,7 @@ function SmfProKeysEvents(trk, tpqn, timing, opts)
         ev.bpm = timing.Bpm(n0.tick)
         ev.bar_qn, ev.down = timing.BarPos(n0.tick)
         ev.bar_len = timing.BarLen(n0.tick)
+        ev.pulse   = Gen5PulseQN(timing.Sig(n0.tick))
         events[#events + 1] = ev
         i = j
     end
@@ -123,6 +130,7 @@ function SmfTierEvents(trk, lo, tpqn, timing, opts)
         ev.bpm = timing.Bpm(n0.tick)
         ev.bar_qn, ev.down = timing.BarPos(n0.tick)
         ev.bar_len = timing.BarLen(n0.tick)
+        ev.pulse   = Gen5PulseQN(timing.Sig(n0.tick))
         events[#events + 1] = ev
         i = j
     end

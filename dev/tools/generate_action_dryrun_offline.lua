@@ -168,7 +168,18 @@ local api = {
     time_precise = function() return os.clock() end,
     TimeMap2_timeToQN = function(_, t) return TimeToQN(t) end,
     TimeMap2_QNToTime = function(_, qn) return QNToTime(qn) end,
-    TimeMap_GetDividedBpmAtTime = function(t) return SegBy('t', t).bpm end,
+    -- As REAPER: the tempo of the time signature's own beat, "2x in /8 signatures". The
+    -- planner must not use it (Generate once did, and 6/8 songs read at double tempo);
+    -- faithful here so such a read shows up offline too.
+    TimeMap_GetDividedBpmAtTime = function(t)
+        local ts = SigAt(TimeToQN(t))
+        return SegBy('t', t).bpm * ts.denom / 4
+    end,
+    TimeMap_GetTimeSigAtTime = function(_, t)
+        local ts = SigAt(TimeToQN(t))
+        return ts.num, ts.denom, SegBy('t', t).bpm
+    end,
+    Master_GetTempo = function() return SEG[1] and SEG[1].bpm or 120 end,
     TimeMap2_timeToBeats = function(_, t)
         local qn = TimeToQN(t)
         local ts, meas = SigAt(qn)

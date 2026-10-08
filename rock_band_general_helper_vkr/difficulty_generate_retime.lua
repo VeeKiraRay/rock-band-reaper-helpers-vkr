@@ -49,6 +49,8 @@ local function TargetGrid(spacings)
 end
 
 local function NearInt(x, tol) return math.abs(x - math.floor(x + 0.5)) <= tol end
+-- On one of its bar's beats (a dotted quarter in 6/8). Needs bar_qn.
+local function OnBeat(ev, tol) return NearInt(ev.bar_qn / (ev.pulse or 1), tol) end
 
 local function ShapeKey(ev) return table.concat(ev.offs, ',') end
 
@@ -169,8 +171,8 @@ function Gen5RetimeDenseRuns(events, opts)
                        or last.qn - first.qn + step < (first.bar_len or 4) * p.retime_min_run.slow - eps then
                         for k = i, j do dense[k] = nil end
                     end
-                elseif j - i + 1 <= 3 and first.bar_qn and NearInt(first.bar_qn, eps)
-                   and last.bar_qn and not NearInt(last.bar_qn, eps) then
+                elseif j - i + 1 <= 3 and first.bar_qn and OnBeat(first, eps)
+                   and last.bar_qn and not OnBeat(last, eps) then
                     for k = i, j do dense[k] = nil; events[k].flourish = true end
                 end
                 i = j + 1
@@ -214,7 +216,7 @@ function Gen5RetimeDenseRuns(events, opts)
         local key = ('%.3f'):format(start)
         local b = bars[key]
         if not b then
-            b = { start = start, len = ev.bar_len or 4, idx = {} }
+            b = { start = start, len = ev.bar_len or 4, pulse = ev.pulse or 1, idx = {} }
             bars[key] = b
             order[#order + 1] = b
         end
@@ -241,8 +243,10 @@ function Gen5RetimeDenseRuns(events, opts)
         end
         if #spacings > 0 then
             local grid = TargetGrid(spacings)
+            -- Halves only when the middle of the bar is a beat: 4/4's beat 3, 6/8's second
+            -- dotted quarter. A 3/4 bar is one segment (its middle is the and of 2).
             local half = b.len / 2
-            local segs = NearInt(half, eps) and { { b.start, b.start + half }, { b.start + half, b.start + b.len } }
+            local segs = NearInt(half / b.pulse, eps) and { { b.start, b.start + half }, { b.start + half, b.start + b.len } }
                          or { { b.start, b.start + b.len } }
             local changed = false
             for _, seg in ipairs(segs) do
@@ -279,7 +283,7 @@ function Gen5RetimeDenseRuns(events, opts)
                 for _, run in ipairs(runs) do
                     local last_i = run.idx[#run.idx]
                     local last, nx = events[last_i], events[last_i + 1]
-                    local land = last.bar_qn and NearInt(last.bar_qn, eps)
+                    local land = last.bar_qn and OnBeat(last, eps)
                                  and (not nx or nx.qn - last.qn >= 1 - eps)
                     -- Notes that stay put just outside this segment also hold slots off.
                     local lo = run.lo or -math.huge
@@ -360,7 +364,7 @@ function Gen5RetimeDenseRuns(events, opts)
                 local qn = moved[i]
                 local bar_s = ev.bar_qn and (ev.qn - ev.bar_qn) or math.floor(ev.qn / 4) * 4
                 out[#out + 1] = { qn = qn, qn_e = qn + (ev.qn_e - ev.qn), offs = ev.offs, bpm = ev.bpm,
-                                  bar_qn = qn - bar_s, bar_len = ev.bar_len,
+                                  bar_qn = qn - bar_s, bar_len = ev.bar_len, pulse = ev.pulse,
                                   down = math.abs(qn - bar_s) <= eps, retimed = true,
                                   hopo = ev.hopo }
             else
@@ -382,7 +386,8 @@ function Gen5RetimeDenseRuns(events, opts)
     local best = {}
     for _, ev in ipairs(out) do
         if ev.retimed and ev.bar_qn then
-            local beat = ev.qn - ev.bar_qn + math.floor(ev.bar_qn + 0.5)
+            local pulse = ev.pulse or 1
+            local beat = ev.qn - ev.bar_qn + math.floor(ev.bar_qn / pulse + 0.5) * pulse
             local d = math.abs(ev.qn - beat)
             local x = expert_at[Key(beat)]
             if d > eps and d <= 0.25 + eps and x and not on[Key(beat)] then

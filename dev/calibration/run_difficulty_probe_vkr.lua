@@ -180,7 +180,7 @@ local function Annotate(events)
         ev.qn    = r.TimeMap2_timeToQN(0, ev.s)
         ev.qn_e  = r.TimeMap2_timeToQN(0, ev.e)
         ev.class = BeatClass(ev.s, ev.qn)
-        ev.bpm   = select(1, r.TimeMap_GetDividedBpmAtTime(ev.s)) or 120
+        ev.bpm   = GetBPMAt(ev.s)   -- quarter notes per minute; the "divided" BPM is 2x in /8
     end
 end
 
@@ -275,7 +275,7 @@ local function ProbeInstrument(song, inst, rank, from_idx)
     end
     if #ev_by_tier.X == 0 then return ('%s: %s has no Expert notes'):format(song.shortname, inst.track) end
 
-    local bpm_first = select(1, r.TimeMap_GetDividedBpmAtTime(ev_by_tier.X[1].s)) or 0
+    local bpm_first = GetBPMAt(ev_by_tier.X[1].s)
 
     for _, dl in ipairs(TIERS) do
         local events = ev_by_tier[dl]

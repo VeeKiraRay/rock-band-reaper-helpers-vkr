@@ -6,11 +6,14 @@
 -- code the helper ships. The REAPER side - reading tracks, writing notes, undo - lives
 -- in actions_difficulty_generate.lua.
 --
--- Input event:  { qn, qn_e, offs = { gem offsets 0-4, ascending }, bpm, down, bar_qn, bar_len }
---   qn / qn_e - onset and end in quarter notes; bpm - tempo at the onset;
+-- Input event:  { qn, qn_e, offs = { gem offsets 0-4, ascending }, bpm, down, bar_qn, bar_len, pulse }
+--   qn / qn_e - onset and end in quarter notes; bpm - tempo at the onset, in quarter
+--               notes per minute whatever the time signature;
 --   down      - true when the onset is on a bar line;
 --   bar_qn    - quarter notes from the bar line (optional; 4/4 is assumed without it);
---   bar_len   - length of the onset's bar in quarter notes (optional; 4 without it).
+--   bar_len   - length of the onset's bar in quarter notes (optional; 4 without it);
+--   pulse     - the bar's beat in quarter notes, Gen5PulseQN (optional; 1 without it,
+--               1.5 in 6/8, 9/8 and 12/8).
 -- Output event: { qn, qn_e, offs } with offs relative to the TARGET tier's lowest pitch.
 --
 -- What it aims for is what official charts do, not merely what Validate requires:
@@ -143,7 +146,7 @@ function Gen5PlanTier(kind, dl, events, opts)
             if guide_len and guide_len[i] then qn_e, full = ev.qn + guide_len[i], ev.qn + guide_len[i] end
             -- bar_qn carried through: the next tier in a chain is built from this one.
             out[#out + 1] = { qn = ev.qn, qn_e = qn_e, qn_e_full = full, offs = offs, bpm = ev.bpm, down = ev.down,
-                              bar_qn = ev.bar_qn, bar_len = ev.bar_len,
+                              bar_qn = ev.bar_qn, bar_len = ev.bar_len, pulse = ev.pulse,
                               -- Expert's hammer-on, and whether the fast-run rewrite
                               -- moved the note, for the force-HOPO markers on Hard
                               -- (difficulty_generate_hopo.lua). Not `retimed` itself:
