@@ -109,8 +109,10 @@ end
 
 -- events: the upper tier (planner input, sorted). opts = { gap = fn(ev) -> the tier's
 -- minimum gap at that onset, eps = tolerance }.
--- A DENSE onset is closer than gap(ev) to a neighbour, on a song faster than
--- GEN5_PARAMS.fast_8ths_bpm. Bars holding dense onsets are rewritten:
+-- A DENSE onset is closer than gap(ev) to a neighbour. Above GEN5_PARAMS.fast_8ths_bpm any
+-- dense run is rewritten (but a short flourish); at or below it only a run lasting at least
+-- GEN5_PARAMS.retime_min_run.slow of its bar - shorter ones are thinned as before. Bars
+-- holding dense onsets are rewritten:
 --   * grid: one step slower than the bar's closest dense notes (TargetGrid);
 --   * segments: half bars, anchored on the bar line and the middle of the bar (one segment
 --     when the bar does not split into whole beats), so a bar never loses only its end;
@@ -120,24 +122,29 @@ end
 --   * a run that LANDS - its last note on a beat, then a beat or more of silence - keeps
 --     landing there: no slot after that beat;
 --   * a 16th rest before a note on the 8th grid stays: the run restarts at that note;
---   * a group that runs straight into the next half bar's beat counts its grid back from
---     that beat, so it still leads into it;
+--   * a LONG run (half a bar or more) sits on one grid aligned to the beats, between its
+--     first and last Expert notes, with no free step before the next half bar while it
+--     carries on into it (no break in the middle of a run);
+--   * a short group that runs straight into the next half bar's beat counts its grid back
+--     from that beat, so it still leads into it;
 --   * Assign picks which notes go to which slot.
 -- Returns (events, retimed_bars): a new event list with the rewritten notes moved
 -- (retimed = true) and the dropped ones gone, and { { start = bar start QN, grid }... } for
 -- every bar that changed.
 function Gen5RetimeDenseRuns(events, opts)
     local p, eps = GEN5_PARAMS, opts.eps
+    -- opts.mode: 'auto' | 'thin' | 'rewrite' (GEN5_PARAMS.fast_runs_default when unset).
+    local mode = opts.mode or p.fast_runs_default
+    if mode == 'thin' then return events, {} end
     local dense, any = {}, false
     for i, ev in ipairs(events) do
-        if (ev.bpm or 120) > p.fast_8ths_bpm then
-            local g = opts.gap(ev) - eps
-            local pv, nx = events[i - 1], events[i + 1]
-            if (pv and ev.qn - pv.qn < g) or (nx and nx.qn - ev.qn < g) then
-                dense[i], any = true, true
-            end
+        local g = opts.gap(ev) - eps
+        local pv, nx = events[i - 1], events[i + 1]
+        if (pv and ev.qn - pv.qn < g) or (nx and nx.qn - ev.qn < g) then
+            dense[i], any = true, true
         end
     end
+    local function Fast(ev) return (ev.bpm or 120) > p.fast_8ths_bpm end
     -- A short flourish into 8ths is thinned on the 8th grid, not rewritten: a run of at
     -- most 3 dense notes that starts on a beat and ends off it (chronosp bass bar 73:
     -- G G R | R R, 16ths then 8ths). As triplets its last note ran on into the 8ths at the
@@ -152,7 +159,17 @@ function Gen5RetimeDenseRuns(events, opts)
                 local j = i
                 while dense[j + 1] and events[j + 1].qn - events[j].qn < opts.gap(events[j]) - eps do j = j + 1 end
                 local first, last = events[i], events[j]
-                if j - i + 1 <= 3 and first.bar_qn and NearInt(first.bar_qn, eps)
+                local step = j > i and (events[i + 1].qn - first.qn) or 0
+                if not Fast(first) then
+                    -- At or below fast_8ths_bpm only a run lasting retime_min_run.slow of its
+                    -- bar is rewritten ('auto': none); a shorter one is thinned as before -
+                    -- and is NOT marked flourish, which would switch the busy-bar rule on in
+                    -- a slow song (korpiklaani changed 62 bars that way in a trial).
+                    if mode == 'auto'
+                       or last.qn - first.qn + step < (first.bar_len or 4) * p.retime_min_run.slow - eps then
+                        for k = i, j do dense[k] = nil end
+                    end
+                elseif j - i + 1 <= 3 and first.bar_qn and NearInt(first.bar_qn, eps)
                    and last.bar_qn and not NearInt(last.bar_qn, eps) then
                     for k = i, j do dense[k] = nil; events[k].flourish = true end
                 end
@@ -165,6 +182,31 @@ function Gen5RetimeDenseRuns(events, opts)
         for k in pairs(dense) do if dense[k] then any = true; break end end
     end
     if not any then return events, {} end
+
+    -- LONG runs: dense notes that keep going for half a bar or more (a 16th rest ends a
+    -- run). Their rewrite stays inside the notes Expert plays - no slot before its first or
+    -- after its last note - on one beat-aligned grid with no break where it crosses the
+    -- middle of the bar (user rules, 2026-10-07: korpiklaani keys bar 26's run of 16ths from
+    -- the "and" of 1 was laid out from the downbeat, a note where Expert has none; Pro Keys
+    -- bars 26/32/53/55 then broke at beat 3). Short groups keep the layouts below, which
+    -- the hand-reduced chronosp solo verified (bars 20-24, 162).
+    local long = {}
+    do
+        local i = 1
+        while i <= #events do
+            if dense[i] then
+                local j = i
+                while dense[j + 1] and events[j + 1].qn - events[j].qn < opts.gap(events[j]) - eps do j = j + 1 end
+                local step = j > i and (events[i + 1].qn - events[i].qn) or 0
+                if events[j].qn - events[i].qn + step >= (events[i].bar_len or 4) / 2 - eps then
+                    for k = i, j do long[k] = true end
+                end
+                i = j + 1
+            else
+                i = i + 1
+            end
+        end
+    end
 
     local bars, order = {}, {}
     for i, ev in ipairs(events) do
@@ -251,6 +293,18 @@ function Gen5RetimeDenseRuns(events, opts)
                     -- A grid step stays free before the next half bar, whose first slot is
                     -- its beat.
                     local g0 = run.start_at or h0
+                    -- A LONG run (see `long` above) - a restart after a 16th rest too - sits
+                    -- on one grid aligned to the beats, between its first and last Expert
+                    -- notes, laid out forward, and with no free step before the next half
+                    -- bar while it carries on into it: no break in the middle of a run.
+                    -- Expert's first note drops when it falls between grid points (bar 55 of
+                    -- korpiklaani's Pro Keys: 12-72 -> 16 24 32 40 48 56 64 72, the user's
+                    -- drawing; chronosp's riff 12-90 -> 16 24 32 40 | 48, its hand reduction).
+                    local is_long = long[run.idx[1]]
+                    local late_long = is_long and run.notes[1].qn > h0 + eps
+                    if is_long then g0 = h0 end
+                    local carries = is_long and events[last_i + 1] and dense[last_i + 1]
+                                    and events[last_i + 1].qn >= h1 - eps
                     local slots, anchor = {}, false
                     -- A group that runs straight into the next half bar's beat (beat 3, or
                     -- the next bar's downbeat) leads into it: its grid counts back from that
@@ -260,7 +314,7 @@ function Gen5RetimeDenseRuns(events, opts)
                     -- keeps the forward grid - on a whole half bar both give the same slots.
                     local joins = nx and math.abs(nx.qn - h1) <= eps
                                   and nx.qn - last.qn < opts.gap(last) - eps
-                    if joins and math.abs(run.notes[1].qn - h0) > eps then
+                    if joins and math.abs(run.notes[1].qn - h0) > eps and not late_long then
                         local floor = math.max(h0, run.start_at or (lo + grid))
                         local k = 1
                         while h1 - k * grid >= floor - eps do
@@ -270,8 +324,10 @@ function Gen5RetimeDenseRuns(events, opts)
                     else
                         for k = 0, math.floor((h1 - g0) / grid + eps) do
                             local s = g0 + k * grid
-                            if s <= h1 - grid + eps and s >= lo + grid - eps and s <= hi - grid + eps
-                               and not (land and s > last.qn + eps) then
+                            if (s <= h1 - grid + eps or (carries and s < h1 - eps))
+                               and s >= lo + grid - eps and s <= hi - grid + eps
+                               and not (land and s > last.qn + eps)
+                               and not (is_long and (s < run.notes[1].qn - eps or s > last.qn + eps)) then
                                 slots[#slots + 1] = s
                             end
                         end

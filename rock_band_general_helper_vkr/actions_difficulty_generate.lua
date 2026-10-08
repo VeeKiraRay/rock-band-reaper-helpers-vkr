@@ -429,7 +429,7 @@ end
 -- Track: by name in All instruments, else the Guitar sub-tab's selection - and by name
 -- when nothing is selected there, since Bass and Keys always follow PART GUITAR.
 -- Returns { H = log.busy_bars, M = log.rhythm_bars } (entries nil when there is nothing).
-local function GuitarRefs(sel_s, sel_e, by_name, busy_drop, first_tier)
+local function GuitarRefs(sel_s, sel_e, by_name, busy_drop, first_tier, fast_runs)
     local refs = {}
     if first_tier == 'E' then return refs end
     local inst = GenInstrumentByKey('gtr')
@@ -442,7 +442,7 @@ local function GuitarRefs(sel_s, sel_e, by_name, busy_drop, first_tier)
     local upper = ToPlannerEvents(src, RangeLo(inst, src_dl))
     if first_tier == 'H' then
         local log
-        upper, log = Gen5PlanTier('gb', 'H', upper, { busy_drop = busy_drop })
+        upper, log = Gen5PlanTier('gb', 'H', upper, { busy_drop = busy_drop, fast_runs = fast_runs })
         refs.H = log.busy_bars
     end
     local _, mlog = Gen5PlanTier('gb', 'M', upper)
@@ -624,13 +624,15 @@ function GenerateDifficulties(inst_key, tiers, force, answers)
 
     -- 'auto' (or anything else) leaves busy_drop unset: the planner decides from the tempo
     -- at the first note.
+    -- Hard fast runs: 'auto' | 'thin' | 'rewrite' (GEN5_PARAMS.fast_runs_default).
+    local fast_runs = S.diff_gen_fast_runs
     local busy = S.diff_gen_busy_drop
     local busy_drop = (busy == 1 or busy == 2) and busy or nil
     -- Guitar leads Bass, Keys and Pro Keys on Hard's busy bars and Medium's rhythm (GuitarRefs).
     local refs = {}
     for _, job in ipairs(jobs) do
         if job.inst.key ~= 'gtr' then
-            refs = GuitarRefs(sel_s, read_e, inst_key == GEN_ALL_KEY, busy_drop, tiers[1])
+            refs = GuitarRefs(sel_s, read_e, inst_key == GEN_ALL_KEY, busy_drop, tiers[1], fast_runs)
             break
         end
     end
@@ -643,7 +645,7 @@ function GenerateDifficulties(inst_key, tiers, force, answers)
     if answers.pk_pull_back == nil and tiers[1] == 'H' then
         for _, job in ipairs(jobs) do
             if job.inst.kind == 'pk' then
-                local out = GenPKPlanTier('H', job.src, { busy_drop = busy_drop, busy_ref = refs.H,
+                local out = GenPKPlanTier('H', job.src, { busy_drop = busy_drop, busy_ref = refs.H, fast_runs = fast_runs,
                                                           shifts = job.src_shifts })
                 if #out > 0 and GenPKSameAsUpper(out, job.src) then
                     S.diff_copy_pending = {
@@ -697,7 +699,7 @@ function GenerateDifficulties(inst_key, tiers, force, answers)
                                       + r.GetMediaItemInfo_Value(d.item, 'D_LENGTH'))
             local guide = inst.kind == 'k5'
                 and ProKeysGuide(dl, sel_s, read_e, inst_key == GEN_ALL_KEY, pk_generated) or nil
-            local opts = { guide = guide, busy_drop = busy_drop,
+            local opts = { guide = guide, busy_drop = busy_drop, fast_runs = fast_runs,
                            busy_ref   = inst.key ~= 'gtr' and dl == 'H' and refs.H or nil,
                            rhythm_ref = inst.key ~= 'gtr' and dl == 'M' and refs.M or nil }
             -- Pro Keys in a time selection. A tier with no notes outside the selection is
@@ -709,9 +711,9 @@ function GenerateDifficulties(inst_key, tiers, force, answers)
             if inst.kind == 'pk' then
                 opts.shifts = upper_shifts
                 if sel_s then
-                    local tier_shifts, tier_events = ReadPKTierEvents(d.track)
+                    local tier_shifts, tier_notes = ReadPKTierEvents(d.track)
                     local outside = false
-                    for _, ev in ipairs(tier_events) do
+                    for _, ev in ipairs(tier_notes) do
                         if ev.s < sel_s - 0.001 or ev.s >= sel_e then outside = true; break end
                     end
                     if not outside then
@@ -832,6 +834,15 @@ function GenerateDifficulties(inst_key, tiers, force, answers)
                 100 * log.kept / math.max(1, log.upper),
                 log.guided and (', following PART REAL_KEYS_' .. dl) or '')
             if #parts > 0 then lines[#lines + 1] = '    ' .. table.concat(parts, ', ') end
+            -- Keys plays Pro Keys' onsets exactly; a Pro Keys note with no Keys note within a
+            -- 32nd means the two Expert charts differ there (they are meant to match).
+            if log.guided and log.guide_missed and #log.guide_missed > 0 then
+                local bars = {}
+                for _, q in ipairs(log.guide_missed) do bars[#bars + 1] = MeasureAt(q) end
+                lines[#lines + 1] = ('    %d PART REAL_KEYS_%s note%s with no Keys note to follow (%s): Keys and'
+                    .. ' Pro Keys should have the same notes at the same positions - check the Expert charts there'):format(
+                    #log.guide_missed, dl, #log.guide_missed == 1 and '' or 's', MeasureRanges(bars))
+            end
             -- The "Hard equals Expert" question: what was asked, what the user chose, what
             -- was done.
             if inst.kind == 'pk' and dl == 'H' and answers.pk_pull_back ~= nil then
@@ -866,6 +877,12 @@ function GenerateDifficulties(inst_key, tiers, force, answers)
                     or 'your choice'
                 lines[#lines + 1] = ('    busy bars of 8ths: drop %d per bar, less any 8th rests already there (%s)'):format(
                     log.busy_drop, why)
+                if log.fast_runs then
+                    local what = ({ auto = 'rewritten one grid slower above 160 BPM, thinned below',
+                                    thin = 'thinned to the Hard grid (never rewritten)',
+                                    rewrite = 'rewritten one grid slower (at or below 160 BPM: runs of half a bar or more)' })[log.fast_runs]
+                    if what then lines[#lines + 1] = '    fast runs: ' .. what end
+                end
                 for _, l in ipairs(RetimedLines(log.retimed_bars)) do lines[#lines + 1] = l end
                 for _, l in ipairs(HopoLines(hopo_spans)) do lines[#lines + 1] = l end
                 if (log.busy_followed or 0) > 0 then

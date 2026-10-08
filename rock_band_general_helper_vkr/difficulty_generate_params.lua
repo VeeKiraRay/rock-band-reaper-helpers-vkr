@@ -98,12 +98,28 @@ GEN5_PARAMS = {
     -- fourth note per half measure." Official Hard keeps 7 or 6 of 8 straight 8ths about
     -- equally often at every tempo, so the user can override it per song.
     fast_8ths_bpm = 160,
-    -- Above fast_8ths_bpm, Hard rewrites runs closer than its gap one grid slower (16ths to
-    -- 8th triplets, 8th triplets to 8ths) instead of thinning them in place - see
-    -- difficulty_generate_retime.lua. The penalty (in 1/24 QN of movement) is what a skip
-    -- that invents a color move costs; 20 matched the chronosp_brutal_decay hand reduction
-    -- best of the variants tried (165 of 170 colors).
+    -- Hard rewrites runs closer than its gap one grid slower (16ths to 8th triplets, 8th
+    -- triplets to 8ths) instead of thinning them in place - see
+    -- difficulty_generate_retime.lua. Above fast_8ths_bpm any such run; at or below it only
+    -- a run lasting at least retime_min_run.slow of its bar. The penalty (in 1/24 QN of
+    -- movement) is what a skip that invents a color move costs; 20 matched the
+    -- chronosp_brutal_decay hand reduction best of the variants tried (165 of 170 colors).
     retime_color_penalty = 20,
+    -- The shortest run a song at or below fast_8ths_bpm rewrites, as a share of its bar
+    -- (0.5 = half a bar: 8 consecutive 16ths in 4/4). A user rule (2026-10-07), not official
+    -- practice - official Hard never rewrites. From molto_c_love_for_sale (128 BPM): its
+    -- opening runs of 16ths thinned in place to plain 8ths and lost their motion. Shorter
+    -- groups stay thinned: at these tempos a 16th pair is usually part of the groove
+    -- (korpiklaani's 8th lines with a 16th pair). Widen to a whole bar if half feels off;
+    -- other minimums were measured on fast songs (a reference note, not adopted).
+    retime_min_run = { slow = 0.5 },
+    -- When Hard rewrites fast runs (the Generate sub-tab's "Hard fast runs", opts.fast_runs):
+    --   'auto'    - above fast_8ths_bpm only (any run); slower songs are thinned;
+    --   'thin'    - never: every run is thinned in place, as official charts do;
+    --   'rewrite' - above fast_8ths_bpm any run, at or below it runs of retime_min_run.
+    -- Both rewrites are user rules, not official practice. Default 'rewrite' for now - the
+    -- user's own choice while testing; revisit the default for general users before release.
+    fast_runs_default = 'rewrite',
     -- An onset is ISOLATED when its gaps to both neighbouring upper-tier onsets are more
     -- than this (quarter notes). Spacing only, so it keeps the one-rhythm rule.
     -- Hard never removes an isolated onset through the cap or the busy-bar rule: on a

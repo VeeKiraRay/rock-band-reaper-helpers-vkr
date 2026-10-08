@@ -68,6 +68,14 @@
 --       run of 16ths still loses its two notes. A 210 BPM solo kept 5 of 14
 --       notes before; now it keeps 12 and its motion. The result lists those
 --       bars to review by hand.
+--     - New "Hard fast runs" choice: Rewrite (the default for now), Auto
+--       (rewrite above 160 BPM only) or Thin (never rewrite, as official
+--       charts do). With Rewrite, runs of 16ths lasting half a bar or more are
+--       rewritten at 160 BPM or slower too (shorter groups are thinned to 8ths
+--       as before), so a fast passage in a slower song keeps its motion.
+--     - A long run is rewritten on one grid that stays on the beats, between
+--       its first and last Expert note, with no break where it crosses beat 3.
+--       A run starting on the "and" of 1 no longer begins on the downbeat.
 --     - Medium keeps a lone off-beat note with space around it, as official
 --       Medium almost always does - unless Medium would otherwise keep more
 --       than 95% of Hard: then those notes go first, and only if that is not
@@ -113,8 +121,9 @@
 --     - Keys follow the same-difficulty Pro Keys automatically when it has
 --       notes, so a Pro Keys reduction you already made carries over. All
 --       instruments generates Pro Keys first, and Keys then follows it. One
---       Keys note per Pro Keys note: a grace note just before a beat no
---       longer survives next to the beat.
+--       Keys note per Pro Keys note, at exactly the Pro Keys note's position,
+--       so both play the same rhythm (a rewritten run included); a Pro Keys
+--       note Keys has no note for is listed in the result.
 --     - Pro Keys Validate: note spacing on Medium and Easy now works like
 --       Keys - an error under an 8th (Medium) or a quarter (Easy), an
 --       advisory under the RBN doc's quarter and half. Interval jumps are

@@ -918,9 +918,11 @@ Test.it('fast runs: 16ths become 8th triplets, keeping the color order (hand-red
         { 'bar 21: a group cut to one note keeps the one that leads into the beat',
           '0:G 6:G 12:G 18:G 24:B 36:G 42:G 48:Y 60:G 66:G 72:R 84:G 90:G',
           '0:G 8:G 16:G 24:B 40:G 48:Y 60:G 68:G 76:R 88:G', 4 },
-        { 'bar 165: notes on the 8th grid outside the run stay put',
+        -- The long run ends on Expert's O at 60: nothing goes past it (step 1, 2026-10-07 -
+        -- the hand reduction had 64:O; the user accepted dropping it).
+        { 'bar 165: notes on the 8th grid outside the run stay put; a long run ends where Expert\'s does',
           '0:Y 6:Y 12:R 18:R 24:G 30:G 36:R 42:R 48:Y 54:B 60:O 72:O 84:B',
-          '0:Y 8:Y 16:R 24:G 32:G 40:R 48:Y 56:B 64:O 72:O 84:B' },
+          '0:Y 8:Y 16:R 24:G 32:G 40:R 48:Y 56:B 72:O 84:B' },
         { 'bar 152: a stray tick (37) does not make the bar read as 16th triplets',
           '0:O 6:O 12:B 18:O 24:B 30:Y 37:R 42:G 48:O 56:B 64:Y 72:B 80:Y 88:R',
           nil },
@@ -982,12 +984,16 @@ Test.it('fast runs: 8th triplets become 8ths, 16th triplets 16ths', function()
     Test.expect(n == 16, ('24 sixteenth triplets should become 16 sixteenths, got %d: %s'):format(n, Hard24(out)))
 end)
 
-Test.it('fast runs: not below 160 BPM, and the same rhythm lands on the same positions on every part', function()
-    local sixteenths = '0:B 6:B 12:B 18:B 24:B 30:B 36:B 42:B 48:B 54:Y 60:R 66:Y 72:R 78:Y 84:R 90:Y'
-    local out, log = Gen5PlanTier('gb', 'H', Bar24(sixteenths, 1, 140))
+Test.it('fast runs: a short run is not rewritten at or below 160 BPM, and the same rhythm lands on the same positions on every part', function()
+    -- At 140 BPM only a run of half a bar or more is rewritten (retime_min_run); five 16ths
+    -- then 8ths are thinned to 8ths as before.
+    local short = '0:B 6:B 12:B 18:B 24:B 36:B 48:Y 60:R 72:Y 84:R'
+    local out, log = Gen5PlanTier('gb', 'H', Bar24(short, 1, 140))
     Test.expect(#(log.retimed_bars or {}) == 0, 'retimed at 140 BPM: ' .. Hard24(out))
     local _, n = Hard24(out):gsub('%d+:', '')
     Test.expect(n <= 8, ('at 140 BPM Hard keeps 8ths, got %d notes: %s'):format(n, Hard24(out)))
+
+    local sixteenths = '0:B 6:B 12:B 18:B 24:B 30:B 36:B 42:B 48:B 54:Y 60:R 66:Y 72:R 78:Y 84:R 90:Y'
 
     local gtr  = Bar24(sixteenths, 1)
     local bass = Bar24('0:G 6:G 12:R 18:R 24:G 30:R 36:Y 42:Y 48:G 54:G 60:G 66:G 72:R 78:R 84:B 90:B', 1)
@@ -1042,9 +1048,10 @@ Test.it('force-HOPO: a run of one color, or a hammer-on lost to ordinary thinnin
     local same = HopoChart('0:O 8:O 16:O 24:O 32:O 40:O 48:O 56:O 64:O 72:O 80:O 88:O', 6, 4)
     Gen5MarkHopos(same, {}, {})
     Test.expect(#Gen5ForceHopoSpans((Gen5PlanTier('gb', 'H', same))) == 0, 'one color: no hammer-ons to keep')
-    -- 8th triplets at 140 BPM: not rewritten (not fast), thinned in place - official Hard
-    -- strums such notes almost always, so no markers.
-    local slow = Bar24('0:O 8:B 16:Y 24:B 32:Y 40:R 48:G 56:Y 64:R 72:Y 80:R 88:G', 1, 140)
+    -- A short group of 8th triplets at 140 BPM: not rewritten (under half a bar at or below
+    -- 160 BPM), thinned in place - official Hard strums such notes almost always, so no
+    -- markers.
+    local slow = Bar24('0:O 8:B 16:Y 24:B 48:G 72:R', 1, 140)
     Gen5MarkHopos(slow, {}, {})
     Test.expect(#Gen5ForceHopoSpans((Gen5PlanTier('gb', 'H', slow))) == 0, '140 BPM thinning: none')
 end)
@@ -1326,6 +1333,22 @@ Test.it('Keys following Pro Keys keeps one onset per Pro Keys onset', function()
     Test.expect(table.concat(p, ' ') == '0 1 2 3', 'kept ' .. table.concat(p, ' '))
 end)
 
+Test.it('Keys following a rewritten Pro Keys run takes its positions (korpiklaani bar 55)', function()
+    -- Keys Expert: 16ths from the "and" of 1 to beat 4. Pro Keys Hard: the same run rewritten
+    -- to 8th triplets (16..72/24). Keys plays exactly those onsets - not its nearest 16ths
+    -- (18 24 30 42 ..., uneven groups with gaps). A Pro Keys note with no Keys note near it is
+    -- reported (guide_missed).
+    local keys, guide = {}, {}
+    for k = 0, 10 do keys[#keys + 1] = Ev(0.5 + k * 0.25, 0.2, { 1 }, 120, 0) end
+    for k = 0, 7 do guide[#guide + 1] = { qn = (16 + k * 8) / 24, qn_e = (16 + k * 8) / 24 + 0.2 } end
+    guide[#guide + 1] = { qn = 3.5, qn_e = 3.7 }   -- no Keys note at 84/24
+    local out, log = Gen5PlanTier('k5', 'H', keys, { guide = guide })
+    local p = {}
+    for _, ev in ipairs(out) do p[#p + 1] = ('%d'):format(math.floor(ev.qn * 24 + 0.5)) end
+    Test.expect(table.concat(p, ' ') == '16 24 32 40 48 56 64 72', 'kept ' .. table.concat(p, ' '))
+    Test.expect(#(log.guide_missed or {}) == 1, 'missed ' .. #(log.guide_missed or {}) .. ', expected 1 (84/24)')
+end)
+
 Test.it('Hard that equals Expert is detected, and pull_back shortens every sustain by a 1/16 or a 1/8', function()
     -- Single notes every half note, each held a quarter: Hard keeps them as they are.
     -- Pulled back, each loses a 1/16 (simple single -> single; the last at a phrase end)
@@ -1413,4 +1436,115 @@ Test.it('Easy goes back to Hard\'s downbeats inside an "and" phrase', function()
     -- Beats 1 and 3 from Hard: B on 1, C on 3, in every bar of the lick.
     Test.expect(Positions(easy) == '4 6 8 10 12 14', 'Easy: ' .. Positions(easy))
     Test.expect(Pitches(easy[1]) == '59' and Pitches(easy[2]) == '60', 'Easy pitches: ' .. Pitches(easy[1]) .. ' ' .. Pitches(easy[2]))
+end)
+
+----------------------------------------------------------------------
+-- Difficulty > Generate: the fast-run rewrite keeps a long run inside Expert's notes
+----------------------------------------------------------------------
+Test.section('Generate planner - fast-run rewrite bounds')
+
+-- Positions of a bar's Hard notes, in 1/24 QN from the bar line.
+local function Grid24(out, bar_start)
+    local p = {}
+    for _, ev in ipairs(out) do
+        if ev.qn >= bar_start - 1e-6 and ev.qn < bar_start + 4 - 1e-6 then
+            p[#p + 1] = ('%d'):format(math.floor((ev.qn - bar_start) * 24 + 0.5))
+        end
+    end
+    return table.concat(p, ' ')
+end
+
+Test.it('a long run starting on the "and" of 1 stays on the beat grid, inside its notes, unbroken (chronosp bar 60)', function()
+    -- 210 BPM: a chord on 1, then 16ths from the "and" of 1 to the end of the bar. The grid
+    -- stays aligned to the beats (16, not 12 or 0: never before Expert's first note at 12)
+    -- and carries straight across beat 3 - the user's hand reduction of chronosp.
+    local colors = { 1, 1, 1, 1, 3, 3, 2, 2, 3, 3, 2, 2, 1, 0 }
+    local events = { Ev(0, 0.2, { 0, 1 }, 210, 0) }
+    for k = 0, 13 do events[#events + 1] = Ev(0.5 + k * 0.25, 0.2, { colors[k + 1] }, 210, 0) end
+    events[#events + 1] = Ev(4, 0.2, { 0 }, 210, 4)
+    local out = Gen5PlanTier('gb', 'H', events, { busy_drop = 2 })
+    local got = Grid24(out, 0)
+    Test.expect(got:match('^0 16 24 32 40 48'), 'bar: ' .. got .. ' (expected 0 16 24 32 40 48 ...)')
+end)
+
+Test.it('a long run crossing beat 3 has no break (korpiklaani Pro Keys bar 55)', function()
+    -- 120 BPM, Rewrite: 16ths from the "and" of 1 to beat 4, then a note on 4&. Laid out on
+    -- one 8th-triplet grid from 16 to 72 - the user's drawing.
+    local events = {}
+    for k = 0, 10 do events[#events + 1] = Ev(0.5 + k * 0.25, 0.2, { 62 }, 120, 0) end
+    events[#events + 1] = Ev(3.5, 0.2, { 60 }, 120, 0)
+    local out = GenPKPlanTier('H', events, { fast_runs = 'rewrite' })
+    local got = Grid24(out, 0)
+    Test.expect(got == '16 24 32 40 48 56 64 72 84', 'bar: ' .. got)
+end)
+
+Test.it('Hard fast runs: Thin never rewrites, Auto rewrites above 160 BPM only', function()
+    local function Bar(bpm)
+        local events = {}
+        for k = 0, 15 do events[#events + 1] = Ev(k * 0.25, 0.2, { k % 5 }, bpm, 0) end
+        events[#events + 1] = Ev(4, 0.2, { 0 }, bpm, 4)
+        return events
+    end
+    local function Rewritten(bpm, mode)
+        local _, log = Gen5PlanTier('gb', 'H', Bar(bpm), { busy_drop = 1, fast_runs = mode })
+        return #(log.retimed_bars or {}) > 0
+    end
+    Test.expect(not Rewritten(210, 'thin'), 'Thin rewrote at 210 BPM')
+    Test.expect(Rewritten(210, 'auto'), 'Auto did not rewrite at 210 BPM')
+    Test.expect(not Rewritten(128, 'auto'), 'Auto rewrote at 128 BPM')
+    Test.expect(Rewritten(128, 'rewrite'), 'Rewrite did not rewrite a whole bar of 16ths at 128 BPM')
+end)
+
+Test.it('a long run puts no note after its last Expert note (chronosp bar 165)', function()
+    -- 16ths from 0 to 2.5 (beat 3 "and"), then a rest until 3: the second half bar's run
+    -- ends on 2.5 (60/24), so no slot at 64/24.
+    local events = {}
+    for k = 0, 10 do events[#events + 1] = Ev(k * 0.25, 0.2, { k % 5 }, 210, 0) end
+    events[#events + 1] = Ev(3, 0.2, { 4 }, 210, 0)
+    local out = Gen5PlanTier('gb', 'H', events, { busy_drop = 2 })
+    for _, ev in ipairs(out) do
+        Test.expect(not (ev.qn > 2.5 + 1e-6 and ev.qn < 3 - 1e-6),
+            ('a note at %d/24, after the run\'s last note (60/24)'):format(math.floor(ev.qn * 24 + 0.5)))
+    end
+end)
+
+Test.it('a short group into beat 3 keeps leading into it (chronosp bars 21/23)', function()
+    -- 210 BPM: 16ths 0-1 (a run that lands on beat 2), then G G on 36/24 and 42/24 into Y on
+    -- beat 3. The pair is short: it is laid out back from beat 3 - 40 G | 48 Y.
+    local events = {}
+    for k = 0, 4 do events[#events + 1] = Ev(k * 0.25, 0.2, { 0 }, 210, 0) end
+    events[#events + 1] = Ev(1.5, 0.2, { 0 }, 210, 0)
+    events[#events + 1] = Ev(1.75, 0.2, { 0 }, 210, 0)
+    events[#events + 1] = Ev(2, 0.2, { 2 }, 210, 0)
+    events[#events + 1] = Ev(3, 0.2, { 1 }, 210, 0)
+    local got = Grid24(Gen5PlanTier('gb', 'H', events, { busy_drop = 2 }), 0)
+    Test.expect((' ' .. got .. ' '):find(' 40 48 ', 1, true), 'bar: ' .. got .. ' (expected ... 40 48 ...)')
+end)
+
+Test.it('at or below 160 BPM a run of half a bar or more is rewritten (molto opening)', function()
+    -- 128 BPM: a bar of 16 moving 16ths becomes 8th triplets, colour order kept.
+    local events = {}
+    for k = 0, 15 do events[#events + 1] = Ev(k * 0.25, 0.2, { k % 5 }, 128, 0) end
+    events[#events + 1] = Ev(4, 0.2, { 0 }, 128, 4)
+    local got = Grid24(Gen5PlanTier('gb', 'H', events, { busy_drop = 1 }), 0)
+    Test.expect(got == '0 8 16 24 32 40 48 56 64 72 80 88', 'bar: ' .. got)
+end)
+
+Test.it('at or below 160 BPM a shorter run is thinned as before, with no busy-bar side effect', function()
+    -- 128 BPM: six 16ths (under half a bar), then 8ths - thinned to 8ths, as before the rule.
+    local events = {}
+    for k = 0, 5 do events[#events + 1] = Ev(k * 0.25, 0.2, { k % 5 }, 128, 0) end
+    for k = 3, 7 do events[#events + 1] = Ev(k * 0.5, 0.2, { k % 5 }, 128, 0) end
+    local out, log = Gen5PlanTier('gb', 'H', events, { busy_drop = 1 })
+    Test.expect(#(log.retimed_bars or {}) == 0, 'a short run was rewritten')
+    for _, ev in ipairs(out) do
+        Test.expect(math.abs(ev.qn * 2 - math.floor(ev.qn * 2 + 0.5)) < 1e-6, ('a note off the 8th grid at %g'):format(ev.qn))
+    end
+    -- korpiklaani's lick: 16th grace notes inside an 8th line (1, 1.25, 1.5) - no flourish
+    -- marking at this tempo, so the busy-bar rule reads the bar as before (not "whole").
+    local lick = {}
+    for _, q in ipairs({ 0, 0.5, 1, 1.25, 1.5, 2, 2.5, 3, 3.25, 3.5 }) do lick[#lick + 1] = Ev(q, 0.2, { 1 }, 120, 0) end
+    local _, llog = Gen5PlanTier('gb', 'H', lick, { busy_drop = 1 })
+    Test.expect(#(llog.retimed_bars or {}) == 0, 'the lick was rewritten')
+    for _, ev in ipairs(lick) do Test.expect(not ev.flourish, ('flourish marked at %g at 120 BPM'):format(ev.qn)) end
 end)

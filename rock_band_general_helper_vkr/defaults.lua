@@ -180,6 +180,8 @@ S = {
     -- Difficulty > Generate: notes a full bar of 8ths loses on Hard - 'auto', 1 or 2
     -- (session only; Auto decides from the song's tempo, see GEN5_PARAMS.fast_8ths_bpm)
     diff_gen_busy_drop    = 'auto',
+    -- (session only) 'auto' | 'thin' | 'rewrite' - see GEN5_PARAMS.fast_runs_default
+    diff_gen_fast_runs    = 'rewrite',
     -- Difficulty tab: pending overwrite confirmation (not persisted, transient UI
     -- state). nil = no popup. Otherwise: { message = string, on_confirm = function()
     -- ... end, confirm_label = string? } - set by a Copy*Diff call or by
@@ -1227,10 +1229,12 @@ TIPS = {
                           "quarter note of space around them (Medium drops them when off\n" ..
                           "the beat); a Hard that keeps almost all of Expert is eased by\n" ..
                           "moving each bar down a lane so it tops out at Blue.\n\n" ..
-                          "Above 160 BPM, Hard plays fast runs one grid slower instead of\n" ..
-                          "thinning them: 16ths become 8th triplets, 8th triplets become\n" ..
-                          "8ths, keeping the order of the colors. Those bars are listed in\n" ..
-                          "the result to review by hand.\n\n" ..
+                          "Hard plays fast runs one grid slower instead of thinning them\n" ..
+                          "(\"Hard fast runs\"): 16ths become 8th triplets, 8th triplets\n" ..
+                          "become 8ths, keeping the order of the colors. A long run stays\n" ..
+                          "on the beat grid between its first and last Expert note, with no\n" ..
+                          "break in the middle. Those bars are listed in the result to\n" ..
+                          "review by hand.\n\n" ..
                           "Medium keeps a note per beat in busy bars, prefers a chord to a\n" ..
                           "single note next to it (but not to a downbeat), and puts a beat\n" ..
                           "Hard's rewrite moved back where Expert plays it. Bass and Keys\n" ..
@@ -1262,6 +1266,16 @@ TIPS = {
                           "The result is checked with Validate's rules and anything left\n" ..
                           "to fix is listed. Asks before replacing existing notes. One\n" ..
                           "undo reverts it. Respects time selection if active.",
+    diff_gen_fast_runs  = "How Hard handles runs of 16ths (or faster).\n\n" ..
+                          "Rewrite: played one grid slower - 16ths become 8th triplets, 8th\n" ..
+                          "triplets become 8ths - keeping the order of the notes. Above 160\n" ..
+                          "BPM any run; at or below it runs of half a bar or more.\n" ..
+                          "Auto: rewrite above 160 BPM only, thin slower songs.\n" ..
+                          "Thin: never rewrite - the notes are thinned to the Hard grid, as\n" ..
+                          "official charts do.\n\n" ..
+                          "Rewriting is not what official charts do: it keeps a fast\n" ..
+                          "passage moving instead of turning it into plain 8ths. Rewritten\n" ..
+                          "bars are listed in the result to review by hand.",
     diff_gen_busy_drop  = "How many notes a full bar of 8ths loses on Hard.\n\n" ..
                           "Drop 1: the and of 4 (1 & 2 & 3 & 4).\n" ..
                           "Drop 2: also the and of 2 - two groups of three\n" ..

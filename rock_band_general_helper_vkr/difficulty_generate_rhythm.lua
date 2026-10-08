@@ -290,8 +290,12 @@ end
 -- One Keys onset per Pro Keys onset, the closest: a 32nd grace note before a beat sits
 -- within GUIDE_TOL of the beat's Pro Keys onset too, and kept both (lovegame Keys Hard
 -- had 24 more onsets than the Pro Keys Hard it followed).
+-- Returns (keep, lens, at, missed): at[i] = the Pro Keys onset a kept event takes over (Keys
+-- plays Pro Keys' rhythm exactly - a rewritten Pro Keys run sits on 8th triplets, and
+-- Keys' nearest 16ths made uneven groups with gaps, korpiklaani bar 55); missed = the
+-- Pro Keys onsets no Keys note matched (Keys and Pro Keys Expert differ there).
 local function SelectByGuide(events, guide)
-    local keep, lens, j = {}, {}, 1
+    local keep, lens, at, j = {}, {}, {}, 1
     local owner = {}   -- guide index -> event index matched to it
     for i, ev in ipairs(events) do
         while j <= #guide and guide[j].qn < ev.qn - GUIDE_TOL do j = j + 1 end
@@ -305,14 +309,17 @@ local function SelectByGuide(events, guide)
         if best then
             local prev = owner[best]
             if not prev or math.abs(guide[best].qn - ev.qn) < math.abs(guide[best].qn - events[prev].qn) then
-                if prev then keep[prev], lens[prev] = nil, nil end
+                if prev then keep[prev], lens[prev], at[prev] = nil, nil, nil end
                 owner[best] = i
                 keep[i] = true
                 lens[i] = guide[best].qn_e - guide[best].qn
+                at[i] = guide[best].qn
             end
         end
     end
-    return keep, lens
+    local missed = {}
+    for k, g in ipairs(guide) do if not owner[k] then missed[#missed + 1] = g.qn end end
+    return keep, lens, at, missed
 end
 
 ----------------------------------------------------------------------
@@ -591,8 +598,32 @@ function Gen5SelectOnsets(kind, dl, events, opts, log)
             table.sort(merged, function(a, c) return a.qn < c.qn end)
             events = merged
         end
-        keep, guide_len = SelectByGuide(events, opts.guide)
+        local at
+        keep, guide_len, at, log.guide_missed = SelectByGuide(events, opts.guide)
         log.guided = true
+        -- Kept notes move onto the Pro Keys onset they follow (same index, so keep and
+        -- guide_len still line up; the matching is one-to-one and in order).
+        do
+            local moved = {}
+            for i, ev in ipairs(events) do
+                local q = at[i]
+                if q and math.abs(q - ev.qn) > 1e-9 then
+                    local c = {}
+                    for k, v in pairs(ev) do c[k] = v end
+                    local d = q - ev.qn
+                    c.qn, c.qn_e = q, ev.qn_e + d
+                    if ev.qn_e_full then c.qn_e_full = ev.qn_e_full + d end
+                    if ev.bar_qn then
+                        c.bar_qn = ev.bar_qn + d
+                        c.down = math.abs(c.bar_qn) <= EPS
+                    end
+                    moved[i] = c
+                else
+                    moved[i] = ev
+                end
+            end
+            events = moved
+        end
         -- The guide is a chart someone reduced by hand; still hold Validate's floor, and
         -- never keep two onsets closer than the shortest note that can be written.
         local floor = math.max(K5_MIN_SP[dl] or 0, MIN_LEN_QN)
@@ -613,8 +644,10 @@ function Gen5SelectOnsets(kind, dl, events, opts, log)
         -- are already the reduction, so the gap does not apply between them and their
         -- neighbours (the rewrite keeps them a grid step apart).
         if dl == 'H' then
+            -- opts.fast_runs: 'auto' | 'thin' | 'rewrite' (GEN5_PARAMS.fast_runs_default).
             events, log.retimed_bars = Gen5RetimeDenseRuns(events, {
-                gap = function(ev) return MinGapQN('H', ev.bpm) end, eps = EPS })
+                gap = function(ev) return MinGapQN('H', ev.bpm) end, eps = EPS, mode = opts.fast_runs })
+            log.fast_runs = opts.fast_runs or GEN5_PARAMS.fast_runs_default
             -- A note of a run in a bar the rewrite did not change (it neither moved nor
             -- dropped anything there) is an ordinary note again: chronosp bass bar 85's
             -- downbeat ends bar 84's 16ths, and as `retimed` it kept the busy-bar rule off

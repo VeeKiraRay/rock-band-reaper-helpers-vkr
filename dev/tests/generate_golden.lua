@@ -2,9 +2,11 @@
 --
 -- dev/tests/golden/ (gitignored - the files are the author's own charts) holds MIDI files
 -- whose Hard, Medium and Easy were generated and then checked by hand as correct. For
--- every Guitar, Bass and Keys part in each file, this runs the planner on the file's
--- Expert exactly as the "Hard > Medium > Easy" button would (each tier from the one just
--- generated, Auto options) and compares the result with the verified tiers.
+-- every Guitar, Bass, Keys and Pro Keys part in each file, this runs the planner on the
+-- file's Expert exactly as the "Hard > Medium > Easy" button would (each tier from the one
+-- just generated, default options) and compares the result with the verified tiers. Pro
+-- Keys also compares each tier's lane-shift markers; when its Hard would equal Expert (the
+-- action then asks), the verified chart tells which answer was given.
 --
 -- A failure means a rule change altered a chart someone already approved. Then either the
 -- change is right - regenerate the song, check it, and replace the golden file - or the
@@ -14,7 +16,8 @@
 -- a color-only change is easy to tell from a rhythm change.
 --
 -- Requires (globals): Test, r, GOLDEN_DIR, SmfReadFile, SmfFindTrack, SmfNotesInRange,
---   SmfSongTiming, SmfTierEvents, Gen5PlanTier, Gen5MarkHopos, Gen5ForceHopoSpans.
+--   SmfSongTiming, SmfTierEvents, SmfProKeysEvents, Gen5PlanTier, GenPKPlanTier,
+--   GenPKSameAsUpper, Gen5MarkHopos, Gen5ForceHopoSpans.
 
 -- Parts compared. verify = false lists a part Generate cannot build yet: it is reported as
 -- skipped, never failed. Flip it to true once that instrument's planner is ready.
@@ -23,8 +26,9 @@ local PARTS = {
     { track = 'PART BASS',        kind = 'gb', label = 'Bass',     verify = true  },
     { track = 'PART KEYS',        kind = 'k5', label = 'Keys',     verify = true  },
     { track = 'PART DRUMS',                    label = 'Drums',    verify = false },
-    { track = 'PART REAL_KEYS_X',              label = 'Pro Keys', verify = false },
+    { track = 'PART REAL_KEYS_X', kind = 'pk', label = 'Pro Keys', verify = true  },
 }
+local NOTE_NAMES = { 'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B' }
 local LO        = { X = 96, H = 84, M = 72, E = 60 }
 local ONSET_TOL = 0.005  -- QN: under one tick at 480 PPQ apart counts as the same onset
 local LEN_TOL   = 0.006  -- QN: the action rounds lengths to the take's ticks on write
@@ -112,10 +116,15 @@ local function CompareHopo(gen_spans, want_spans, song, timing)
     return lines
 end
 
+-- A chord as text: colours on the 5-lane instruments, note names on Pro Keys (its offs
+-- are MIDI pitches).
+local SHAPE_PK = false
 local function Shape(offs)
     local s = {}
-    for _, o in ipairs(offs) do s[#s + 1] = COLORS[o] or '?' end
-    return table.concat(s)
+    for _, o in ipairs(offs) do
+        s[#s + 1] = SHAPE_PK and (NOTE_NAMES[o % 12 + 1] .. (o // 12 - 2)) or COLORS[o] or '?'
+    end
+    return table.concat(s, SHAPE_PK and '+' or '')
 end
 
 -- Compare generated tier `gen` with the verified tier `want`. Returns (counts, lines).
@@ -183,8 +192,54 @@ for _, name in ipairs(files) do
         end
         for _, part in ipairs(PARTS) do
             local trk = SmfFindTrack(song, part.track)
+            SHAPE_PK = part.kind == 'pk'
             if trk and not part.verify then
                 r.ShowConsoleMsg(('  SKIP  %s: no Generate planner yet\n'):format(part.label))
+            elseif trk and part.kind == 'pk' then
+                -- Pro Keys: a track per tier. Planned as the action plans it: Expert's lane
+                -- shifts go along, Hard follows Guitar's busy bars, Medium Guitar's rhythm,
+                -- Easy gets Hard for its "and" phrases. Zero-length notes are KEPT (the action
+                -- uses them on Pro Keys: Expert's track is never written).
+                local upper, shifts = SmfProKeysEvents(trk, song.tpqn, timing)
+                local hard
+                for _, dl in ipairs({ 'H', 'M', 'E' }) do
+                    local tier_trk = SmfFindTrack(song, 'PART REAL_KEYS_' .. dl)
+                    if not tier_trk then
+                        r.ShowConsoleMsg(('  SKIP  Pro Keys %s: no PART REAL_KEYS_%s\n'):format(dl, dl))
+                        break
+                    end
+                    local want, want_shifts = SmfProKeysEvents(tier_trk, song.tpqn, timing)
+                    local opts = { shifts = shifts,
+                                   busy_ref   = dl == 'H' and refs.H or nil,
+                                   rhythm_ref = dl == 'M' and refs.M or nil,
+                                   and_source = dl == 'E' and hard or nil }
+                    local gen, log = GenPKPlanTier(dl, upper, opts)
+                    -- Hard equal to Expert asks the user (Shorten sustains / Keep); the verified
+                    -- chart holds the answer: shortened sustains unless it IS Expert as it is.
+                    if dl == 'H' and GenPKSameAsUpper(gen, upper) and not GenPKSameAsUpper(want, upper) then
+                        opts.pull_back = true
+                        gen, log = GenPKPlanTier(dl, upper, opts)
+                    end
+                    local label = ('Pro Keys %s'):format(({ H = 'Hard', M = 'Medium', E = 'Easy' })[dl])
+                    Test.it(label, function()
+                        SHAPE_PK = true
+                        local c, lines = Compare(gen, want, song, timing)
+                        local total = c.missing + c.extra + c.color + c.length
+                        Test.expect(total == 0, ('%d differences - rhythm: %d missing, %d extra; pitches: %d; lengths: %d\n           %s')
+                            :format(total, c.missing, c.extra, c.color, c.length, table.concat(lines, '\n           ')))
+                    end)
+                    Test.it(label .. ' lane shifts', function()
+                        local function List(list)
+                            local out = {}
+                            for _, sh in ipairs(list or {}) do out[#out + 1] = ('%.3f:%d'):format(sh.qn, sh.pitch) end
+                            return table.concat(out, ' ')
+                        end
+                        Test.expect(List(log.shifts) == List(want_shifts),
+                            ('generated [%s], verified [%s] (QN:marker)'):format(List(log.shifts), List(want_shifts)))
+                    end)
+                    if dl == 'H' then hard = gen end
+                    upper, shifts = gen, log.shifts   -- the chain: the next tier is built from this one
+                end
             elseif trk then
                 -- Zero-length notes are skipped, as the REAPER action skips them.
                 local upper = SmfTierEvents(trk, LO.X, song.tpqn, timing, { skip_zero = true })
