@@ -343,6 +343,11 @@ function ReadK5TierEvents(track, diff_label, sel_s, sel_e)
     return GroupK5Chords(notes), #notes
 end
 
+-- Broken chords (DiffCheckOverlaps, actions_difficulty_shared.lua): the 5-lane doc's "you
+-- should not overlap more than 3 notes at a time" on Expert and Hard; none on Medium
+-- unless a quarter note apart, none on Easy. Defined after K5Label and QNAt.
+local K5_OVERLAP = { max = { X = 3, H = 3 }, label = K5Label, qn_at = QNAt }
+
 -- Every check for one tier, as categories { name, rule, issues }. rule is a
 -- stable id for counting violations per rule; name is the heading Validate
 -- prints. Category order is the report order. Global so callers other than
@@ -381,6 +386,8 @@ function CollectK5Checks(diff_label, events)
         and DiffReleaseGapName(diff_label)
         or  'Sustain gaps (min 1/16 single / 1/8 chord)'
     cats[#cats + 1] = { name = sg_name, rule = 'sustain_gap', issues = CheckK5SustainGaps(events, diff_label) }
+    cats[#cats + 1] = { name = 'Overlapping gems (max 3 on Expert/Hard)', rule = 'overlap',
+                        issues = DiffCheckOverlaps(events, diff_label, K5_OVERLAP) }
 
     return cats
 end

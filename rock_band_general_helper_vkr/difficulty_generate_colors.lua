@@ -33,6 +33,49 @@ function Gen5ReduceChordSize(offs, max_n)
     return { offs[1], offs[math.ceil(#offs / 2)], offs[#offs] }
 end
 
+-- Keys (5-lane) Hard and Medium: reduce a chord to max_n notes by keeping its TOP notes, as
+-- Pro Keys does. Official Keys differs from Guitar/Bass here (RB3 DLC, hold-out excluded):
+-- going to one note it keeps the top - Expert>Hard 70% vs 25% for the bottom, Hard>Medium 52%
+-- vs 32% - and Hard>Medium 3>2 keeps the top two 35%, the outer pair 33%, the bottom two 23%.
+-- Easy is a tie (Medium>Easy keeps the lowest 40%, the top 38%); Keys Easy keeps the top too,
+-- and Gen5KeysEasyMotion then keeps its line moving. The RBN Keys doc does not say which notes
+-- stay. User decisions 2026-10-08/09; Expert>Hard 3>2 alone leans the other way (outer 39%,
+-- top 33%).
+function Gen5ReduceChordSizeKeys(offs, max_n)
+    if #offs <= max_n then return offs end
+    local out = {}
+    for i = #offs - max_n + 1, #offs do out[#out + 1] = offs[i] end
+    return out
+end
+
+-- Keys Easy: a Medium chord reduced to one note keeps the line moving. out: the Easy events
+-- (offs already one note); upper_offs[i]: the offs of the Medium event out[i] came from.
+--   1. the same chord as the previous one -> the previous Easy note (a chord repeated for a
+--      while stays one note: GR GR GR is G G G, never G R G);
+--   2. a different chord whose note would repeat the previous Easy note -> another note of
+--      the chord, from the top down (GR then GY: G then Y);
+--   3. otherwise the note the chord rule chose.
+-- Picking one note per chord on its own made repeats Medium does not have: 10.2% of Easy
+-- steps against official 2.4% (official Keys Easy repeats a lane on 27.9% of steps,
+-- Generate 35.8%). With both rules: 27.0% and 1.4%, and Easy colors agree with official
+-- more often (RB3 DLC, hold-out excluded; user decision 2026-10-09). Returns notes changed.
+function Gen5KeysEasyMotion(out, upper_offs)
+    local changed = 0
+    for i = 2, #out do
+        local ev, pv, up = out[i], out[i - 1], upper_offs[i]
+        if up and #up >= 2 and #ev.offs == 1 and #pv.offs == 1 and upper_offs[i - 1] then
+            if SameOffs(up, upper_offs[i - 1]) then
+                if ev.offs[1] ~= pv.offs[1] then ev.offs = { pv.offs[1] }; changed = changed + 1 end
+            elseif ev.offs[1] == pv.offs[1] then
+                for k = #up, 1, -1 do
+                    if up[k] ~= pv.offs[1] then ev.offs = { up[k] }; changed = changed + 1; break end
+                end
+            end
+        end
+    end
+    return changed
+end
+
 -- Narrow a chord whose span exceeds max_span by lowering its top note.
 function Gen5NarrowSpan(offs, max_span)
     if max_span and #offs >= 2 and offs[#offs] - offs[1] > max_span then

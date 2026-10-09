@@ -375,76 +375,14 @@ local function CheckPreferredRanges(lane_shifts)
     return issues
 end
 
--- Check for notes that start while earlier notes are still playing (broken chords / arpeggios).
--- X: max 4 simultaneously active; H: max 3. M: none unless ≥ quarter note apart. E: none.
--- Also flags overlapping span > octave (12 semitones) for X/H.
-local function CheckOverlappingGems(events, diff_label)
-    local max_ov = { X=4, H=3 }
-    local issues = {}
-
-    for i = 2, #events do
-        local curr = events[i]
-
-        -- Collect pitches from all events that started earlier but are still sounding at curr.s
-        local active_pitches = {}
-        for j = 1, i - 1 do
-            local prev = events[j]
-            if prev.e > curr.s + 0.002 then
-                for _, p in ipairs(prev.pitches) do
-                    active_pitches[#active_pitches + 1] = p
-                end
-            end
-        end
-
-        if #active_pitches == 0 then goto ov_next end
-
-        -- Medium exception: OK when the overlapping event started ≥ quarter note ago
-        if diff_label == 'M' then
-            local last_start = 0
-            for j = 1, i - 1 do
-                local prev = events[j]
-                if prev.e > curr.s + 0.002 and prev.s > last_start then
-                    last_start = prev.s
-                end
-            end
-            if QNAt(curr.s) - QNAt(last_start) >= 1.0 - EPS_QN then goto ov_next end
-        end
-
-        do
-            table.sort(active_pitches)
-            local all_p = {}
-            for _, p in ipairs(active_pitches) do all_p[#all_p + 1] = p end
-            for _, p in ipairs(curr.pitches)   do all_p[#all_p + 1] = p end
-            table.sort(all_p)
-            local span  = all_p[#all_p] - all_p[1]
-            local count = #all_p
-
-            if diff_label == 'E' then
-                issues[#issues + 1] = ('%s: %s starts while %s still playing (no overlapping on Easy)'):format(
-                    FormatTime(curr.s), EventLabel(curr.pitches), EventLabel(active_pitches))
-            elseif diff_label == 'M' then
-                issues[#issues + 1] = ('%s: %s overlaps previous note (no overlapping on Medium unless \xe2\x89\xa5 quarter note apart)'):format(
-                    FormatTime(curr.s), EventLabel(curr.pitches))
-            elseif count > max_ov[diff_label] then
-                issues[#issues + 1] = ('%s: %d notes active simultaneously (max %d overlapping for %s)'):format(
-                    FormatTime(curr.s), count, max_ov[diff_label], DIFF_NAMES[diff_label])
-            end
-
-            -- Span check: applies to X/H (for M/E the overlap itself is already flagged)
-            if (diff_label == 'X' or diff_label == 'H') and span > 12 then
-                issues[#issues + 1] = ('%s: overlapping notes span %d semitones (max 12 = octave)'):format(
-                    FormatTime(curr.s), span)
-            end
-        end
-
-        ::ov_next::
-    end
-    return issues
-end
+-- Broken chords: the shared check (DiffCheckOverlaps, actions_difficulty_shared.lua) with
+-- the Pro Keys doc's limits - up to 4 notes on Expert and Hard ("Up to 4 notes in Pro Keys
+-- Expert / Hard"; this check allowed only 3 on Hard), within an octave.
+local PK_OVERLAP = { max = { X = 4, H = 4 }, span = 12, label = EventLabel, qn_at = QNAt }
 
 -- Check gap between the end of a sustained note and the start of the next note.
 -- Only fires on notes longer than 1/8 note. Gaps from overlapping notes are skipped
--- (those are reported by CheckOverlappingGems instead).
+-- (those are reported by DiffCheckOverlaps instead).
 -- Expert/Hard: 16th note for simple transitions; 8th note for complex.
 --   Simple = single→single, or one side is single and its pitch is in the chord.
 --   chord→chord is ALWAYS complex regardless of shared notes (different voicing = different transition).
@@ -461,7 +399,7 @@ local function CheckSustainGaps(events, diff_label)
         if dur_qn < 0.5 - EPS_QN then goto sg_next end  -- not sustained (< 1/8 note)
 
         local gap_qn = QNAt(next_ev.s) - qn_e
-        if gap_qn < 0 then goto sg_next end  -- overlap: handled by CheckOverlappingGems
+        if gap_qn < 0 then goto sg_next end  -- overlap: handled by DiffCheckOverlaps
 
         local is_chord   = #ev.pitches > 1
         local next_chord = #next_ev.pitches > 1
@@ -551,7 +489,11 @@ local function CheckMissingMeasures(exp_events, lower_events)
     return issues
 end
 
--- Check whether any lower-diff note has no Expert counterpart within 1/8 note.
+-- Check whether any lower-diff note has no Expert counterpart within 1/8 note, and that a
+-- lower-diff chord has no more notes than Expert sounds there: the nearest Expert onset, the
+-- earlier Expert notes still held at it, and the notes rolled in within 1/8 note after it
+-- while it still sounds. A rolled chord (notes a 1/32 apart, all held) is one chord on the
+-- lower tiers (GenMergeRolls), and Expert plays every note of it.
 local function CheckNotesAboveExpert(exp_events, lower_events)
     local issues = {}
     for _, ev in ipairs(lower_events) do
@@ -565,8 +507,21 @@ local function CheckNotesAboveExpert(exp_events, lower_events)
             issues[#issues + 1] = ('%s: %s has no Expert note within 1/8 note'):format(
                 FormatTime(ev.s), EventLabel(ev.pitches))
         elseif #ev.pitches > #nearest_ev.pitches then
-            issues[#issues + 1] = ('%s: %s has more notes than nearest Expert chord %s'):format(
-                FormatTime(ev.s), EventLabel(ev.pitches), EventLabel(nearest_ev.pitches))
+            local sounding, seen = {}, {}
+            for _, xev in ipairs(exp_events) do
+                if xev == nearest_ev or (xev.s < nearest_ev.s and xev.e > nearest_ev.s + 0.002)
+                   or (xev.s > nearest_ev.s and xev.s <= nearest_ev.s + tolerance
+                       and nearest_ev.e > xev.s + 0.002) then
+                    for _, p in ipairs(xev.pitches) do
+                        if not seen[p] then seen[p] = true; sounding[#sounding + 1] = p end
+                    end
+                end
+            end
+            if #ev.pitches > #sounding then
+                table.sort(sounding)
+                issues[#issues + 1] = ('%s: %s has more notes than nearest Expert chord %s'):format(
+                    FormatTime(ev.s), EventLabel(ev.pitches), EventLabel(sounding))
+            end
         end
     end
     return issues
@@ -664,7 +619,7 @@ function CollectPKChecks(diff_label, events, lane_shifts, exp_events, sel_s)
     end
 
     cats[#cats + 1] = { name = 'Overlapping gems', rule = 'overlap',
-                        issues = Records(CheckOverlappingGems(events, diff_label)) }
+                        issues = DiffCheckOverlaps(events, diff_label, PK_OVERLAP) }
     cats[#cats + 1] = { name = 'Sustain gaps', rule = 'sustain_gap',
                         issues = Records(CheckSustainGaps(events, diff_label)) }
 

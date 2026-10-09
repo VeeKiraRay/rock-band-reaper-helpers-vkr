@@ -35,6 +35,7 @@ dofile(_root .. 'rock_band_general_helper_vkr/actions_difficulty_gtrbass.lua')
 dofile(_root .. 'rock_band_general_helper_vkr/actions_difficulty_5k.lua')
 dofile(_root .. 'rock_band_general_helper_vkr/actions_difficulty.lua')   -- PK_MAX_CHORD / PK_MAX_SPAN
 dofile(_root .. 'rock_band_general_helper_vkr/difficulty_generate_params.lua')
+dofile(_root .. 'rock_band_general_helper_vkr/difficulty_generate_overlaps.lua')
 dofile(_root .. 'rock_band_general_helper_vkr/difficulty_generate_retime.lua')
 dofile(_root .. 'rock_band_general_helper_vkr/difficulty_generate_colors.lua')
 dofile(_root .. 'rock_band_general_helper_vkr/difficulty_generate_rhythm.lua')
@@ -87,14 +88,27 @@ end
 -- preferred ranges are advisories and not counted. Medium/Easy: one lane-shift marker,
 -- every note inside its window. Shifts: the tier's markers (log.shifts).
 local PK_SP = { M = 0.5, E = 1.0 }
+-- Keys and Pro Keys overlaps, counted by Validate's own check (DiffCheckOverlaps,
+-- actions_difficulty_shared.lua) on quarter-note positions: an overlap within the RBN
+-- limits is allowed (GenPlanOverlaps keeps them on Hard), anything over is an error.
+FormatTime = FormatTime or function(t) return ('%.3f'):format(t) end
+local OVERLAP_OPTS = {
+    k5 = { max = { X = 3, H = 3 }, label = function() return '' end, qn_at = function(q) return q end },
+    pk = { max = { X = 4, H = 4 }, span = 12, label = function() return '' end, qn_at = function(q) return q end },
+}
+local function CountOverlaps(kind, dl, gen)
+    local evs = {}
+    for i, ev in ipairs(gen) do evs[i] = { s = ev.qn, e = ev.qn_e, pitches = ev.offs } end
+    return #DiffCheckOverlaps(evs, dl, OVERLAP_OPTS[kind])
+end
+
 local function CountPKViolations(dl, gen, shifts)
-    local v = 0
+    local v = CountOverlaps('pk', dl, gen)
     for i, ev in ipairs(gen) do
         if #ev.offs > PK_MAX_CHORD[dl] then v = v + 1 end
         if PK_MAX_SPAN[dl] and #ev.offs >= 2 and ev.offs[#ev.offs] - ev.offs[1] > PK_MAX_SPAN[dl] then v = v + 1 end
         local nx = gen[i + 1]
         if nx then
-            if nx.qn < ev.qn_e - 0.005 then v = v + 1 end                         -- overlap
             if PK_SP[dl] and nx.qn - ev.qn < PK_SP[dl] * 0.95 then v = v + 1 end  -- spacing
             if ev.qn_e - ev.qn >= 0.49 and nx.qn >= ev.qn_e then
                 local need = (dl == 'M' or dl == 'E') and 1.0 or 0.5
@@ -128,7 +142,7 @@ end
 -- Rule violations Validate reports as errors, in quarter notes.
 local function CountViolations(kind, dl, gen, shifts)
     if kind == 'pk' then return CountPKViolations(dl, gen, shifts or {}) end
-    local v = 0
+    local v = kind == 'k5' and CountOverlaps('k5', dl, gen) or 0
     local max_n = kind == 'gb' and GB_MAX_CHORD[dl] or K5_MAX_CHORD[dl]
     for i, ev in ipairs(gen) do
         if #ev.offs > max_n then v = v + 1 end
@@ -136,7 +150,7 @@ local function CountViolations(kind, dl, gen, shifts)
            and ev.offs[#ev.offs] - ev.offs[1] > GB_MAX_SPAN[dl] then v = v + 1 end
         local nx = gen[i + 1]
         if nx then
-            if nx.qn < ev.qn_e - 0.005 then v = v + 1 end                    -- overlap
+            if kind == 'gb' and nx.qn < ev.qn_e - 0.005 then v = v + 1 end   -- overlap
             if kind == 'k5' and K5_MIN_SP[dl] and nx.qn - ev.qn < K5_MIN_SP[dl] * 0.95 then
                 v = v + 1                                                     -- spacing
             end

@@ -10,7 +10,8 @@
 -- Medium's chord bonus and the busy-bar accent rule. Pitches or colors never matter.
 --
 -- Requires (globals, read at call time): K5_MIN_SP (actions_difficulty_5k.lua),
---   Gen5RetimeDenseRuns (difficulty_generate_retime.lua).
+--   Gen5RetimeDenseRuns (difficulty_generate_retime.lua), GenMergeRolls
+--   (difficulty_generate_overlaps.lua).
 
 local SUSTAIN_QN   = GEN5_SUSTAIN_QN
 local MIN_LEN_QN   = GEN5_MIN_LEN_QN
@@ -612,6 +613,13 @@ end
 -- guide_len[i] the Pro Keys note length a guided Keys onset takes over.
 function Gen5SelectOnsets(kind, dl, events, opts, log)
     local keep, guide_len, weights, shifted
+    -- Keys/Pro Keys Hard: a rolled chord is one chord on the note it lands on
+    -- (GenMergeRolls, difficulty_generate_overlaps.lua) - before the fast-run rewrite would
+    -- read the roll as a run, and before Keys matches its Pro Keys guide (whose Hard has
+    -- the chord there).
+    if dl == 'H' and (kind == 'k5' or kind == 'pk') then
+        events, log.rolls = GenMergeRolls(events, function(ev) return MinGapQN('H', ev.bpm) end)
+    end
     if kind == 'k5' and opts.guide and #opts.guide > 0 then
         -- Easy following a Pro Keys Easy that went back to Hard's downbeats in an "and"
         -- phrase: those notes are not in Keys Medium, so Keys' own Hard notes are

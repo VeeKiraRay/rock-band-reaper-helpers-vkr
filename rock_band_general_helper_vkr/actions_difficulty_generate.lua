@@ -913,6 +913,25 @@ function GenerateDifficulties(inst_key, tiers, force, answers)
                         n, n == 1 and '' or 's', MeasureRanges(bars))
                 end
             end
+            -- Keys/Pro Keys overlapping gems (GenPlanOverlaps) and rolled chords (GenMergeRolls).
+            if inst.kind ~= 'gb' then
+                local held = 0
+                for i, ev in ipairs(out) do
+                    local nx = out[i + 1]
+                    if nx and ev.qn_e > nx.qn + GEN5_EPS then held = held + 1 end
+                end
+                local ov = log.overlaps or {}
+                if held > 0 then
+                    lines[#lines + 1] = ('    %d note%s held over later notes, as Expert does%s'):format(held, held == 1 and '' or 's',
+                        (ov.chord_notes or 0) + (ov.trimmed or 0) > 0
+                            and (' (to keep the overlap limit: %d chord note%s left out, %d held note%s ended earlier)'):format(
+                                ov.chord_notes, ov.chord_notes == 1 and '' or 's', ov.trimmed, ov.trimmed == 1 and '' or 's')
+                            or '')
+                end
+                if (log.rolls or 0) > 0 then
+                    lines[#lines + 1] = ('    %d rolled chord%s played as one chord on the beat'):format(log.rolls, log.rolls == 1 and '' or 's')
+                end
+            end
             if dl == 'M' then
                 if (log.filled or 0) > 0 then
                     lines[#lines + 1] = ('    %d note%s kept so busy bars keep a note per beat'):format(

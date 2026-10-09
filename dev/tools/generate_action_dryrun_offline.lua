@@ -246,7 +246,7 @@ for _, f in ipairs({
     M .. 'defaults.lua', M .. 'helpers.lua', M .. 'actions_guitar.lua', M .. 'actions_guitar_validate.lua',
     M .. 'actions_difficulty_shared.lua', M .. 'actions_difficulty.lua', M .. 'actions_difficulty_5k.lua',
     M .. 'actions_difficulty_gtrbass.lua',
-    M .. 'difficulty_generate_params.lua', M .. 'difficulty_generate_retime.lua',
+    M .. 'difficulty_generate_params.lua', M .. 'difficulty_generate_overlaps.lua', M .. 'difficulty_generate_retime.lua',
     M .. 'difficulty_generate_colors.lua', M .. 'difficulty_generate_rhythm.lua',
     M .. 'difficulty_generate_5lane.lua', M .. 'difficulty_generate_prokeys.lua',
     M .. 'difficulty_generate_hopo.lua', M .. 'actions_difficulty_generate.lua', M .. 'difficulty_read.lua',

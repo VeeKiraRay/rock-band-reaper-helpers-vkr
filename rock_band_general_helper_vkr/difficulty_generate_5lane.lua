@@ -28,8 +28,9 @@
 -- file reduces chords and colors and fixes sustain lengths. Load after both.
 --
 -- Requires (globals, read at call time): GB_MAX_CHORD, GB_MAX_SPAN, GB_RANGE,
---   K5_MAX_CHORD (actions_difficulty_gtrbass.lua / _5k.lua), Gen5ReduceChordSize /
---   Gen5NarrowSpan / Gen5ShiftSegments / Gen5ShiftBars (difficulty_generate_colors.lua).
+--   K5_MAX_CHORD (actions_difficulty_gtrbass.lua / _5k.lua), Gen5ReduceChordSize(Keys) / Gen5KeysEasyMotion /
+--   Gen5NarrowSpan / Gen5ShiftSegments / Gen5ShiftBars (difficulty_generate_colors.lua),
+--   GenPlanOverlaps / GenNextAfterHold (difficulty_generate_overlaps.lua).
 
 local SUSTAIN_QN   = GEN5_SUSTAIN_QN
 local SHORT_QN     = 0.125   -- length a sustain becomes when cut back (1/32 note)
@@ -51,19 +52,27 @@ end
 
 -- Shorten sustains to leave the tier's release gap, cut a sustain that would end up
 -- shorter than the tier keeps (MinSustainQN) back to a plain note, and keep every note
--- clear of the next onset. Returns (shortened, cut).
+-- clear of the next onset. A note GenPlanOverlaps holds over later onsets (hold) is
+-- measured against the first onset after it ends instead; if it ends up too short to
+-- sustain, it is a plain note clear of the very next onset like any other.
+-- Returns (shortened, cut).
 local function FixLengths(kind, dl, out)
     local shortened, cut = 0, 0
     for i, ev in ipairs(out) do
-        local nx = out[i + 1]
+        local first = out[i + 1]
+        local nx = GenNextAfterHold(out, i)
         local len = ev.qn_e - ev.qn
         if len >= SUSTAIN_QN - EPS then
-            if nx then
+            -- A held note pulled back can end at or just after a note it was held over:
+            -- then that note is the one after its end, and the gap is measured again.
+            while nx do
                 local limit = nx.qn - ReleaseGapQN(kind, dl, ev)
-                if ev.qn_e > limit + EPS then
-                    ev.qn_e = limit
-                    shortened = shortened + 1
-                end
+                if ev.qn_e <= limit + EPS then break end
+                ev.qn_e = limit
+                shortened = shortened + 1
+                local again = GenNextAfterHold(out, i)
+                if again == nx then break end
+                nx = again
             end
             -- A tail the tier above shortened for a note this tier drops comes back up to
             -- this tier's minimum when the original note was that long and there is room:
@@ -76,7 +85,7 @@ local function FixLengths(kind, dl, out)
             -- With EPS: a sustain left exactly at the minimum stays a sustain. Without it,
             -- tempo-map rounding made identical repeats land either side of 1/8.
             if ev.qn_e - ev.qn < min_len - EPS then
-                ev.qn_e = ev.qn + math.min(SHORT_QN, nx and (nx.qn - ev.qn - EPS) or SHORT_QN)
+                ev.qn_e = ev.qn + math.min(SHORT_QN, first and (first.qn - ev.qn - EPS) or SHORT_QN)
                 cut = cut + 1
             end
         end
@@ -89,10 +98,14 @@ local function FixLengths(kind, dl, out)
             cut = cut + 1
         end
         -- At least MIN_LEN_QN long, but never into the next onset (an overlap hides the
-        -- next note in game). Kept onsets are at least MIN_LEN_QN apart, so both hold.
+        -- next note in game) - unless it is a sustain GenPlanOverlaps holds over it. Kept
+        -- onsets are at least MIN_LEN_QN apart, so both hold.
         if ev.qn_e - ev.qn < MIN_LEN_QN then ev.qn_e = ev.qn + MIN_LEN_QN end
-        if nx and ev.qn_e > nx.qn - EPS / 2 then
-            ev.qn_e = math.max(ev.qn + MIN_LEN_QN * 0.6, nx.qn - EPS / 2)
+        -- A held sustain stops only for the first onset after its end (nil: none follows).
+        local stop = first
+        if ev.hold and ev.qn_e - ev.qn >= SUSTAIN_QN - EPS then stop = nx end
+        if stop and ev.qn_e > stop.qn - EPS / 2 then
+            ev.qn_e = math.max(ev.qn + MIN_LEN_QN * 0.6, stop.qn - EPS / 2)
         end
     end
     return shortened, cut
@@ -135,10 +148,15 @@ function Gen5PlanTier(kind, dl, events, opts)
     events, keep, guide_len = Gen5SelectOnsets(kind, dl, events, opts, log)
 
     local max_n   = kind == 'gb' and GB_MAX_CHORD[dl] or K5_MAX_CHORD[dl]
+    -- Keys keeps a chord's top notes; Guitar/Bass the outer pair and the lowest note
+    -- (Gen5ReduceChordSizeKeys says why).
+    local reduce  = kind == 'k5' and Gen5ReduceChordSizeKeys or Gen5ReduceChordSize
+    local upper_offs = {}   -- Keys Easy: each kept event's Medium offs (Gen5KeysEasyMotion)
     local out = {}
     for i, ev in ipairs(events) do
         if keep[i] then
-            local offs = Gen5ReduceChordSize(Copy(ev.offs), max_n)
+            local offs = reduce(Copy(ev.offs), max_n)
+            upper_offs[#out + 1] = ev.offs
             if #offs ~= #ev.offs then log.chords_reduced = log.chords_reduced + 1 end
             -- qn_e_full: the note's length before any tier shortened it (FixLengths).
             local full = ev.qn_e_full or ev.qn_e
@@ -159,6 +177,10 @@ function Gen5PlanTier(kind, dl, events, opts)
     end
     log.kept    = #out
     log.removed = log.upper - #out
+
+    -- Keys Easy: a chord reduced to one note keeps the line moving (no new repeats, a
+    -- repeated chord stays one note).
+    if kind == 'k5' and dl == 'E' then log.easy_motion = Gen5KeysEasyMotion(out, upper_offs) end
 
     -- Hard that barely thinned is made easier by color instead (color_fallback_keep).
     local fb = GEN5_PARAMS.color_fallback_keep[dl]
@@ -184,6 +206,13 @@ function Gen5PlanTier(kind, dl, events, opts)
         end
     end
 
+    -- Keys: notes Expert holds while later notes start keep sounding within the docs'
+    -- limits (GenPlanOverlaps, difficulty_generate_overlaps.lua); after the colors, so a
+    -- shifted line is what the lane and count checks see.
+    if kind == 'k5' then
+        log.overlaps = GenPlanOverlaps(kind, dl, out, reduce,
+            function(h) return ReleaseGapQN(kind, dl, h) end)
+    end
     log.shortened, log.cut = FixLengths(kind, dl, out)
     return out, log
 end

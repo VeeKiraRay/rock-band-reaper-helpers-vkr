@@ -1639,3 +1639,130 @@ Test.it('6/8: no keys "and" phrase - the 8th after a beat is not an "and" there'
     for _, ev in ipairs(events) do ev.pulse = 1 end
     Test.expect(#Gen5AndPhrases(events, 'k5') == 1, 'the 3/4 control is no "and" phrase - the test proves nothing')
 end)
+
+Test.section('Generate planner - overlapping gems (Keys, Pro Keys)')
+
+-- 90 BPM: under the Keys 3/16 gray zone (>= 100 BPM), so lengths are only cut by the
+-- rules under test.
+local OV_BPM = 90
+
+-- The planned event starting at qn, or nil.
+local function At(out, qn)
+    for _, ev in ipairs(out) do if math.abs(ev.qn - qn) < 1e-6 then return ev end end
+end
+
+local function Offs(ev) return ev and table.concat(ev.offs, ',') or 'none' end
+
+Test.it('Hard keeps a note Expert holds under moving notes (Loiri bar 41)', function()
+    -- R held for a bar while B/O chords play over it: at most 3 notes sound at once.
+    local events = { Ev(0, 5, { 1 }, OV_BPM, 0), Ev(1, 0.125, { 3, 4 }, OV_BPM, 0), Ev(2, 0.125, { 3 }, OV_BPM, 0),
+                     Ev(3, 0.125, { 3, 4 }, OV_BPM, 0), Ev(6, 0.125, { 0 }, OV_BPM, 4) }
+    local out = Gen5PlanTier('k5', 'H', events)
+    local r_ = At(out, 0)
+    Test.expect(r_ and math.abs(r_.qn_e - 5) < 1e-6, ('held R ends at %s, expected 5 (Expert)'):format(r_ and r_.qn_e or 'none'))
+    -- Size only: a chart this sparse is eased by color (the 95% fallback moves B O down).
+    Test.expect(At(out, 1) and #At(out, 1).offs == 2, 'the chord over it lost notes: ' .. Offs(At(out, 1)))
+end)
+
+Test.it('an onset under a held note loses chord notes before the held note goes', function()
+    -- Held G + R Y B = 4 sounding on 5-lane (max 3): the chord keeps its top two (Keys rule).
+    local events = { Ev(0, 4, { 0 }, OV_BPM, 0), Ev(1, 0.125, { 1, 2, 3 }, OV_BPM, 0), Ev(6, 0.125, { 0 }, OV_BPM, 4) }
+    local out = Gen5PlanTier('k5', 'H', events)
+    Test.expect(Offs(At(out, 1)) == '2,3', 'onset chord: ' .. Offs(At(out, 1)) .. ', expected 2,3')
+    Test.expect(math.abs(At(out, 0).qn_e - 4) < 1e-6, ('held G ends at %g, expected 4'):format(At(out, 0).qn_e))
+end)
+
+Test.it('stacked sustains: the earliest-started one ends so a new single note fits', function()
+    -- G, R, Y held one after another, then a single B: 3 held + 1 is over 5-lane's 3.
+    local events = { Ev(0, 8, { 0 }, OV_BPM, 0), Ev(1, 7, { 1 }, OV_BPM, 0), Ev(2, 6, { 2 }, OV_BPM, 0),
+                     Ev(3, 0.125, { 3 }, OV_BPM, 0) }
+    local out = Gen5PlanTier('k5', 'H', events)
+    Test.expect(At(out, 3) ~= nil, 'the single B was dropped')
+    Test.expect(At(out, 0).qn_e <= 3 - 0.25 + 1e-6, ('G should end before B with its gap, ends %g'):format(At(out, 0).qn_e))
+    Test.expect(math.abs(At(out, 1).qn_e - 8) < 1e-6 and math.abs(At(out, 2).qn_e - 8) < 1e-6,
+        ('R and Y should keep holding to 8: %g, %g'):format(At(out, 1).qn_e, At(out, 2).qn_e))
+    -- Pro Keys allows 4: the same shape keeps every note held.
+    local pk = { Ev(0, 8, { 48 }, OV_BPM, 0), Ev(1, 7, { 52 }, OV_BPM, 0), Ev(2, 6, { 55 }, OV_BPM, 0),
+                 Ev(3, 0.125, { 60 }, OV_BPM, 0) }
+    local pout = GenPKPlanTier('H', pk, {})
+    Test.expect(math.abs(At(pout, 0).qn_e - 8) < 1e-6, ('Pro Keys: 4 sounding is allowed, 48 ends %g'):format(At(pout, 0).qn_e))
+end)
+
+Test.it('a held note never sounds into a note on its own lane, nor across more than an octave on Pro Keys', function()
+    local out = Gen5PlanTier('k5', 'H', { Ev(0, 4, { 1 }, OV_BPM, 0), Ev(2, 0.125, { 1 }, OV_BPM, 0) })
+    Test.expect(At(out, 0).qn_e <= 2 - 0.25 + 1e-6, ('R held into R at 2: ends %g'):format(At(out, 0).qn_e))
+    local pout = GenPKPlanTier('H', { Ev(0, 4, { 48 }, OV_BPM, 0), Ev(2, 0.125, { 62 }, OV_BPM, 0) }, {})
+    Test.expect(At(pout, 0).qn_e <= 2 - 0.25 + 1e-6, ('48 held under 62 (14 semitones): ends %g'):format(At(pout, 0).qn_e))
+end)
+
+Test.it('Medium holds a note only over a note a bar or more later; Easy never', function()
+    local long = { Ev(0, 8, { 0 }, OV_BPM, 0), Ev(4, 0.125, { 2 }, OV_BPM, 4) }
+    local m = Gen5PlanTier('k5', 'M', long)
+    Test.expect(math.abs(At(m, 0).qn_e - 8) < 1e-6, ('Medium: G held a bar before Y should stay, ends %g'):format(At(m, 0).qn_e))
+    local short = { Ev(0, 8, { 0 }, OV_BPM, 0), Ev(2, 0.125, { 2 }, OV_BPM, 0) }
+    m = Gen5PlanTier('k5', 'M', short)
+    Test.expect(At(m, 0).qn_e <= 2 + 1e-6, ('Medium: G held half a bar before Y should end, ends %g'):format(At(m, 0).qn_e))
+    local e = Gen5PlanTier('k5', 'E', long)
+    Test.expect(At(e, 0).qn_e <= 4 + 1e-6, ('Easy never overlaps: G ends %g'):format(At(e, 0).qn_e))
+end)
+
+Test.it('a rolled chord becomes one chord on its strongest beat', function()
+    -- Loiri's last chord at 61 BPM: R and Y a 1/32 apart into a held O on the downbeat.
+    local roll = { Ev(3.75, 3.75, { 1 }, 61, 0), Ev(3.875, 3.625, { 2 }, 61, 0), Ev(4, 3.5, { 4 }, 61, 4) }
+    local out = Gen5PlanTier('k5', 'H', roll)
+    Test.expect(#out == 1 and Offs(At(out, 4)) == '1,2,4', ('expected one R Y O chord on 4, got %d events, %s'):format(#out, Offs(At(out, 4))))
+    -- A roll that starts on the downbeat stays there (promisesinthedark bar 15).
+    local from = { Ev(4, 3.5, { 48, 55 }, 90, 4), Ev(4.25, 3.25, { 57 }, 90, 4) }
+    local pout = GenPKPlanTier('H', from, {})
+    Test.expect(#pout == 1 and Offs(At(pout, 4)) == '48,55,57', ('expected 48+55+57 on 4, got %d events, %s'):format(#pout, Offs(At(pout, 4))))
+end)
+
+Test.it('Keys chords keep their top notes; Guitar keeps the outer pair and the lowest', function()
+    -- Official Keys keeps the top note going to one note (Hard>Medium 52% vs 32%); Guitar/Bass
+    -- Easy keeps the lowest (69%).
+    Test.expect(table.concat(Gen5ReduceChordSizeKeys({ 0, 1, 3 }, 2), ',') == '1,3', 'Keys G R B -> R B')
+    Test.expect(table.concat(Gen5ReduceChordSizeKeys({ 1, 3 }, 1), ',') == '3', 'Keys R B -> B')
+    Test.expect(table.concat(Gen5ReduceChordSize({ 0, 1, 3 }, 2), ',') == '0,3', 'Guitar G R B -> G B')
+    Test.expect(table.concat(Gen5ReduceChordSize({ 1, 3 }, 1), ',') == '1', 'Guitar R B -> R')
+    -- Through the planner: a Hard G R B chord becomes R B on Medium, B on Easy. The 8ths
+    -- between are there for Medium to drop: a Medium keeping nearly all of Hard is eased by
+    -- color instead, which would move the chord.
+    local hard = {}
+    for b = 0, 3 do
+        hard[#hard + 1] = Ev(b * 4, 0.125, { 0, 1, 3 }, OV_BPM, b * 4)
+        for k = 1, 7 do hard[#hard + 1] = Ev(b * 4 + k * 0.5, 0.125, { k % 2 == 1 and 1 or 2 }, OV_BPM, b * 4) end
+    end
+    Test.expect(Offs(At(Gen5PlanTier('k5', 'M', hard), 0)) == '1,3', 'Keys Medium chord: ' .. Offs(At(Gen5PlanTier('k5', 'M', hard), 0)))
+    local medium = Gen5PlanTier('k5', 'M', hard)
+    Test.expect(Offs(At(Gen5PlanTier('k5', 'E', medium), 0)) == '3', 'Keys Easy note from R B: ' .. Offs(At(Gen5PlanTier('k5', 'E', medium), 0)))
+end)
+
+Test.it('Keys Easy keeps its line moving: no new repeats, a repeated chord stays one note', function()
+    local function E(...) local o = {} for i, offs in ipairs({ ... }) do o[i] = { offs = { offs[#offs] } } end return o end
+    local function Run(chords)
+        local out = E(table.unpack(chords))   -- the chord rule's pick: the top note
+        Gen5KeysEasyMotion(out, chords)
+        local t = {}
+        for i, ev in ipairs(out) do t[i] = ev.offs[1] end
+        return table.concat(t, ' ')
+    end
+    -- R Y then G Y: the top Y would repeat while Medium moved -> G. (Lanes: 0 G .. 4 O.)
+    Test.expect(Run({ { 1, 2 }, { 0, 2 } }) == '2 0', 'RY GY: ' .. Run({ { 1, 2 }, { 0, 2 } }))
+    -- The same chord three times stays one note, also after rule 2 changed its first.
+    Test.expect(Run({ { 1, 2 }, { 0, 2 }, { 0, 2 }, { 0, 2 } }) == '2 0 0 0', 'RY GY GY GY: ' .. Run({ { 1, 2 }, { 0, 2 }, { 0, 2 }, { 0, 2 } }))
+    -- A single Medium note is never changed, even when it repeats.
+    Test.expect(Run({ { 2 }, { 2 } }) == '2 2', 'Y Y: ' .. Run({ { 2 }, { 2 } }))
+end)
+
+Test.it('Validate: overlap limits per tier (DiffCheckOverlaps)', function()
+    local opts = { max = { X = 3, H = 3 }, label = function(p) return table.concat(p, '+') end,
+                   qn_at = function(q) return q end }
+    local function N(s, e, p) return { s = s, e = e, pitches = p } end
+    local three = { N(0, 4, { 96 }), N(1, 4, { 97 }), N(2, 2.1, { 98 }) }
+    local four  = { N(0, 4, { 96 }), N(1, 4, { 97 }), N(2, 2.1, { 98, 99 }) }
+    Test.expect(#DiffCheckOverlaps(three, 'H', opts) == 0, '3 sounding on 5-lane Hard is allowed')
+    Test.expect(#DiffCheckOverlaps(four, 'H', opts) == 1, '4 sounding on 5-lane Hard is one error')
+    Test.expect(#DiffCheckOverlaps({ N(0, 4, { 72 }), N(1, 1.1, { 74 }) }, 'M', opts) == 0, 'Medium: a quarter apart is allowed')
+    Test.expect(#DiffCheckOverlaps({ N(0, 4, { 72 }), N(0.5, 0.6, { 74 }) }, 'M', opts) == 1, 'Medium: an 8th apart is an error')
+    Test.expect(#DiffCheckOverlaps({ N(0, 4, { 60 }), N(2, 2.1, { 62 }) }, 'E', opts) == 1, 'Easy: any overlap is an error')
+end)

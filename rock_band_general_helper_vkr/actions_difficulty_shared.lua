@@ -4,7 +4,8 @@
 -- (Hard vs Expert, Medium vs Hard, Easy vs Medium) - never always-vs-Expert.
 -- Also holds what the per-instrument checks share: the DiffIssue record and
 -- the report builder that turns check categories into Validate's text.
--- Requires: nothing (pure functions, no S/r access)
+-- Requires: nothing at load (pure functions, no S/r access); DiffCheckOverlaps reads
+-- FormatTime (lib/reaper_imgui_helpers.lua) when it runs.
 
 -- Same event count, and every event's start/end time within ~5ms and
 -- normalized pitch-offset shape exactly matching, means the lower tier is an
@@ -139,6 +140,57 @@ function DiffIssue(s, pitches, msg, extra)
         for k, v in pairs(extra) do rec[k] = v end
     end
     return rec
+end
+
+-- Notes that start while earlier notes are still sounding (broken chords), for the Keys
+-- and Pro Keys validators. The RBN docs: on Expert/Hard at most opts.max[diff_label]
+-- notes sounding at once (5-lane 3, Pro Keys 4), within opts.span semitones when set (Pro
+-- Keys: an octave); on Medium none, except a note that started a quarter note or more
+-- before ("in some rare cases"); on Easy none.
+--   events - { s, e, pitches } sorted by s (project time)
+--   opts   - { max = { X =, H = }, span = semitones or nil, label = fn(pitches) -> text,
+--              qn_at = fn(time) -> quarter notes }
+-- Returns DiffIssue records.
+local TIER_NAMES = { X = 'Expert', H = 'Hard', M = 'Medium', E = 'Easy' }
+function DiffCheckOverlaps(events, diff_label, opts)
+    local issues = {}
+    for i = 2, #events do
+        local curr = events[i]
+        -- Pitches of the earlier events still sounding at curr, and the latest of their starts.
+        local active, last_start = {}, nil
+        for j = 1, i - 1 do
+            local prev = events[j]
+            if prev.e > curr.s + 0.002 then
+                for _, p in ipairs(prev.pitches) do active[#active + 1] = p end
+                if not last_start or prev.s > last_start then last_start = prev.s end
+            end
+        end
+        if #active > 0 and not (diff_label == 'M'
+                                and opts.qn_at(curr.s) - opts.qn_at(last_start) >= 1.0 - 0.01) then
+            local all_p = {}
+            for _, p in ipairs(active) do all_p[#all_p + 1] = p end
+            for _, p in ipairs(curr.pitches) do all_p[#all_p + 1] = p end
+            table.sort(all_p)
+            table.sort(active)
+            local max_ov = opts.max[diff_label]
+            if diff_label == 'E' then
+                issues[#issues + 1] = DiffIssue(curr.s, curr.pitches, ('%s: %s starts while %s still playing (no overlapping on Easy)'):format(
+                    FormatTime(curr.s), opts.label(curr.pitches), opts.label(active)))
+            elseif diff_label == 'M' then
+                issues[#issues + 1] = DiffIssue(curr.s, curr.pitches, ('%s: %s overlaps previous note (no overlapping on Medium unless \xe2\x89\xa5 quarter note apart)'):format(
+                    FormatTime(curr.s), opts.label(curr.pitches)))
+            elseif max_ov and #all_p > max_ov then
+                issues[#issues + 1] = DiffIssue(curr.s, curr.pitches, ('%s: %d notes active simultaneously (max %d overlapping for %s)'):format(
+                    FormatTime(curr.s), #all_p, max_ov, TIER_NAMES[diff_label] or diff_label))
+            end
+            -- Span: Expert/Hard (on Medium/Easy the overlap itself is already flagged).
+            if opts.span and (diff_label == 'X' or diff_label == 'H') and all_p[#all_p] - all_p[1] > opts.span then
+                issues[#issues + 1] = DiffIssue(curr.s, curr.pitches, ('%s: overlapping notes span %d semitones (max %d = octave)'):format(
+                    FormatTime(curr.s), all_p[#all_p] - all_p[1], opts.span))
+            end
+        end
+    end
+    return issues
 end
 
 -- Report text for one tier's check categories. Each category is

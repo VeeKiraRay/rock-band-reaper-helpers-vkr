@@ -46,6 +46,7 @@ dofile(_mdir .. 'actions_difficulty_gtrbass.lua')  -- GB_* rule tables (r only i
 dofile(_mdir .. 'actions_difficulty_5k.lua')       -- K5_* rule tables (r only inside functions)
 dofile(_mdir .. 'actions_difficulty.lua')          -- PK_MAX_CHORD / PK_MAX_SPAN (r only inside functions)
 dofile(_mdir .. 'difficulty_generate_params.lua')  -- GEN5_PARAMS, shared gaps (pure)
+dofile(_mdir .. 'difficulty_generate_overlaps.lua') -- GenMergeRolls, GenPlanOverlaps (pure)
 dofile(_mdir .. 'difficulty_generate_retime.lua')  -- Gen5RetimeDenseRuns (pure)
 dofile(_mdir .. 'difficulty_generate_colors.lua')  -- chords and colors (pure)
 dofile(_mdir .. 'difficulty_generate_rhythm.lua')  -- Gen5SelectOnsets (pure)

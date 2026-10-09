@@ -139,6 +139,20 @@
 --       bar's dotted-quarter beats instead of three quarter notes across
 --       them. Outside 4/4, a full bar of 8ths on Hard loses the 8th before
 --       the next bar line first (in 3/4 the "and" of 3, not the "and" of 2).
+--     - Keys and Pro Keys: a note Expert holds while other notes start over
+--       it keeps sounding on Hard, within the RBN limits (3 notes at once on
+--       Keys, 4 within an octave on Pro Keys). Over the limit, the new
+--       chord loses notes first, then the earliest held note ends early; a
+--       note that starts is never dropped for it. Medium keeps such a note
+--       only when it was held for a bar or more; Easy never. A rolled chord
+--       (notes a 1/32 apart, all held) becomes one chord on the beat.
+--     - Keys chords lose their lowest notes, keeping the top (melody) note as
+--       Pro Keys does and as official Keys charts do most often (Green-Red-
+--       Blue becomes Red-Blue). On Easy, a chord repeated for a while stays
+--       one note, and a chord change never turns into a repeated note.
+--     - Validate: Keys now checks overlapping notes (max 3 on Expert/Hard);
+--       Pro Keys allows 4 on Hard, as its doc says, and no longer flags a
+--       chord built from a rolled Expert chord.
 --     - The result is checked with Validate's own rules and anything left to
 --       fix is listed with its time. It asks before replacing notes, one undo
 --       reverts the whole run, and a time selection limits it to the notes
@@ -333,6 +347,7 @@ for _, _f in ipairs({
     _mdir .. 'actions_difficulty_gtrbass.lua',
     _mdir .. 'actions_difficulty_drums.lua',
     _mdir .. 'difficulty_generate_params.lua',
+    _mdir .. 'difficulty_generate_overlaps.lua',
     _mdir .. 'difficulty_generate_retime.lua',
     _mdir .. 'difficulty_generate_colors.lua',
     _mdir .. 'difficulty_generate_rhythm.lua',
@@ -442,6 +457,7 @@ dofile(_mdir .. 'actions_difficulty_drums.lua')
 -- action that reads and writes tracks. All only touch the rule tables and FindTrackExact
 -- (difficulty_read.lua) at call time.
 dofile(_mdir .. 'difficulty_generate_params.lua')
+dofile(_mdir .. 'difficulty_generate_overlaps.lua')
 dofile(_mdir .. 'difficulty_generate_retime.lua')
 dofile(_mdir .. 'difficulty_generate_colors.lua')
 dofile(_mdir .. 'difficulty_generate_rhythm.lua')

@@ -29,7 +29,8 @@
 --     them. Validate lists them as advisories.
 --
 -- Requires (globals, read at call time): PK_MAX_CHORD, PK_MAX_SPAN (actions_difficulty.lua),
---   Gen5SelectOnsets (difficulty_generate_rhythm.lua).
+--   Gen5SelectOnsets (difficulty_generate_rhythm.lua), GenPlanOverlaps / GenNextAfterHold
+--   (difficulty_generate_overlaps.lua).
 
 -- Lane-shift marker pitch -> the 10 white keys it shows (lo..hi). The RBN doc's six.
 GEN_PK_WINDOWS = {
@@ -59,9 +60,11 @@ local function Copy(t)
 end
 
 -- Reduce a chord (ascending pitches) to tier dl: keep the top note, then add notes
--- downward while the chord has room and stays within the tier's span.
-function GenPKReduceChord(pitches, dl)
-    local max_n, span = PK_MAX_CHORD[dl] or 1, PK_MAX_SPAN[dl] or 0
+-- downward while the chord has room and stays within the tier's span. max_n: optional,
+-- fewer notes than the tier allows (an onset under held notes, GenPlanOverlaps).
+function GenPKReduceChord(pitches, dl, max_n)
+    local span = PK_MAX_SPAN[dl] or 0
+    max_n = math.min(max_n or math.huge, PK_MAX_CHORD[dl] or 1)
     if #pitches <= max_n and (#pitches < 2 or pitches[#pitches] - pitches[1] <= span) then
         return Copy(pitches)
     end
@@ -202,29 +205,38 @@ local function ReleaseGap(dl, ev, nx)
 end
 
 -- Sustains leave the tier's gap; one cut shorter than 3/16 becomes a 1/16 note. No note
--- runs into the next onset (overlapping gems are left to hand authoring). Returns
--- (shortened, cut).
+-- runs into the next onset, except a sustain GenPlanOverlaps holds over later onsets
+-- (hold): its gap is measured from the first onset after it ends. Returns (shortened, cut).
 local function FixLengths(dl, out)
     local shortened, cut = 0, 0
     for i, ev in ipairs(out) do
-        local nx = out[i + 1]
-        if nx and ev.qn_e - ev.qn >= SUSTAIN_QN - EPS then
+        local first = out[i + 1]
+        local nx = GenNextAfterHold(out, i)
+        -- A held note pulled back can end at or just after a note it was held over: then
+        -- that note is the one after its end, and the gap is measured again.
+        while nx and ev.qn_e - ev.qn >= SUSTAIN_QN - EPS do
             local limit = nx.qn - ReleaseGap(dl, ev, nx)
             -- Not EPS: Validate forgives only 5% of a 1/16 gap (0.0125 QN), and Expert
             -- sometimes leaves 0.23 QN, which Hard keeps unless it is shortened here.
             -- Positions are snapped to 1/960 QN, so there is no float noise to absorb.
-            if ev.qn_e > limit + 1e-3 then
-                ev.qn_e = limit
-                shortened = shortened + 1
-                if ev.qn_e - ev.qn < STUB_QN - EPS then
-                    ev.qn_e = ev.qn + PLAIN_QN
-                    cut = cut + 1
-                end
+            if ev.qn_e <= limit + 1e-3 then break end
+            ev.qn_e = limit
+            shortened = shortened + 1
+            if ev.qn_e - ev.qn < STUB_QN - EPS then
+                ev.qn_e = ev.qn + PLAIN_QN
+                cut = cut + 1
+                break
             end
+            local again = GenNextAfterHold(out, i)
+            if again == nx then break end
+            nx = again
         end
         if ev.qn_e - ev.qn < MIN_LEN_QN then ev.qn_e = ev.qn + MIN_LEN_QN end
-        if nx and ev.qn_e > nx.qn - EPS / 2 then
-            ev.qn_e = math.max(ev.qn + MIN_LEN_QN * 0.6, nx.qn - EPS / 2)
+        -- A held sustain stops only for the first onset after its end (nil: none follows).
+        local stop = first
+        if ev.hold and ev.qn_e - ev.qn >= SUSTAIN_QN - EPS then stop = nx end
+        if stop and ev.qn_e > stop.qn - EPS / 2 then
+            ev.qn_e = math.max(ev.qn + MIN_LEN_QN * 0.6, stop.qn - EPS / 2)
         end
     end
     return shortened, cut
@@ -332,6 +344,10 @@ function GenPKPlanTier(dl, events, opts)
     for i = #out, 1, -1 do if #out[i].offs == 0 then table.remove(out, i) end end
     log.kept, log.removed = #out, log.upper - #out
 
+    -- Notes Expert holds while later notes start keep sounding within the docs' limits
+    -- (GenPlanOverlaps); after the window fit, so the octave check sees the final pitches.
+    log.overlaps = GenPlanOverlaps('pk', dl, out, function(offs, n) return GenPKReduceChord(offs, dl, n) end,
+        function(h, ev) return ReleaseGap(dl, h, ev) end)
     log.shortened, log.cut = FixLengths(dl, out)
     if dl == 'H' and opts.pull_back then log.pulled, log.pull_cut = PullBackSustains(out) end
     return out, log
