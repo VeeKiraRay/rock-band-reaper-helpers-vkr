@@ -604,6 +604,24 @@ end
 -- Onset selection
 ----------------------------------------------------------------------
 
+-- The gap an onset needs after the previous kept one on tier dl. Medium in a compound
+-- meter (6/8, 9/8, 12/8) keeps each beat AND the 8th after it - official 6/8 Medium's
+-- commonest bar of six 8ths is 0 0.5 1.5 2 (164 of 335 bars; the two beats alone 53), while
+-- official Easy keeps the beats (0 kept 97%, 1.5 94%, the other 8ths about 20%). With one
+-- beat-wide gap for every onset, Medium and Easy came out the same in steady 6/8 bars
+-- (vm_loiri_sydameeni_joulu_teen: Easy kept 222 of Medium's 223 onsets). User decision
+-- 2026-10-09. So the 8th after a beat needs only Hard's gap, a beat a quarter after the
+-- kept note before it, and every other onset the usual beat-wide gap.
+local function TierGapQN(dl, ev)
+    local pulse = ev.pulse or 1
+    if dl == 'M' and pulse > 1 and ev.bar_qn then
+        local pos = ev.bar_qn % pulse
+        if math.abs(pos - 0.5) <= EPS then return MinGapQN('H', ev.bpm) end
+        if pos <= EPS or pulse - pos <= EPS then return 1.0 end
+    end
+    return MinGapQN(dl, ev.bpm, pulse)
+end
+
 -- Decide which of the upper tier's onsets tier dl keeps. Arguments and opts as for
 -- Gen5PlanTier (difficulty_generate_5lane.lua); log is filled with the rhythm fields
 -- (guided, retimed_bars, first_bpm, busy_*, filled, offbeats_dropped, rhythm_*, and_phrases,
@@ -742,7 +760,7 @@ function Gen5SelectOnsets(kind, dl, events, opts, log)
         weights = Weights(kind, dl, events, shifted)
         keep = SelectByGap(events, function(ev, earlier)
             if ev.retimed or earlier.retimed then return MIN_LEN_QN end
-            return MinGapQN(dl, ev.bpm, ev.pulse)
+            return TierGapQN(dl, ev)
         end, weights)
     end
 

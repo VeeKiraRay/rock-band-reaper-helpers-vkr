@@ -135,9 +135,10 @@
 --       "only sustain lengths differ".
 --     - Songs not in 4/4: the tempo is read in quarter notes, as Validate
 --       reads it (a 6/8 song at 105 BPM was treated as 210, so every rule
---       for fast songs fired). In 6/8, 9/8 and 12/8 Medium and Easy keep the
---       bar's dotted-quarter beats instead of three quarter notes across
---       them. Outside 4/4, a full bar of 8ths on Hard loses the 8th before
+--       for fast songs fired). In 6/8, 9/8 and 12/8 Easy keeps the bar's
+--       dotted-quarter beats and Medium each beat plus the 8th after it, as
+--       official charts do, instead of three quarter notes across them.
+--       Outside 4/4, a full bar of 8ths on Hard loses the 8th before
 --       the next bar line first (in 3/4 the "and" of 3, not the "and" of 2).
 --     - Keys and Pro Keys: a note Expert holds while other notes start over
 --       it keeps sounding on Hard, within the RBN limits (3 notes at once on

@@ -1591,15 +1591,17 @@ Test.it('beat classes count from the bar line, in the bar\'s own beat', function
     Test.expect(Gen5BeatClass({ qn = 1, bar_qn = 1, bar_len = 3, pulse = 1.5 }) == '8th', '6/8 third 8th')
 end)
 
-Test.it('6/8: Medium and Easy keep the bar\'s two beats, not three quarter notes across them', function()
+Test.it('6/8: Medium keeps each beat and the 8th after it, Easy the two beats', function()
     -- vm_loiri_sydameeni_joulu_teen: counted in quarter notes, Medium kept 0, 1 and 2 of
-    -- each bar. Official 6/8 Medium keeps 0 and 1.5 in 97% of cases.
+    -- each bar. Official 6/8 Medium's commonest bar of 8ths is 0 0.5 1.5 2; official Easy
+    -- keeps 0 and 1.5 (97%, 94%). Never three quarter notes across the bar's two beats.
     local hard = MeterBars(8, 3, 1.5, 105)
-    for _, dl in ipairs({ 'M', 'E' }) do
-        local out = Gen5PlanTier('gb', dl, hard)
+    local want = { M = '0 0.5 1.5 2', E = '0 1.5' }
+    local medium = Gen5PlanTier('gb', 'M', hard)
+    for dl, out in pairs({ M = medium, E = Gen5PlanTier('gb', 'E', medium) }) do
         for b = 0, 7 do
             local got = BarKept(out, b, 3)
-            Test.expect(got == '0 1.5', ('%s bar %d keeps [%s], expected [0 1.5]'):format(dl, b, got))
+            Test.expect(got == want[dl], ('%s bar %d keeps [%s], expected [%s]'):format(dl, b, got, want[dl]))
         end
     end
 end)
