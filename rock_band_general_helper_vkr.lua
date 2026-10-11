@@ -31,11 +31,11 @@
 --
 --   v0.9.63
 --     - New Difficulty > Generate sub-tab. Builds Hard, Medium and Easy for
---       Guitar, Bass, Pro Keys or Keys from the difficulty above, in one click.
---       Pick an instrument - or All instruments, which uses PART GUITAR, PART
---       BASS, PART REAL_KEYS_X/H/M/E and PART KEYS and skips any that is
---       missing or muted - then generate one difficulty or the whole
---       Hard > Medium > Easy chain.
+--       Guitar, Bass, Pro Keys, Keys or Drums from the difficulty above, in
+--       one click. Pick an instrument - or All instruments, which uses PART
+--       GUITAR, PART BASS, PART REAL_KEYS_X/H/M/E, PART KEYS and PART DRUMS
+--       and skips any that is missing or muted - then generate one difficulty
+--       or the whole Hard > Medium > Easy chain.
 --     - It reduces the way official charts do, not just enough to pass
 --       Validate. It keeps downbeats and beats first; Medium loses most 8ths
 --       and Easy about half the beats. Measured against the official RB3 DLC
@@ -151,6 +151,31 @@
 --       Pro Keys does and as official Keys charts do most often (Green-Red-
 --       Blue becomes Red-Blue). On Easy, a chord repeated for a while stays
 --       one note, and a chord change never turns into a repeated note.
+--     - Drums are reduced on their own, limb by limb, and never move a note
+--       (official charts don't): Hard drops 16ths at 140 BPM and up, keeps a
+--       16th tom/snare run only if it lasts two beats or less, puts the
+--       hi-hat on 8ths, thins the kicks (under steady 8th hats to beats 1
+--       and 3 plus beat 4 where Expert has it, so the bar ends with a faster
+--       kick pattern; with quiet hands every beat keeps its kick, under the
+--       snare too) and plays Expert's disco-flip sections
+--       as a normal beat. Medium moves the hi-hat to quarters from 130 BPM -
+--       where official charts switch, earlier than the RBN doc's 140 - and on
+--       a slower song too when Medium would otherwise keep over 93% of Hard;
+--       it keeps kicks on quarter notes (half a bar apart under busy hands),
+--       at most two gems at once, and keeps a kick or snare
+--       between hi-hat notes only on the beat ("Drums Medium": Beats, None
+--       as the RBN doc says, or Keep). Easy plays kick + snare in verses on
+--       the hi-hat and a two-hand beat elsewhere, read from the EVENTS
+--       track's sections, and never pairs a gem with a kick. Medium and Easy
+--       drop a hi-hat sandwiched between snare accents, so the hands don't
+--       alternate hat and accent on every 8th. Every difficulty
+--       thins the kicks in fills, plays rolls on its own grid with an even
+--       number of hits, and turns a double crash with no room before it into
+--       one crash. With "Hard fast runs" on Rewrite or Auto, tom and snare
+--       fills are played one grid slower instead of thinned to 8ths.
+--     - Drums Validate: "kick during a drum fill" is now an advisory, and
+--       only when a fill keeps every kick of the difficulty above (official
+--       charts thin them, they don't remove them).
 --     - Validate: Keys now checks overlapping notes (max 3 on Expert/Hard);
 --       Pro Keys allows 4 on Hard, as its doc says, and no longer flags a
 --       chord built from a rolled Expert chord.
@@ -346,6 +371,7 @@ for _, _f in ipairs({
     _mdir .. 'actions_difficulty.lua',
     _mdir .. 'actions_difficulty_5k.lua',
     _mdir .. 'actions_difficulty_gtrbass.lua',
+    _mdir .. 'actions_difficulty_drums_checks.lua',
     _mdir .. 'actions_difficulty_drums.lua',
     _mdir .. 'difficulty_generate_params.lua',
     _mdir .. 'difficulty_generate_overlaps.lua',
@@ -355,6 +381,7 @@ for _, _f in ipairs({
     _mdir .. 'difficulty_generate_5lane.lua',
     _mdir .. 'difficulty_generate_prokeys.lua',
     _mdir .. 'difficulty_generate_hopo.lua',
+    _mdir .. 'difficulty_generate_drums.lua',
     _mdir .. 'actions_difficulty_generate.lua',
     _mdir .. 'difficulty_read.lua',
     _mdir .. 'difficulty_explain.lua',
@@ -453,6 +480,7 @@ dofile(_mdir .. 'actions_difficulty_shared.lua')
 dofile(_mdir .. 'actions_difficulty.lua')
 dofile(_mdir .. 'actions_difficulty_5k.lua')
 dofile(_mdir .. 'actions_difficulty_gtrbass.lua')
+dofile(_mdir .. 'actions_difficulty_drums_checks.lua')
 dofile(_mdir .. 'actions_difficulty_drums.lua')
 -- Difficulty > Generate: the pure planner (its Hard fast-run rewrite first), then the
 -- action that reads and writes tracks. All only touch the rule tables and FindTrackExact
@@ -465,6 +493,7 @@ dofile(_mdir .. 'difficulty_generate_rhythm.lua')
 dofile(_mdir .. 'difficulty_generate_5lane.lua')
 dofile(_mdir .. 'difficulty_generate_prokeys.lua')
 dofile(_mdir .. 'difficulty_generate_hopo.lua')
+dofile(_mdir .. 'difficulty_generate_drums.lua')
 dofile(_mdir .. 'actions_difficulty_generate.lua')
 dofile(_mdir .. 'difficulty_read.lua')
 dofile(_mdir .. 'difficulty_explain.lua')

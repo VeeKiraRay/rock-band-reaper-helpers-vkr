@@ -3,7 +3,7 @@
 
 -- Per-difficulty pitch ranges on tracks that pack all four tiers into one
 -- track at different pitch bands (matches DRUMS_RANGE in
--- actions_difficulty_drums.lua - the wider scan boundary, not the narrower
+-- actions_difficulty_drums_checks.lua - the wider scan boundary, not the narrower
 -- gem-legality ranges in GB_RANGE/K5_RANGE).
 local DIFF_TIER_RANGE = {
     [1] = { lo = 96, hi = 100 }, -- Expert

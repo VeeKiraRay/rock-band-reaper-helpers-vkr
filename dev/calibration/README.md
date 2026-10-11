@@ -1013,6 +1013,24 @@ Order matters: everything downstream reads the CSV the first script writes.
     once, when the parameters are final, and report that number; re-running it after
     further tuning turns it into a development set.
 
+13. **`run_generate_eval_drums_offline.lua`** — the same for the Drums planner
+    (`rock_band_general_helper_vkr/difficulty_generate_drums.lua`), against the official
+    PART DRUMS tiers:
+
+    ```
+    lua dev/calibration/run_generate_eval_drums_offline.lua [rewrite|auto|thin] [diag] [holdout]
+    ```
+
+    Onset precision / recall / F1 and per-lane (Kick, Red, Yellow, Blue, Green) note
+    recall / precision, plain Copy as the baseline, the chain row, and Validate's error
+    rules (`CollectDrumsChecks`) re-implemented in quarter notes for the generated tiers
+    (must be 0) beside the official ones. `thin` is the official-like setting; `rewrite`
+    moves fill runs, which then never line up with an official onset. `diag` adds the keep
+    rate by lane and beat class (generated / official) and Easy's beat type per bar
+    (kick + snare, two-hand) against official - the tables the planner's numbers were set
+    from. Its companion for a single song is `dev/tools/generate_compare_drums_offline.lua`
+    (a song's own tiers bar by bar against the generated ones). Same hold-out rule as above.
+
 Unit tests: **`dev/tests/run_difficulty_score.lua`** for the pure scorers, and
 **`dev/tests/run_difficulty_suggester.lua`** for the tiers, the predictor, and the frozen
 artifact — the latter refits every model from the CSV at its recorded ridge and compares

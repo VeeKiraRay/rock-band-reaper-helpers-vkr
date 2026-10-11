@@ -320,6 +320,14 @@ function Gen5RetimeDenseRuns(events, opts)
                                   and nx.qn - last.qn < opts.gap(last) - eps
                     if joins and math.abs(run.notes[1].qn - h0) > eps and not late_long then
                         local floor = math.max(h0, run.start_at or (lo + grid))
+                        -- Never before the group's first Expert note - the long-run limit, for
+                        -- short groups too (user rule 2026-10-10, every instrument). Drums'
+                        -- pojat_lemmikkih bar 36: 16ths from the "a" of 3 into the downbeat
+                        -- were laid out from the "and" of 3's triplet. It changed one verified
+                        -- 5-lane bar, chronosp_brutal_decay Guitar 162 (Expert 0:R 36:B 42:R 48:B
+                        -- 54:R): Hard 32:B 40:R 48:B 56:R -> 40:R 48:B 56:R, and Medium's
+                        -- downbeat R is a sustain again; the user approved it.
+                        floor = math.max(floor, run.notes[1].qn - eps)
                         local k = 1
                         while h1 - k * grid >= floor - eps do
                             table.insert(slots, 1, h1 - k * grid)

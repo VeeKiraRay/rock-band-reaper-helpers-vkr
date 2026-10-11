@@ -16,8 +16,12 @@
 -- a color-only change is easy to tell from a rhythm change.
 --
 -- Requires (globals): Test, r, GOLDEN_DIR, SmfReadFile, SmfFindTrack, SmfNotesInRange,
---   SmfSongTiming, SmfTierEvents, SmfProKeysEvents, Gen5PlanTier, GenPKPlanTier,
---   GenPKSameAsUpper, Gen5MarkHopos, Gen5ForceHopoSpans.
+--   SmfSongTiming, SmfTierEvents, SmfProKeysEvents, SmfDrumsContext, Gen5PlanTier,
+--   GenPKPlanTier, GenPKSameAsUpper, Gen5MarkHopos, Gen5ForceHopoSpans, GenDrumsPlanTier.
+--
+-- Drums are compared only in the songs listed in GOLDEN_DIR/drums_verified.txt (one MIDI
+-- file name per line; the list lives beside the charts, so it is local too): most golden
+-- songs' drum tiers predate the Drums planner and were never checked against it.
 
 -- Parts compared. verify = false lists a part Generate cannot build yet: it is reported as
 -- skipped, never failed. Flip it to true once that instrument's planner is ready.
@@ -25,7 +29,7 @@ local PARTS = {
     { track = 'PART GUITAR',      kind = 'gb', label = 'Guitar',   verify = true  },
     { track = 'PART BASS',        kind = 'gb', label = 'Bass',     verify = true  },
     { track = 'PART KEYS',        kind = 'k5', label = 'Keys',     verify = true  },
-    { track = 'PART DRUMS',                    label = 'Drums',    verify = false },
+    { track = 'PART DRUMS',       kind = 'drums', label = 'Drums', verify = true  },
     { track = 'PART REAL_KEYS_X', kind = 'pk', label = 'Pro Keys', verify = true  },
 }
 local NOTE_NAMES = { 'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B' }
@@ -34,6 +38,7 @@ local ONSET_TOL = 0.005  -- QN: under one tick at 480 PPQ apart counts as the sa
 local LEN_TOL   = 0.006  -- QN: the action rounds lengths to the take's ticks on write
 local MAX_LINES = 10     -- differences listed per tier (all are counted)
 local COLORS    = { [0] = 'G', 'R', 'Y', 'B', 'O' }
+local GEMS      = { [0] = 'K', 'R', 'Y', 'B', 'G' }   -- Drums: kick, red, yellow, blue, green
 
 local function ListMidi(dir)
     local out = {}
@@ -118,11 +123,12 @@ end
 
 -- A chord as text: colours on the 5-lane instruments, note names on Pro Keys (its offs
 -- are MIDI pitches).
-local SHAPE_PK = false
+local SHAPE_PK, SHAPE_DRUMS = false, false
 local function Shape(offs)
     local s = {}
     for _, o in ipairs(offs) do
-        s[#s + 1] = SHAPE_PK and (NOTE_NAMES[o % 12 + 1] .. (o // 12 - 2)) or COLORS[o] or '?'
+        s[#s + 1] = SHAPE_PK and (NOTE_NAMES[o % 12 + 1] .. (o // 12 - 2))
+                    or (SHAPE_DRUMS and GEMS[o]) or COLORS[o] or '?'
     end
     return table.concat(s, SHAPE_PK and '+' or '')
 end
@@ -166,6 +172,19 @@ local function Compare(gen, want, song, timing)
     return counts, lines
 end
 
+-- Songs whose drum tiers someone checked against the Drums planner (see the header).
+local DRUMS_VERIFIED = {}
+do
+    local f = io.open(GOLDEN_DIR .. 'drums_verified.txt', 'r')
+    if f then
+        for line in f:lines() do
+            local name = line:match('^%s*(.-)%s*$')
+            if name ~= '' and not name:match('^#') then DRUMS_VERIFIED[name:lower()] = true end
+        end
+        f:close()
+    end
+end
+
 local files = ListMidi(GOLDEN_DIR)
 if #files == 0 then
     r.ShowConsoleMsg('  (no golden charts in dev/tests/golden/ - nothing to compare)\n')
@@ -195,6 +214,26 @@ for _, name in ipairs(files) do
             SHAPE_PK = part.kind == 'pk'
             if trk and not part.verify then
                 r.ShowConsoleMsg(('  SKIP  %s: no Generate planner yet\n'):format(part.label))
+            elseif trk and part.kind == 'drums' and not DRUMS_VERIFIED[name:lower()] then
+                r.ShowConsoleMsg(('  SKIP  %s: not listed in drums_verified.txt\n'):format(part.label))
+            elseif trk and part.kind == 'drums' then
+                -- Drums: the chain as the button runs it, default options, with the song's
+                -- marker context (fills, rolls, toms, disco flip, EVENTS sections).
+                local ctx = SmfDrumsContext(song, trk)
+                local upper = SmfTierEvents(trk, LO.X, song.tpqn, timing, { skip_zero = true })
+                for _, dl in ipairs({ 'H', 'M', 'E' }) do
+                    local gen = GenDrumsPlanTier(dl, upper, { ctx = ctx })
+                    local want = SmfTierEvents(trk, LO[dl], song.tpqn, timing)
+                    Test.it(('Drums %s'):format(({ H = 'Hard', M = 'Medium', E = 'Easy' })[dl]), function()
+                        SHAPE_DRUMS = true
+                        local c, lines = Compare(gen, want, song, timing)
+                        SHAPE_DRUMS = false
+                        local total = c.missing + c.extra + c.color + c.length
+                        Test.expect(total == 0, ('%d differences - rhythm: %d missing, %d extra; gems: %d; lengths: %d\n           %s')
+                            :format(total, c.missing, c.extra, c.color, c.length, table.concat(lines, '\n           ')))
+                    end)
+                    upper = gen
+                end
             elseif trk and part.kind == 'pk' then
                 -- Pro Keys: a track per tier. Planned as the action plans it: Expert's lane
                 -- shifts go along, Hard follows Guitar's busy bars, Medium Guitar's rhythm,

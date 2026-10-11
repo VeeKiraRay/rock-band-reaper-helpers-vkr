@@ -14,7 +14,7 @@ function DrawDifficultyGenerateTab(ctx, midi_tracks)
 
     SectionHeader('Instrument')
     local lbl_col = LabelColWidth({ 'Instrument', 'Track', 'Expert track', 'Medium track', 'Hard 8th runs',
-                                    'Hard fast runs' })
+                                    'Hard fast runs', 'Drums Medium' })
 
     local cur_key  = S.diff_gen_instrument
     local cur_inst = GenInstrumentByKey(cur_key)
@@ -59,8 +59,8 @@ function DrawDifficultyGenerateTab(ctx, midi_tracks)
     else
         r.ImGui_TextWrapped(ctx,
             'Uses each instrument\'s default track (PART GUITAR, PART BASS, PART REAL_KEYS_X/H/M/E, '
-            .. 'PART KEYS) and skips any that is missing or muted. Pro Keys runs before Keys, '
-            .. 'and Keys follows the Pro Keys it just generated.')
+            .. 'PART KEYS, PART DRUMS) and skips any that is missing or muted. Pro Keys runs before '
+            .. 'Keys, and Keys follows the Pro Keys it just generated.')
     end
 
     -- Two rows of radios, aligned on one per-option pitch (RadioGroupWidth).
@@ -70,6 +70,13 @@ function DrawDifficultyGenerateTab(ctx, midi_tracks)
         { label = 'Hard fast runs', field = 'diff_gen_fast_runs', id = 'gen_fast', tip = TIPS.diff_gen_fast_runs,
           opts = { { 'rewrite', 'Rewrite' }, { 'auto', 'Auto' }, { 'thin', 'Thin' } } },
     }
+    -- Drums only (or All instruments): Medium's kick/snare between hi-hat notes.
+    local key_now = S.diff_gen_instrument
+    if key_now == 'drums' or key_now == GEN_ALL_KEY then
+        rows[#rows + 1] = { label = 'Drums Medium', field = 'diff_gen_drums_between', id = 'gen_dbtw',
+                            tip = TIPS.diff_gen_drums_between,
+                            opts = { { 'beats', 'Beats' }, { 'none', 'None' }, { 'keep', 'Keep' } } }
+    end
     local all = {}
     for _, row in ipairs(rows) do for _, o in ipairs(row.opts) do all[#all + 1] = o[2] end end
     local radio_w = RadioGroupWidth(all)

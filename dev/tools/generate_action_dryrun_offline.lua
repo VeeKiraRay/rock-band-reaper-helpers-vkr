@@ -4,7 +4,7 @@
 --   lua dev/tools/generate_action_dryrun_offline.lua
 --       the test fixtures (verbose) + every 6th development song of the RB3 DLC corpus
 --       (summary: runs that leave Validate errors)
---   lua dev/tools/generate_action_dryrun_offline.lua <song.mid> [gtr|bass|keys|pk|all] [from_qn to_qn]
+--   lua dev/tools/generate_action_dryrun_offline.lua <song.mid> [gtr|bass|keys|pk|drums|all] [from_qn to_qn]
 --       one song, one part (default gtr): the result text, then X/H/M/E for the range
 --       (default: 16 QN from the first Expert note). 'all' runs All instruments (Pro Keys
 --       first, then Keys following it) and dumps Pro Keys and Keys.
@@ -90,7 +90,13 @@ local api = {
         for _, n in ipairs(item.notes or {}) do last = math.max(last, n.tick + n.len) end
         return QNToTime(last / (item.tpqn or 480))
     end,
-    MIDI_CountEvts = function(take) return true, #take.notes, 0, 0 end,
+    MIDI_CountEvts = function(take) return true, #take.notes, 0, #(take.texts or {}) end,
+    -- Text events (Drums reads disco-flip mix events and the EVENTS sections).
+    MIDI_GetTextSysexEvt = function(take, j)
+        local t = (take.texts or {})[j + 1]
+        if not t then return false end
+        return true, false, false, t.tick, t.type, t.text
+    end,
     MIDI_GetNote = function(take, j)
         local n = take.notes[j + 1]
         return true, false, false, n.tick, n.tick + n.len, n.chan or 0, n.pitch, n.vel
@@ -192,7 +198,17 @@ local api = {
         local s = ts.qn + k * meas
         return k, s, s + meas
     end,
-    format_timestr_pos = function(t) return ('%d.1.00'):format(math.floor(TimeToQN(t) / 4) + 1) end,
+    -- Measure number through the time signatures (a 2/4 bar moves every later bar line).
+    -- 1e-6: a note's time round-trips through seconds, and 55.99999 QN is bar 15, not 14.
+    format_timestr_pos = function(t)
+        local qn, bars, from, meas = TimeToQN(t) + 1e-6, 0, 0, 4
+        for _, x in ipairs(P.timesigs) do
+            if x.qn > qn then break end
+            bars = bars + math.floor((x.qn - from) / meas + 0.5)
+            from, meas = x.qn, x.num * 4 / x.denom
+        end
+        return ('%d.1.00'):format(bars + math.floor((qn - from) / meas) + 1)
+    end,
     GetSet_LoopTimeRange = function() return 0, 0 end,
     CountTempoTimeSigMarkers = function() return #P.markers end,
     FindTempoTimeSigMarker = function(_, t)
@@ -222,7 +238,7 @@ local api = {
         end
         table.sort(P.timesigs, function(a, b) return a.qn < b.qn end)
         for _, trk in ipairs(song.tracks) do
-            P.tracks[#P.tracks + 1] = { name = trk.name or '', notes = trk.notes, tpqn = song.tpqn }
+            P.tracks[#P.tracks + 1] = { name = trk.name or '', notes = trk.notes, texts = trk.texts, tpqn = song.tpqn }
         end
         return 1
     end,
@@ -245,11 +261,12 @@ for _, f in ipairs({
     _root .. 'lib/reaper_difficulty_score_vocals.lua',
     M .. 'defaults.lua', M .. 'helpers.lua', M .. 'actions_guitar.lua', M .. 'actions_guitar_validate.lua',
     M .. 'actions_difficulty_shared.lua', M .. 'actions_difficulty.lua', M .. 'actions_difficulty_5k.lua',
-    M .. 'actions_difficulty_gtrbass.lua',
+    M .. 'actions_difficulty_gtrbass.lua', M .. 'actions_difficulty_drums_checks.lua',
     M .. 'difficulty_generate_params.lua', M .. 'difficulty_generate_overlaps.lua', M .. 'difficulty_generate_retime.lua',
     M .. 'difficulty_generate_colors.lua', M .. 'difficulty_generate_rhythm.lua',
     M .. 'difficulty_generate_5lane.lua', M .. 'difficulty_generate_prokeys.lua',
-    M .. 'difficulty_generate_hopo.lua', M .. 'actions_difficulty_generate.lua', M .. 'difficulty_read.lua',
+    M .. 'difficulty_generate_hopo.lua', M .. 'difficulty_generate_drums.lua',
+    M .. 'actions_difficulty_generate.lua', M .. 'difficulty_read.lua',
     _root .. 'dev/calibration/difficulty_holdout.lua',
 }) do dofile(f) end
 
@@ -257,6 +274,8 @@ local PARTS = {
     gtr  = { field = 'diff_gtr_idx',  track = 'PART GUITAR', read = ReadGBTierEvents, range = GB_RANGE },
     bass = { field = 'diff_bass_idx', track = 'PART BASS',   read = ReadGBTierEvents, range = GB_RANGE },
     keys = { field = 'diff_5k_idx',   track = 'PART KEYS',   read = ReadK5TierEvents, range = K5_RANGE },
+    drums = { field = 'diff_drums_idx', track = 'PART DRUMS', read = ReadDrumsTierEvents, range = DRUMS_RANGE,
+              letters = { [0] = 'K', 'R', 'Y', 'B', 'G' } },
     -- A track per tier; the dump reads each tier's own track.
     pk   = { field = 'diff_pk_x_idx', track = 'PART REAL_KEYS_X', pk = true },
 }
@@ -268,7 +287,7 @@ local function Run(path, key)
     P.tracks = {}
     reaper.InsertMedia(path)
     local part = PARTS[key == 'all' and 'pk' or key]
-    S.diff_gtr_idx, S.diff_bass_idx, S.diff_5k_idx = -1, -1, -1
+    S.diff_gtr_idx, S.diff_bass_idx, S.diff_5k_idx, S.diff_drums_idx = -1, -1, -1, -1
     for _, f in pairs(PK_FIELDS) do S[f] = -1 end
     for i, tr in ipairs(P.tracks) do
         for k, pt in pairs(PARTS) do if tr.name == pt.track then S[pt.field] = i - 1 end end
@@ -322,7 +341,7 @@ local function DumpTiers(track, key, q0, q1)
             local qn = reaper.TimeMap2_timeToQN(0, ev.s)
             if qn >= q0 and qn < q1 then
                 local cs = {}
-                for _, p in ipairs(ev.pitches) do cs[#cs + 1] = COLORS[p - lo] or '?' end
+                for _, p in ipairs(ev.pitches) do cs[#cs + 1] = (part.letters or COLORS)[p - lo] or '?' end
                 local len = reaper.TimeMap2_timeToQN(0, ev.e) - qn
                 cells[#cells + 1] = ('%g:%s%s'):format(qn, table.concat(cs), len >= 0.49 and '~' or '')
             end
@@ -354,7 +373,8 @@ if arg[1] then
         DumpTiers(track, key, q0, q1)
     end
 else
-    for _, f in ipairs({ { 'rb_guitar.mid', 'gtr' }, { 'rb_bass.mid', 'bass' }, { 'rb_keys.mid', 'keys' } }) do
+    for _, f in ipairs({ { 'rb_guitar.mid', 'gtr' }, { 'rb_bass.mid', 'bass' }, { 'rb_keys.mid', 'keys' },
+                         { 'rb_drums.mid', 'drums' } }) do
         Run(_root .. 'dev/tests/midi/' .. f[1], f[2])
         print(('%-14s %s'):format(f[1], S.status))
     end
@@ -363,7 +383,7 @@ else
     for i, path in ipairs(files) do
         local name = SmfShortname(path)
         if i % 6 == 0 and not name:find('%(') and not DiffIsHeldOut(name) then
-            for _, key in ipairs({ 'gtr', 'bass', 'keys', 'pk' }) do
+            for _, key in ipairs({ 'gtr', 'bass', 'keys', 'pk', 'drums' }) do
                 if Run(path, key) then
                     n = n + 1
                     if not S.status:find('no Validate errors', 1, true) then

@@ -80,6 +80,7 @@ dev/calibration/*_rating_key.txt
 dev/calibration/difficulty_probe_*.txt
 dev/calibration/difficulty_probe_*.csv
 dev/calibration/generate_eval_report.txt
+dev/calibration/generate_eval_drums_report.txt
 
 # Difficulty > Generate golden charts (dev/tests/run_generate_golden.lua): the author's own
 # hand-verified charts, kept local. Only the README that explains the folder is tracked.

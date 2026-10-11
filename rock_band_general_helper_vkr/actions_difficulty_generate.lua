@@ -7,6 +7,8 @@
 --
 -- Requires (globals): S, r, GetTimeSelection, FindFirstMIDIItem, ClearNotesInRange,
 --   InsertNotes, FindTrackExact (difficulty_read.lua), Gen5PlanTier, GenPKPlanTier,
+--   GenDrumsPlanTier (difficulty_generate_drums.lua), DRUMS_RANGE / ReadDrumsTierEvents /
+--   CollectDrumsChecks (actions_difficulty_drums_checks.lua),
 --   GEN_PK_WINDOWS, GB_RANGE / K5_RANGE, ReadGBTierEvents / ReadK5TierEvents,
 --   CollectGBChecks / CollectK5Checks / CollectPKChecks, ReadPKTierEvents
 --   (actions_difficulty.lua), ReadProKeysEvents (actions_difficulty_5k.lua), Gen5MarkHopos /
@@ -15,7 +17,7 @@
 
 -- The instruments Generate supports, in dropdown order - which is also the run order of
 -- All instruments, so Pro Keys comes before Keys (Keys follows the Pro Keys this run
--- generated). Adding one (Drums) is one entry here plus its planner. idx_field is the
+-- generated). Adding one is one entry here plus its planner. idx_field is the
 -- track field the instrument's own Difficulty sub-tab uses, so the selection is shared
 -- rather than duplicated. Pro Keys has a track per tier: tier_fields instead.
 GEN_INSTRUMENTS = {
@@ -24,6 +26,8 @@ GEN_INSTRUMENTS = {
     { key = 'pk',   label = 'Pro Keys', track_name = 'PART REAL_KEYS_X', kind = 'pk',
       tier_fields = { X = 'diff_pk_x_idx', H = 'diff_pk_h_idx', M = 'diff_pk_m_idx', E = 'diff_pk_e_idx' } },
     { key = 'keys', label = 'Keys',   track_name = 'PART KEYS',   idx_field = 'diff_5k_idx',   kind = 'k5' },
+    -- Drums: its own planner, independent of the band (difficulty_generate_drums.lua).
+    { key = 'drums', label = 'Drums', track_name = 'PART DRUMS', idx_field = 'diff_drums_idx', kind = 'drums' },
 }
 -- Pro Keys pitches a tier owns: the lane-shift markers and the playable keys.
 local PK_RANGES = { { 0, 0 }, { 2, 2 }, { 4, 5 }, { 7, 7 }, { 9, 9 }, { 48, 72 } }
@@ -57,6 +61,7 @@ end
 -- Pro Keys planner events carry real pitches (offs = pitch - 0).
 local function RangeLo(inst, dl)
     if inst.kind == 'pk' then return 0 end
+    if inst.kind == 'drums' then return DRUMS_RANGE[dl].lo end
     return (inst.kind == 'gb' and GB_RANGE or K5_RANGE)[dl].lo
 end
 
@@ -68,6 +73,7 @@ local function ReadTier(inst, track, dl, sel_s, sel_e)
         return events, shifts
     end
     if inst.kind == 'gb' then return ReadGBTierEvents(track, dl, sel_s, sel_e) end
+    if inst.kind == 'drums' then return ReadDrumsTierEvents(track, dl, sel_s, sel_e) end
     return ReadK5TierEvents(track, dl, sel_s, sel_e)
 end
 
@@ -75,6 +81,7 @@ end
 local function CheckTier(inst, track, dl, events, sel_s, sel_e, ctx)
     if inst.kind == 'pk' then return CollectPKChecks(dl, events, ctx.shifts, ctx.exp_events, sel_s) end
     if inst.kind == 'gb' then return CollectGBChecks(dl, events, track, sel_s, sel_e) end
+    if inst.kind == 'drums' then return CollectDrumsChecks(dl, events, track, sel_s, sel_e) end
     return CollectK5Checks(dl, events)
 end
 
@@ -412,6 +419,125 @@ local function MarkerSpans(take, pitch, sel_s, sel_e)
     return spans
 end
 
+-- The marker context the Drums planner takes (difficulty_generate_drums.lua, opts.ctx),
+-- over the WHOLE take even in a time selection (a fill or disco section may start before
+-- it): fill lanes (120), roll lanes (126/127), Pro Drums tom markers (110-112), Expert's
+-- disco-flip spans ([mix 3 drumsNd] up to the next [mix 3 drumsN]; "dnoflip" is not a
+-- flip), and the EVENTS track's [section] / [prc_] names (Easy's beat type).
+local function DrumsContext(take)
+    local ctx = { fills = MarkerSpans(take, 120), rolls = MarkerSpans(take, 126),
+                  toms = { [2] = MarkerSpans(take, 110), [3] = MarkerSpans(take, 111), [4] = MarkerSpans(take, 112) },
+                  disco = {}, sections = {} }
+    for _, sp in ipairs(MarkerSpans(take, 127)) do ctx.rolls[#ctx.rolls + 1] = sp end
+    local function QN(ppq, tk) return SnapQN(r.TimeMap2_timeToQN(0, r.MIDI_GetProjTimeFromPPQPos(tk, ppq))) end
+    local texts = {}
+    local _, _, _, n_txt = r.MIDI_CountEvts(take)
+    for i = 0, n_txt - 1 do
+        local ok, _, _, ppq, typ, msg = r.MIDI_GetTextSysexEvt(take, i)
+        if ok and typ == 1 then texts[#texts + 1] = { qn = QN(ppq, take), msg = msg } end
+    end
+    table.sort(texts, function(a, b) return a.qn < b.qn end)
+    local open
+    for _, t in ipairs(texts) do
+        local suffix = t.msg:match('^%[mix 3 drums%d(%a*)%]')
+        if suffix == 'd' then
+            open = open or t.qn
+        elseif suffix and open then
+            ctx.disco[#ctx.disco + 1] = { qn = open, qn_e = t.qn }
+            open = nil
+        end
+    end
+    if open then ctx.disco[#ctx.disco + 1] = { qn = open, qn_e = math.huge } end
+    local ev_track = FindTrackExact('EVENTS')
+    local ev_take
+    if ev_track then ev_take = select(2, FindFirstMIDIItem(ev_track)) end
+    if ev_take then
+        local _, _, _, n = r.MIDI_CountEvts(ev_take)
+        for i = 0, n - 1 do
+            local ok, _, _, ppq, typ, msg = r.MIDI_GetTextSysexEvt(ev_take, i)
+            local name = ok and typ == 1 and (msg:match('^%[section (.-)%]') or msg:match('^%[prc_(.-)%]'))
+            if name then ctx.sections[#ctx.sections + 1] = { qn = QN(ppq, ev_take), name = name } end
+        end
+    end
+    return ctx
+end
+
+-- kept of upper as a whole percentage that never rounds to the ends: 100 only when
+-- nothing was dropped (829 of 833 is 99, not 100), 0 only when nothing was kept.
+function KeptPercent(kept, upper)
+    if upper <= 0 then return 0 end
+    local p = math.floor(100 * kept / upper + 0.5)
+    if kept < upper then p = math.min(p, 99) end
+    if kept > 0 then p = math.max(p, 1) end
+    return p
+end
+
+-- Result lines for one Drums tier (log from GenDrumsPlanTier).
+local function DrumsLines(dl, log, opts)
+    local lines = {}
+    if log.unflipped > 0 then
+        lines[#lines + 1] = ('    %d hits in Expert\'s disco-flip sections played as a normal beat (hi-hat back on'
+            .. ' Yellow, snare on Red); set this tier\'s [mix N drums...] events to the plain config'):format(log.unflipped)
+    end
+    if log.rolls > 0 then
+        lines[#lines + 1] = ('    %d roll lane%s played on the %s grid with an even number of hits'):format(log.rolls,
+            log.rolls == 1 and '' or 's', dl == 'H' and '16th (8th at 140+ BPM)' or dl == 'M' and '8th (quarter at 120+ BPM)'
+            or 'quarter-note')
+    end
+    if dl == 'H' then
+        local what = ({ auto = 'rewritten one grid slower above 160 BPM, thinned below',
+                        thin = 'thinned to the Hard grid (never rewritten)',
+                        rewrite = 'rewritten one grid slower (at or below 160 BPM: runs of half a bar or more)' })[
+                        opts.fast_runs or GEN5_PARAMS.fast_runs_default]
+        if what then lines[#lines + 1] = '    tom/snare fill runs: ' .. what end
+        for _, l in ipairs(RetimedLines(log.retimed_bars)) do lines[#lines + 1] = l end
+    end
+    if dl == 'H' and log.hard_fallback then
+        lines[#lines + 1] = ('    Hard would have kept %d of %d notes (more than %d%% of Expert), so %d hi-hat%s left'
+            .. ' steady 8th bars (%d per bar - "Hard 8th runs": %s)'):format(log.hard_fallback.before, log.upper_notes,
+            math.floor(100 * GEN_DRUMS_PARAMS.hard_fallback_keep + 0.5), log.hat_drops or 0,
+            (log.hat_drops or 0) == 1 and '' or 's', log.busy_drop, log.busy_auto and 'Auto' or 'your choice')
+    elseif dl == 'H' and (log.hat_drops or 0) > 0 then
+        lines[#lines + 1] = ('    %d hi-hat%s left steady 8th bars (%d per bar - "Hard 8th runs": %s)'):format(
+            log.hat_drops, log.hat_drops == 1 and '' or 's', log.busy_drop, log.busy_auto and 'Auto' or 'your choice')
+    end
+    if dl == 'M' and log.fallback then
+        lines[#lines + 1] = ("    Medium's hands would have kept %d of Hard's %d hand notes (more than %d%%), so the"
+            .. ' hi-hat/ride moved to quarter notes'):format(log.fallback.before_hands, log.upper_hands,
+            math.floor(100 * GEN_DRUMS_PARAMS.medium_fallback_keep + 0.5))
+    end
+    if dl == 'M' then
+        lines[#lines + 1] = '    kick/snare between hi-hat notes: ' .. (({ beats = 'kept on the beat only',
+            none = 'none kept', keep = 'all kept' })[opts.between or 'beats'] or '?')
+    end
+    if dl == 'E' then
+        local ks, hands = log.easy_types.ks, log.easy_types.hands
+        lines[#lines + 1] = ('    beat per section: %d kick + snare, %d two-hand%s'):format(ks, hands,
+            (ks + hands <= 1) and ' (no EVENTS sections found - one beat type for the whole song)' or '')
+    end
+    if (log.sandwiched or 0) > 0 then
+        lines[#lines + 1] = ('    %d hi-hat/ride hit%s between snare accents removed, so the hands do not alternate'
+            .. ' hat and accent on every 8th'):format(log.sandwiched, log.sandwiched == 1 and '' or 's')
+    end
+    if (log.tom_before_crash or 0) > 0 then
+        lines[#lines + 1] = ('    %d tom%s before a crash removed (the snare stays), so the hand can reach the crash'):format(
+            log.tom_before_crash, log.tom_before_crash == 1 and '' or 's')
+    end
+    if (log.before_crash or 0) > 0 then
+        lines[#lines + 1] = ('    %d hi-hat/ride note%s an 8th before a crash removed, so the hand can reach the crash'):format(
+            log.before_crash, log.before_crash == 1 and '' or 's')
+    end
+    if (log.drum_changes or 0) > 0 then
+        lines[#lines + 1] = ('    %d two-hand hit%s lost the drum before a change of drum an 8th later'):format(
+            log.drum_changes, log.drum_changes == 1 and '' or 's')
+    end
+    if log.runs_broken > 0 then
+        lines[#lines + 1] = ('    %d run%s of four 8ths broken up (too fast for constant 8ths on %s)'):format(
+            log.runs_broken, log.runs_broken == 1 and '' or 's', DIFF_NAMES[dl])
+    end
+    return lines
+end
+
 -- Result line for the force-HOPO markers written on Hard (spans from Gen5ForceHopoSpans).
 local function HopoLines(spans)
     if #spans == 0 then return {} end
@@ -590,6 +716,7 @@ function GenerateDifficulties(inst_key, tiers, force, answers)
                 -- Expert, for Validate's cross-difficulty checks of the written tiers.
                 if t.tracks.X then job.exp_events = select(1, ReadTier(t.inst, t.tracks.X, 'X', sel_s, read_e)) end
             end
+            if t.inst.kind == 'drums' then job.drums_ctx = DrumsContext(dest[tiers[1]].take) end
             -- Guitar/Bass Hard from Expert: which Expert notes hammer on (automatic or
             -- forced), so Hard can keep them (difficulty_generate_hopo.lua).
             if t.inst.kind == 'gb' and src_dl == 'X' then
@@ -638,7 +765,7 @@ function GenerateDifficulties(inst_key, tiers, force, answers)
     -- Guitar leads Bass, Keys and Pro Keys on Hard's busy bars and Medium's rhythm (GuitarRefs).
     local refs = {}
     for _, job in ipairs(jobs) do
-        if job.inst.key ~= 'gtr' then
+        if job.inst.key ~= 'gtr' and job.inst.kind ~= 'drums' then
             refs = GuitarRefs(sel_s, read_e, inst_key == GEN_ALL_KEY, busy_drop, tiers[1], fast_runs)
             break
         end
@@ -758,6 +885,10 @@ function GenerateDifficulties(inst_key, tiers, force, answers)
                 opts.pull_back = dl == 'H' and answers.pk_pull_back or nil
                 out, log = GenPKPlanTier(dl, upper, opts)
                 pk_generated[dl] = out
+            elseif inst.kind == 'drums' then
+                opts = { fast_runs = fast_runs, between = S.diff_gen_drums_between, ctx = job.drums_ctx,
+                         busy_drop = busy_drop }
+                out, log = GenDrumsPlanTier(dl, upper, opts)
             else
                 out, log = Gen5PlanTier(inst.kind, dl, upper, opts)
             end
@@ -814,8 +945,13 @@ function GenerateDifficulties(inst_key, tiers, force, answers)
             local errors, listed = 0, {}
             local checks = CheckTier(inst, d.track, dl, written, sel_s, read_e,
                                      { shifts = written_shifts, exp_events = job.exp_events })
+            local marker_issues = 0
             for _, cat in ipairs(checks) do
-                if not cat.advisory then
+                if cat.marker then
+                    -- About a marker the tier shares with Expert (a Drums roll lane), not
+                    -- the notes Generate wrote: noted once below, not counted.
+                    marker_issues = marker_issues + #cat.issues
+                elseif not cat.advisory then
                     for _, rec in ipairs(cat.issues) do
                         if not rec.advisory then
                             errors = errors + 1
@@ -823,6 +959,11 @@ function GenerateDifficulties(inst_key, tiers, force, answers)
                         end
                     end
                 end
+            end
+            if marker_issues > 0 and dl == tiers[1] then
+                lines[#lines + 1] = ('    %d issue%s with the roll lane markers themselves (start off the grid, or'
+                    .. ' a velocity Hard cannot use) - Validate lists them; Generate does not change markers'):format(
+                    marker_issues, marker_issues == 1 and '' or 's')
             end
             total_errors = total_errors + errors
             Lap('validate')
@@ -836,11 +977,23 @@ function GenerateDifficulties(inst_key, tiers, force, answers)
             end
             if log.shortened > 0 then parts[#parts + 1] = ('%d sustains shortened'):format(log.shortened) end
             if log.cut > 0 then parts[#parts + 1] = ('%d cut back to a plain note'):format(log.cut) end
-            lines[#lines + 1] = ('  %s: kept %d of %d onsets from %s (%.0f%%)%s'):format(
-                DIFF_NAMES[dl], log.kept, log.upper, DIFF_NAMES[UPPER[dl]],
-                100 * log.kept / math.max(1, log.upper),
+            -- Onsets AND notes: a chord losing a note, or a kick dropped under a hi-hat,
+            -- keeps the onset, so the onset count alone hides most of a reduction (Drums Hard
+            -- kept 829 of 833 onsets but 1273 of 1569 notes).
+            local function CountNotes(evs)
+                local n = 0
+                for _, ev in ipairs(evs) do n = n + #ev.offs end
+                return n
+            end
+            local n_up, n_out = CountNotes(upper), CountNotes(out)
+            lines[#lines + 1] = ('  %s: kept %d of %d onsets (%d%%), %d of %d notes (%d%%) from %s%s'):format(
+                DIFF_NAMES[dl], log.kept, log.upper, KeptPercent(log.kept, log.upper),
+                n_out, n_up, KeptPercent(n_out, n_up), DIFF_NAMES[UPPER[dl]],
                 log.guided and (', following PART REAL_KEYS_' .. dl) or '')
             if #parts > 0 then lines[#lines + 1] = '    ' .. table.concat(parts, ', ') end
+            if inst.kind == 'drums' then
+                for _, l in ipairs(DrumsLines(dl, log, opts)) do lines[#lines + 1] = l end
+            end
             -- Keys plays Pro Keys' onsets exactly; a Pro Keys note with no Keys note within a
             -- 32nd means the two Expert charts differ there (they are meant to match).
             if log.guided and log.guide_missed and #log.guide_missed > 0 then
@@ -876,7 +1029,7 @@ function GenerateDifficulties(inst_key, tiers, force, answers)
                             log.folded, log.folded == 1 and '' or 's') or '')
                 end
             end
-            if dl == 'H' then
+            if dl == 'H' and inst.kind ~= 'drums' then
                 local why = log.busy_auto
                     and ('Auto: song starts at %.0f BPM, %s %d'):format(log.first_bpm or 0,
                         (log.first_bpm or 0) > GEN5_PARAMS.fast_8ths_bpm and 'over' or 'not over',
@@ -914,7 +1067,7 @@ function GenerateDifficulties(inst_key, tiers, force, answers)
                 end
             end
             -- Keys/Pro Keys overlapping gems (GenPlanOverlaps) and rolled chords (GenMergeRolls).
-            if inst.kind ~= 'gb' then
+            if inst.kind == 'k5' or inst.kind == 'pk' then
                 local held = 0
                 for i, ev in ipairs(out) do
                     local nx = out[i + 1]

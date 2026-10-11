@@ -136,3 +136,46 @@ function SmfTierEvents(trk, lo, tpqn, timing, opts)
     end
     return events
 end
+
+-- The marker context the Drums planner (difficulty_generate_drums.lua, opts.ctx) takes,
+-- from a song's PART DRUMS track and its EVENTS track, in quarter notes:
+--   fills    { { qn, qn_e }... }  drum fill lanes (120 - all five lanes span the same)
+--   rolls    roll (126) and special roll (127) lanes
+--   toms     { [2|3|4] = spans }  Pro Drums tom markers 110 / 111 / 112 (Y / B / G)
+--   disco    Expert's disco-flip spans: [mix 3 drumsNd] up to the next [mix 3 drumsN]
+--            ("dnoflip" is not a flip for the lower tiers)
+--   sections { { qn, name }... }  [section x] / [prc_x] text events on EVENTS
+function SmfDrumsContext(song, trk)
+    local tpqn = song.tpqn
+    local function Spans(lo, hi)
+        local out = {}
+        for _, n in ipairs(SmfNotesInRange(trk, lo, hi)) do
+            out[#out + 1] = { qn = n.tick / tpqn, qn_e = (n.tick + n.len) / tpqn }
+        end
+        return out
+    end
+    local ctx = { fills = Spans(120, 120), rolls = Spans(126, 127),
+                  toms = { [2] = Spans(110, 110), [3] = Spans(111, 111), [4] = Spans(112, 112) },
+                  disco = {}, sections = {} }
+    local open
+    for _, t in ipairs(SmfTexts(trk)) do
+        local suffix = t.text:match('^%[mix 3 drums%d(%a*)%]')
+        if suffix then
+            if suffix == 'd' then
+                open = open or t.tick
+            elseif open then
+                ctx.disco[#ctx.disco + 1] = { qn = open / tpqn, qn_e = t.tick / tpqn }
+                open = nil
+            end
+        end
+    end
+    if open then ctx.disco[#ctx.disco + 1] = { qn = open / tpqn, qn_e = math.huge } end
+    local ev_trk = SmfFindTrack(song, 'EVENTS')
+    if ev_trk then
+        for _, t in ipairs(SmfTexts(ev_trk)) do
+            local name = t.text:match('^%[section (.-)%]') or t.text:match('^%[prc_(.-)%]')
+            if name then ctx.sections[#ctx.sections + 1] = { qn = t.tick / tpqn, name = name } end
+        end
+    end
+    return ctx
+end

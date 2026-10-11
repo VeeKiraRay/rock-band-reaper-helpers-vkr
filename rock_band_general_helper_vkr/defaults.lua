@@ -182,6 +182,10 @@ S = {
     diff_gen_busy_drop    = 'auto',
     -- (session only) 'auto' | 'thin' | 'rewrite' - see GEN5_PARAMS.fast_runs_default
     diff_gen_fast_runs    = 'rewrite',
+    -- (session only) Drums Medium: a kick/snare between hi-hat notes - 'beats' (keep those
+    -- on a beat, as official charts do) | 'none' (the RBN doc) | 'keep'. See
+    -- difficulty_generate_drums.lua (opts.between).
+    diff_gen_drums_between = 'beats',
     -- Difficulty tab: pending overwrite confirmation (not persisted, transient UI
     -- state). nil = no popup. Otherwise: { message = string, on_confirm = function()
     -- ... end, confirm_label = string? } - set by a Copy*Diff call or by
@@ -1210,9 +1214,10 @@ TIPS = {
     -- Difficulty tab - Generate
     diff_gen_instrument = "Which instrument to generate difficulties for.\n\n" ..
                           "All instruments uses each instrument's default track (PART GUITAR,\n" ..
-                          "PART BASS, PART REAL_KEYS_X/H/M/E, PART KEYS) and skips any that\n" ..
-                          "is missing or muted. Pro Keys runs before Keys, and Keys follows\n" ..
-                          "the Pro Keys it just generated.",
+                          "PART BASS, PART REAL_KEYS_X/H/M/E, PART KEYS, PART DRUMS) and skips\n" ..
+                          "any that is missing or muted. Pro Keys runs before Keys, and Keys\n" ..
+                          "follows the Pro Keys it just generated. Drums are reduced on their\n" ..
+                          "own: they neither follow nor lead the other instruments.",
     diff_gen_track      = "The instrument's track. Shared with that instrument's own\n" ..
                           "Difficulty sub-tab - changing it here changes it there too.",
     diff_gen_tier       = "Generate this difficulty from the one above it as it is now\n" ..
@@ -1259,6 +1264,19 @@ TIPS = {
                           "quarter); one cut under 3/16 becomes a 1/16 note. If Expert is so\n" ..
                           "simple that Hard would be an exact copy, it asks first whether to\n" ..
                           "shorten Hard's sustains a little or keep Hard as Expert.\n\n" ..
+                          "Drums are reduced limb by limb, never moving a note (except\n" ..
+                          "fills with \"Hard fast runs\" on Rewrite/Auto). Hard: no 16ths at\n" ..
+                          "140 BPM or faster, a tom/snare run of 16ths only if it lasts two\n" ..
+                          "beats or less, hi-hat/ride on 8ths, fewer kicks (under steady 8th\n" ..
+                          "hats kicks on 1, 3 and 4), Expert's disco-flip sections played as a\n" ..
+                          "normal beat. Medium: the hi-hat on quarter notes from 130 BPM -\n" ..
+                          "or slower too when Medium would otherwise keep over 93% of Hard -\n" ..
+                          "kicks on quarter notes above 100 BPM (half a bar apart under busy\n" ..
+                          "hands) and one a bar from 170 BPM, at most two gems at once.\n" ..
+                          "Easy: a kick + snare\n" ..
+                          "beat in verses kept on the hi-hat, a two-hand beat elsewhere\n" ..
+                          "(from the EVENTS track's sections), never a gem with a kick. Fill\n" ..
+                          "kicks are thinned, rolls under a roll lane keep an even count.\n\n" ..
                           "Keys and Pro Keys: a lick that starts on an \"and\" and moves\n" ..
                           "on its \"and\"s (while its beats repeat a note) keeps the\n" ..
                           "\"and\"s on Medium, so the line keeps moving; Easy goes back to\n" ..
@@ -1266,7 +1284,8 @@ TIPS = {
                           "The result is checked with Validate's rules and anything left\n" ..
                           "to fix is listed. Asks before replacing existing notes. One\n" ..
                           "undo reverts it. Respects time selection if active.",
-    diff_gen_fast_runs  = "How Hard handles runs of 16ths (or faster).\n\n" ..
+    diff_gen_fast_runs  = "How Hard handles runs of 16ths (or faster). Drums: tom and\n" ..
+                          "snare runs (fills) only, never a groove with cymbals.\n\n" ..
                           "Rewrite: played one grid slower - 16ths become 8th triplets, 8th\n" ..
                           "triplets become 8ths - keeping the order of the notes. Above 160\n" ..
                           "BPM any run; at or below it runs of half a bar or more.\n" ..
@@ -1276,7 +1295,17 @@ TIPS = {
                           "Rewriting is not what official charts do: it keeps a fast\n" ..
                           "passage moving instead of turning it into plain 8ths. Rewritten\n" ..
                           "bars are listed in the result to review by hand.",
-    diff_gen_busy_drop  = "How many notes a full bar of 8ths loses on Hard.\n\n" ..
+    diff_gen_drums_between = "Drums Medium: a kick or snare between two hi-hat/ride notes.\n\n" ..
+                          "Beats: keep it when it is on a beat, drop it on an 8th or 16th -\n" ..
+                          "what official Medium charts do (they keep 83-94% of those on a\n" ..
+                          "beat, 22% on an 8th).\n" ..
+                          "None: drop them all - the RBN doc's rule (\"No kicks or snares in\n" ..
+                          "between hihat/ride gems\").\n" ..
+                          "Keep: keep them all.",
+    diff_gen_busy_drop  = "How many notes a full bar of 8ths loses on Hard.\n" ..
+                          "Drums: only when Hard would barely differ from Expert (over 95%\n" ..
+                          "of its notes) - a bar of steady 8th hi-hats loses that many\n" ..
+                          "hat-only \"and\"s (after a crash on 1 the \"and\" of 1 first).\n\n" ..
                           "Drop 1: the and of 4 (1 & 2 & 3 & 4).\n" ..
                           "Drop 2: also the and of 2 - two groups of three\n" ..
                           "(1 & 2 . 3 & 4 .).\n\n" ..

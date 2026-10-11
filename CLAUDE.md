@@ -473,9 +473,10 @@ Before that isolation, two runners went unnoticed missing a library for months.
     difficulty_generate_rhythm.lua             the pure 5-lane and Pro Keys planners
     difficulty_generate_5lane.lua              (shared with dev/calibration/),
     difficulty_generate_prokeys.lua
-    difficulty_generate_hopo.lua               Hard's force-HOPO markers, the REAPER
-    actions_difficulty_generate.lua            action, and the sub-tab body
-    ui_difficulty_generate.lua
+    difficulty_generate_hopo.lua               Hard's force-HOPO markers, the Drums
+    difficulty_generate_drums.lua              planner (limb by limb, independent of
+    actions_difficulty_generate.lua            the band), the REAPER action, and the
+    ui_difficulty_generate.lua                 sub-tab body
     metadata_genres.lua                      ← Metadata > Genre: supported vocabulary
     metadata_genres_ext.lua                    (transcribed), the authored extended
     metadata_genres_lookup.lua                 vocabulary + mapping, and the lookup

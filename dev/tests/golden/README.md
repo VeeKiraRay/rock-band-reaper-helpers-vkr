@@ -16,7 +16,8 @@ notes, colors and lengths, and Guitar/Bass Hard's force-HOPO markers.
   right - regenerate, re-check, replace the file - or rework the rule so the verified
   song stays as it was. The failure lists rhythm, color and length differences
   separately, by bar.
-- **Drums and Pro Keys** are reported as skipped until their planners exist; turn them
-  on with the `verify` flag in `dev/tests/generate_golden.lua`.
+- **Drums** are compared only in songs listed in `drums_verified.txt` in this folder (one
+  MIDI file name per line, `#` starts a comment): most of these songs' drum tiers predate
+  the Drums planner. Add a song there once its regenerated drums are checked.
 
 An empty folder runs zero tests.
