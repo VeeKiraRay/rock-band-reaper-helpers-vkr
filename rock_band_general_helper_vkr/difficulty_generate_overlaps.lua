@@ -6,13 +6,8 @@
 -- within an octave; Medium "generally no overlapping notes ... in some rare cases 2 note
 -- overlaps if they are spaced out over a 1/4 note or more"; none on Easy.
 --
--- Official charts (RB3 DLC, hold-out excluded) decide Hard's overlaps per song: of the
--- songs with 5+ Expert overlaps whose notes both stay on Hard, about half keep none of them
--- (5-lane 52 of 107, Pro Keys 60 of 113) and about a sixth keep every one. Medium keeps
--- almost none (5-lane: none in 32 of 36 songs); what it does keep is mostly a note held a
--- bar or more. The rules here are the user's (2026-10-08): Hard keeps Expert's overlaps
--- within the limits and never loses an onset to one, Medium keeps only a long hold, Easy
--- none, and a rolled chord becomes one chord.
+-- Here: Hard keeps Expert's overlaps within those limits and never loses an onset to one,
+-- Medium keeps only a long hold, Easy none, and a rolled chord becomes one chord.
 --
 -- PURE: no r, no S. Load after difficulty_generate_params.lua.
 
@@ -37,9 +32,8 @@ end
 -- A rolled chord on the upper tier: onsets each closer than gap_fn(ev) to the next, the
 -- last one a sustain, and every earlier note still sounding an 8th or more past the last
 -- onset. Hard plays it as ONE chord with every note of the roll, on the roll's strongest
--- beat position (user rule 2026-10-08, from vm_loiri_sydameeni_joulu_teen's final chord: R
--- and Y a 1/32 apart into a held O on the downbeat; as single notes the gap kept only the
--- O). The planner's chord rules reduce the chord afterwards.
+-- beat position (R and Y a 1/32 apart into a held O on the downbeat: as single notes the
+-- gap would keep only the O). The planner's chord rules reduce the chord afterwards.
 -- Returns (events, merged): a new list, and how many rolls became chords.
 function GenMergeRolls(events, gap_fn)
     local out, merged = {}, 0
@@ -57,7 +51,7 @@ function GenMergeRolls(events, gap_fn)
         end
         if first <= #out then
             -- The chord goes on the roll's strongest beat position, the later one on a tie:
-            -- the downbeat a roll lands on (Loiri), or the downbeat it starts from
+            -- the downbeat a roll lands on, or the downbeat it starts from
             -- (promisesinthedark: 53+60 on the downbeat, 62 a 16th later). On the 16th, the
             -- song-wide keep cap took the chord and left the bar empty.
             local anchor, best = ev, STRENGTH[Gen5BeatClass(ev)] or 0

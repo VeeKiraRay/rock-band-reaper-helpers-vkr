@@ -4,6 +4,7 @@
 -- difficulty_generate_params.lua) holds by construction, not by keeping copies in step.
 --
 -- PURE: no r, no S. Load after difficulty_generate_params.lua.
+-- Each rule's source and numbers: docs/difficulty_reduction.md.
 --
 -- Input event: { qn, qn_e, offs, bpm, down, bar_qn, bar_len, pulse } as described in
 -- difficulty_generate_5lane.lua. offs is read only for its size (a chord or a single):
@@ -87,12 +88,8 @@ end
 
 -- CAP_KEEP_RATE was measured on 4/4 bars only. In any other bar an 8th off-beat goes
 -- sooner the stronger the beat it leads into: into the next bar line first, then into a
--- beat, then into another 8th. That is the order the 4/4 table itself shows (the and of
--- 4, then of 2, then of 1 and 3), and the order official charts use elsewhere (RB3 DLC,
--- hold-out excluded): 3/4 Hard keeps the and of 3 least (fast 11%, slow 38%) and the and
--- of 2 next (slow 56%, and of 1 87%); 6/8 Hard turns a bar of six 8ths into 0 0.5 1.5 2
--- most often (77 of 129 bars) - the 8ths before the bar line and before the second beat
--- go. Ties go to the later off-beat, as in the busy-bar rule.
+-- beat, then into another 8th - the order the 4/4 table itself shows (the and of 4, then
+-- of 2, then of 1 and 3). Ties go to the later off-beat, as in the busy-bar rule.
 local function MeterRate(ev)
     local c = Gen5BeatClass(ev)
     local rate = CAP_CLASS_RATE[c] or 0.5
@@ -222,8 +219,7 @@ end
 -- none: Drop 2 on a bar of straight 8ths takes two, on a bar with one rest one, on a bar
 -- with two rests nothing. Which notes go:
 --   1. in 4/4, the RBN doc positions first - "remove every fourth note per half measure",
---      the and of 2 and the and of 4 (with Drop 1 the and of 4 wins: official Hard drops it
---      most);
+--      the and of 2 and the and of 4 (with Drop 1 the and of 4, the least kept);
 --   2. then the other off-beats, least-kept bar position first (PosRate: CAP_KEEP_RATE in
 --      4/4, MeterRate in other meters), the later one on a tie;
 --   3. protected notes (ProtectedSet) last, whatever their position.
@@ -320,12 +316,11 @@ end
 -- Keys following the same-tier Pro Keys chart: keep the events that land on a Pro
 -- Keys onset, with that note's length. guide = sorted { { qn, qn_e }... }.
 -- One Keys onset per Pro Keys onset, the closest: a 32nd grace note before a beat sits
--- within GUIDE_TOL of the beat's Pro Keys onset too, and kept both (lovegame Keys Hard
--- had 24 more onsets than the Pro Keys Hard it followed).
+-- within GUIDE_TOL of the beat's Pro Keys onset too, and would keep both.
 -- Returns (keep, lens, at, missed): at[i] = the Pro Keys onset a kept event takes over (Keys
--- plays Pro Keys' rhythm exactly - a rewritten Pro Keys run sits on 8th triplets, and
--- Keys' nearest 16ths made uneven groups with gaps, korpiklaani bar 55); missed = the
--- Pro Keys onsets no Keys note matched (Keys and Pro Keys Expert differ there).
+-- plays Pro Keys' rhythm exactly - a rewritten Pro Keys run sits on 8th triplets, where
+-- Keys' nearest 16ths would make uneven groups); missed = the Pro Keys onsets no Keys note
+-- matched (Keys and Pro Keys Expert differ there).
 local function SelectByGuide(events, guide)
     local keep, lens, at, j = {}, {}, {}, 1
     local owner = {}   -- guide index -> event index matched to it
@@ -442,7 +437,7 @@ local function Weights(kind, dl, events, shifted)
             if #ev.offs >= 2 and p.chord_bonus[dl] then
                 -- Only against a single note it competes with (within the tier's gap): a
                 -- bonus on every chord of an all-chord passage only rewarded keeping more
-                -- of them, off-beats over the downbeat (chronosp bars 18-19).
+                -- of them, off-beats over the downbeat (a 210 BPM all-chord passage).
                 local gap = MinGapQN(dl, ev.bpm, ev.pulse)
                 for j = i - 1, i + 1, 2 do
                     local o = events[j]
@@ -478,9 +473,8 @@ end
 -- onsets than the bar has beats and Medium kept fewer than its beats, removed upper
 -- onsets come back until it has as many as beats: at least an 8th from every kept
 -- onset, beats and downbeats first, then by weight, then a held note, then the earlier.
--- From the user's review of chronosp_brutal_decay: bar 7 keeps beat 3 AND the held note on
--- 3& (B . B . G B), bar 11 beat 3 AND the 3& chord (B . B . G GY). Official fast Medium
--- keeps both of such a pair only 5% of the time; the user preferred the bar's pulse.
+-- So a bar keeps beat 3 AND the held note on 3& (B . B . G B): the bar's pulse over
+-- fewer notes.
 -- Returns the number of onsets added. shifted: as for Weights - in an "and" phrase the
 -- "and"s are the beats.
 local function FillBeats(events, keep, w, shifted)
@@ -488,7 +482,7 @@ local function FillBeats(events, keep, w, shifted)
     local added, kept_qn = 0, {}
     for i, ev in ipairs(events) do if keep[i] then kept_qn[#kept_qn + 1] = ev.qn end end
     -- At least an 8th from every kept onset, and not closer than a quarter on BOTH sides:
-    -- filling the middle of 36 . 60 (chronosp bar 18) made three 8th chords in a row.
+    -- filling the middle of 36 . 60 (an all-chord bar) made three 8th chords in a row.
     local function Clear(qn)
         local near_l, near_r = false, false
         for _, k in ipairs(kept_qn) do
@@ -514,8 +508,8 @@ local function FillBeats(events, keep, w, shifted)
                                           rate = PosRate(ev) }
                 end
             end
-            -- Last tie-break: the bar position official charts keep most (CAP_KEEP_RATE), so
-            -- an all-chord syncopated bar (chronosp bar 18) gets 0 12 | 48 60, Hard's own
+            -- Last tie-break: the bar position most often kept (CAP_KEEP_RATE), so
+            -- an all-chord syncopated bar gets 0 12 | 48 60, Hard's own
             -- pairs, rather than three 8ths in a row.
             table.sort(cands, function(a, c)
                 if a.beat ~= c.beat then return a.beat > c.beat end
@@ -539,7 +533,7 @@ end
 
 -- A rewritten Hard note that stands for a beat Expert plays (beat_qn, set by
 -- Gen5RetimeDenseRuns) goes back to that beat for Medium and Easy, so the beat is not left
--- empty below Hard: chronosp bar 20's beat 4 sat at 76/24 on Hard. Returns a new list.
+-- empty below Hard: a 210 BPM bar's beat 4 sat at 76/24 on Hard. Returns a new list.
 local function SnapRewrittenToBeats(events)
     local out, moved = {}, false
     for i, ev in ipairs(events) do
@@ -605,13 +599,10 @@ end
 ----------------------------------------------------------------------
 
 -- The gap an onset needs after the previous kept one on tier dl. Medium in a compound
--- meter (6/8, 9/8, 12/8) keeps each beat AND the 8th after it - official 6/8 Medium's
--- commonest bar of six 8ths is 0 0.5 1.5 2 (164 of 335 bars; the two beats alone 53), while
--- official Easy keeps the beats (0 kept 97%, 1.5 94%, the other 8ths about 20%). With one
--- beat-wide gap for every onset, Medium and Easy came out the same in steady 6/8 bars
--- (vm_loiri_sydameeni_joulu_teen: Easy kept 222 of Medium's 223 onsets). User decision
--- 2026-10-09. So the 8th after a beat needs only Hard's gap, a beat a quarter after the
--- kept note before it, and every other onset the usual beat-wide gap.
+-- meter (6/8, 9/8, 12/8) keeps each beat AND the 8th after it (`0 0.5 1.5 2`), while Easy
+-- keeps the beats - with one beat-wide gap for every onset the two came out the same in
+-- steady 6/8 bars. So the 8th after a beat needs only Hard's gap, a beat a quarter after
+-- the kept note before it, and every other onset the usual beat-wide gap.
 local function TierGapQN(dl, ev)
     local pulse = ev.pulse or 1
     if dl == 'M' and pulse > 1 and ev.bar_qn then
@@ -709,8 +700,8 @@ function Gen5SelectOnsets(kind, dl, events, opts, log)
                 gap = function(ev) return MinGapQN('H', ev.bpm) end, eps = EPS, mode = opts.fast_runs })
             log.fast_runs = opts.fast_runs or GEN5_PARAMS.fast_runs_default
             -- A note of a run in a bar the rewrite did not change (it neither moved nor
-            -- dropped anything there) is an ordinary note again: chronosp bass bar 85's
-            -- downbeat ends bar 84's 16ths, and as `retimed` it kept the busy-bar rule off
+            -- dropped anything there) is an ordinary note again: a bass bar's
+            -- downbeat ends the bar before's 16ths, and as `retimed` it kept the busy-bar rule off
             -- a bar of straight 8ths.
             local changed = {}
             for _, rb in ipairs(log.retimed_bars) do changed[('%.3f'):format(rb.start)] = true end
@@ -728,7 +719,7 @@ function Gen5SelectOnsets(kind, dl, events, opts, log)
         -- Keys/Pro Keys lick that starts on an "and" (GEN5_PARAMS.and_phrase). Medium: its
         -- phrases are weighed on the "and" grid. Easy (opts.and_source = Hard): the same
         -- phrases, found on Hard, take Hard's notes on the beats instead of Medium's - back
-        -- to the downbeats, as the user's korpiklaani hand chart (0:B 2:C).
+        -- to the downbeats (0:B 2:C).
         if dl == 'M' then
             log.and_phrases = Gen5AndPhrases(events, kind)
             if #log.and_phrases > 0 then

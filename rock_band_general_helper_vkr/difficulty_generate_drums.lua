@@ -4,27 +4,26 @@
 -- actions_difficulty_drums_checks.lua (it reads DRUMS_RULES at call time, so Validate
 -- and Generate share one set of thresholds).
 --
--- Drums are reduced limb by limb, not by the band's one-rhythm model
--- (difficulty_generate_rhythm.lua): a drum onset is several limbs at once, and each limb
--- thins on its own terms - the kick goes fastest, the snare backbeat stays, the right
--- hand drops from 8ths to quarters with tempo. Drums neither follow nor lead the other
--- instruments (user decision 2026-10-09; drums leading the band is a later prototype).
+-- What each rule does and why - its source (RBN doc, official charts, user rule) and the
+-- measured numbers - is in docs/difficulty_reduction.md, "Drums". Keep the two in step.
 --
--- Official charts never move a drum note (RB3 DLC, 482 songs: 0.03% of Hard onsets are
--- not on an Expert onset), so every rule here deletes or relanes. The one exception is the
--- "Hard fast runs" setting: fills and tom/snare runs go through the same one-grid-slower
--- rewrite as Guitar's fast runs (Gen5RetimeDenseRuns), a user choice that keeps more of a
--- fill's speed than official's 8th grid. 'thin' gives the official behaviour.
+-- Drums are reduced limb by limb, not by the band's one-rhythm model
+-- (difficulty_generate_rhythm.lua): each limb thins on its own terms. Rules delete or
+-- relane notes and never move one - except Hard's fast-run rewrite of fills.
 --
 -- Input event: { qn, qn_e, offs, bpm, bar_qn, bar_len, pulse, down }, offs the gem
 -- offsets 0 Kick, 1 Red (snare), 2 Yellow, 3 Blue, 4 Green, ascending.
 -- opts:
 --   fast_runs  'rewrite' | 'auto' | 'thin' (Hard only; GEN5_PARAMS.fast_runs_default)
 --   unflip     the tier that un-flips Expert's disco beats ('H' default, 'none')
---   between    Medium kick/snare between hi-hat notes: 'beats' (default, keep those on a
---              beat), 'none' (the RBN doc: never), 'keep'
+--   between    Medium kick/snare between hi-hat notes: 'beats' (default) | 'none' | 'keep'
+--   eighth_hands  Medium/Easy at fast tempos, which of three hand hits an 8th apart goes:
+--              'hands' (default) | 'beats'. See LowerEighthHands.
+--   expert     Medium/Easy: the Expert events, for fills Hard's rewrite moved off the 8th
+--              grid (ExpertForRewrittenRuns). nil = plan from the tier above only.
+--   keep_kicks the kicks are already this tier's (Drums 2X): skip the kick-choosing rules
 --   ctx        { fills, rolls, disco = { { qn, qn_e }... }, toms = { [2|3|4] = spans },
---                sections = { { qn, name }... } } - all optional, in quarter notes
+--                sections = { { qn, name }... }, song_bpm } - all optional, in quarter notes
 
 local EPS = GEN5_EPS
 -- Roll lane membership: Validate takes the notes from 1 ms before the lane's start to 1 ms
@@ -33,72 +32,79 @@ local EPS = GEN5_EPS
 local ROLL_TOL = 0.004
 local KICK, SNARE, YEL, BLU, GRN = 0, 1, 2, 3, 4
 
--- Tunables that are this planner's own choices (the RBN tempo rules are DRUMS_RULES).
--- Every number is from the RB3 DLC probe over official charts (development songs,
--- hold-out excluded) unless marked as a user rule.
+-- The planner's own thresholds (the RBN tempo rules shared with Validate are DRUMS_RULES).
+-- Tempos in BPM, spacings in quarter notes. nil turns a rule off where noted.
 GEN_DRUMS_PARAMS = {
-    -- Hard keeps a 16th tom/snare run at full speed only when it lasts at most this many
-    -- beats (RBN Hard: "Such passages should be authored only if they last a beat or two").
+    -- Hard: a tom/snare 16th run stays at full speed when it lasts at most this many beats.
     hard_run_beats = 2,
-    -- Hard: two kicks never closer than this (RBN: "remove kicks on adjacent 8th or 16th
-    -- notes" as a first step). Official Hard keeps 60% of 8th kicks, 33% of 16th ones.
+    -- Hard below 140 BPM: this many tom/snare 16ths in a row make a run; a lone 16th snare
+    -- stays on the "a" and goes on the "e" (HardSixteenths).
+    hard_16th_min_run = 2,
+    -- Hard kick spacing: two kicks at least this far apart ...
     hard_kick_gap = 0.5,
-    -- ... and from this tempo, a quarter note between kicks (official Hard keeps 46% of
-    -- 8th kicks at 140+ BPM, 65% below).
+    -- ... an off-beat kick (8th or 16th position) this far, and every kick from _fast_bpm.
     hard_kick_gap_8th = 0.75,
     hard_kick_gap_fast_bpm = 140,
     hard_kick_gap_fast = 0.75,
-    -- Drop the kick under the snare (off the bar line)? OFF - user decision 2026-10-09: no
-    -- RBN rule forbids kick + snare together below Easy, and the kick on the beat carries
-    -- the groove; Hard thins the off-beat kicks around it instead (hard_kick_gap_8th).
-    -- Official charts mostly do drop it, but per song: of 222 songs with 20+ such hits,
-    -- 156 drop it almost always (Hard keeps < 5%), 15 keep it almost always (95%+), the
-    -- rest mix; overall Hard keeps 21.5% (bar line 43%, beat 22%, off-beat 8%).
+    -- Drop the kick under a snare (off the bar line)? Per tier; off on both.
     kick_under_snare = { H = false, M = false },
-    -- Medium/Easy: kicks a quarter note apart, half a bar from 140 BPM (official Medium
-    -- keeps 66% of Hard's beat kicks below 140 BPM, 42% above; 1.3 kicks a bar at 120-139).
+    -- Medium/Easy kick spacing: a quarter note, half a bar from _fast_bpm ...
     lower_kick_gap = 1.0,
     lower_kick_gap_fast_bpm = 140,
     lower_kick_gap_fast = 2.0,
-    -- ... and half a bar when the hands are busy around the kick: a hand hit an 8th before
-    -- AND after it (user idea 2026-10-09). The oom-pah groove KY RY KY RY ... (370 Hard
-    -- bars in 22 official songs, all under 140 BPM) becomes KY RY Y RY KY RY Y RY on
-    -- official Medium 154 times, stays as Hard 13 times.
+    -- ... and half a bar when the hands are busy around the kick (an 8th before and after).
     lower_kick_gap_busy = 2.0,
-    -- Hard too (TRIAL 2026-10-10): official Hard turns Expert's kick on every beat under
-    -- steady 8th hats into kicks on 1 and 3 in 49% of bars (all four kept 23%; 1,400 bars
-    -- at 100-139 BPM). nil = off.
+    -- Hard: half a bar between kicks under busy hands (BusyHands). nil = off.
     hard_kick_gap_busy = 2.0,
-    -- ... and the bar's last-beat kick comes back when that spacing removed it (EndOfBarKick).
+    -- Hard: the bar's last-beat kick comes back when the spacing removed it (EndOfBarKick).
     hard_end_of_bar_kick = true,
-    -- ... and one 8th kick paired with beat 3's kick comes back (PairedKick).
+    -- Hard: one 8th kick paired with beat 3's kick comes back (PairedKick).
     hard_paired_kick = true,
     -- Hard drops hat-only "and"s in steady 8th-hat bars per "Hard 8th runs" (HardHatDrops):
-    -- 'always' (every such bar, as the band's busy bars), 'fallback' (only when Hard would
-    -- keep more than hard_fallback_keep of Expert's notes), 'off'.
+    -- 'always' (every such bar), 'fallback' (only when Hard would keep more than
+    -- hard_fallback_keep of Expert's notes), 'off'.
     hard_hat_drop = 'fallback',
     hard_fallback_keep = 0.95,
-    -- Medium/Easy hi-hat/ride stream to quarter notes from this tempo (2026-10-10). The RBN
-    -- doc says 140 (DRUMS_RULES.general_medium_8th_bpm, used when nil); official Medium
-    -- switches at 130: steady 8th hats stay all 8 in 54% of bars at 125-129 BPM, 18% at
-    -- 130-134 (quarters 67%), 3% at 135-139. Per song, Medium then keeps 76% of Hard's
-    -- notes at 125-134 BPM (official 76%) instead of 86%.
+    -- Medium/Easy hi-hat/ride stream to quarter notes from this tempo (nil:
+    -- DRUMS_RULES.general_medium_8th_bpm).
     lower_hat_quarter_bpm = 130,
-    -- Medium keeping more than this share of Hard's hand gems (kicks not counted) puts its
-    -- hi-hat/ride on quarter notes at any tempo (GenDrumsPlanTier). nil = off.
+    -- Medium keeping more than this share of Hard's gems puts its hi-hat/ride on quarter
+    -- notes at any tempo, in songs whose median tempo is _bpm or more (GenDrumsPlanTier).
     medium_fallback_keep = 0.93,
     medium_fallback_bpm = 120,
-    medium_fallback_on = 'hands',   -- what the share counts: 'hands' (every gem but the kick) | 'notes'      -- only songs whose median tempo (of the tier above) is this or more
-    -- Medium: from this tempo the hand that just crashed gets an 8th to reset (RBN "at
-    -- faster tempos, remove gems immediately after a crash"; official Medium keeps the
-    -- next note 66% below 120 BPM, 32% at 120-139, 5% above).
+    medium_fallback_on = 'hands',   -- what the share counts: 'hands' (every gem but the kick) | 'notes'
+    -- Medium: the gems an 8th after a crash accent go from this tempo (AfterCrash) ...
     after_crash_bpm = 120,
-    -- Roll lanes (126/127) are Expert-only in official charts (all 226 markers velocity
-    -- > 50); the lower tiers play the roll on a grid: Hard 16ths below
-    -- DRUMS_RULES.roll_hard_16th_bpm, else 8ths (official 38% / 46%); Medium 8ths below
-    -- this tempo, else quarters; Easy quarters.
+    -- ... and the snare too from this one. nil = off.
+    after_crash_snare_bpm = 140,
+    -- Medium plays a roll lane as 8ths below this tempo, as quarters from it.
     medium_roll_8th_bpm = 120,
-    -- Easy fills go to quarter notes from DRUMS_RULES.roll_easy_quarter_bpm.
+    -- Medium: a two-hand hit with a tom plays one gem from this tempo (MediumTomPairs). nil = off.
+    medium_tom_pair_bpm = 140,
+    -- ... except in a sparse bar.
+    medium_tom_pair_sparse_keep = true,
+    -- Medium/Easy: a cymbal change an 8th apart loses a hi-hat/ride (CymbalChanges).
+    lower_cymbal_change = true,
+    -- Easy: a verse plays kick + snare when its kick/snare hits come at least this often per
+    -- quarter note (EasyBeats).
+    easy_ks_min_density = 0.5,
+    -- Easy: a lone drum "and" between two beat hits goes from this tempo (EasyLoneAnds). nil = off.
+    easy_lone_and_bpm = 140,
+    -- Easy two-hand bar: a half bar with no hand hit keeps its kicks.
+    easy_quiet_half_kicks = true,
+    -- Medium/Easy: no three hand hits in a row an 8th apart from this tempo (LowerEighthHands).
+    lower_eighth_hands_bpm = { M = 150, E = 140 },
+    -- Easy: no pair of hand hits an 8th apart either, from this tempo. nil = off.
+    easy_no_pairs_bpm = 170,
+    -- Which of the three goes: 'hands' | 'beats' ("Drums fast 8ths").
+    lower_eighth_hands_default = 'hands',
+    -- Easy: a bar with the backbeat on the "and"s plays the hands on the "and"s from this
+    -- tempo (HardAndBackbeat). nil = off.
+    easy_and_backbeat_bpm = 110,
+    -- Easy: a run of _min+ hand hits an 8th apart, each with a snare, keeps only the beats
+    -- from this tempo (EasySnareRuns). nil = off.
+    easy_snare_run_bpm = 120,
+    easy_snare_run_min = 5,
 }
 
 local function NearInt(x, tol) return math.abs(x - math.floor(x + 0.5)) <= tol end
@@ -149,7 +155,7 @@ local function HasCymbal(ev)
 end
 
 -- A fill-like onset: hands on the snare and toms only, no cymbal (a tom run, a snare
--- roll, a fill under a fill lane).
+-- roll). By content, never by fill lane (a lane marks where overdrive can be activated).
 local function FillLike(ev)
     if HasCymbal(ev) then return false end
     for _, o in ipairs(ev.offs) do
@@ -189,6 +195,56 @@ local function Mark(ev, ctx)
     end
 end
 
+-- Medium/Easy below a fill Hard rewrote: Medium's 8th grid finds nothing of an 8th-triplet
+-- rewrite but the beats, so the fill is taken from Expert instead. A Hard note with no
+-- Expert note at its position was moved by the rewrite; each run of moved notes holding one
+-- off the 8th grid is replaced by Expert's notes between the run's neighbours, which the
+-- tier then reduces like any fill. Read from Expert (not kept from Hard's run) so a
+-- Medium-only run, Hard read from the track, does the same. `expert`: nil = off. Returns
+-- the new list and the number of bars with a run replaced.
+local function ExpertForRewrittenRuns(events, expert)
+    if not expert or #expert == 0 then return events, 0 end
+    local function Key(qn) return math.floor(qn * 960 + 0.5) end
+    local at = {}
+    for _, x in ipairs(expert) do at[Key(x.qn)] = true end
+    local function Moved(ev) return not at[Key(ev.qn)] end
+    local out, bars, n, i = {}, {}, 0, 1
+    while i <= #events do
+        if Moved(events[i]) then
+            local j = i
+            while j < #events and Moved(events[j + 1]) do j = j + 1 end
+            local off = false
+            for k = i, j do if not OnGrid(events[k], 0.5) then off = true end end
+            if off then
+                local lo = events[i - 1] and events[i - 1].qn or -math.huge
+                local hi = events[j + 1] and events[j + 1].qn or math.huge
+                for _, x in ipairs(expert) do
+                    if x.qn > lo + EPS and x.qn < hi - EPS then out[#out + 1] = Copy(x) end
+                end
+                local bar = ('%.3f'):format(events[i].qn - (events[i].bar_qn or 0))
+                if not bars[bar] then bars[bar] = true; n = n + 1 end
+            else
+                for k = i, j do out[#out + 1] = events[k] end
+            end
+            i = j + 1
+        else
+            out[#out + 1] = events[i]
+            i = i + 1
+        end
+    end
+    return out, n
+end
+
+-- The tempo for a once-per-song decision (Easy's quarter-note fills): the faster of the
+-- tempo at bar 1 (ctx.song_bpm, where a song's authored tempo is set) and the first note's -
+-- a live tempo map can start the drums a fraction under a threshold. The faster one only,
+-- so Generate is never looser than Validate, which reads each note's tempo.
+local function SongTempo(evs, ctx)
+    local first = evs[1] and evs[1].bpm or 120
+    local song = ctx and ctx.song_bpm
+    return song and song > first and song or first
+end
+
 -- Fresh copies carrying the marker context.
 local function Annotate(events, ctx)
     local out = {}
@@ -201,13 +257,14 @@ local function Annotate(events, ctx)
 end
 
 -- Weighted interval scheduling: the highest-weight subset of list whose neighbours are at
--- least gap(ev) apart. Returns a set of kept list indexes.
+-- least gap(ev, earlier) apart - the later one's gap, which may depend on the earlier one
+-- it is measured against. Returns a set of kept list indexes.
 local function KeepByGap(list, gap, weight)
     local n = #list
     local best, take, prev = { [0] = 0 }, {}, {}
     for i = 1, n do
         local j = i - 1
-        while j >= 1 and list[i].qn - list[j].qn < gap(list[i]) - EPS do j = j - 1 end
+        while j >= 1 and list[i].qn - list[j].qn < gap(list[i], list[j]) - EPS do j = j - 1 end
         prev[i] = j
         local with = weight(list[i]) + best[j]
         if with > best[i - 1] then best[i], take[i] = with, true
@@ -226,11 +283,9 @@ local CLASS_W = { down = 8, beat = 5, ['8th'] = 3, trip = 2, ['16th'] = 1.5, oth
 -- Disco flip
 ----------------------------------------------------------------------
 
--- RBN Hard: "Un-flip any 'Disco' beats ... put the hihat gems back on yellow, snares back
--- on red, delete the in-between 16th notes, and add a yellow hihat gem above the snare
--- gem." Inside Expert's [mix 3 drumsNd] spans Red is the hi-hat and Yellow the snare.
--- Official lower tiers never carry a "d" mix event (RB3 DLC: 0 of ~1500), so the tier
--- that un-flips is Hard unless the user picks another (CAT offers the same choice).
+-- Expert's disco-flip sections back to a normal beat: inside Expert's [mix 3 drumsNd] spans
+-- Red is the hi-hat and Yellow the snare; the hi-hat goes back on Yellow (8ths only), the
+-- snare on Red with a hi-hat above it. Hard un-flips unless opts.unflip names another tier.
 local function Unflip(evs, log)
     for _, ev in ipairs(evs) do
         if ev.disco then
@@ -287,9 +342,7 @@ local function Rolls(evs, dl, log)
         end
         local gems = 0
         for _, i in ipairs(keep) do gems = gems + #evs[i].offs end
-        -- An even number of hits (RBN Hard: "16th note rolls with an uneven number of hits
-        -- require an extra bit of advanced reading ... so even them out"): trim the start,
-        -- so the roll still lands where Expert's does.
+        -- An even number of hits: trim the start, so the roll still lands where Expert's does.
         while gems % 2 == 1 and #keep > 2 do
             gems = gems - #evs[keep[1]].offs
             table.remove(keep, 1)
@@ -314,8 +367,7 @@ local function Rolls(evs, dl, log)
                 keep[#keep + 1] = best
                 table.sort(keep)
             elseif #evs[k0].offs == 1 then
-                -- Nothing a grid step away: a roll of one hit is no roll (official Medium
-                -- and Easy often leave the lane empty or with its landing note only).
+                -- Nothing a grid step away: a roll of one hit is no roll.
                 keep = {}
             end
         end
@@ -331,9 +383,10 @@ end
 -- Fills and runs
 ----------------------------------------------------------------------
 
--- Runs of fill-like onsets (toms/snare, no cymbal, not under a roll lane) at least 3
--- long, each within `step` of the next. Returns { { first, last }... } index pairs.
-local function FillRuns(evs, step)
+-- Runs of fill-like onsets (toms/snare, no cymbal, not under a roll lane) at least
+-- min_len (default 3) long, each within `step` of the next. Returns { { first, last }... }
+-- index pairs.
+local function FillRuns(evs, step, min_len)
     local runs, i = {}, 1
     while i <= #evs do
         if FillLike(evs[i]) and not evs[i].rolled then
@@ -342,7 +395,7 @@ local function FillRuns(evs, step)
                   and evs[j + 1].qn - evs[j].qn <= step + EPS do
                 j = j + 1
             end
-            if j - i + 1 >= 3 then runs[#runs + 1] = { i, j } end
+            if j - i + 1 >= (min_len or 3) then runs[#runs + 1] = { i, j } end
             i = j + 1
         else
             i = i + 1
@@ -351,13 +404,112 @@ local function FillRuns(evs, step)
     return runs
 end
 
+-- Tom markers over a rewritten run. Pro Drums tom markers (110-112) are shared by every
+-- tier and often sit exactly on Expert's tom notes, so a tom the rewrite moved would fall
+-- off its marker and show as a cymbal. For every color with a tom the rewrite moved (even
+-- one its old marker still covers, so the result points at it), the markers in the run are
+-- replaced by one marker over the whole run, grown over any marker reaching into it. A
+-- marker already exactly that span is left alone. A fill run holds no cymbal, so this never
+-- turns the run's own notes into toms; a cymbal of that color elsewhere under the new
+-- marker - the tier above, or a tier this run does not write (opts.keep_cymbals) - would,
+-- so that run is thinned instead and listed in the result.
+local TOM_MARKER_TAIL = 0.125   -- the new marker ends a 32nd after the run's last note
+
+-- The new markers one run needs, for the colors in need: { { o, qn, qn_e,
+-- replaces = { old spans } }... }.
+local function RunTomMarkers(run_s, run_e, ctx, need)
+    local out = {}
+    for o = YEL, GRN do
+        local spans = ctx.toms and ctx.toms[o] or {}
+        local s, e = run_s, run_e + TOM_MARKER_TAIL
+        local used, replaces, grew = {}, {}, true
+        while grew do
+            grew = false
+            for k, sp in ipairs(spans) do
+                if not used[k] and sp.qn < e - EPS and sp.qn_e > s + EPS then
+                    used[k] = true
+                    replaces[#replaces + 1] = sp
+                    if sp.qn < s then s = sp.qn; grew = true end
+                    if sp.qn_e > e then e = sp.qn_e; grew = true end
+                end
+            end
+        end
+        local same = #replaces == 1 and math.abs(replaces[1].qn - s) <= EPS and math.abs(replaces[1].qn_e - e) <= EPS
+        if need[o] and #replaces > 0 and not same then
+            out[#out + 1] = { o = o, qn = s, qn_e = e, replaces = replaces }
+        end
+    end
+    return out
+end
+
+-- A cymbal of the marker's color under it: in the tier above (its markers as they are),
+-- or in a tier this run leaves as it is (keep_cymbals[o]: positions in QN).
+local function TomMarkerConflict(m, evs, keep_cymbals)
+    for _, ev in ipairs(evs) do
+        if ev.qn >= m.qn - EPS and ev.qn < m.qn_e - EPS and Has(ev, m.o) and IsCymbal(ev, m.o) then return true end
+    end
+    for _, qn in ipairs(keep_cymbals and keep_cymbals[m.o] or {}) do
+        if qn >= m.qn - EPS and qn < m.qn_e - EPS then return true end
+    end
+    return false
+end
+
+-- The context with the new markers in place of the ones they replace. Markers of one
+-- color from neighbouring runs that overlap become one. Returns (ctx, merged markers).
+local function ApplyTomMarkers(ctx, markers)
+    local by_o = {}
+    for _, m in ipairs(markers) do
+        by_o[m.o] = by_o[m.o] or {}
+        table.insert(by_o[m.o], m)
+    end
+    local toms, merged = {}, {}
+    for o = YEL, GRN do
+        local list = by_o[o] or {}
+        table.sort(list, function(a, b) return a.qn < b.qn end)
+        local gone, mine = {}, {}
+        for _, m in ipairs(list) do
+            local last = mine[#mine]
+            if last and m.qn < last.qn_e - EPS then
+                last.qn_e = math.max(last.qn_e, m.qn_e)
+                for _, sp in ipairs(m.replaces) do last.replaces[#last.replaces + 1] = sp end
+                for _, b in ipairs(m.bars) do last.bars[#last.bars + 1] = b end
+            else
+                mine[#mine + 1] = { o = o, qn = m.qn, qn_e = m.qn_e, replaces = { table.unpack(m.replaces) },
+                                    bars = { table.unpack(m.bars) } }
+            end
+        end
+        for _, m in ipairs(mine) do
+            for _, sp in ipairs(m.replaces) do gone[sp] = true end
+            merged[#merged + 1] = m
+        end
+        local spans = {}
+        for _, sp in ipairs(ctx.toms and ctx.toms[o] or {}) do if not gone[sp] then spans[#spans + 1] = sp end end
+        for _, m in ipairs(mine) do spans[#spans + 1] = { qn = m.qn, qn_e = m.qn_e } end
+        table.sort(spans, function(a, b) return a.qn < b.qn end)
+        toms[o] = spans
+    end
+    local out = {}
+    for k, v in pairs(ctx) do out[k] = v end
+    out.toms = toms
+    return out, merged
+end
+
 -- Hard: fast fill runs rewritten one grid slower (Gen5RetimeDenseRuns, the Guitar/Bass/
--- Keys rewrite and its "Hard fast runs" setting). Only runs of 16ths (and 16th triplets
--- below roll_hard_16th_bpm, where Hard may still play 16ths) are offered to it; grooves
--- with cymbals are never rewritten - official Hard thins them to 8ths.
-local function RetimeFills(evs, mode, log, ctx)
-    if (mode or GEN5_PARAMS.fast_runs_default) == 'thin' then return evs end
-    local any = false
+-- Keys rewrite and its "Hard fast runs" setting). Only tom/snare runs are offered to it -
+-- grooves with cymbals are thinned by the other rules. Returns the events and the marker
+-- context after the run's tom markers changed (log.tom_markers lists the new markers,
+-- log.tom_conflict_bars the runs thinned instead).
+local function RetimeFills(evs, mode, log, ctx, keep_cymbals)
+    if (mode or GEN5_PARAMS.fast_runs_default) == 'thin' then return evs, ctx end
+    local runs = {}
+    -- 8th-triplet tom/snare runs from hard_trip_stream_bpm: one grid slower is 8ths, which
+    -- the run breaker accepts because Expert is faster there.
+    for _, run in ipairs(FillRuns(evs, 1 / 3)) do
+        local a, b = run[1], run[2]
+        local trip = (evs[a].bpm or 120) >= DRUMS_RULES.hard_trip_stream_bpm
+        for k = a + 1, b do if math.abs(evs[k].qn - evs[k - 1].qn - 1 / 3) > EPS then trip = false end end
+        if trip then runs[#runs + 1] = { a = a, b = b } end
+    end
     for _, run in ipairs(FillRuns(evs, 0.25)) do
         local a, b = run[1], run[2]
         local step = evs[a + 1].qn - evs[a].qn
@@ -366,26 +518,89 @@ local function RetimeFills(evs, mode, log, ctx)
         -- and is thinned instead.
         if step >= 0.25 - EPS
            or (step >= 1 / 6 - EPS and (evs[a].bpm or 120) < DRUMS_RULES.roll_hard_16th_bpm) then
-            for k = a, b do evs[k].fill_run = true end
-            any = true
+            runs[#runs + 1] = { a = a, b = b }
         end
     end
-    if not any then return evs end
-    local out, bars = Gen5RetimeDenseRuns(evs, {
-        gap  = function(ev) return ev.fill_run and 0.5 or GEN5_MIN_LEN_QN end,
-        eps  = EPS, mode = mode })
+    -- Rewrite; a run whose new tom marker would cover a cymbal is taken out and the rest
+    -- rewritten again (the runs are independent, so this ends within #runs passes).
+    local out, bars, markers
+    while true do
+        local any = false
+        for _, ev in ipairs(evs) do ev.fill_run, ev.run_id = nil, nil end
+        for k, run in ipairs(runs) do
+            if not run.thinned then
+                for i = run.a, run.b do evs[i].fill_run, evs[i].run_id = true, k end
+                any = true
+            end
+        end
+        if not any then out, bars, markers = evs, {}, {}; break end
+        out, bars = Gen5RetimeDenseRuns(evs, {
+            gap  = function(ev) return ev.fill_run and 0.5 or GEN5_MIN_LEN_QN end,
+            -- A group of a mixed run never lands faster than Hard may play: 16ths below
+            -- roll_hard_16th_bpm, else 8th triplets (16th triplets are too fast for Hard).
+            min_grid = function(ev)
+                return (ev.bpm or 120) < DRUMS_RULES.roll_hard_16th_bpm and 0.25 or 1 / 3
+            end,
+            -- A mixed run's groups (16ths, then 32nds, then 16ths) each one grid slower than
+            -- themselves, as a run of 16ths alone would be.
+            group_grid = 'own',
+            eps  = EPS, mode = mode })
+        -- The runs that moved a tom (need[o]: its color), over Expert's span and the
+        -- rewritten notes.
+        local moved = {}
+        for _, ev in ipairs(out) do
+            local id = ev.retimed and ev.src and ev.src.run_id
+            if id and math.abs(ev.qn - ev.src.qn) > EPS then
+                for _, o in ipairs(ev.offs) do
+                    if IsTom(ev.src, o) then
+                        local run = runs[id]
+                        local m = moved[id] or { s = evs[run.a].qn, e = evs[run.b].qn, need = {} }
+                        moved[id] = m
+                        m.need[o] = true
+                    end
+                end
+            end
+        end
+        for _, ev in ipairs(out) do
+            local m = ev.retimed and ev.src and moved[ev.src.run_id]
+            if m then m.s, m.e = math.min(m.s, ev.qn), math.max(m.e, ev.qn) end
+        end
+        markers = {}
+        local conflict = false
+        for id, m in pairs(moved) do
+            local first = evs[runs[id].a]
+            local bar = first.qn - (first.bar_qn or 0)
+            for _, mk in ipairs(RunTomMarkers(m.s, m.e, ctx, m.need)) do
+                if TomMarkerConflict(mk, evs, keep_cymbals) then
+                    runs[id].thinned, conflict = bar, true
+                    break
+                end
+                mk.bars = { bar }
+                markers[#markers + 1] = mk
+            end
+        end
+        if not conflict then break end
+    end
     log.retimed_bars = bars
+    log.tom_conflict_bars = {}
+    for _, run in ipairs(runs) do
+        if run.thinned then log.tom_conflict_bars[#log.tom_conflict_bars + 1] = run.thinned end
+    end
+    local new_ctx
+    new_ctx, log.tom_markers = ApplyTomMarkers(ctx, markers)
+    for _, ev in ipairs(evs) do ev.fill_run, ev.run_id = nil, nil end
     for _, ev in ipairs(out) do
-        ev.fill_run = nil
+        ev.fill_run, ev.run_id, ev.src = nil, nil, nil
         if ev.retimed then
-            -- A fresh event (moved): its own copy of the gems, and the markers at its new spot.
+            -- A fresh event (moved): its own copy of the gems.
             local offs = {}
             for i, o in ipairs(ev.offs) do offs[i] = o end
             ev.offs = offs
-            Mark(ev, ctx)
         end
+        -- The markers at its spot, with the new tom markers.
+        if ev.retimed or #log.tom_markers > 0 then Mark(ev, new_ctx) end
     end
-    return out
+    return out, new_ctx
 end
 
 -- Fill runs a tier plays on a grid of `grid` QN (Medium 8ths, Easy 8ths or quarters):
@@ -402,9 +617,7 @@ local function GridFillRuns(evs, step, grid)
             if OnGrid(evs[k], grid) then on = on + 1 elseif OnShifted(evs[k]) then shifted = shifted + 1 end
         end
         -- Quarter-note grid (Easy) only: the phase that keeps more of the run's hits, the
-        -- beats on a tie. An 8th run that starts and ends on "and"s keeps its "and"s
-        -- (molto bar 22's snare accents, Rb R R -> Rb . R on Easy, not . R .). Costs 0.3 of
-        -- Easy's chain F1 against official, which puts such quarters on the beats more often.
+        -- beats on a tie - an 8th run on the "and"s keeps its "and"s (Rb R R -> Rb . R).
         -- Never on Medium's 8th grid: its shifted phase would be the 16th "e"s and "a"s.
         local Phase = OnGrid
         if grid >= 1 - EPS and shifted > on then Phase = OnShifted; on = shifted end
@@ -450,20 +663,23 @@ local function DropStreamCymbals(evs, i)
     end
 end
 
--- Hard's 16th rules, for every onset not already settled (rolled, retimed).
---   * at or above DRUMS_RULES.roll_hard_16th_bpm: nothing off the 8th / 8th-triplet grid
---     (RBN: avoid 16ths at 140+; official keeps 3-5% of them);
---   * below it: a tom/snare run of 16ths stays only if it lasts hard_run_beats or less,
---     else it goes to the 8th grid; hi-hat/ride 16ths in a stream go (right-hand
---     timekeeping on 8ths); a lone snare 16th stays on the "a" and goes on the "e" (RBN:
---     "remove about half of them in a way that is consistent").
+-- Hard's 16th rules, for every onset not already settled (rolled, retimed):
+--   * at or above DRUMS_RULES.roll_hard_16th_bpm: nothing off the 8th / 8th-triplet grid;
+--   * below it: a tom/snare run of 16ths (hard_16th_min_run+ hits) stays only if it lasts
+--     hard_run_beats or less, else it goes to the 8th grid; hi-hat/ride 16ths in a stream
+--     go (right-hand timekeeping on 8ths); a lone snare 16th stays on the "a" and goes on
+--     the "e", the same way throughout the song.
 local function HardSixteenths(evs)
     local R, P = DRUMS_RULES, GEN_DRUMS_PARAMS
     local in_run = {}
-    for _, run in ipairs(FillRuns(evs, 0.25)) do
+    for _, run in ipairs(FillRuns(evs, 0.25, P.hard_16th_min_run)) do
         local a, b = run[1], run[2]
-        local long = evs[b].qn - evs[a].qn + 0.25 > P.hard_run_beats + EPS
-        for k = a, b do in_run[k] = long and 'long' or 'short' end
+        -- A run shorter than 3 counts only as a 16th pair: two 32nds (a flam) are no run,
+        -- and the faster-notes rule below keeps one of them.
+        if b - a + 1 >= 3 or evs[b].qn - evs[a].qn >= 0.25 - EPS then
+            local long = evs[b].qn - evs[a].qn + 0.25 > P.hard_run_beats + EPS
+            for k = a, b do in_run[k] = long and 'long' or 'short' end
+        end
     end
     for i, ev in ipairs(evs) do
         if not ev.rolled and not ev.retimed and not OnGrid(ev, 0.5) and not OnGrid(ev, 1 / 3) then
@@ -501,13 +717,10 @@ end
 
 -- Easy, where Easy ITSELF moved the hats to quarter notes (Medium had a cymbal-only "and"
 -- a beat earlier that Easy dropped): a two-hand "and" keeps only its drum, and the beat
--- before it loses its hi-hat/ride too (a hit left with nothing goes). Official Easy in that
--- case (373): the "and" keeps only its drum 87%; the beat before keeps its cymbal 11%
--- (drum only 36%, gone 53%). The right hand no longer moves hat -> drum on consecutive
--- 8ths. User decision 2026-10-10. NOT where Medium was already on quarters (molto after its
--- Medium fallback): there official Easy keeps the "and" as Medium has it - hat + drum 72%
--- (ride 86%), the beat before keeps its cymbal 84% - and firing there cost Easy's ride
--- 5 points of recall. upper_cym_only: positions (1/24 QN) of Medium's cymbal-only hits.
+-- before it loses its hi-hat/ride too (a hit left with nothing goes), so the right hand no
+-- longer moves hat -> drum on consecutive 8ths. Not where Medium was already on quarters:
+-- there the "and" stays as Medium has it. upper_cym_only: positions (1/24 QN) of Medium's
+-- cymbal-only hits.
 local function EasyTwoHandAnds(evs, upper_cym_only)
     local at = {}
     for _, ev in ipairs(evs) do at[math.floor(ev.qn * 24 + 0.5)] = ev end
@@ -536,10 +749,8 @@ local function EasyTwoHandAnds(evs, upper_cym_only)
 end
 
 -- Medium/Easy right hand: nothing on 16ths; a hi-hat/ride stream on quarter notes at or
--- above lower_hat_quarter_bpm (RBN Medium: "The player's right hand shouldn't be expected
--- to keep time with 8th notes if the song is 140bpm or faster"; official switches at 130),
--- or at any tempo with all_quarters (Medium's fallback). Triplet off-beats go unless they
--- stand alone (official Medium keeps 16% of them).
+-- above lower_hat_quarter_bpm, or at any tempo with all_quarters (Medium's fallback).
+-- Triplet off-beats go unless they stand alone.
 local function LowerHands(evs, all_quarters)
     local R = DRUMS_RULES
     local from_bpm = all_quarters and 0 or (GEN_DRUMS_PARAMS.lower_hat_quarter_bpm or R.general_medium_8th_bpm)
@@ -551,11 +762,8 @@ local function LowerHands(evs, all_quarters)
                 if not (OnGrid(ev, 1 / 3) and lone) then ev.offs = {} end
             elseif (ev.bpm or 120) >= from_bpm and not OnGrid(ev, 1)
                    and CymbalStream(evs, i, 0.5) and not TwoHand(ev) then
-                -- A two-hand "and" (hat + snare/tom) keeps its hat: official Medium in such
-                -- quarter-hat passages keeps both 44% / drum only 27% / drops it 25% under
-                -- 130 BPM (user decision 2026-10-10; at 130+ official drops the whole hit 58% -
-                -- tempo split left for the user's fast-song testing). Easy then takes the hat
-                -- off it (EasyTwoHandAnds).
+                -- A two-hand "and" (hat + snare/tom) keeps its hat; Easy may take it off
+                -- (EasyTwoHandAnds).
                 for o = YEL, BLU do if IsCymbal(ev, o) then Drop(ev, o) end end
             end
         end
@@ -572,6 +780,90 @@ local function KickWeight(ev)
     if Has(ev, GRN) then w = w + 3 end          -- a crash wants its kick
     if #ev.offs == 1 then w = w + 1 end         -- a kick on its own carries the rhythm
     return w
+end
+
+-- The backbeat on the "and"s (Hard from DRUMS_RULES.general_hard_8th_bpm; Easy from
+-- easy_and_backbeat_bpm): a bar with a snare on at least 3 of its 4 "and"s, none on the
+-- beats, everything on the 8th grid - or a half bar with both its "and"s - plays the hands
+-- on the "and"s only: the beats lose their hi-hat/ride (a kick and a crash stay), the
+-- "and"s keep snare + cymbal, so every tier keeps the backbeat. The bar's events get
+-- `and_beat`, so EndOfBarKick leaves Hard's kicks on beats 1 and 3. Returns the number of
+-- bars (or half bars) changed.
+local function HardAndBackbeat(evs, from_bpm)
+    local bars = {}
+    for _, ev in ipairs(evs) do
+        if ev.bar_qn and Gen5Is44(ev) and (ev.bpm or 120) >= from_bpm then
+            local key = ('%.3f'):format(ev.qn - ev.bar_qn)
+            bars[key] = bars[key] or {}
+            table.insert(bars[key], ev)
+        end
+    end
+    -- Snares on the "and"s of a stretch of events, and whether it qualifies at all (all on
+    -- the 8th grid, no snare or tom on a beat).
+    local function Count(list)
+        local ands, ok = 0, true
+        for k, ev in ipairs(list) do
+            if not OnGrid(ev, 0.5) or ev.rolled then ok = false end
+            local drum = Has(ev, SNARE)
+            local tom = false
+            for _, o in ipairs(ev.offs) do if IsTom(ev, o) then drum, tom = true, true end end
+            if OnGrid(ev, 1) then
+                -- A snare under a crash on the stretch's first beat is an accent, not a
+                -- backbeat (`KRG RY KY RY`).
+                local accent = k == 1 and Has(ev, SNARE) and not tom and Has(ev, GRN) and IsCymbal(ev, GRN)
+                if drum and not accent then ok = false end
+            elseif Has(ev, SNARE) then
+                ands = ands + 1
+            end
+        end
+        return ok, ands
+    end
+    local function Apply(list)
+        for _, ev in ipairs(list) do
+            ev.and_beat = true
+            if OnGrid(ev, 1) then
+                for o = YEL, BLU do if IsCymbal(ev, o) then Drop(ev, o) end end
+            end
+        end
+    end
+    local n = 0
+    for _, list in pairs(bars) do
+        local ok, ands = Count(list)
+        if ok and ands >= 3 then
+            Apply(list)
+            n = n + 1
+        else
+            -- A HALF bar with the snare on both of its "and"s - the groove's first half
+            -- before a fill (`KY RY KY R | R KG . KB` -> `K RY K R | ...`).
+            local halves = { {}, {} }
+            for _, ev in ipairs(list) do table.insert(halves[ev.bar_qn < 2 - EPS and 1 or 2], ev) end
+            for _, half in ipairs(halves) do
+                local hok, hands = Count(half)
+                if hok and hands >= 2 then Apply(half); n = n + 1 end
+            end
+        end
+    end
+    return n
+end
+
+-- Hard below hard_kick_gap_fast_bpm: a kick on a beat with a kick-only hit a 16th after it
+-- (a kick figure, `KY RY KY K RY`) keeps the beat's kick and loses the 16th one, and the
+-- busy-hands half bar does not apply to that beat kick. Returns the set of beat events
+-- kept that way.
+local function HardKickFigures(evs)
+    local figure = {}
+    for i, ev in ipairs(evs) do
+        local nx = evs[i + 1]
+        if nx and Has(ev, KICK) and OnBeat(ev) and (ev.bpm or 120) < GEN_DRUMS_PARAMS.hard_kick_gap_fast_bpm
+           and math.abs(nx.qn - ev.qn - 0.25) <= EPS and #nx.offs == 1 and nx.offs[1] == KICK and not nx.rolled then
+            local nn = evs[i + 2]
+            if not nn or nn.qn - nx.qn > 0.25 - EPS then   -- a lone 16th, not the start of a run
+                nx.offs = {}
+                figure[ev] = true
+            end
+        end
+    end
+    return figure
 end
 
 -- "Are the hands busy around this kick": a hand hit (any gem but the kick) an 8th before
@@ -601,22 +893,12 @@ local function ThinKicks(evs, gap)
     end
 end
 
--- Hard: a bar whose busy-hands spacing left no kick on its last beat or the "and" after it
--- gets the last-beat kick back when Expert had one there - the end of the bar keeps a
--- faster kick pattern than its start (user idea 2026-10-10). Official Hard, steady 8th
--- hats at 100-139 BPM, Expert kicks on 1, 3, 4 and the "and" of 4 (316 bars): beat 4
--- kept 33%, the "and" 27%, both 1%, neither 39%. With no Expert kick on beat 4 the "and"
--- alone stays only 34% of the time, so that case is left thinned.
 -- Hard: a bar of steady 8th hi-hats/rides loses n_drop of its hat-only "and"s - the drums
 -- side of the band's "Hard 8th runs" setting (busy_drop: 1 or 2; Auto = 2 when the song
 -- starts above GEN5_PARAMS.fast_8ths_bpm). Order: the "and" of 1 when the downbeat is a
--- crash (the hand comes back from the crash), then the "and" of 4, then the "and" of 2 -
--- so after a crash, Drop 1 takes the "and" of 1 and Drop 2 the "and"s of 1 and 4. Only a
--- hat-only hit loses its hat (with a kick or snare it stays; official drops those 5% vs
--- 13%); a slot that is not hat-only is skipped. User rule 2026-10-10. Official Hard, steady
--- 8th hats at 130-169 BPM: a crash on 1 -> the "and" of 1 goes 41% (100% of bars losing
--- one); otherwise each "and" ~13%, a single drop the "and" of 1 49% / of 4 38%.
--- Returns the number of hats removed.
+-- crash (the hand comes back from the crash), then the "and" of 4, then the "and" of 2.
+-- Only a hat-only hit loses its hat; a slot that is not hat-only is skipped. Returns the
+-- number of hats removed.
 local function HardHatDrops(evs, n_drop)
     local bars = {}
     for _, ev in ipairs(evs) do
@@ -654,10 +936,7 @@ end
 
 -- Hard: the busy-hands spacing keeps the kicks on 1 and 3; one 8th kick paired with beat
 -- 3's kick - the one leading into it (the "and" of 2), else the one right after it (the
--- "and" of 3) - comes back. Not when Expert has both: then official Hard keeps 1 and 3 only.
--- Official Hard, steady 8th hats: Expert K . . K K . . . kept as is 93% at 140+ BPM (58 bars),
--- 55% under 140 (766); K . . . K K . K -> K . . . K K . . 46% at 140+ (76), 62% under 140
--- (216); K . . K K K . . -> K . . . K . . . 83-100% (19). User question 2026-10-10 (pojat).
+-- "and" of 3) - comes back. Not when Expert has both: then 1 and 3 only.
 local function PairedKick(evs)
     local bars = {}
     for _, ev in ipairs(evs) do
@@ -681,13 +960,18 @@ local function PairedKick(evs)
     end
 end
 
+-- Hard: a bar whose busy-hands spacing left no kick on its last beat or the "and" after it
+-- gets the last-beat kick back when Expert had one there - the end of the bar keeps a
+-- faster kick pattern than its start. With no Expert kick on beat 4 the "and" alone is left
+-- thinned.
 local function EndOfBarKick(evs)
     local bars = {}
     for _, ev in ipairs(evs) do
         if ev.bar_qn and ev.bar_len then
             local key = ('%.3f'):format(ev.qn - ev.bar_qn)
-            local b = bars[key] or {}
+            local b = bars[key] or { evs = {} }
             bars[key] = b
+            b.evs[#b.evs + 1] = ev
             local last = ev.bar_len - (ev.pulse or 1)
             if math.abs(ev.bar_qn - last) <= EPS then b.last = ev
             elseif math.abs(ev.bar_qn - (last + 0.5)) <= EPS then b.after = ev end
@@ -695,16 +979,27 @@ local function EndOfBarKick(evs)
     end
     for _, b in pairs(bars) do
         local ev = b.last
-        if ev and ev.kick_dropped and not Has(ev, KICK) and not (b.after and Has(b.after, KICK)) then
+        -- Not in a backbeat-on-the-"and"s bar: kicks on beats 1 and 3 there (HardAndBackbeat).
+        if ev and ev.kick_dropped and not Has(ev, KICK) and not (b.after and Has(b.after, KICK)) and not ev.and_beat then
             Add(ev, KICK)
+            -- The beat's kick wins over a 16th kick right after it, which the spacing kept
+            -- only because the beat's had gone (KY on beat 4 + K on its "e").
+            for _, o in ipairs(b.evs) do
+                if o.qn > ev.qn + EPS and o.qn < ev.qn + GEN_DRUMS_PARAMS.hard_kick_gap_8th - EPS
+                   and Has(o, KICK) then
+                    Drop(o, KICK)
+                    o.kick_dropped = true
+                end
+            end
         end
     end
 end
 
--- Medium/Easy kicks (RBN Medium/Easy and Validate): on quarter notes above
--- DRUMS_RULES.kick_grid_bpm, at most one per bar from kick_per_measure_bpm, never under
--- an off-beat crash (Medium: "Syncopated or off-beat crashes ... leave them with no kick").
-local function LowerKicks(evs)
+-- Medium/Easy kicks: on quarter notes above DRUMS_RULES.kick_grid_bpm, never under an
+-- off-beat crash, then spaced (a quarter note; half a bar at speed or under busy hands; one
+-- a bar from kick_per_measure_bpm is OneKickPerBar's). keep_spacing: only the kicks the
+-- tier may not contain go (Drums 2X, whose kicks are already a tier's - GenDrums2xInput).
+local function LowerKicks(evs, keep_spacing)
     local R = DRUMS_RULES
     for _, ev in ipairs(evs) do
         if Has(ev, KICK) then
@@ -717,11 +1012,15 @@ local function LowerKicks(evs)
             end
         end
     end
+    if keep_spacing then return end
     local P = GEN_DRUMS_PARAMS
     local Busy = BusyHands(evs)
-    ThinKicks(evs, function(ev)
+    ThinKicks(evs, function(ev, pv)
         if (ev.bpm or 120) >= P.lower_kick_gap_fast_bpm then return P.lower_kick_gap_fast end
-        if Busy(ev) then return P.lower_kick_gap_busy end
+        -- Busy hands' half bar reaches back only within the kick's own bar, as on Hard.
+        local same_bar = not pv
+            or math.abs((ev.qn - (ev.bar_qn or 0)) - (pv.qn - (pv.bar_qn or 0))) < EPS
+        if Busy(ev) and same_bar then return P.lower_kick_gap_busy end
         return P.lower_kick_gap
     end)
 end
@@ -759,31 +1058,17 @@ local function KickUnderSnare(evs, dl)
     end
 end
 
--- Kicks inside drum fills (the fill lane): official charts thin them, not remove them -
--- a fill with 4-6 Expert kicks keeps 3.2 on Hard, 2.1 on Medium, 0.6 on Easy (64-84% of
--- Easy fills keep none). Easy: no kicks in a fill. Hard and Medium
--- thin fill kicks no differently from any other kicks - official Hard keeps ~67% of a
--- fill's kicks, its share everywhere - and a fill lane usually covers an ordinary groove
--- bar (the fill only shows when overdrive is ready): a quarter-note spacing there took
--- pojat_lemmikkih's "and" of 2 kick in every fill-lane bar (2026-10-10). Dropping it left
--- the offline evaluation unchanged (Hard kick recall 73 -> 75).
-local function EasyFillKicks(evs)
-    for _, ev in ipairs(evs) do if ev.fill and #ev.offs > 1 then Drop(ev, KICK) end end
-    for _, ev in ipairs(evs) do if ev.fill and Has(ev, KICK) then ev.offs = {} end end
-end
+-- Fill lanes (pitch 120) change no kicks, on any tier: a lane marks where overdrive can be
+-- activated, not what is played there.
 
 ----------------------------------------------------------------------
 -- Medium: limb independence, crashes, three-limb hits
 ----------------------------------------------------------------------
 
--- RBN Medium: "No kicks or snares in between hihat/ride (ie, right hand time keeping)
--- gems." Official Medium is looser - a kick or snare on the beat stays (83-94% of them),
--- one on an 8th mostly goes (22% stay), on a 16th it goes (2%). mode 'beats' keeps the
--- ones on a beat (official), 'none' removes them all (the doc), 'keep' leaves them.
--- The "hi-hat/ride" of the rule is right-hand timekeeping: a Yellow/Blue cymbal. A crash is
--- not (molto bar 82: hat, snare on the "and" of 4, crash on the next downbeat - the snare
--- went because the crash counted as a hat; official Medium under 130 BPM keeps such a snare
--- 76%, Easy 85%).
+-- Medium: a kick/snare-only hit between two hi-hat/ride notes at most a quarter apart.
+-- mode 'beats' keeps the ones on a beat, 'none' removes them all, 'keep' leaves them. The
+-- "hi-hat/ride" is right-hand timekeeping - a Yellow/Blue cymbal; a crash is not (a snare
+-- on the "and" before a downbeat crash stays).
 local function TimeCymbal(ev)
     return (IsCymbal(ev, YEL) and Has(ev, YEL)) or (IsCymbal(ev, BLU) and Has(ev, BLU))
 end
@@ -811,13 +1096,9 @@ end
 
 -- A hi-hat/ride hit sandwiched between snare accents - an accent (snare, no cymbal) an
 -- 8th before AND an 8th after - loses its cymbal; a kick on it stays. Otherwise the hands
--- alternate hat and snare on every 8th, and with a tom in the accent both hands are on the
--- accent and the right hand must leap back to the hat (molto_c_love_for_sale bar 22:
--- Y Rb Y Rb Y). Official (55 songs): Medium, accents with a tom, keeps the accents and
--- drops the hat between 43 of 55 times (12 drop the tom); Easy at 120+ BPM drops the hat
--- 18 of 24 times. need_tom: Medium - snare-only accents there are Between's job (official
--- Medium drops the snares instead). Crashes stay: a crash on the beat is an accent too.
--- User decision 2026-10-10: both tiers, the official way.
+-- alternate hat and accent on every 8th, and with a tom in the accent the right hand must
+-- leap back to the hat (`Y Rb Y Rb Y`). need_tom: Medium, where snare-only accents are
+-- Between's job. Crashes stay: a crash on the beat is an accent too.
 local function SandwichedHats(evs, need_tom)
     local at = {}
     for _, ev in ipairs(evs) do at[math.floor(ev.qn * 24 + 0.5)] = ev end
@@ -841,11 +1122,9 @@ local function SandwichedHats(evs, need_tom)
     return #drop
 end
 
--- Two two-hand hits (one cymbal + one drum each) an 8th apart whose drum changes - tom to
--- snare, snare to tom, tom to another tom: the first loses its drum and keeps its cymbal,
--- so the drum hand gets a beat to move (molto bar 34: Yb RY -> Y RY). Official Medium,
--- under 130 BPM: tom -> snare, the first drops its tom 94% (45 of 48); snare -> tom, the
--- first drops its snare 67% (10 of 15). Medium and Easy (user decision 2026-10-10).
+-- Medium/Easy: two two-hand hits (one cymbal + one drum each) an 8th apart whose drum
+-- changes - tom to snare, snare to tom, tom to another tom: the first loses its drum and
+-- keeps its cymbal, so the drum hand gets a beat to move (`Yb RY` -> `Y RY`).
 local function DrumChanges(evs)
     local function Split(ev)
         local cym, drum = {}, {}
@@ -871,11 +1150,8 @@ local function DrumChanges(evs)
 end
 
 -- Easy: a two-hand hit (hi-hat/ride + snare/tom) an 8th before a crash loses its hat and
--- keeps its drum, so the right hand is free to reach the crash (molto bar 18: RY | G ->
--- R | G). A user rule (2026-10-10): official Easy under 130 BPM keeps that hat 66% and drops
--- it 34% (n=422); official Medium drops it 39% under 130 BPM and almost always from 130 (hat
--- kept 1%, the whole hit gone 57%) - Medium's tempo split waits for the fast-song testing.
--- A hat-only hit before a crash is left alone (official Easy keeps it 74% under 130 BPM).
+-- keeps its drum, so the right hand is free to reach the crash (`RY | G` -> `R | G`). A
+-- hat-only hit before a crash is left alone.
 local function EasyBeforeCrash(evs)
     local n = 0
     for i = 1, #evs - 1 do
@@ -889,11 +1165,181 @@ local function EasyBeforeCrash(evs)
     return n
 end
 
--- A snare + tom hit (both hands on drums, no cymbal) a quarter note or less before a crash
--- loses its tom, so the hand gets to the crash (pojat_lemmikkih bar 74's last Rg into bar
--- 75's crash). Official Medium drops that tom 79% a quarter before / 69% an 8th before
--- under 130 BPM, 70% a quarter before at 130+ (n=669); official Easy has few left. Medium
--- and Easy (user request 2026-10-10).
+-- Medium: a two-hand hit with a tom - two toms, or a cymbal + a tom - plays one gem from
+-- medium_tom_pair_bpm; two toms also on an off-beat at any tempo. A cymbal + tom off the
+-- beat below that tempo is the two-hand "and" LowerHands keeps. The gem kept: of two toms
+-- the higher lane (Green over Blue over Yellow), of a cymbal + tom the tom. A snare + tom
+-- stays; a roll's notes are left to the roll.
+local function MediumTomPairs(evs)
+    local bpm, n = GEN_DRUMS_PARAMS.medium_tom_pair_bpm, 0
+    if not bpm then return 0 end
+    -- A sparse bar keeps its tom pairs: no more hand NOTES than beats - a double counts two,
+    -- kicks none (`Kyb Kyb` stays; `bg Rg bg R`, 7 notes, does not). When the bar is over only
+    -- because a two-tom hit repeats an 8th later, the repeats go and the doubles stay
+    -- (`yb yb . yb yb` -> `yb . . yb`).
+    local function Hands(ev)
+        local n = 0
+        for _, o in ipairs(ev.offs) do if o ~= KICK then n = n + 1 end end
+        return n
+    end
+    local function TwoToms(ev)
+        local t = 0
+        for _, o in ipairs(ev.offs) do if o ~= KICK and IsTom(ev, o) then t = t + 1 end end
+        return t == 2 and Hands(ev) == 2
+    end
+    local function Same(a, b)
+        if #a.offs ~= #b.offs then return false end
+        for k, o in ipairs(a.offs) do if b.offs[k] ~= o then return false end end
+        return true
+    end
+    local per_bar, repeats = {}, {}
+    for i, ev in ipairs(evs) do
+        local key = ('%.3f'):format(ev.qn - (ev.bar_qn or 0))
+        per_bar[key] = (per_bar[key] or 0) + Hands(ev)
+        local pv = evs[i - 1]
+        if pv and TwoToms(ev) and Same(pv, ev) and math.abs(ev.qn - pv.qn - 0.5) <= EPS and not ev.rolled then
+            repeats[key] = repeats[key] or {}
+            table.insert(repeats[key], ev)
+        end
+    end
+    for key, list in pairs(repeats) do
+        local ev = list[1]
+        local beats = (ev.bar_len or 4) / (ev.pulse or 1)
+        if per_bar[key] > beats + EPS and per_bar[key] - 2 * #list <= beats + EPS then
+            for _, r in ipairs(list) do
+                local keep = {}
+                for _, o in ipairs(r.offs) do if o == KICK then keep[#keep + 1] = o end end
+                r.offs = keep
+                n = n + 1
+            end
+            per_bar[key] = per_bar[key] - 2 * #list
+        end
+    end
+    for _, ev in ipairs(evs) do
+        local key = ('%.3f'):format(ev.qn - (ev.bar_qn or 0))
+        local beats = (ev.bar_len or 4) / (ev.pulse or 1)
+        local sparse = GEN_DRUMS_PARAMS.medium_tom_pair_sparse_keep and per_bar[key] <= beats + EPS
+        if not sparse then
+        local lo, hi, count = nil, nil, 0
+        for _, o in ipairs(ev.offs) do
+            if o ~= KICK then
+                count = count + 1
+                if not lo or o < lo then lo = o end
+                if not hi or o > hi then hi = o end
+            end
+        end
+        local both = count == 2 and IsTom(ev, lo) and IsTom(ev, hi)
+        if count == 2 and not ev.rolled and lo >= YEL and (IsTom(ev, lo) or IsTom(ev, hi))
+           and ((ev.bpm or 120) >= bpm or (both and not OnBeat(ev))) then
+            -- Two toms: the higher lane stays; a cymbal + tom: the tom stays.
+            Drop(ev, (IsTom(ev, hi) and hi ~= lo) and lo or hi)
+            n = n + 1
+        end
+        end
+    end
+    return n
+end
+
+-- Easy from easy_lone_and_bpm: a lone drum "and" - snare, tom or kick, no cymbal - with a
+-- hit on the beat an 8th before and after it goes. A roll's notes stay.
+local function EasyLoneAnds(evs)
+    local bpm = GEN_DRUMS_PARAMS.easy_lone_and_bpm
+    if not bpm then return evs, 0 end
+    local drop, n = {}, 0
+    for i = 2, #evs - 1 do
+        local p, m, nx = evs[i - 1], evs[i], evs[i + 1]
+        if (m.bpm or 120) >= bpm and not m.rolled and not OnBeat(m) and OnGrid(m, 0.5)
+           and math.abs(m.qn - p.qn - 0.5) <= EPS and math.abs(nx.qn - m.qn - 0.5) <= EPS
+           and OnBeat(p) and OnBeat(nx) and not HasCymbal(m) then
+            drop[i] = true
+            n = n + 1
+        end
+    end
+    for i in pairs(drop) do evs[i].offs = {} end
+    return Compact(evs), n
+end
+
+-- Medium/Easy: two hits an 8th apart on DIFFERENT cymbals that need 3+ hand pads between
+-- them make a hand jump (`RY | RG`; with two pads, `B | G`, each hand stays on its own).
+-- The hi-hat/ride that is not on both goes - Yellow before Blue - so the hand has one
+-- cymbal to stay on; crashes, snares and toms stay. A double crash (Yellow/Blue + Green
+-- cymbal) stays and the other hit keeps only its top gem (GemRank) - for an input that
+-- still has one: DoubleCrashes leaves none on a generated tier.
+-- GemRank: how much a hand gem matters when one of two must go.
+local function GemRank(ev, o)
+    if o == GRN then return IsCymbal(ev, o) and 7 or 5 end
+    if o == SNARE then return 6 end
+    if o == BLU then return IsCymbal(ev, o) and 2 or 4 end
+    if o == YEL then return IsCymbal(ev, o) and 1 or 3 end
+    return 0
+end
+
+local function CymbalChanges(evs)
+    if not GEN_DRUMS_PARAMS.lower_cymbal_change then return 0 end
+    local function Cyms(ev)
+        local c = {}
+        for _, o in ipairs(ev.offs) do if o >= YEL and IsCymbal(ev, o) then c[o] = true end end
+        return c
+    end
+    local function Double(c) return c[GRN] and (c[YEL] or c[BLU]) end
+    local function TopOnly(ev)
+        local best, br = nil, -1
+        for _, o in ipairs(ev.offs) do
+            if o ~= KICK and GemRank(ev, o) > br then best, br = o, GemRank(ev, o) end
+        end
+        local keep = {}
+        for _, o in ipairs(ev.offs) do if o == KICK or o == best then keep[#keep + 1] = o end end
+        local changed = #keep < #ev.offs
+        ev.offs = keep
+        return changed
+    end
+    local n = 0
+    for i = 1, #evs - 1 do
+        local a, b = evs[i], evs[i + 1]
+        if math.abs(b.qn - a.qn - 0.5) <= EPS and not a.rolled and not b.rolled then
+            local ca, cb = Cyms(a), Cyms(b)
+            local differ = false
+            if next(ca) and next(cb) then
+                for o in pairs(ca) do if not cb[o] then differ = true end end
+                for o in pairs(cb) do if not ca[o] then differ = true end end
+            end
+            -- ... and the two hits need 3+ different hand pads between them (the kick does not
+            -- count; a tom and a cymbal of one color are different pads): with two, each hand
+            -- stays on its own pad (`B | G`).
+            local pads, npads = {}, 0
+            for _, ev in ipairs({ a, b }) do
+                for _, o in ipairs(ev.offs) do
+                    if o ~= KICK then
+                        local key = o .. (IsTom(ev, o) and 't' or '')
+                        if not pads[key] then pads[key] = true; npads = npads + 1 end
+                    end
+                end
+            end
+            if differ and npads >= 3 then
+                local da, db = Double(ca), Double(cb)
+                if da and not db then
+                    if TopOnly(b) then n = n + 1 end
+                elseif db and not da then
+                    if TopOnly(a) then n = n + 1 end
+                elseif not (da and db) then
+                    -- The lowest-ranked hi-hat/ride on only one of the two hits.
+                    local ev, o = nil, nil
+                    for _, cand in ipairs({ YEL, BLU }) do
+                        if not o then
+                            if ca[cand] and not cb[cand] then ev, o = a, cand
+                            elseif cb[cand] and not ca[cand] then ev, o = b, cand end
+                        end
+                    end
+                    if o then Drop(ev, o); n = n + 1 end
+                end
+            end
+        end
+    end
+    return n
+end
+
+-- Medium/Easy: a snare + tom hit (both hands on drums, no cymbal) a quarter note or less
+-- before a crash loses its tom, so the hand gets to the crash.
 local function TomBeforeCrash(evs)
     local n = 0
     for i = 1, #evs - 1 do
@@ -908,9 +1354,10 @@ local function TomBeforeCrash(evs)
     return n
 end
 
--- The hand that just crashed resets: from after_crash_bpm the cymbal/tom gems of an
--- onset an 8th or less after a crash accent go (the snare - the other hand - and the kick
--- stay). An accent, not a ride on the crash: one with no crash an 8th before it.
+-- Medium: the hand that just crashed resets. From after_crash_bpm the cymbal/tom gems of
+-- an onset an 8th or less after a crash accent go; from after_crash_snare_bpm its snare too
+-- (`KG R . RY` -> `KG . . RY`). The kick stays. An accent, not a ride on the crash: one
+-- with no crash an 8th before it. Easy follows Medium.
 local function AfterCrash(evs)
     local P = GEN_DRUMS_PARAMS
     for i = 2, #evs do
@@ -919,14 +1366,23 @@ local function AfterCrash(evs)
             and not (pp and Has(pp, GRN) and pv.qn - pp.qn <= 0.5 + EPS)
         if accent and (ev.bpm or 120) >= P.after_crash_bpm and ev.qn - pv.qn <= 0.5 + EPS and not ev.rolled then
             for o = YEL, GRN do Drop(ev, o) end
+            if P.after_crash_snare_bpm and (ev.bpm or 120) >= P.after_crash_snare_bpm then Drop(ev, SNARE) end
         end
     end
 end
 
--- At most `max` gems: a three-limb hit loses the kick (official KRY -> RY), anything
--- bigger then its non-crash cymbal.
+-- At most `max` gems: a three-limb hit loses the kick (KRY -> RY), anything bigger then
+-- its non-crash cymbal.
 local function MaxGems(evs, max)
-    for _, ev in ipairs(evs) do
+    for i, ev in ipairs(evs) do
+        -- A kick + a double crash with no room before it (DoubleCrashes will make it a single
+        -- Green anyway): the Yellow/Blue goes, not the kick - KYG -> KG rather than YG -> G.
+        if #ev.offs > max and max == 2 and #ev.offs == 3 and Has(ev, KICK) and Has(ev, GRN)
+           and IsCymbal(ev, GRN) and (Has(ev, YEL) or Has(ev, BLU)) then
+            local o = Has(ev, YEL) and YEL or BLU
+            local pv = evs[i - 1]
+            if IsCymbal(ev, o) and (not pv or ev.qn - pv.qn < 0.95) then Drop(ev, o) end
+        end
         if #ev.offs > max then Drop(ev, KICK) end
         while #ev.offs > max do
             if not (Drop(ev, YEL) or Drop(ev, BLU)) then table.remove(ev.offs) end
@@ -938,13 +1394,11 @@ end
 -- Easy: one beat type per section
 ----------------------------------------------------------------------
 
--- RBN Easy: "the player either is playing a 2-hand beat with no kick, or a beat with just
--- kick and snare ... less intense sections should be authored a kick/snare beat, and more
--- rocking sections should be authored as a 2-hand beat." Official Easy (RB3 DLC) picks it
--- per section, and the section name with the right hand's cymbal predicts it: a verse kept
--- on the hi-hat is kick + snare 74% of the time, every other section (and a verse on the
--- ride or crash) is mostly the 2-hand beat (chorus 89%, outro 90%, intro 80%). A section
--- whose Medium has no cymbal at all is kick + snare by necessity.
+-- Easy plays one beat per section: kick + snare, or the two-hand beat (no kick). A verse
+-- led by the hi-hat or the ride plays kick + snare when its Medium has at least
+-- easy_ks_min_density kick/snare onsets per quarter note - a sparser verse keeps its
+-- cymbal; a crash-led verse and every other section play the two-hand beat. A section whose
+-- Medium has no cymbal at all is kick + snare by necessity.
 function GenDrumsIsVerse(name) return (name or ''):lower():find('verse', 1, true) ~= nil end
 
 local function SectionTypes(evs, sections)
@@ -962,16 +1416,24 @@ local function SectionTypes(evs, sections)
     local count = {}
     for _, ev in ipairs(evs) do
         local k = SecIndex(ev.qn)
-        local c = count[k] or { [YEL] = 0, [BLU] = 0, [GRN] = 0 }
+        local c = count[k] or { [YEL] = 0, [BLU] = 0, [GRN] = 0, ks = 0 }
         count[k] = c
+        c.first = c.first or ev.qn
+        c.last = ev.qn
         for _, o in ipairs(ev.offs) do if IsCymbal(ev, o) then c[o] = c[o] + 1 end end
+        if Has(ev, KICK) or Has(ev, SNARE) then c.ks = c.ks + 1 end
     end
     local types = {}
     for k, s in ipairs(secs) do
-        local c = count[k] or { [YEL] = 0, [BLU] = 0, [GRN] = 0 }
+        local c = count[k] or { [YEL] = 0, [BLU] = 0, [GRN] = 0, ks = 0 }
         local total = c[YEL] + c[BLU] + c[GRN]
         local hat = c[YEL] > 0 and c[YEL] >= c[BLU] and c[YEL] >= c[GRN]
-        types[k] = (total == 0 or (GenDrumsIsVerse(s.name) and hat)) and 'ks' or 'hands'
+        local ride = c[BLU] > 0 and c[BLU] >= c[YEL] and c[BLU] >= c[GRN]
+        -- Kick/snare onsets per quarter note over the section's notes.
+        local density = c.first and c.ks / (c.last - c.first + 1) or 0
+        local ks = GenDrumsIsVerse(s.name) and (hat or ride)
+                   and density >= (GEN_DRUMS_PARAMS.easy_ks_min_density or 0)
+        types[k] = (total == 0 or ks) and 'ks' or 'hands'
     end
     return SecIndex, types, secs
 end
@@ -980,9 +1442,18 @@ local function EasyBeats(evs, sections, log)
     local SecIndex, types = SectionTypes(evs, sections)
     -- Bars with no cymbal at all play kick + snare whatever their section.
     local bar_cym = {}
+    -- Half bars with a hand hit (a two-hand bar's kicks stay in a half bar without one).
+    local half_hands = {}
+    local function HalfKey(ev)
+        local half = (ev.bar_qn or 0) >= (ev.bar_len or 4) / 2 - EPS and 2 or 1
+        return ('%.3f:%d'):format(ev.qn - (ev.bar_qn or 0), half)
+    end
     for _, ev in ipairs(evs) do
         local key = ('%.3f'):format(ev.qn - (ev.bar_qn or 0))
         if HasCymbal(ev) then bar_cym[key] = true end
+        for _, o in ipairs(ev.offs) do
+            if o ~= KICK then half_hands[HalfKey(ev)] = true; break end
+        end
     end
     local seen = {}
     for _, ev in ipairs(evs) do
@@ -992,15 +1463,17 @@ local function EasyBeats(evs, sections, log)
         if not ev.rolled then
             local bar = ('%.3f'):format(ev.qn - (ev.bar_qn or 0))
             if t == 'ks' then
-                -- Kick + snare: the hi-hat/ride goes, a crash stays (instead of its kick -
-                -- RBN Easy: "author the crashes instead of the kicks"), toms stay.
+                -- Kick + snare: the hi-hat/ride goes, a crash stays (instead of its kick),
+                -- toms stay.
                 for o = YEL, BLU do if IsCymbal(ev, o) then Drop(ev, o) end end
-            elseif bar_cym[bar] then
+            elseif bar_cym[bar] and (half_hands[HalfKey(ev)] or not GEN_DRUMS_PARAMS.easy_quiet_half_kicks) then
+                -- Two-hand beat: no kicks - except in a half bar with no hand hit at all
+                -- (easy_quiet_half_kicks): there the kicks are all there is.
                 Drop(ev, KICK)
             end
         end
     end
-    -- No gem paired with a kick (RBN Easy): the other gem wins.
+    -- No gem paired with a kick: the other gem wins.
     for _, ev in ipairs(evs) do if #ev.offs > 1 then Drop(ev, KICK) end end
 end
 
@@ -1008,14 +1481,16 @@ end
 -- Every tier: double crashes, constant 8ths
 ----------------------------------------------------------------------
 
--- A Green + Yellow/Blue double crash needs a quarter note of space before it (Validate,
--- H/M/E; RBN Hard "unless there is plenty of empty space around them"), else it is a
--- single Green.
+-- A Green + Yellow/Blue double crash is a single Green on every tier below Expert, room
+-- around it or not; a kick under it stays. Cymbals only: a tom pair (`bg`) or a cymbal +
+-- tom (`Yg`) is no double crash.
 local function DoubleCrashes(evs)
-    for i, ev in ipairs(evs) do
-        if #ev.offs == 2 and ev.offs[2] == GRN and (ev.offs[1] == YEL or ev.offs[1] == BLU) then
-            local pv = evs[i - 1]
-            if not pv or ev.qn - pv.qn < 0.95 then table.remove(ev.offs, 1) end
+    for _, ev in ipairs(evs) do
+        local hands = {}
+        for _, o in ipairs(ev.offs) do if o ~= KICK then hands[#hands + 1] = o end end
+        if #hands == 2 and hands[2] == GRN and (hands[1] == YEL or hands[1] == BLU)
+           and IsCymbal(ev, hands[1]) and IsCymbal(ev, GRN) then
+            Drop(ev, hands[1])
         end
     end
 end
@@ -1029,23 +1504,69 @@ local function OnsetValue(ev)
     return v + 0.5 * #ev.offs
 end
 
--- No run of min_run_len onsets an 8th apart at or above the tier's tempo (Validate:
--- Hard general_hard_8th_bpm, Medium/Easy general_medium_8th_bpm; RBN Hard "the upper
--- threshold for playing a constant stream of 8th notes at this difficulty is about
--- 170bpm"). Each run of four loses its least valuable onset.
-local function BreakEighthRuns(evs, dl)
+-- No run of min_run_len onsets an 8th apart at or above the tier's tempo (Hard
+-- general_hard_8th_bpm, Medium/Easy general_medium_8th_bpm): each run loses its least
+-- valuable onset. Medium/Easy count every onset. Hard counts hand notes only - the stream
+-- is the hands' timekeeping, a kick-only hit is no part of it - and is relative to Expert: a
+-- run at one spacing (8ths from general_hard_8th_bpm, 8th triplets from
+-- DRUMS_RULES.hard_trip_stream_bpm) is only a problem where Expert does not play faster over
+-- the same stretch - a reduction is what Hard is for, a copy of Expert's stream is not.
+-- `upper`: the events Hard is planned from (Expert). Validate's Hard check
+-- (CheckDrumsGeneralDensity) counts the same way.
+local function BreakEighthRuns(evs, dl, upper)
     local R = DRUMS_RULES
-    local bpm_lim = dl == 'H' and R.general_hard_8th_bpm or R.general_medium_8th_bpm
+    local hands_only = dl == 'H'
+    -- Spacings checked and the tempo each starts at.
+    local spacings = dl == 'H' and { { 0.5, R.general_hard_8th_bpm }, { 1 / 3, R.hard_trip_stream_bpm } }
+                     or { { 0.5, R.general_medium_8th_bpm } }
+    local function Hand(ev)
+        if not hands_only then return true end
+        for _, o in ipairs(ev.offs) do if o ~= KICK then return true end end
+        return false
+    end
+    -- Expert's hand hits, for "is Expert faster over this stretch".
+    local xq = {}
+    if dl == 'H' and upper then
+        for _, ev in ipairs(upper) do if Hand(ev) then xq[#xq + 1] = ev.qn end end
+    end
+    local function ExpertFaster(q0, q1, n, sp)
+        if not upper then return false end
+        local cnt, prev, closest = 0, nil, math.huge
+        for _, q in ipairs(xq) do
+            if q >= q0 - EPS and q <= q1 + EPS then
+                cnt = cnt + 1
+                if prev then closest = math.min(closest, q - prev) end
+                prev = q
+            end
+        end
+        return cnt > n or closest < sp - EPS
+    end
+    local function List()
+        local l = {}
+        for k, ev in ipairs(evs) do if Hand(ev) then l[#l + 1] = k end end
+        return l
+    end
+    local L = List()
     local removed = 0
     local i = 1
-    while i <= #evs do
-        local run = { i }
-        local j = i
-        while j < #evs and math.abs(evs[j + 1].qn - evs[j].qn - 0.5) <= 0.025 and #run < R.min_run_len do
-            j = j + 1
-            run[#run + 1] = j
+    while i <= #L do
+        local run, sp_found, floor = { L[i] }, nil, nil
+        if i < #L then
+            local gap = evs[L[i + 1]].qn - evs[L[i]].qn
+            for _, sp in ipairs(spacings) do
+                if math.abs(gap - sp[1]) <= 0.025 then sp_found, floor = sp[1], sp[2] end
+            end
         end
-        if #run >= R.min_run_len and (evs[i].bpm or 120) >= bpm_lim then
+        local j = i
+        if sp_found then
+            while j < #L and math.abs(evs[L[j + 1]].qn - evs[L[j]].qn - sp_found) <= 0.025 and #run < R.min_run_len do
+                j = j + 1
+                run[#run + 1] = L[j]
+            end
+        end
+        local q0, q1 = evs[run[1]].qn, evs[run[#run]].qn
+        if sp_found and #run >= R.min_run_len and (evs[L[i]].bpm or 120) >= floor
+           and not (dl == 'H' and ExpertFaster(q0, q1, #run, sp_found)) then
             local worst, wv
             for _, k in ipairs(run) do
                 local v = OnsetValue(evs[k])
@@ -1053,12 +1574,135 @@ local function BreakEighthRuns(evs, dl)
             end
             table.remove(evs, worst)
             removed = removed + 1
-            i = run[1]
+            local first = run[1]
+            L = List()
+            i = #L + 1
+            for pos, k in ipairs(L) do if k >= first then i = pos; break end end
         else
             i = i + 1
         end
     end
     return removed
+end
+
+-- Medium/Easy at fast tempos (lower_eighth_hands_bpm): no three hand hits in a row an 8th
+-- apart; a pair stays. Each window of three loses one hit's hands (its kick stays), left to
+-- right; a roll's notes are not counted. Which hit goes is opts.eighth_hands:
+--   'beats'  the "and"s first;
+--   'hands'  the hit with the least important hand gems (GemRank; a beat wins a tie), so a
+--            hat on the beat can go for two snares (`KY RY RY` -> `K RY RY`).
+-- Easy from easy_no_pairs_bpm: a PAIR of hand hits an 8th apart loses one too, chosen the
+-- same way; two equal hits (a tom pair `yb yb`) keep the first, the beat. A kick next to a
+-- hand hit stays.
+local function LowerEighthHands(evs, dl, mode)
+    local from = (GEN_DRUMS_PARAMS.lower_eighth_hands_bpm or {})[dl]
+    if not from then return 0 end
+    mode = mode or GEN_DRUMS_PARAMS.lower_eighth_hands_default
+    local function Hand(ev)
+        for _, o in ipairs(ev.offs) do if o ~= KICK then return true end end
+        return false
+    end
+    local function Value(ev)
+        if mode == 'hands' then
+            local top, n = 0, 0
+            for _, o in ipairs(ev.offs) do
+                if o ~= KICK then top = math.max(top, GemRank(ev, o)); n = n + 1 end
+            end
+            return top + 0.1 * n + (OnBeat(ev) and 0.5 or 0)
+        end
+        return OnsetValue(ev)
+    end
+    local n = 0
+    local changed = true
+    while changed do
+        changed = false
+        local list = {}
+        for _, ev in ipairs(evs) do if Hand(ev) and not ev.rolled then list[#list + 1] = ev end end
+        local pair_from = dl == 'E' and GEN_DRUMS_PARAMS.easy_no_pairs_bpm or nil
+        for i = 1, #list - 1 do
+            local a, b, c = list[i], list[i + 1], list[i + 2]
+            local triple = c and (a.bpm or 120) >= from and b.qn - a.qn < 0.55 and c.qn - b.qn < 0.55
+            if not triple then c = nil end
+            if triple or (pair_from and (a.bpm or 120) >= pair_from and b.qn - a.qn < 0.55) then
+                -- A hit whose removal leaves more than a quarter note with no hit at all (a
+                -- kick under it stays, so it counts as a hit) is worth one GemRank step more
+                -- (`R . b g | KG`: the "and" goes, not the beat-3 tom). A step, not a ban: in
+                -- a backbeat on the "and"s every "and" opens such a gap. Only an end of the
+                -- window can open one.
+                local function Opens(ev)
+                    for _, o in ipairs(ev.offs) do if o == KICK then return false end end
+                    local k
+                    for idx, e in ipairs(evs) do if e == ev then k = idx; break end end
+                    local pv, nx
+                    for j = k - 1, 1, -1 do if #evs[j].offs > 0 then pv = evs[j]; break end end
+                    for j = k + 1, #evs do if #evs[j].offs > 0 then nx = evs[j]; break end end
+                    return pv ~= nil and nx ~= nil and nx.qn - pv.qn > 1 + EPS
+                end
+                -- The least valuable; on a tie the middle one (two lone hits rather than a
+                -- pair), then the earlier.
+                local worst, wv
+                for _, ev in ipairs(c and { b, a, c } or { a, b }) do
+                    local v = Value(ev) + (Opens(ev) and 1 or 0)
+                    if not wv or v < wv - 1e-9 then worst, wv = ev, v end
+                end
+                -- A pair of equal hits: the second goes (the gap step would otherwise keep
+                -- whichever hit has more silence after it).
+                if not c then
+                    local function Sig(ev)
+                        local h = {}
+                        for _, o in ipairs(ev.offs) do if o ~= KICK then h[#h + 1] = o .. (IsTom(ev, o) and 't' or '') end end
+                        return table.concat(h, ',')
+                    end
+                    if Sig(a) == Sig(b) then worst = b end
+                end
+                local keep = {}
+                for _, o in ipairs(worst.offs) do if o == KICK then keep[#keep + 1] = o end end
+                worst.offs = keep
+                n = n + 1
+                changed = true
+                break
+            end
+        end
+    end
+    return n
+end
+
+-- Easy from easy_snare_run_bpm: a run of easy_snare_run_min or more hand hits an 8th apart,
+-- each with a snare (a build-up, `RY RY RY RY R R`), keeps only the hits on the beats - the
+-- "and"s lose their hands (a kick there stays). Medium keeps such runs. Returns the number
+-- of hits changed.
+local function EasySnareRuns(evs)
+    local from = GEN_DRUMS_PARAMS.easy_snare_run_bpm
+    if not from then return 0 end
+    local min = GEN_DRUMS_PARAMS.easy_snare_run_min or 5
+    local hands = {}
+    for _, ev in ipairs(evs) do
+        if not ev.rolled then
+            for _, o in ipairs(ev.offs) do if o ~= KICK then hands[#hands + 1] = ev; break end end
+        end
+    end
+    local n, i = 0, 1
+    while i <= #hands do
+        local j = i
+        if Has(hands[i], SNARE) then
+            while j < #hands and Has(hands[j + 1], SNARE) and math.abs(hands[j + 1].qn - hands[j].qn - 0.5) <= 0.025 do
+                j = j + 1
+            end
+        end
+        if j - i + 1 >= min and (hands[i].bpm or 120) >= from then
+            for k = i, j do
+                local ev = hands[k]
+                if not OnBeat(ev) then
+                    local keep = {}
+                    for _, o in ipairs(ev.offs) do if o == KICK then keep[#keep + 1] = o end end
+                    ev.offs = keep
+                    n = n + 1
+                end
+            end
+        end
+        i = j + 1
+    end
+    return n
 end
 
 -- Last word on roll lanes: every roll covers an even number of gems in the finished tier
@@ -1096,6 +1740,65 @@ end
 -- log: upper, kept (onsets), notes, upper_notes, unflipped, rolls, retimed_bars,
 --      runs_broken, easy_types = { ks, hands }, fallback (Medium, see below).
 local PlanTier
+
+-- A single-pedal Expert from a 2X Expert (events; offs 0 = kick), for Drums 2X when the song
+-- has no usable PART DRUMS: exactly what General > Actions > "Remove 2x kicks" would leave on
+-- PART DRUMS - DoubleBassPlan (actions_drums_2x.lua) finds the second-foot kicks and they
+-- go; the hands stay. Any change to that rule belongs there, so the button and Generate
+-- cannot disagree. Returns new events.
+function GenDrumsSinglePedal(events)
+    local out, kicks, qns, down = {}, {}, {}, {}
+    for _, ev in ipairs(events) do
+        local c = Copy(ev)
+        out[#out + 1] = c
+        if Has(c, KICK) then
+            kicks[#kicks + 1] = c
+            qns[#qns + 1] = c.qn
+            down[#qns] = c.down or false
+        end
+    end
+    -- DoubleBassPlan asks only about the kicks' own positions.
+    local by_qn = {}
+    for k, q in ipairs(qns) do by_qn[q] = down[k] end
+    local marks = DoubleBassPlan(qns, function(qn) return by_qn[qn] or false end)
+    for k, ev in ipairs(kicks) do if marks[k] then Drop(ev, KICK) end end
+    return Compact(out)
+end
+
+-- Drums 2X (double bass pedal): PART DRUMS_2X carries the chart with both pedals, PART DRUMS
+-- the same song for one pedal. Each 2X tier plays the kicks of the PART DRUMS tier one step
+-- up - 2X Hard PART DRUMS Expert's, 2X Medium its Hard's, 2X Easy its Medium's - under the
+-- 2X hands planned as usual (opts.keep_kicks skips the kick-choosing rules; what the tier
+-- may not contain still goes). So a 2X tier never equals its PART DRUMS tier and is never
+-- harder than the 2X tier above. Returns upper (the 2X tier above's events) with its kicks
+-- replaced by single's (the PART DRUMS tier one step up); a kick where upper has no hit
+-- becomes a hit of its own.
+function GenDrums2xInput(upper, single)
+    local x2, x1 = upper, single
+    local out, at = {}, {}
+    for _, ev in ipairs(x2) do
+        local c = Copy(ev)
+        Drop(c, KICK)
+        out[#out + 1] = c
+        at[math.floor(c.qn * 960 + 0.5)] = c
+    end
+    for _, ev in ipairs(x1) do
+        if Has(ev, KICK) then
+            local key = math.floor(ev.qn * 960 + 0.5)
+            local c = at[key] or at[key - 1] or at[key + 1]
+            if not c then
+                c = Copy(ev)
+                c.offs = {}
+                out[#out + 1] = c
+                at[key] = c
+            end
+            Add(c, KICK)
+        end
+    end
+    table.sort(out, function(a, b) return a.qn < b.qn end)
+    return Compact(out)
+end
+
 function GenDrumsPlanTier(dl, events, opts)
     opts = opts or {}
     if dl == 'H' then
@@ -1124,16 +1827,10 @@ function GenDrumsPlanTier(dl, events, opts)
         return out, log
     end
     local out, log = PlanTier(dl, events, opts)
-    -- Medium's arms barely easier than Hard's (a song under lower_hat_quarter_bpm whose
-    -- Hard is already simple - molto_c_love_for_sale at 128 kept 94% of Hard's hand gems):
-    -- the hi-hat/ride goes to quarter notes whatever the tempo. User rule 2026-10-10, like
-    -- the 5-lane Medium fallback - a product choice: near 128 BPM official Medium often
-    -- keeps the 8th hats, so every setting costs some agreement. It counts HAND gems, not
-    -- all notes: with all notes, Hard's end-of-bar kick (EndOfBarKick) gave Medium more
-    -- kicks to remove, molto's share fell from 94.5% to 88% and the fallback stopped firing
-    -- although the arms had not changed. Swept on the chain (X > H > M vs official Medium,
-    -- 482 dev songs, from 120 BPM): hands > 93% fires in 50 songs, onset F1 94.0 -> 92.8;
-    -- notes > 88% fires in 37 (92.9) but moves with every kick rule; from 0 BPM far more.
+    -- Medium fallback: Medium's arms barely easier than Hard's (a song under
+    -- lower_hat_quarter_bpm whose Hard is already simple) - plan it again with the
+    -- hi-hat/ride on quarter notes whatever the tempo. The share counts HAND gems: counted
+    -- with kicks, it moved with every kick rule while the arms stayed the same.
     local fb = GEN_DRUMS_PARAMS.medium_fallback_keep
     local min_bpm = GEN_DRUMS_PARAMS.medium_fallback_bpm or 0
     local hands = GEN_DRUMS_PARAMS.medium_fallback_on == 'hands'
@@ -1156,8 +1853,10 @@ PlanTier = function(dl, events, opts)
     local log = { upper = #events, kept = 0, notes = 0, upper_notes = 0, hands = 0, upper_hands = 0,
                   unflipped = 0, rolls = 0,
                   retimed_bars = {}, runs_broken = 0, easy_types = { ks = 0, hands = 0 },
+                  tom_markers = {}, tom_conflict_bars = {},
                   -- The fields the 5-lane result lines read.
                   chords_reduced = 0, recolored = 0, shortened = 0, cut = 0 }
+    if dl ~= 'H' then events, log.expert_runs = ExpertForRewrittenRuns(events, opts.expert) end
     local bpms = {}
     for _, ev in ipairs(events) do
         log.upper_notes = log.upper_notes + #ev.offs
@@ -1166,6 +1865,14 @@ PlanTier = function(dl, events, opts)
     end
     table.sort(bpms)
     log.median_bpm = bpms[#bpms // 2 + 1]
+    -- Hits with more than two hand gems in the tier above: unplayable, a charting mistake to
+    -- report (the result lists their bars).
+    log.too_many_gems = {}
+    for _, ev in ipairs(events) do
+        local hands = 0
+        for _, o in ipairs(ev.offs) do if o ~= KICK then hands = hands + 1 end end
+        if hands > 2 then log.too_many_gems[#log.too_many_gems + 1] = ev.qn end
+    end
     local evs = Annotate(events, ctx)
     -- Positions (1/24 QN) of the incoming tier's cymbal-only hits (EasyTwoHandAnds).
     local upper_cym_only = {}
@@ -1179,35 +1886,71 @@ PlanTier = function(dl, events, opts)
     evs = Rolls(evs, dl, log)
 
     if dl == 'H' then
-        evs = RetimeFills(evs, opts.fast_runs, log, ctx)
+        evs, ctx = RetimeFills(evs, opts.fast_runs, log, ctx, opts.keep_cymbals)
         evs = HardSixteenths(evs)
-        KickUnderSnare(evs, 'H')
-        local P = GEN_DRUMS_PARAMS
-        local Busy = BusyHands(evs)
-        ThinKicks(evs, function(ev)
-            if P.hard_kick_gap_busy and Busy(ev) then return P.hard_kick_gap_busy end
-            if (ev.bpm or 120) >= P.hard_kick_gap_fast_bpm then return P.hard_kick_gap_fast end
-            -- An off-beat 8th kick needs more room than one on the beat.
-            if Gen5BeatClass(ev) == '8th' then return P.hard_kick_gap_8th end
-            return P.hard_kick_gap
-        end)
-        if GEN_DRUMS_PARAMS.hard_end_of_bar_kick then EndOfBarKick(evs) end
-        if GEN_DRUMS_PARAMS.hard_paired_kick then PairedKick(evs) end
+        log.and_backbeat = HardAndBackbeat(evs, DRUMS_RULES.general_hard_8th_bpm)
+        evs = Compact(evs)
+        -- opts.keep_kicks: the kicks are already the ones this tier should play (Drums 2X
+        -- takes them from PART DRUMS one tier up, GenDrums2xInput).
+        if not opts.keep_kicks then
+            KickUnderSnare(evs, 'H')
+            local P = GEN_DRUMS_PARAMS
+            local figure = HardKickFigures(evs)
+            local Busy = BusyHands(evs)
+            ThinKicks(evs, function(ev, pv)
+                -- Busy hands' half bar reaches back only within the kick's own bar: a busy
+                -- downbeat must not clear the last half of the bar before's kick line.
+                local same_bar = not pv
+                    or math.abs((ev.qn - (ev.bar_qn or 0)) - (pv.qn - (pv.bar_qn or 0))) < EPS
+                if P.hard_kick_gap_busy and Busy(ev) and same_bar and not figure[ev] then return P.hard_kick_gap_busy end
+                if (ev.bpm or 120) >= P.hard_kick_gap_fast_bpm then return P.hard_kick_gap_fast end
+                -- A kick off the beat needs more room than one on it - on a 16th as on an
+                -- 8th (kicks on every 16th off-beat, an 8th apart, keep every other one).
+                local class = Gen5BeatClass(ev)
+                if class == '8th' or class == '16th' then return P.hard_kick_gap_8th end
+                return P.hard_kick_gap
+            end)
+            if GEN_DRUMS_PARAMS.hard_end_of_bar_kick then EndOfBarKick(evs) end
+            if GEN_DRUMS_PARAMS.hard_paired_kick then PairedKick(evs) end
+        end
         if opts.hat_drops and opts.hat_drops > 0 then log.hat_drops = HardHatDrops(evs, opts.hat_drops) end
+        -- More than two hand gems on one hit is unplayable (two hands, one foot) and never in an
+        -- official chart, on any tier: a charting mistake in the tier above (listed by the
+        -- planner's start, log.too_many_gems). Hard keeps the kick and two hand gems - a
+        -- Yellow/Blue cymbal goes first.
+        for _, ev in ipairs(evs) do
+            local hands = 0
+            for _, o in ipairs(ev.offs) do if o ~= KICK then hands = hands + 1 end end
+            while hands > 2 do
+                if not (Drop(ev, YEL) or Drop(ev, BLU)) then
+                    for k = #ev.offs, 1, -1 do if ev.offs[k] ~= KICK then table.remove(ev.offs, k); break end end
+                end
+                hands = hands - 1
+            end
+        end
         MaxGems(evs, 3)
     else
+        if dl == 'E' then
+            -- The backbeat on the "and"s from easy_and_backbeat_bpm, the hands on the "and"s
+            -- only (`G R Y RY Y RY Y RY` -> `G R . RY . RY . RY`). Tested on the bar as Medium
+            -- has it, before Easy's own steps: its quarter-note fills can take a beat snare out
+            -- of a bar and make it look like the groove.
+            local and_from = GEN_DRUMS_PARAMS.easy_and_backbeat_bpm
+            if and_from then log.and_backbeat = HardAndBackbeat(evs, and_from) end
+        end
         local fill_grid = 0.5
-        if dl == 'E' and (evs[1] and evs[1].bpm or 120) >= DRUMS_RULES.roll_easy_quarter_bpm then fill_grid = 1.0 end
+        if dl == 'E' and SongTempo(evs, ctx) >= DRUMS_RULES.roll_easy_quarter_bpm then fill_grid = 1.0 end
         -- Easy's quarter-note fills: a run continues across a quarter-note gap, so a fill
         -- Medium broke into pieces (its runs of four 8ths lose one) is still one run and goes
-        -- to quarters from its start (pojat_lemmikkih bars 73-74: Rg Rg . Rg Rg Rg ... kept
-        -- its first 8th pair on Easy). 2026-10-10.
+        -- to quarters from its start.
         evs = GridFillRuns(evs, fill_grid >= 1 and 1.0 or 0.5 - EPS, fill_grid)
         evs = LowerHands(evs, opts.all_quarters)
         if dl == 'M' then
             KickUnderSnare(evs, 'M')
             log.sandwiched = SandwichedHats(evs, true)
             log.drum_changes = DrumChanges(evs)
+            log.tom_pairs = MediumTomPairs(evs)
+            evs = Compact(evs)   -- a repeated tom pair may have been emptied
             Between(evs, opts.between or 'beats')
             AfterCrash(evs)
         else
@@ -1218,27 +1961,40 @@ PlanTier = function(dl, events, opts)
             log.before_crash = EasyBeforeCrash(evs)
         end
         -- Three-limb hits lose their kick BEFORE the kicks are spaced, so the spacing only
-        -- chooses among kicks that survive (molto bar 7: it kept beat 4's KRY kick over
-        -- beat 3's, then lost it to the two-gem limit, and beat 3 had none).
+        -- chooses among kicks that survive (otherwise it could keep a KRY's kick over the
+        -- neighbouring one, then lose it to the two-gem limit, leaving neither).
         MaxGems(evs, 2)
-        LowerKicks(evs)
-        if dl == 'E' then EasyFillKicks(evs) end   -- Hard/Medium: see EasyFillKicks
+        LowerKicks(evs, opts.keep_kicks)
     end
     if dl ~= 'H' then OneKickPerBar(evs) end
     evs = Compact(evs)
     DoubleCrashes(evs)
-    log.runs_broken = BreakEighthRuns(evs, dl)
+    log.runs_broken = BreakEighthRuns(evs, dl, dl == 'H' and events or nil)
+    if dl == 'E' then
+        log.snare_runs = EasySnareRuns(evs)
+        evs = Compact(evs)
+    end
+    if dl ~= 'H' then
+        log.eighth_hands = LowerEighthHands(evs, dl, opts.eighth_hands)
+        log.eighth_hands_mode = opts.eighth_hands or GEN_DRUMS_PARAMS.lower_eighth_hands_default
+        evs = Compact(evs)
+    end
+    if dl == 'E' then evs, log.lone_ands = EasyLoneAnds(evs) end
     -- After the run breaker: it can remove the hit that stood right before a crash, and the
-    -- one before it then needs the treatment (pojat bar 74 on Medium).
+    -- one before it then needs the treatment.
     if dl ~= 'H' then log.tom_before_crash = TomBeforeCrash(evs) end
+    if dl ~= 'H' then log.cym_changes = CymbalChanges(evs) end
     EvenRolls(evs, ctx.rolls)
     evs = Compact(evs)
 
     for _, ev in ipairs(evs) do
-        ev.fill, ev.roll, ev.disco, ev.tom, ev.rolled, ev.kick_dropped = nil, nil, nil, nil, nil, nil
+        ev.fill, ev.roll, ev.disco, ev.tom, ev.rolled, ev.kick_dropped, ev.and_beat = nil, nil, nil, nil, nil, nil, nil
         log.notes = log.notes + #ev.offs
         for _, o in ipairs(ev.offs) do if o ~= KICK then log.hands = log.hands + 1 end end
     end
     log.kept = #evs
+    -- The marker context the next tier is planned with (Hard's rewrite may have changed
+    -- the tom markers: log.tom_markers).
+    log.ctx = ctx
     return evs, log
 end

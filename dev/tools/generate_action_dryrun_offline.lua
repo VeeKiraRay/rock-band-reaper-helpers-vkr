@@ -4,7 +4,8 @@
 --   lua dev/tools/generate_action_dryrun_offline.lua
 --       the test fixtures (verbose) + every 6th development song of the RB3 DLC corpus
 --       (summary: runs that leave Validate errors)
---   lua dev/tools/generate_action_dryrun_offline.lua <song.mid> [gtr|bass|keys|pk|drums|all] [from_qn to_qn]
+--   lua dev/tools/generate_action_dryrun_offline.lua <song.mid> [gtr|bass|keys|pk|drums|drums2x|drums+2x|all|
+--       drums-1x-muted|drums-muted|drums-2x-on-1x|drums-2x-as-1x] [from_qn to_qn]
 --       one song, one part (default gtr): the result text, then X/H/M/E for the range
 --       (default: 16 QN from the first Expert note). 'all' runs All instruments (Pro Keys
 --       first, then Keys following it) and dumps Pro Keys and Keys.
@@ -265,7 +266,7 @@ for _, f in ipairs({
     M .. 'difficulty_generate_params.lua', M .. 'difficulty_generate_overlaps.lua', M .. 'difficulty_generate_retime.lua',
     M .. 'difficulty_generate_colors.lua', M .. 'difficulty_generate_rhythm.lua',
     M .. 'difficulty_generate_5lane.lua', M .. 'difficulty_generate_prokeys.lua',
-    M .. 'difficulty_generate_hopo.lua', M .. 'difficulty_generate_drums.lua',
+    M .. 'difficulty_generate_hopo.lua', M .. 'actions_drums_2x.lua', M .. 'difficulty_generate_drums.lua',
     M .. 'actions_difficulty_generate.lua', M .. 'difficulty_read.lua',
     _root .. 'dev/calibration/difficulty_holdout.lua',
 }) do dofile(f) end
@@ -276,6 +277,8 @@ local PARTS = {
     keys = { field = 'diff_5k_idx',   track = 'PART KEYS',   read = ReadK5TierEvents, range = K5_RANGE },
     drums = { field = 'diff_drums_idx', track = 'PART DRUMS', read = ReadDrumsTierEvents, range = DRUMS_RANGE,
               letters = { [0] = 'K', 'R', 'Y', 'B', 'G' } },
+    drums2x = { field = 'diff_drums2x_idx', track = 'PART DRUMS_2X', read = ReadDrumsTierEvents, range = DRUMS_RANGE,
+                letters = { [0] = 'K', 'R', 'Y', 'B', 'G' } },
     -- A track per tier; the dump reads each tier's own track.
     pk   = { field = 'diff_pk_x_idx', track = 'PART REAL_KEYS_X', pk = true },
 }
@@ -286,14 +289,38 @@ local PK_FIELDS = { X = 'diff_pk_x_idx', H = 'diff_pk_h_idx', M = 'diff_pk_m_idx
 local function Run(path, key)
     P.tracks = {}
     reaper.InsertMedia(path)
+    -- drums-1x-muted: Drums with no PART DRUMS track picked ((none)), so a song's PART
+    -- DRUMS_2X takes its kicks from the single-pedal version made in memory. (A muted PART
+    -- DRUMS picked for the run stops it since 2026-10-15 - Generate never writes to a muted
+    -- track - so (none) is how a 2X-only run is made.)
+    local no_base = key == 'drums-1x-muted'
+    if no_base then key = 'drums' end
+    -- drums-muted: PART DRUMS muted AND picked - the run must stop without writing.
+    if key == 'drums-muted' then
+        for _, tr in ipairs(P.tracks) do if tr.name == 'PART DRUMS' then tr.mute = 1 end end
+        key = 'drums'
+    end
+    -- drums-2x-on-1x: "Only 2x bass pedal authored on PART DRUMS" ticked. drums-2x-as-1x:
+    -- the same, on a song whose PART DRUMS_2X is renamed PART DRUMS (and its PART DRUMS
+    -- hidden) - a song charted only in its double-pedal version.
+    S.diff_gen_drums_2x_on_1x = key == 'drums-2x-on-1x' or key == 'drums-2x-as-1x'
+    if key == 'drums-2x-as-1x' then
+        for _, tr in ipairs(P.tracks) do
+            if tr.name == 'PART DRUMS' then tr.name = 'PART DRUMS (single pedal, hidden)' end
+        end
+        for _, tr in ipairs(P.tracks) do if tr.name == 'PART DRUMS_2X' then tr.name = 'PART DRUMS' end end
+    end
+    if S.diff_gen_drums_2x_on_1x then key = 'drums' end
     local part = PARTS[key == 'all' and 'pk' or key]
-    S.diff_gtr_idx, S.diff_bass_idx, S.diff_5k_idx, S.diff_drums_idx = -1, -1, -1, -1
+    S.diff_gtr_idx, S.diff_bass_idx, S.diff_5k_idx, S.diff_drums_idx, S.diff_drums2x_idx = -1, -1, -1, -1, -1
     for _, f in pairs(PK_FIELDS) do S[f] = -1 end
     for i, tr in ipairs(P.tracks) do
         for k, pt in pairs(PARTS) do if tr.name == pt.track then S[pt.field] = i - 1 end end
         for dl, f in pairs(PK_FIELDS) do if tr.name == 'PART REAL_KEYS_' .. dl then S[f] = i - 1 end end
     end
-    if S[part.field] < 0 then return nil end
+    if no_base then S.diff_drums_idx = -1 end
+    -- Drums: PART DRUMS, or a song with only PART DRUMS_2X.
+    if S[part.field] < 0 and not (key == 'drums' and S.diff_drums2x_idx >= 0) then return nil end
     S.diff_copy_pending = nil
     local ok, err = pcall(GenerateDifficulties, key == 'all' and GEN_ALL_KEY or key, { 'H', 'M', 'E' }, true)
     -- A question after the overwrite one (Pro Keys Hard equal to Expert): take the
@@ -304,7 +331,7 @@ local function Run(path, key)
         ok, err = pcall(pending.on_alt)
     end
     if not ok then S.status, S.last_result = 'ERROR ' .. tostring(err), nil end
-    return reaper.GetTrack(0, S[part.field])
+    return reaper.GetTrack(0, S[part.field] >= 0 and S[part.field] or S.diff_drums2x_idx)
 end
 
 -- Pro Keys: each tier's own track, pitch names, lane shifts as [marker].
@@ -348,12 +375,24 @@ local function DumpTiers(track, key, q0, q1)
         end
         print('  ' .. dl, table.concat(cells, ' '))
     end
+    if key == 'drums' or key == 'drums2x' then
+        -- Pro Drums tom markers over the range (Hard's rewrite may change them).
+        local cells = {}
+        for _, n in ipairs(ReadDrumsNotes(track, 110, 112)) do
+            local qn, qn_e = reaper.TimeMap2_timeToQN(0, n.s), reaper.TimeMap2_timeToQN(0, n.e)
+            if qn < q1 and qn_e > q0 then
+                cells[#cells + 1] = ('%s %g-%g'):format(({ [110] = 'Y', [111] = 'B', [112] = 'G' })[n.pitch], qn, qn_e)
+            end
+        end
+        print('  toms', table.concat(cells, ', '))
+    end
 end
 
 if arg[1] then
     local key = arg[2] or 'gtr'
     local track = Run(arg[1], key)
-    local part = PARTS[key == 'all' and 'pk' or key]
+    local part = PARTS[(key == 'all' and 'pk') or ((key == 'drums-1x-muted' or key == 'drums-muted' or key == 'drums-2x-on-1x'
+                                                   or key == 'drums-2x-as-1x') and 'drums') or key]
     if not track then print(('no %s track in %s'):format(part.track, arg[1])); return end
     print(S.status)
     print(S.last_result or '')
@@ -369,8 +408,30 @@ if arg[1] then
             print('  Keys:')
             DumpTiers(reaper.GetTrack(0, S.diff_5k_idx), 'keys', q0, q1)
         end
+    elseif part.track == 'PART DRUMS' and S.diff_drums2x_idx >= 0 then
+        -- Both drum tracks: kicks per tier (a 2X tier should differ from its PART DRUMS
+        -- tier), then each track's tiers.
+        for _, f in ipairs({ { 'PART DRUMS', S.diff_drums_idx, 'drums' }, { 'PART DRUMS_2X', S.diff_drums2x_idx, 'drums2x' } }) do
+            if f[2] >= 0 then
+                local tr, counts = reaper.GetTrack(0, f[2]), {}
+                for _, dl in ipairs({ 'X', 'H', 'M', 'E' }) do
+                    local n = 0
+                    for _, ev in ipairs(ReadDrumsTierEvents(tr, dl)) do
+                        for _, pch in ipairs(ev.pitches) do if pch == DRUMS_RANGE[dl].lo then n = n + 1 end end
+                    end
+                    counts[#counts + 1] = ('%s %d'):format(dl, n)
+                end
+                print(('  %-14s kicks: %s'):format(f[1], table.concat(counts, ', ')))
+            end
+        end
+        for _, f in ipairs({ { 'PART DRUMS', S.diff_drums_idx, 'drums' }, { 'PART DRUMS_2X', S.diff_drums2x_idx, 'drums2x' } }) do
+            if f[2] >= 0 then
+                print('  ' .. f[1] .. ':')
+                DumpTiers(reaper.GetTrack(0, f[2]), f[3], q0, q1)
+            end
+        end
     else
-        DumpTiers(track, key, q0, q1)
+        DumpTiers(track, part == PARTS.drums and 'drums' or key, q0, q1)
     end
 else
     for _, f in ipairs({ { 'rb_guitar.mid', 'gtr' }, { 'rb_bass.mid', 'bass' }, { 'rb_keys.mid', 'keys' },

@@ -583,7 +583,7 @@ end
 
 Test.it('a busy bar of 8ths the gap left whole loses its and of 4, even when the song-wide cap is met', function()
     -- Four bars of 16ths (the Hard gap thins them, so the song is already far under the
-    -- 95% cap), then the pojat_lemmikkih bar: G O G Y R B R in 8ths at 157 BPM.
+    -- 95% cap), then the 160 BPM test song bar: G O G Y R B R in 8ths at 157 BPM.
     local events, bpm = {}, 157
     for b = 0, 3 do
         for k = 0, 15 do events[#events + 1] = Ev(b * 4 + k * 0.25, 0.2, { k % 5 }, bpm, b * 4) end
@@ -639,7 +639,7 @@ Test.it('the same rhythm reduces to the same onsets on guitar, bass and keys', f
 end)
 
 Test.it('identical repeats keep identical sustains despite tempo-map rounding', function()
-    -- The pojat_lemmikkih intro: a Green held 5/32 then Orange on beat 2, four times.
+    -- The 160 BPM test song intro: a Green held 5/32 then Orange on beat 2, four times.
     -- The Hard gap leaves the Green exactly 1/8 long, on the cut-back boundary. Converting
     -- through a tempo map leaves float noise; a few 1e-9 either side used to decide
     -- whether a bar kept its sustain.
@@ -673,7 +673,7 @@ Test.it('Easy keeps a held note over a short note when only one fits', function(
     Test.expect(table.concat(kept, ' ') == '0 5 8', 'expected 0 5 8 (held B kept), got ' .. table.concat(kept, ' '))
 end)
 
--- The pojat_lemmikkih keys part: a held R, then a bar of three short notes a dotted
+-- The 160 BPM test song part: a held R, then a bar of three short notes a dotted
 -- quarter apart (beat 1, the and of 2, beat 4), then held notes again. top_first = true
 -- gives O B Y, false gives Y B O.
 local function SparseKeys(top_first)
@@ -793,7 +793,7 @@ local function Removed(cells, out, bar)
 end
 
 Test.it('Drop 2: a bar that already rests loses fewer, and keeps an accent chord and a sustain', function()
-    -- The chronosp_brutal_decay guitar at 210 BPM (Auto = Drop 2), bars 44, 45 and 52.
+    -- The 210 BPM test song guitar at 210 BPM (Auto = Drop 2).
     local cases = {
         { { 'GR', '.', 'R', 'R', 'RB', 'RY', 'Y', 'YO' }, '2&',   'bar 44 (rest at 1&, chord on 4&)' },
         { { 'GR', '.', 'G', 'G', 'Y', 'R', 'G', 'O~' },   '2&',   'bar 52 (sustain on 4&)' },
@@ -811,8 +811,8 @@ Test.it('a busy bar that already has two 8th rests keeps every note', function()
     -- already met and only the busy-bar rule decides the last bar.
     local full = { 'G', 'R', 'Y', 'B', 'G', 'R', 'Y', 'B' }
     for _, c in ipairs({
-        { { '.', 'R', 'R', 'R', 'RB', 'RY', 'YB', '.' }, 'chronosp bar 45' },
-        { { 'O', '.', 'B', 'Y', 'R', 'Y', '.', 'Y' },    'chronosp bar 150' },
+        { { '.', 'R', 'R', 'R', 'RB', 'RY', 'YB', '.' }, 'fast bar 1' },
+        { { 'O', '.', 'B', 'Y', 'R', 'Y', '.', 'Y' },    'fast bar 2' },
     }) do
         local events = SlotBars(full, 4, 210)
         for _, ev in ipairs(SlotBars(c[1], 1, 210)) do
@@ -824,7 +824,7 @@ Test.it('a busy bar that already has two 8th rests keeps every note', function()
     end
 end)
 
-Test.it('Drop 1 with a rest already in the bar still takes the and of 4 (pojat_lemmikkih bar 3)', function()
+Test.it('Drop 1 with a rest already in the bar still takes the and of 4', function()
     local cells = { 'G', '.', 'O', 'G', 'Y', 'R', 'B', 'R' }
     local got = Removed(cells, Gen5PlanTier('gb', 'H', SlotBars(cells, 4, 157)))
     Test.expect(got == '4&', 'removed [' .. got .. '], expected [4&]')
@@ -863,7 +863,7 @@ end)
 
 ----------------------------------------------------------------------
 -- Generate planner: fast dense runs rewritten one grid slower on Hard
--- (difficulty_generate_retime.lua). Cases from the chronosp_brutal_decay solo at 210 BPM,
+-- (difficulty_generate_retime.lua). Cases from the 210 BPM test song solo at 210 BPM,
 -- checked against its hand reduction.
 ----------------------------------------------------------------------
 
@@ -1035,7 +1035,7 @@ local function SpanStr(spans)
     return table.concat(out, ' ')
 end
 
-Test.it('force-HOPO: 8th triplets rewritten as 8ths keep their hammer-ons (chronosp bar 172)', function()
+Test.it('force-HOPO: 8th triplets rewritten as 8ths keep their hammer-ons', function()
     -- Expert hammers on every note after the first (new color each, 160 ticks apart); Hard's
     -- 8ths are 240 apart. One span from the second note through the next bar's downbeat.
     local x = HopoChart('0:O 8:B 16:Y 24:B 32:Y 40:R 48:G 56:Y 64:R 72:Y 80:R 88:G', 4, 1)
@@ -1057,7 +1057,7 @@ Test.it('force-HOPO: a run of one color, or a hammer-on lost to ordinary thinnin
 end)
 
 Test.it("force-HOPO: Expert's own forced hammer-ons are copied where the note survives", function()
-    -- Expert bar 7 of chronosp: forced on the notes at 12 and 24 (/24 QN). Two bars of
+    -- Expert bar 7 of a 210 BPM test song: forced on the notes at 12 and 24 (/24 QN). Two bars of
     -- 16ths first, which the Hard gap thins, so the 95% keep cap is met without this bar.
     local x = Bar24('0:G 6:R 12:G 18:R 24:G 30:R 36:G 42:R 48:G 54:R 60:G 66:R 72:G 78:R 84:G 90:R', 2, 120)
     for _, ev in ipairs(Bar24('0:G 12:R 24:Y 48:G', 1, 120)) do
@@ -1070,7 +1070,7 @@ Test.it("force-HOPO: Expert's own forced hammer-ons are copied where the note su
 end)
 
 ----------------------------------------------------------------------
--- Generate: Medium (chronosp_brutal_decay bars 7, 10, 11, 18-20; pojat_lemmikkih bar 3)
+-- Generate: Medium (a 210 BPM test song; a 160 BPM test song)
 ----------------------------------------------------------------------
 
 -- Hard bar 0 from cells, then a single G on the next downbeat; Medium planned from it.
@@ -1106,12 +1106,12 @@ Test.it('Medium: an all-chord bar gets no chord bonus, so the next downbeat stay
 end)
 
 Test.it('Medium colors: only notes above Blue move, unless that makes a repeat Hard does not have', function()
-    -- chronosp bar 10: moving only the O made B B -> the bar moves down whole.
+    -- a 210 BPM test song: moving only the O made B B -> the bar moves down whole.
     local out = MediumOf('0:G 12:G 24:Y 48:B 60:G 72:O')
     Test.expect(Hard24(out) == '0:G 24:R 48:Y 72:B', 'bar 10: ' .. Hard24(out))
-    -- pojat bar 3 (157 BPM): moving only the O makes no repeat -> only the O moves.
+    -- a 160 BPM test song (157 BPM): moving only the O makes no repeat -> only the O moves.
     out = MediumOf('0:G 24:O 36:G 48:Y 60:R 72:B', 157)
-    Test.expect(Hard24(out) == '0:G 24:B 48:Y 72:B', 'pojat bar 3: ' .. Hard24(out))
+    Test.expect(Hard24(out) == '0:G 24:B 48:Y 72:B', 'G O Y B bar: ' .. Hard24(out))
     -- A chord keeps its shape: Y+O moves down as R+B, not Y+B.
     -- (A busy Hard bar, so Medium thins it and no color fallback applies.)
     out = MediumOf('0:YB 12:YB 24:YB 36:YB 48:YB 60:YB 72:YO', 157, 'gb', { 1, 3 })
@@ -1274,7 +1274,7 @@ Test.it('Medium keeps the upper tier\'s single window, preferred or not', functi
 end)
 
 Test.it('a note that fits the window never moves, so the same note always lands on the same key', function()
-    -- pojat_lemmikkih: D3 F3 C3 D3 in C2-E3. F3 is outside and folds to F2; the D3s and the
+    -- a 160 BPM test song: D3 F3 C3 D3 in C2-E3. F3 is outside and folds to F2; the D3s and the
     -- C3 fit and stay - choosing the octave nearest the previous note moved them down
     -- after F2 but not the first D3.
     local events = {}
@@ -1333,7 +1333,7 @@ Test.it('Keys following Pro Keys keeps one onset per Pro Keys onset', function()
     Test.expect(table.concat(p, ' ') == '0 1 2 3', 'kept ' .. table.concat(p, ' '))
 end)
 
-Test.it('Keys following a rewritten Pro Keys run takes its positions (korpiklaani bar 55)', function()
+Test.it('Keys following a rewritten Pro Keys run takes its positions', function()
     -- Keys Expert: 16ths from the "and" of 1 to beat 4. Pro Keys Hard: the same run rewritten
     -- to 8th triplets (16..72/24). Keys plays exactly those onsets - not its nearest 16ths
     -- (18 24 30 42 ..., uneven groups with gaps). A Pro Keys note with no Keys note near it is
@@ -1389,7 +1389,7 @@ end)
 ----------------------------------------------------------------------
 Test.section('Generate planner - "and" phrases')
 
--- The korpiklaani_juo_viinaa lick as Hard has it, at 120 BPM: a pickup on the and of 4,
+-- The 120 BPM test song lick as Hard has it, at 120 BPM: a pickup on the and of 4,
 -- then three bars of straight 8ths whose beats repeat a note (B B C C) and whose "and"s
 -- move (B G C A). beats / ands: the notes on beats 1-4 and on their "and"s, as offs.
 local function Lick(beats, ands)
@@ -1454,10 +1454,10 @@ local function Grid24(out, bar_start)
     return table.concat(p, ' ')
 end
 
-Test.it('a long run starting on the "and" of 1 stays on the beat grid, inside its notes, unbroken (chronosp bar 60)', function()
+Test.it('a long run starting on the "and" of 1 stays on the beat grid, inside its notes, unbroken', function()
     -- 210 BPM: a chord on 1, then 16ths from the "and" of 1 to the end of the bar. The grid
     -- stays aligned to the beats (16, not 12 or 0: never before Expert's first note at 12)
-    -- and carries straight across beat 3 - the user's hand reduction of chronosp.
+    -- and carries straight across beat 3 - the user's hand reduction of a 210 BPM test song.
     local colors = { 1, 1, 1, 1, 3, 3, 2, 2, 3, 3, 2, 2, 1, 0 }
     local events = { Ev(0, 0.2, { 0, 1 }, 210, 0) }
     for k = 0, 13 do events[#events + 1] = Ev(0.5 + k * 0.25, 0.2, { colors[k + 1] }, 210, 0) end
@@ -1467,7 +1467,7 @@ Test.it('a long run starting on the "and" of 1 stays on the beat grid, inside it
     Test.expect(got:match('^0 16 24 32 40 48'), 'bar: ' .. got .. ' (expected 0 16 24 32 40 48 ...)')
 end)
 
-Test.it('a long run crossing beat 3 has no break (korpiklaani Pro Keys bar 55)', function()
+Test.it('a long run crossing beat 3 has no break (Pro Keys)', function()
     -- 120 BPM, Rewrite: 16ths from the "and" of 1 to beat 4, then a note on 4&. Laid out on
     -- one 8th-triplet grid from 16 to 72 - the user's drawing.
     local events = {}
@@ -1495,7 +1495,7 @@ Test.it('Hard fast runs: Thin never rewrites, Auto rewrites above 160 BPM only',
     Test.expect(Rewritten(128, 'rewrite'), 'Rewrite did not rewrite a whole bar of 16ths at 128 BPM')
 end)
 
-Test.it('a long run puts no note after its last Expert note (chronosp bar 165)', function()
+Test.it('a long run puts no note after its last Expert note', function()
     -- 16ths from 0 to 2.5 (beat 3 "and"), then a rest until 3: the second half bar's run
     -- ends on 2.5 (60/24), so no slot at 64/24.
     local events = {}
@@ -1508,7 +1508,7 @@ Test.it('a long run puts no note after its last Expert note (chronosp bar 165)',
     end
 end)
 
-Test.it('a short group into beat 3 keeps leading into it (chronosp bars 21/23)', function()
+Test.it('a short group into beat 3 keeps leading into it', function()
     -- 210 BPM: 16ths 0-1 (a run that lands on beat 2), then G G on 36/24 and 42/24 into Y on
     -- beat 3. The pair is short: it is laid out back from beat 3 - 40 G | 48 Y.
     local events = {}
@@ -1521,7 +1521,7 @@ Test.it('a short group into beat 3 keeps leading into it (chronosp bars 21/23)',
     Test.expect((' ' .. got .. ' '):find(' 40 48 ', 1, true), 'bar: ' .. got .. ' (expected ... 40 48 ...)')
 end)
 
-Test.it('at or below 160 BPM a run of half a bar or more is rewritten (molto opening)', function()
+Test.it('at or below 160 BPM a run of half a bar or more is rewritten', function()
     -- 128 BPM: a bar of 16 moving 16ths becomes 8th triplets, colour order kept.
     local events = {}
     for k = 0, 15 do events[#events + 1] = Ev(k * 0.25, 0.2, { k % 5 }, 128, 0) end
@@ -1540,7 +1540,7 @@ Test.it('at or below 160 BPM a shorter run is thinned as before, with no busy-ba
     for _, ev in ipairs(out) do
         Test.expect(math.abs(ev.qn * 2 - math.floor(ev.qn * 2 + 0.5)) < 1e-6, ('a note off the 8th grid at %g'):format(ev.qn))
     end
-    -- korpiklaani's lick: 16th grace notes inside an 8th line (1, 1.25, 1.5) - no flourish
+    -- a 120 BPM test song's lick: 16th grace notes inside an 8th line (1, 1.25, 1.5) - no flourish
     -- marking at this tempo, so the busy-bar rule reads the bar as before (not "whole").
     local lick = {}
     for _, q in ipairs({ 0, 0.5, 1, 1.25, 1.5, 2, 2.5, 3, 3.25, 3.5 }) do lick[#lick + 1] = Ev(q, 0.2, { 1 }, 120, 0) end
@@ -1592,7 +1592,7 @@ Test.it('beat classes count from the bar line, in the bar\'s own beat', function
 end)
 
 Test.it('6/8: Medium keeps each beat and the 8th after it, Easy the two beats', function()
-    -- vm_loiri_sydameeni_joulu_teen: counted in quarter notes, Medium kept 0, 1 and 2 of
+    -- a 6/8 test song: counted in quarter notes, Medium kept 0, 1 and 2 of
     -- each bar. Official 6/8 Medium's commonest bar of 8ths is 0 0.5 1.5 2; official Easy
     -- keeps 0 and 1.5 (97%, 94%). Never three quarter notes across the bar's two beats.
     local hard = MeterBars(8, 3, 1.5, 105)
@@ -1655,7 +1655,7 @@ end
 
 local function Offs(ev) return ev and table.concat(ev.offs, ',') or 'none' end
 
-Test.it('Hard keeps a note Expert holds under moving notes (Loiri bar 41)', function()
+Test.it('Hard keeps a note Expert holds under moving notes', function()
     -- R held for a bar while B/O chords play over it: at most 3 notes sound at once.
     local events = { Ev(0, 5, { 1 }, OV_BPM, 0), Ev(1, 0.125, { 3, 4 }, OV_BPM, 0), Ev(2, 0.125, { 3 }, OV_BPM, 0),
                      Ev(3, 0.125, { 3, 4 }, OV_BPM, 0), Ev(6, 0.125, { 0 }, OV_BPM, 4) }
@@ -1709,7 +1709,7 @@ Test.it('Medium holds a note only over a note a bar or more later; Easy never', 
 end)
 
 Test.it('a rolled chord becomes one chord on its strongest beat', function()
-    -- Loiri's last chord at 61 BPM: R and Y a 1/32 apart into a held O on the downbeat.
+    -- a 6/8 test song's last chord at 61 BPM: R and Y a 1/32 apart into a held O on the downbeat.
     local roll = { Ev(3.75, 3.75, { 1 }, 61, 0), Ev(3.875, 3.625, { 2 }, 61, 0), Ev(4, 3.5, { 4 }, 61, 4) }
     local out = Gen5PlanTier('k5', 'H', roll)
     Test.expect(#out == 1 and Offs(At(out, 4)) == '1,2,4', ('expected one R Y O chord on 4, got %d events, %s'):format(#out, Offs(At(out, 4))))
@@ -1819,6 +1819,123 @@ Test.it('Drums Hard below 140: a hi-hat 16th stream goes to 8ths, a 16th snare r
     end
 end)
 
+Test.it('Drums Hard below 140: a pair of 16th snares stays whole, a single one on the "e" goes', function()
+    -- a 120 BPM test song: K R R K - the "e" + "and" snare pair is a run (hard_16th_min_run 2);
+    -- beat 3: K R K - a single snare on the "e" loses it (RBN "remove about half").
+    local x = { DH(0, { 0 }), DH(0.25, { 1 }), DH(0.5, { 1 }), DH(0.75, { 0 }),
+                DH(2, { 0, 2 }), DH(2.25, { 1 }), DH(2.5, { 0, 2 }), DH(4, { 0, 4 }) }
+    local out = GenDrumsPlanTier('H', x, { fast_runs = 'thin' })
+    Test.expect(DHas(DAt(out, 0.25), 1) and DHas(DAt(out, 0.5), 1), 'the snare pair should stay')
+    Test.expect(not DHas(DAt(out, 2.25), 1), 'the single snare on the "e" should go')
+end)
+
+Test.it('Drums Hard: off-beat 16th kicks keep every other; the next bar\'s busy groove does not clear them', function()
+    -- a 120 BPM test song: hats on the 8ths, kicks on every 16th off-beat, RG on beat 4's
+    -- "and"; bar 2 starts a KY R KY groove whose busy downbeat kick reaches back.
+    local x = {}
+    for k = 0, 6 do
+        x[#x + 1] = DH(k * 0.5, { 2 }, 120)
+        x[#x + 1] = DH(k * 0.5 + 0.25, { 0 }, 120)
+    end
+    x[#x + 1] = DH(3.5, { 1, 4 }, 120)
+    for k = 0, 7 do x[#x + 1] = DH(4 + k * 0.5, k % 2 == 0 and { 0, 2 } or { 1, 2 }, 120) end
+    local out = GenDrumsPlanTier('H', x, { fast_runs = 'thin' })
+    local kicks = {}
+    for _, ev in ipairs(out) do if ev.qn < 4 and DHas(ev, 0) then kicks[#kicks + 1] = ('%g'):format(ev.qn) end end
+    Test.expect(#kicks >= 3 and tonumber(kicks[#kicks]) >= 2.5,
+        'bar 1 should keep every other kick to its end, got ' .. table.concat(kicks, ','))
+    for k = 2, #kicks do
+        Test.expect(tonumber(kicks[k]) - tonumber(kicks[k - 1]) >= 0.75 - 1e-6, 'kicks closer than 3/4 QN: ' .. table.concat(kicks, ','))
+    end
+end)
+
+Test.it('Drums Hard: the end-of-bar kick that comes back takes the 16th kick after it out', function()
+    -- a 120 BPM test song: KG RY KY K RY KY RY KY K RY | KY ... - the busy
+    -- beat-4 kick returns (EndOfBarKick), the kick on its "e" must go (official: 0-4% keep both).
+    local function Bar(b, first)
+        return { DH(b, { 0, first }), DH(b + 0.5, { 1, 2 }), DH(b + 1, { 0, 2 }), DH(b + 1.25, { 0 }),
+                 DH(b + 1.5, { 1, 2 }), DH(b + 2, { 0, 2 }), DH(b + 2.5, { 1, 2 }), DH(b + 3, { 0, 2 }),
+                 DH(b + 3.25, { 0 }), DH(b + 3.5, { 1, 2 }) }
+    end
+    local x = Bar(0, 4)
+    for _, ev in ipairs(Bar(4, 2)) do x[#x + 1] = ev end
+    local out = GenDrumsPlanTier('H', x, { fast_runs = 'thin' })
+    local prev
+    for _, ev in ipairs(out) do
+        if DHas(ev, 0) then
+            Test.expect(not prev or ev.qn - prev >= 0.5 - 1e-6, ('kicks %g and %g closer than an 8th'):format(prev or 0, ev.qn))
+            prev = ev.qn
+        end
+    end
+    Test.expect(DHas(DAt(out, 3), 0), 'beat 4 should keep its kick')
+end)
+
+Test.it('Drums Hard: a busy beat kick with a lone kick a 16th after keeps the beat kick', function()
+    local x = { DH(0, { 0, 2 }), DH(0.5, { 1, 2 }), DH(1, { 0, 2 }), DH(1.25, { 0 }), DH(1.5, { 1, 2 }),
+                DH(2, { 0, 2 }), DH(2.5, { 1, 2 }), DH(3, { 0, 2 }), DH(3.5, { 1, 2 }), DH(4, { 0, 4 }) }
+    local out = GenDrumsPlanTier('H', x, { fast_runs = 'thin' })
+    Test.expect(DHas(DAt(out, 1), 0), 'beat 2 should keep its kick')
+    Test.expect(not DAt(out, 1.25), 'the kick on the "e" of 2 should go')
+end)
+
+Test.it('Drums Medium: a kick + cramped double crash keeps the kick and the Green (KYG -> KG)', function()
+    local hard = { DH(0, { 0, 2 }), DH(1.5, { 1, 2 }), DH(2, { 0, 2, 4 }), DH(3, { 1, 2 }) }
+    local out = GenDrumsPlanTier('M', hard, {})
+    local ev = DAt(out, 2)
+    Test.expect(ev and DHas(ev, 0) and DHas(ev, 4) and not DHas(ev, 2), 'expected KG, got ' .. (ev and table.concat(ev.offs, ',') or '-'))
+end)
+
+Test.it('Drums 170+ BPM, backbeat on the "and"s: Hard hands on the "and"s, kicks on 1 and 3; Medium/Easy follow', function()
+    -- a 210 BPM test song: KY RY KY RY KY RY KY RY, two bars. Official Hard keeps the
+    -- kicks on beats 1 and 3 in 87% of such bars (2026-10-15).
+    local x = {}
+    for k = 0, 15 do x[#x + 1] = DH(k * 0.5, k % 2 == 0 and { 0, 2 } or { 1, 2 }, 210) end
+    local sections = { { qn = 0, name = 'intro' } }
+    local hard = GenDrumsPlanTier('H', x, { fast_runs = 'thin', ctx = { sections = sections } })
+    for k = 0, 3 do
+        local beat = DAt(hard, k)
+        Test.expect(not (beat and DHas(beat, 2)), ('Hard beat %d: no hat'):format(k + 1))
+        Test.expect((beat ~= nil and DHas(beat, 0)) == (k % 2 == 0), ('Hard beat %d: a kick only on 1 and 3'):format(k + 1))
+        Test.expect(DHas(DAt(hard, k + 0.5), 1) and DHas(DAt(hard, k + 0.5), 2), ('Hard "and" %d: snare + hat'):format(k + 1))
+    end
+    local med = GenDrumsPlanTier('M', hard, { ctx = { sections = sections } })
+    local ands, kicks = 0, 0
+    for _, ev in ipairs(med) do
+        if ev.qn < 4 then
+            if DHas(ev, 1) then ands = ands + 1 end
+            if DHas(ev, 0) then kicks = kicks + 1 end
+        end
+    end
+    Test.expect(ands == 4 and kicks == 1, ('Medium bar 1: 4 snares and 1 kick, got %d and %d'):format(ands, kicks))
+end)
+
+Test.it('Drums 170+ BPM: a half bar with the snare on both "and"s gets the same treatment', function()
+    local x = { DH(0, { 0, 2 }, 210), DH(0.5, { 1, 2 }, 210), DH(1, { 0, 2 }, 210), DH(1.5, { 1 }, 210),
+                DH(2, { 1 }, 210), DH(2.5, { 0, 4 }, 210), DH(3.5, { 0, 3 }, 210), DH(4, { 0, 4 }, 210) }
+    local hard = GenDrumsPlanTier('H', x, { fast_runs = 'thin' })
+    Test.expect(not DHas(DAt(hard, 0), 2) and not DHas(DAt(hard, 1), 2), 'beats 1-2 lose their hat')
+    Test.expect(DHas(DAt(hard, 0.5), 1) and DHas(DAt(hard, 1.5), 1), 'both "and" snares stay')
+end)
+
+Test.it('Drums Hard 170+ BPM: an 8th stream stays where Expert is faster, a copied one is broken', function()
+    -- Expert 8th triplets (a tom/snare run) -> rewritten to 8ths: Expert is faster, so they stay.
+    local x = { DH(0, { 0, 4 }, 210) }
+    for k = 0, 8 do x[#x + 1] = DH(1 + k / 3, { 1 }, 210) end
+    x[#x + 1] = DH(4, { 0, 4 }, 210)
+    local h = GenDrumsPlanTier('H', x, { fast_runs = 'rewrite' })
+    local eighths = 0
+    for _, ev in ipairs(h) do if ev.qn > 0.9 and ev.qn < 3.9 then eighths = eighths + 1 end end
+    Test.expect(eighths >= 6, ('the rewritten 8ths should all stay, got %d'):format(eighths))
+    -- Expert 8th hats copied: a run of four 8ths loses a hit.
+    local y = {}
+    for k = 0, 7 do y[#y + 1] = DH(k * 0.5, k == 0 and { 0, 4 } or { 3 }, 210) end
+    y[#y + 1] = DH(4, { 0, 4 }, 210)
+    local h2 = GenDrumsPlanTier('H', y, { fast_runs = 'thin' })
+    local n = 0
+    for _, ev in ipairs(h2) do if ev.qn < 4 then n = n + 1 end end
+    Test.expect(n < 8, ('a copied 8th stream should be broken, kept %d'):format(n))
+end)
+
 Test.it('Drums Hard: a long 16th snare run is 8ths when thinned, 8th triplets when rewritten', function()
     local x = {}
     for k = 0, 15 do x[#x + 1] = DH(k * 0.25, { 1 }, 120) end
@@ -1857,7 +1974,7 @@ Test.it('Drums Hard: a disco-flip section is un-flipped (hat on Yellow, snare on
 end)
 
 Test.it('Drums Hard: kicks on 1, 3 and 4 under steady 8th hats; on every beat (under the snare too) when the hands are quiet', function()
-    -- Steady 8th hats (molto_c_love_for_sale bar 7): official Hard keeps kicks on 1 and 3 in
+    -- Steady 8th hats (a 128 BPM test song): official Hard keeps kicks on 1 and 3 in
     -- 49% of such bars, all four in 23%; the end of the bar keeps one more kick - beat 4
     -- when Expert has one (official: beat 4 33%, the "and" 27%, neither 39%).
     local x = { DH(0, { 0, 4 }), DH(0.5, { 2 }), DH(1, { 0, 1 }), DH(1.5, { 2 }), DH(2, { 0, 2 }), DH(2.5, { 2 }),
@@ -1888,7 +2005,7 @@ Test.it('Drums Medium: kicks on quarter notes above 100 BPM, one a bar from 170'
 end)
 
 Test.it('Drums Medium: kicks half a bar apart under busy hands, a quarter apart when the hands are quiet', function()
-    -- korpiklaani's oom-pah groove at 120 BPM: official Medium's commonest answer is
+    -- a 120 BPM test song's oom-pah groove at 120 BPM: official Medium's commonest answer is
     -- KY RY Y RY KY RY Y RY (154 of 370 bars) - the kicks on 2 and 4 go. At 115 BPM here,
     -- under the Medium fallback's tempo floor (this one bar alone would trigger it).
     local busy = {}
@@ -1931,7 +2048,7 @@ Test.it('Drums Medium: steady 8th hats go to quarters from 130 BPM, or below it 
 end)
 
 Test.it('Drums: a hi-hat between two snare accents goes (Medium with a tom, Easy with any snare); a fill on the "and"s keeps them on Easy', function()
-    -- molto_c_love_for_sale bar 22: hat on the beats, snare + blue tom on the "and"s.
+    -- a 128 BPM test song: hat on the beats, snare + blue tom on the "and"s.
     local toms = { [3] = { { qn = 0, qn_e = 4 } } }
     local hard = { DH(0, { 0, 2 }), DH(0.5, { 1, 3 }), DH(1, { 2 }), DH(1.5, { 1, 3 }), DH(2, { 0, 2 }),
                    DH(2.5, { 1, 3 }), DH(3, { 1 }), DH(3.5, { 1 }), DH(4, { 0, 4 }) }
@@ -1947,12 +2064,17 @@ Test.it('Drums: a hi-hat between two snare accents goes (Medium with a tom, Easy
     for _, q in ipairs({ 0.5, 1.5, 2.5 }) do
         Test.expect(DAt(easy, q) ~= nil, ('Easy should keep the accent on %g'):format(q))
     end
-    Test.expect(not DAt(easy, 1) and not DAt(easy, 2), 'Easy: nothing between the accents')
+    -- No hands between the accents. The kick on beat 3 stays since 2026-10-14: the half bar's
+    -- backbeat is on the "and"s (HardAndBackbeat from easy_and_backbeat_bpm), the beat's hat
+    -- goes, the bar has no cymbal left and Easy keeps its kicks (a 128 BPM test song).
+    Test.expect(not DAt(easy, 1), 'Easy: nothing on beat 2 between the accents')
+    local b3 = DAt(easy, 2)
+    Test.expect(not b3 or (#b3.offs == 1 and DHas(b3, 0)), 'Easy: beat 3 at most a kick')
 end)
 
 Test.it('Drums: a two-hand "and" (hat + tom) keeps its hat on Medium; Easy takes the hats off only where Easy itself went to quarters', function()
     local toms = { [3] = { { qn = 0, qn_e = 8 } } }
-    -- Hard: 8th hats, hat + blue tom on beat 4 and its "and" (molto bar 31's ending), 132 BPM
+    -- Hard: 8th hats, hat + blue tom on beat 4 and its "and" (a 128 BPM test song's ending), 132 BPM
     -- so Medium's hats go to quarter notes.
     local hard = { DH(0, { 0, 4 }, 132), DH(0.5, { 2 }, 132), DH(1, { 2, 3 }, 132), DH(1.5, { 2 }, 132),
                    DH(2, { 0, 2 }, 132), DH(2.5, { 2 }, 132), DH(3, { 2, 3 }, 132), DH(3.5, { 2, 3 }, 132),
@@ -1976,7 +2098,7 @@ Test.it('Drums: a two-hand "and" (hat + tom) keeps its hat on Medium; Easy takes
 end)
 
 Test.it('Drums: two two-hand hits an 8th apart with a change of drum - the first loses its drum (Medium and Easy)', function()
-    -- molto_c_love_for_sale bar 34: Yb RY RY RY -> Y RY RY RY. (A tom marker covers the hits
+    -- a 128 BPM test song: Yb RY RY RY -> Y RY RY RY. (A tom marker covers the hits
     -- before its end, so it runs past the tom hit at 1.)
     local toms = { [3] = { { qn = 0, qn_e = 1.25 } } }
     local up = { DH(0, { 0, 2 }), DH(1, { 2, 3 }), DH(1.5, { 1, 2 }), DH(2, { 1, 2 }), DH(2.5, { 1, 2 }), DH(3, { 1 }),
@@ -1990,18 +2112,34 @@ Test.it('Drums: two two-hand hits an 8th apart with a change of drum - the first
     end
 end)
 
-Test.it('Drums Easy: a hat + snare an 8th before a crash loses its hat; Medium keeps it', function()
-    -- molto_c_love_for_sale bar 18 into 19: ... KR RY | G.
+Test.it('Drums Medium/Easy: a hat + snare an 8th before a crash loses its hat (a cymbal change)', function()
+    -- a 128 BPM test song, into the next bar: ... KR RY | G. Easy's own rule (EasyBeforeCrash)
+    -- and, since 2026-10-13, the cymbal-change rule on Medium too (CymbalChanges).
     local up = { DH(2, { 0, 2 }), DH(3, { 0, 1 }), DH(3.5, { 1, 2 }), DH(4, { 0, 4 }), DH(5, { 1, 2 }) }
-    local easy = GenDrumsPlanTier('E', up)
-    Test.expect(DHas(DAt(easy, 3.5), 1) and not DHas(DAt(easy, 3.5), 2), 'Easy: the "and" before the crash keeps its snare, loses its hat')
-    Test.expect(DHas(DAt(easy, 4), 4), 'Easy: the crash stays')
-    local med = GenDrumsPlanTier('M', up, { between = 'keep' })
-    Test.expect(DHas(DAt(med, 3.5), 2), 'Medium: the hat stays')
+    for _, dl in ipairs({ 'E', 'M' }) do
+        local out = GenDrumsPlanTier(dl, up, { between = 'keep' })
+        Test.expect(DHas(DAt(out, 3.5), 1) and not DHas(DAt(out, 3.5), 2), dl .. ': the "and" before the crash keeps its snare, loses its hat')
+        Test.expect(DHas(DAt(out, 4), 4), dl .. ': the crash stays')
+    end
+end)
+
+Test.it('Drums Medium: a cymbal change an 8th apart drops the hi-hat/ride; after a double crash (now Green) too', function()
+    -- a 120 BPM test song: RY | RG -> R | RG (the crash keeps its snare).
+    local a = GenDrumsPlanTier('M', { DH(3, { 1, 2 }), DH(3.5, { 1, 2 }), DH(4, { 1, 4 }), DH(5, { 1 }) }, { between = 'keep' })
+    Test.expect(not DHas(DAt(a, 3.5), 2) and DHas(DAt(a, 4), 1) and DHas(DAt(a, 4), 4), 'RY | RG -> R | RG')
+    -- a 210 BPM test song: RY then B -> R then B.
+    local b = GenDrumsPlanTier('M', { DH(0, { 0, 4 }), DH(1.5, { 1, 2 }), DH(2, { 3 }), DH(3, { 1 }) }, { between = 'keep' })
+    Test.expect(not DHas(DAt(b, 1.5), 2) and DHas(DAt(b, 2), 3), 'RY then B -> R then B')
+    -- A double crash (B + G, room before it) with a hat + snare an 8th after it: the double
+    -- crash is a single Green (DoubleCrashes, every tier since 2026-10-15), and the hit after
+    -- it - another cymbal an 8th later - keeps only its snare.
+    local c = GenDrumsPlanTier('M', { DH(0, { 1 }), DH(2, { 3, 4 }), DH(2.5, { 1, 2 }), DH(3.5, { 1 }) }, { between = 'keep' })
+    Test.expect(not DHas(DAt(c, 2), 3) and DHas(DAt(c, 2), 4), 'the double crash becomes Green')
+    Test.expect(DHas(DAt(c, 2.5), 1) and not DHas(DAt(c, 2.5), 2), 'the hit after keeps only its snare')
 end)
 
 Test.it('Drums Medium: a snare between a hi-hat and a crash is not "between hi-hats"', function()
-    -- molto_c_love_for_sale bar 82: ... RY | R on the "and" of 4 | crash on the downbeat.
+    -- a 128 BPM test song: ... RY | R on the "and" of 4 | crash on the downbeat.
     local up = { DH(2, { 0, 2 }), DH(3, { 1, 2 }), DH(3.5, { 1 }), DH(4, { 0, 4 }), DH(5, { 1, 2 }) }
     local med = GenDrumsPlanTier('M', up)
     Test.expect(DHas(DAt(med, 3.5), 1), 'the snare before the crash should stay')
@@ -2027,7 +2165,7 @@ Test.it('Drums Hard: under busy hands an 8th kick paired with beat 3 stays (befo
         for k = 0, 7 do t[#t + 1] = DHas(DAt(out, k * 0.5), 0) and 'K' or '.' end
         return table.concat(t)
     end
-    -- pojat_lemmikkih: K . . K K . . . at 160 BPM stays (official 93%).
+    -- a 160 BPM test song: K . . K K . . . at 160 BPM stays (official 93%).
     Test.expect(Kicks(GenDrumsPlanTier('H', Bar({ [0] = 1, [3] = 1, [4] = 1 }, 160), { fast_runs = 'thin' })) == 'K..KK...',
         'K..KK... should stay')
     -- K . . . K K . K -> K . . . K K . . (official 46-62%).
@@ -2039,7 +2177,7 @@ Test.it('Drums Hard: under busy hands an 8th kick paired with beat 3 stays (befo
 end)
 
 Test.it('Drums Hard: a rewritten roll into the downbeat never starts before its first Expert note', function()
-    -- pojat_lemmikkih bar 36 (just over 160 BPM): 16th snares from the "a" of 3 into the
+    -- a 160 BPM test song (just over 160 BPM): 16th snares from the "a" of 3 into the
     -- downbeat were laid out from the "and" of 3's triplet; now from beat 4.
     local x = { DH(0, { 0, 2 }, 161), DH(1, { 1, 2 }, 161), DH(2, { 0, 2 }, 161) }
     for _, q in ipairs({ 2.75, 3, 3.25, 3.5, 3.75 }) do x[#x + 1] = DH(q, { 1 }, 161) end
@@ -2052,7 +2190,7 @@ Test.it('Drums Hard: a rewritten roll into the downbeat never starts before its 
 end)
 
 Test.it('Drums: a fill Medium broke into pieces is one run on Easy; the snare + tom before a crash loses its tom', function()
-    -- pojat_lemmikkih bars 73-75 at 160 BPM: Rg (snare + green tom) on 8ths, Medium broke
+    -- a 160 BPM test song: Rg (snare + green tom) on 8ths, Medium broke
     -- the runs of four, then a crash.
     local toms = { [4] = { { qn = 0, qn_e = 8 } } }
     local med = { DH(0, { 0 }, 160) }
@@ -2069,7 +2207,7 @@ Test.it('Drums: a fill Medium broke into pieces is one run on Easy; the snare + 
 end)
 
 Test.it('Drums Hard fallback: a Hard barely easier than Expert drops hat-only "and"s per "Hard 8th runs"', function()
-    -- A simple Expert (pojat_lemmikkih): steady 8th hats, kick on 1 and 3, snare on 2 and 4.
+    -- A simple Expert (a 160 BPM test song): steady 8th hats, kick on 1 and 3, snare on 2 and 4.
     -- Bar 1 starts with a crash, bar 2 with a hat.
     local x = {}
     for b = 0, 1 do
@@ -2131,6 +2269,232 @@ Test.it('Drums Easy: kick + snare in a verse on the hi-hat, a two-hand beat in t
     Test.expect(DHas(DAt(out, 0), 0), 'the verse should keep its kick on 1')
 end)
 
+Test.it('Drums Easy: a verse with sparse kick + snare keeps its 2-hand beat; a ride verse with enough goes kick + snare', function()
+    -- Verse 1 (0-12, hi-hat): one kick or snare a bar of 3/4 (a 3/4 test song at 155 BPM `RY Y Y` /
+    -- `KY Y Y`), 0.33 per quarter note. Verse 2 (12-20, ride): kick/snare on every beat.
+    local med = {}
+    for bar = 0, 3 do
+        local b = bar * 3
+        med[#med + 1] = DH(b, { bar % 2 == 0 and 1 or 0, 2 }, 155)
+        med[#med + 1] = DH(b + 1, { 2 }, 155); med[#med + 1] = DH(b + 2, { 2 }, 155)
+    end
+    for k = 0, 7 do med[#med + 1] = DH(12 + k, { k % 2 == 0 and 0 or 1, 3 }, 120) end
+    local sections = { { qn = 0, name = 'verse_1a' }, { qn = 12, name = 'verse_2a' } }
+    local out = GenDrumsPlanTier('E', med, { ctx = { sections = sections } })
+    local hats, rides = 0, 0
+    for _, ev in ipairs(out) do
+        if ev.qn < 12 and DHas(ev, 2) then hats = hats + 1 end
+        if ev.qn >= 12 and DHas(ev, 3) then rides = rides + 1 end
+    end
+    Test.expect(hats == 12, ('the sparse hi-hat verse should keep all 12 hats, kept %d'):format(hats))
+    Test.expect(rides == 0, ('the busy ride verse should play kick + snare, kept %d rides'):format(rides))
+end)
+
+Test.it('Drums 2X: a tier plays the kicks of the PART DRUMS tier one step up, never thinned further', function()
+    -- 2X Expert: 8th kicks under 8th hats at 150 BPM. PART DRUMS Expert (single pedal):
+    -- kicks on the beats, plus one on the "and" of 4 where 2X has no hit.
+    local x2, x1 = {}, {}
+    for k = 0, 7 do x2[#x2 + 1] = DH(k * 0.5, { 0, 2 }, 150) end
+    for k = 0, 3 do x1[#x1 + 1] = DH(k, { 0, 2 }, 150) end
+    x1[#x1 + 1] = DH(3.75, { 0 }, 150)
+    local input = GenDrums2xInput(x2, x1)
+    local kicks = {}
+    for _, ev in ipairs(input) do if DHas(ev, 0) then kicks[#kicks + 1] = ('%g'):format(ev.qn) end end
+    Test.expect(table.concat(kicks, ',') == '0,1,2,3,3.75', 'input kicks should be PART DRUMS\'s, got ' .. table.concat(kicks, ','))
+    Test.expect(DHas(DAt(input, 0.5), 2) and not DHas(DAt(input, 0.5), 0), 'the 2X hands stay, their kicks go')
+    -- Hard keeps all four beat kicks (normal Hard at 150 BPM spaces them half a bar apart
+    -- under busy hands); 3.75 is a 16th at 150 BPM, so the 16th rule still takes it.
+    local hard = GenDrumsPlanTier('H', input, { fast_runs = 'thin', keep_kicks = true })
+    local hk = {}
+    for _, ev in ipairs(hard) do if DHas(ev, 0) then hk[#hk + 1] = ('%g'):format(ev.qn) end end
+    Test.expect(table.concat(hk, ',') == '0,1,2,3', 'Hard kicks should be 0,1,2,3, got ' .. table.concat(hk, ','))
+    local plain = GenDrumsPlanTier('H', input, { fast_runs = 'thin' })
+    local pk = 0
+    for _, ev in ipairs(plain) do if DHas(ev, 0) then pk = pk + 1 end end
+    Test.expect(pk < 4, ('without keep_kicks Hard should thin them, kept %d'):format(pk))
+end)
+
+Test.it('Drums 2X with no PART DRUMS: the in-memory single-pedal Expert is what "Remove 2x kicks" leaves', function()
+    -- A bar of 16th kicks under quarter hats, then a lone kick on the next downbeat.
+    local x2 = {}
+    for k = 0, 15 do x2[#x2 + 1] = DH(k * 0.25, k % 4 == 0 and { 0, 2 } or { 0 }, 150) end
+    x2[#x2 + 1] = DH(4, { 0, 4 }, 150)
+    local single = GenDrumsSinglePedal(x2)
+    local qns, kept = {}, {}
+    for _, ev in ipairs(x2) do qns[#qns + 1] = ev.qn end
+    local marks = DoubleBassPlan(qns, function(qn) return math.abs(qn % 4) < 1e-9 end)
+    for i, q in ipairs(qns) do if not marks[i] then kept[#kept + 1] = ('%g'):format(q) end end
+    local got = {}
+    for _, ev in ipairs(single) do if DHas(ev, 0) then got[#got + 1] = ('%g'):format(ev.qn) end end
+    Test.expect(table.concat(got, ',') == table.concat(kept, ','),
+        ('kicks %s, DoubleBassPlan keeps %s'):format(table.concat(got, ','), table.concat(kept, ',')))
+    Test.expect(#got < #qns, 'some second-foot kicks should go')
+    Test.expect(DHas(DAt(single, 1), 2) and DHas(DAt(single, 4), 4), 'the hands stay')
+end)
+
+Test.it('Drums Easy two-hand bar: a half bar with no hand hit keeps its kicks', function()
+    local med = { DH(0, { 0, 4 }), DH(1, { 0, 3 }), DH(2, { 0 }), DH(3, { 0 }), DH(4, { 0, 4 }), DH(5, { 0, 2 }), DH(6, { 1, 2 }) }
+    local out = GenDrumsPlanTier('E', med, { ctx = { sections = { { qn = 0, name = 'intro' } } } })
+    Test.expect(DHas(DAt(out, 0), 4) and not DHas(DAt(out, 0), 0), 'beat 1: the crash, no kick')
+    Test.expect(DHas(DAt(out, 2), 0) and DHas(DAt(out, 3), 0), 'beats 3 and 4 (no hands) keep their kicks')
+    Test.expect(not DHas(DAt(out, 4), 0) and not DHas(DAt(out, 5), 0), 'bar 2 has hands in its first half: no kicks there')
+end)
+
+Test.it('Drums Easy at 140+ BPM: a lone drum "and" between two beat hits goes; at 120 it stays', function()
+    -- a 3/4 test song at 155 BPM: G, R on the "and", B, then RB.
+    local function Bar(bpm) return { DH(0, { 4 }, bpm), DH(0.5, { 1 }, bpm), DH(1, { 3 }, bpm), DH(2, { 1, 3 }, bpm) } end
+    local sections = { { qn = 0, name = 'chorus' } }
+    -- 'beats': with the default 'hands' the no-three-8ths rule takes the ride on beat 2 instead
+    -- (the least important hand gem) and the snare is no longer between two beat hits.
+    local fast, log = GenDrumsPlanTier('E', Bar(155), { ctx = { sections = sections }, eighth_hands = 'beats' })
+    -- Since 2026-10-14 the no-three-8ths rule (LowerEighthHands, 'beats') takes it first.
+    Test.expect(not DAt(fast, 0.5) and (log.lone_ands or 0) + (log.eighth_hands or 0) == 1,
+                '155 BPM: the snare on the "and" should go')
+    local slow = GenDrumsPlanTier('E', Bar(120), { ctx = { sections = sections } })
+    Test.expect(DAt(slow, 0.5) ~= nil, '120 BPM: the snare on the "and" should stay')
+end)
+
+Test.it('Drums Medium at 150+ BPM: of three hand hits an 8th apart one goes - Beats: the "and", Hands: the hi-hat', function()
+    -- a 160 BPM test song: ... KY | RY on the "and" | RY on beat 4.
+    local function Bar(bpm)
+        return { DH(0, { 0, 2 }, bpm), DH(1, { 1, 2 }, bpm), DH(2, { 0, 2 }, bpm), DH(2.5, { 1, 2 }, bpm),
+                 DH(3, { 1, 2 }, bpm), DH(4, { 0, 2 }, bpm) }
+    end
+    local beats, log = GenDrumsPlanTier('M', Bar(160), { between = 'keep', eighth_hands = 'beats' })
+    Test.expect(not DAt(beats, 2.5) and DHas(DAt(beats, 2), 2) and DHas(DAt(beats, 3), 1), 'Beats: KY . RY')
+    Test.expect(log.eighth_hands == 1, ('Beats: expected 1 hit changed, got %s'):format(tostring(log.eighth_hands)))
+    local hands = GenDrumsPlanTier('M', Bar(160), { between = 'keep', eighth_hands = 'hands' })
+    local b3 = DAt(hands, 2)
+    Test.expect(b3 ~= nil and DHas(b3, 0) and not DHas(b3, 2), 'Hands: beat 3 keeps its kick, loses its hi-hat')
+    Test.expect(DHas(DAt(hands, 2.5), 1) and DHas(DAt(hands, 3), 1), 'Hands: both snares stay')
+    local slow = GenDrumsPlanTier('M', Bar(140), { between = 'keep', eighth_hands = 'beats' })
+    Test.expect(DHas(DAt(slow, 2.5), 1) and DHas(DAt(slow, 2), 2), '140 BPM: all three stay on Medium')
+end)
+
+Test.it('Drums Medium Hands at 150+ BPM: the hit whose loss leaves over a quarter silent counts one step more', function()
+    -- a 3/4 test song at 155 BPM: R on beat 2, b on beat 3, g on its "and", KG on the next
+    -- downbeat (here beat 4 of a 4/4 bar - the same 8th after the "and").
+    -- The b ranks below the g, but dropping it leaves beat 2 to the "and" of 3 empty: the g goes.
+    local up = { DH(0, { 1 }, 155), DH(1, { 1 }, 155), DH(2, { 3 }, 155), DH(2.5, { 4 }, 155), DH(3, { 0, 4 }, 155),
+                 DH(4, { 1 }, 155) }
+    local toms = { [3] = { { qn = 2, qn_e = 2.1 } }, [4] = { { qn = 2.5, qn_e = 2.6 } } }
+    local out = GenDrumsPlanTier('M', up, { between = 'keep', eighth_hands = 'hands', ctx = { toms = toms } })
+    Test.expect(DHas(DAt(out, 2), 3) and not DAt(out, 2.5), 'the Blue tom on beat 3 stays, the Green tom on the "and" goes')
+    Test.expect(DHas(DAt(out, 3), 4), 'the crash on the downbeat stays')
+end)
+
+Test.it('Drums Medium: a fill Hard rewrote to 8th triplets is reduced from Expert\'s notes', function()
+    -- a 210 BPM test song / a 120 BPM test song: Medium's 8th grid found
+    -- nothing of Hard's triplets but the beats.
+    local x, h = {}, {}
+    for k = 0, 7 do x[#x + 1] = DH(k * 0.25, { 1 }) end           -- Expert: 16th snares, beats 1-2
+    for k = 0, 5 do h[#h + 1] = DH(k / 3, { 1 }) end              -- Hard: the same as 8th triplets
+    x[#x + 1] = DH(2, { 0, 4 }); h[#h + 1] = DH(2, { 0, 4 })
+    x[#x + 1] = DH(3, { 1 }); h[#h + 1] = DH(3, { 1 })
+    local ctx = { fills = { { qn = 0, qn_e = 2 } } }
+    local with, log = GenDrumsPlanTier('M', h, { ctx = ctx, expert = x })
+    Test.expect(DAt(with, 0.5) ~= nil and DAt(with, 1.5) ~= nil, 'with Expert: the fill keeps its "and"s')
+    Test.expect(log.expert_runs == 1, ('expected 1 bar from Expert, got %s'):format(tostring(log.expert_runs)))
+    local without = GenDrumsPlanTier('M', h, { ctx = ctx })
+    Test.expect(not DAt(without, 0.5), 'without Expert: only the beats (the old behaviour)')
+end)
+
+Test.it('Drums Easy from 110 BPM: a bar with the backbeat on the "and"s plays the hands on the "and"s', function()
+    -- a 120 BPM test song (chant_1, 120 BPM): G R Y RY Y RY Y RY -> G R . RY . RY . RY.
+    local function Bar(bpm)
+        return { DH(0, { 4 }, bpm), DH(0.5, { 1 }, bpm), DH(1, { 2 }, bpm), DH(1.5, { 1, 2 }, bpm), DH(2, { 2 }, bpm),
+                 DH(2.5, { 1, 2 }, bpm), DH(3, { 2 }, bpm), DH(3.5, { 1, 2 }, bpm), DH(4, { 4 }, bpm) }
+    end
+    local ctx = { sections = { { qn = 0, name = 'chant_1' } } }
+    local out = GenDrumsPlanTier('E', Bar(120), { ctx = ctx })
+    Test.expect(not DAt(out, 1) and not DAt(out, 2) and not DAt(out, 3), '120 BPM: the beats\' hi-hats go')
+    Test.expect(DHas(DAt(out, 0), 4) and DHas(DAt(out, 1.5), 1) and DHas(DAt(out, 1.5), 2), 'the crash and the "and"s stay')
+    local slow = GenDrumsPlanTier('E', Bar(100), { ctx = ctx })
+    Test.expect(DHas(DAt(slow, 1), 2), '100 BPM: the beats keep their hi-hats')
+end)
+
+Test.it('Drums Easy from 120 BPM: a run of 5+ 8th snare hits keeps only the beats; 4 stay', function()
+    -- a 128 BPM test song (128 BPM): Medium RY RY RY RY R R from beat 2.
+    local function Run(n, bpm)
+        local m = { DH(0, { 0, 2 }, bpm) }
+        for k = 0, n - 1 do m[#m + 1] = DH(1 + k * 0.5, { 1, 2 }, bpm) end
+        m[#m + 1] = DH(5, { 0, 4 }, bpm)
+        return m
+    end
+    local ctx = { sections = { { qn = 0, name = 'intro' } } }
+    local out, log = GenDrumsPlanTier('E', Run(6, 128), { ctx = ctx })
+    Test.expect(not DAt(out, 1.5) and not DAt(out, 2.5) and not DAt(out, 3.5), '128 BPM, 6 hits: the "and"s go')
+    Test.expect(DHas(DAt(out, 1), 1) and DHas(DAt(out, 2), 1) and DHas(DAt(out, 3), 1), 'the beats keep their snares')
+    Test.expect(log.snare_runs == 3, ('expected 3 hits changed, got %s'):format(tostring(log.snare_runs)))
+    local four = GenDrumsPlanTier('E', Run(4, 128), { ctx = ctx })
+    Test.expect(DAt(four, 1.5) ~= nil, '4 hits: the run stays')
+    local slow = GenDrumsPlanTier('E', Run(6, 110), { ctx = ctx })
+    Test.expect(DAt(slow, 1.5) ~= nil, '110 BPM: the run stays')
+end)
+
+Test.it('Drums Easy: the quarter-note fill switch reads the tempo at bar 1 when it is faster', function()
+    -- a 120 BPM test song: 120 at bar 1, the drums start in a bar marked 119.64.
+    local med = {}
+    for k = 0, 7 do med[#med + 1] = DH(k * 0.5, { 1 }, 119.64) end   -- an 8th snare fill
+    med[#med + 1] = DH(4, { 4 }, 119.64)
+    local ctx = { fills = { { qn = 0, qn_e = 4 } }, sections = { { qn = 0, name = 'chorus' } } }
+    local plain = GenDrumsPlanTier('E', med, { ctx = ctx })
+    Test.expect(DAt(plain, 0.5) ~= nil, 'no bar-1 tempo: 119.64 keeps the 8th fill')
+    ctx.song_bpm = 120
+    local fast = GenDrumsPlanTier('E', med, { ctx = ctx })
+    Test.expect(not DAt(fast, 0.5) and DAt(fast, 1) ~= nil, 'bar 1 at 120: the fill goes to quarter notes')
+end)
+
+Test.it('Drums Hard: a hit with three hand gems is reported and keeps the kick and two', function()
+    -- K R Y G on one hit: unplayable (two hands, one foot), never in an official chart.
+    local out, log = GenDrumsPlanTier('H', { DH(0, { 0, 1, 2, 4 }), DH(2, { 1 }) }, { fast_runs = 'thin' })
+    local ev = DAt(out, 0)
+    local hands = 0
+    for _, o in ipairs(ev.offs) do if o ~= 0 then hands = hands + 1 end end
+    Test.expect(DHas(ev, 0) and hands == 2 and not DHas(ev, 2), ('K + two hands, the hi-hat gone: %s'):format(table.concat(ev.offs, ',')))
+    Test.expect(#log.too_many_gems == 1, 'one hit reported')
+end)
+
+Test.it('Drums Medium from 140 BPM: a snare an 8th after a crash goes; at 120 it stays', function()
+    -- a 210 BPM test song (209 BPM) / a 3/4 test song at 155 BPM (155): KG, R on the "and" of 1, RY on the "and" of 2.
+    local function Bar(bpm) return { DH(0, { 0, 4 }, bpm), DH(0.5, { 1 }, bpm), DH(1.5, { 1, 2 }, bpm), DH(3, { 1 }, bpm) } end
+    local fast = GenDrumsPlanTier('M', Bar(155), { between = 'keep' })
+    Test.expect(not DAt(fast, 0.5), '155 BPM: the snare after the crash goes')
+    Test.expect(DHas(DAt(fast, 0), 4) and DHas(DAt(fast, 1.5), 1), 'the crash and the next snare stay')
+    local slow = GenDrumsPlanTier('M', Bar(120), { between = 'keep' })
+    Test.expect(DHas(DAt(slow, 0.5), 1), '120 BPM: the snare stays')
+end)
+
+Test.it('Drums Easy from 170 BPM: no pair of hand hits an 8th apart; a kick next to one stays', function()
+    -- a 210 BPM test song (209 BPM): G, R on the "and" of 1, then "and" snares.
+    local ctx = { sections = { { qn = 0, name = 'chorus' } } }
+    local m = { DH(0, { 4 }, 209), DH(0.5, { 1 }, 209), DH(1.5, { 1 }, 209), DH(2.5, { 1 }, 209), DH(4, { 0 }, 209),
+                DH(4.5, { 1 }, 209), DH(5.5, { 1 }, 209) }
+    local out = GenDrumsPlanTier('E', m, { ctx = ctx })
+    Test.expect(DHas(DAt(out, 0), 4) and not DAt(out, 0.5), 'the crash stays, the "and" snare after it goes')
+    Test.expect(DAt(out, 4.5) ~= nil, 'a kick then a snare an 8th later: both stay')
+    -- The intro's tom pair (bars 4-5): equal hits keep the first, the beat.
+    local toms = { [2] = { { qn = 0, qn_e = 8 } }, [3] = { { qn = 0, qn_e = 8 } } }
+    local pair = GenDrumsPlanTier('E', { DH(0, { 2, 3 }, 210), DH(0.5, { 2, 3 }, 210), DH(6, { 2, 3 }, 210), DH(6.5, { 2, 3 }, 210) },
+                                  { ctx = { toms = toms, sections = ctx.sections } })
+    Test.expect(DAt(pair, 0) ~= nil and not DAt(pair, 0.5), 'tom pair: the beat stays')
+    -- Below 170 the pair stays.
+    local slow = GenDrumsPlanTier('E', { DH(0, { 4 }, 150), DH(0.5, { 1 }, 150), DH(2, { 1 }, 150) }, { ctx = ctx })
+    Test.expect(DAt(slow, 0.5) ~= nil, '150 BPM: the pair stays')
+end)
+
+Test.it('Drums Medium/Easy at fast tempos: a pair of hand hits an 8th apart stays', function()
+    -- a 3/4 test song at 155 BPM: KG, B, G an 8th later.
+    local up = { DH(0, { 0, 4 }, 155), DH(1, { 3 }, 155), DH(1.5, { 4 }, 155), DH(3, { 1 }, 155) }
+    for _, dl in ipairs({ 'M', 'E' }) do
+        for _, mode in ipairs({ 'beats', 'hands' }) do
+            local out = GenDrumsPlanTier(dl, up, { between = 'keep', eighth_hands = mode,
+                                                   ctx = { sections = { { qn = 0, name = 'chorus' } } } })
+            Test.expect(DHas(DAt(out, 1), 3) and DHas(DAt(out, 1.5), 4), dl .. ' ' .. mode .. ': the ride and the crash stay')
+        end
+    end
+end)
+
 Test.it('Drums: a roll lane keeps an even number of hits on the tier\'s grid', function()
     local x = {}
     for k = 0, 8 do x[#x + 1] = DH(k * 0.125, { 1 }) end   -- 32nds, 0 .. 1 under the lane
@@ -2152,11 +2516,151 @@ Test.it('Drums: a roll lane keeps an even number of hits on the tier\'s grid', f
     end
 end)
 
-Test.it('Drums: a double crash without a quarter note of space before it is a single Green', function()
-    local out = GenDrumsPlanTier('H', { DH(0, { 1 }), DH(0.5, { 2, 4 }), DH(2, { 2, 4 }) }, { fast_runs = 'thin' })
-    local a, b = DAt(out, 0.5), DAt(out, 2)
+Test.it('Drums: a double crash is a single Green on every tier, with room or not, a kick staying', function()
+    local out = GenDrumsPlanTier('H', { DH(0, { 1 }), DH(0.5, { 2, 4 }), DH(2, { 2, 4 }), DH(4, { 0, 2, 4 }) }, { fast_runs = 'thin' })
+    local a, b, c = DAt(out, 0.5), DAt(out, 2), DAt(out, 4)
     Test.expect(a ~= nil and #a.offs == 1 and a.offs[1] == 4, 'the cramped double crash should be Green only')
-    Test.expect(b ~= nil and #b.offs == 2, 'the one with space should stay a double crash')
+    Test.expect(b ~= nil and #b.offs == 1 and b.offs[1] == 4, 'the one with room too (official Hard: Green only 90-95%)')
+    Test.expect(c ~= nil and DHas(c, 0) and DHas(c, 4) and not DHas(c, 2), 'KYG -> KG')
+end)
+
+Test.it('Drums: a tom pair or a cymbal + tom is no double crash', function()
+    -- Blue and Green toms over the 2nd hit, a Green tom over the 3rd.
+    local toms = { [3] = { { qn = 0.5, qn_e = 0.6 } }, [4] = { { qn = 0.5, qn_e = 0.6 }, { qn = 1, qn_e = 1.1 } } }
+    local out = GenDrumsPlanTier('H', { DH(0, { 1 }), DH(0.5, { 3, 4 }), DH(1, { 2, 4 }) },
+        { fast_runs = 'thin', ctx = { toms = toms } })
+    local a, b = DAt(out, 0.5), DAt(out, 1)
+    Test.expect(a ~= nil and #a.offs == 2, 'the Blue + Green tom pair should keep both gems')
+    Test.expect(b ~= nil and #b.offs == 2, 'the Yellow cymbal + Green tom should keep both gems')
+end)
+
+-- A bar of 16ths at 120 BPM: snares, then toms Y B G B on beat 4, each under its own short
+-- tom marker exactly on the note (a 3/4 test song at 155 BPM's layout).
+local function TomRunBar()
+    local x, toms = {}, { [2] = {}, [3] = {}, [4] = {} }
+    local tail = { [12] = 2, [13] = 3, [14] = 4, [15] = 3 }
+    for k = 0, 15 do
+        local q, o = k * 0.25, tail[k] or 1
+        x[#x + 1] = DH(q, { o }, 120)
+        if o >= 2 then table.insert(toms[o], { qn = q, qn_e = q + 0.05 }) end
+    end
+    x[#x + 1] = DH(4, { 0, 4 }, 120)
+    return x, toms
+end
+local function UnderSpan(spans, qn)
+    for _, s in ipairs(spans or {}) do if qn >= s.qn - 1e-6 and qn < s.qn_e - 1e-6 then return true end end
+    return false
+end
+
+Test.it('Drums Hard rewrite: a tom moved off its marker gets one marker over the whole run', function()
+    local x, toms = TomRunBar()
+    local out, log = GenDrumsPlanTier('H', x, { fast_runs = 'rewrite', ctx = { toms = toms } })
+    Test.expect(#log.retimed_bars == 1, 'the run should be rewritten')
+    Test.expect(#log.tom_markers > 0, 'expected new tom markers')
+    for _, ev in ipairs(out) do
+        for _, o in ipairs(ev.offs) do
+            if o >= 2 and ev.qn < 4 then
+                Test.expect(UnderSpan(log.ctx.toms[o], ev.qn), ('Hard gem %d at %g lost its tom marker'):format(o, ev.qn))
+            end
+        end
+    end
+    -- Expert's toms stay toms under the new markers.
+    for _, ev in ipairs(x) do
+        local o = ev.offs[1]
+        if o >= 2 and ev.qn < 4 then
+            Test.expect(UnderSpan(log.ctx.toms[o], ev.qn), ('Expert gem %d at %g lost its tom marker'):format(o, ev.qn))
+        end
+    end
+    -- One marker per changed color, from the run's first note.
+    for _, m in ipairs(log.tom_markers) do
+        Test.expect(math.abs(m.qn) < 1e-6 and #log.ctx.toms[m.o] == 1,
+            ('color %d: marker from %g, %d markers'):format(m.o, m.qn, #log.ctx.toms[m.o]))
+    end
+    -- The caller's context is left as it was; the next tier is planned with log.ctx.
+    Test.expect(toms ~= log.ctx.toms and #toms[3] == 2, 'the caller\'s context should not be changed in place')
+end)
+
+Test.it('Drums Hard rewrite: a moved tom its marker still covers gets the whole-run marker too; a whole-run marker stays', function()
+    local x, toms = TomRunBar()
+    -- Blue: one long marker over beat 4 (covers wherever the rewrite puts its toms).
+    toms[3] = { { qn = 3, qn_e = 4 } }
+    local _, log = GenDrumsPlanTier('H', x, { fast_runs = 'rewrite', ctx = { toms = toms } })
+    local blue
+    for _, m in ipairs(log.tom_markers) do if m.o == 3 then blue = m end end
+    Test.expect(blue ~= nil and math.abs(blue.qn) < 1e-6 and math.abs(blue.qn_e - 4) < 1e-6,
+        'Blue: expected one marker over the whole run (0-4)')
+    -- Run it again on its own result's markers: already exactly the whole run - no change.
+    local _, log2 = GenDrumsPlanTier('H', x, { fast_runs = 'rewrite', ctx = log.ctx })
+    Test.expect(#log2.tom_markers == 0, ('a second run should change no marker, got %d'):format(#log2.tom_markers))
+end)
+
+Test.it('Drums Hard rewrite: a run of 16ths with a 32nd group in it - each group on its own grid', function()
+    -- 120 BPM: R 16ths 0-1.75, y 32nds 2 2.125 2.25, b/g 16ths 2.5-3.75, crash on the next bar.
+    local x, toms = {}, { [2] = { { qn = 2, qn_e = 2.3 } }, [3] = { { qn = 2.5, qn_e = 3.1 } }, [4] = { { qn = 3.25, qn_e = 3.8 } } }
+    for k = 0, 7 do x[#x + 1] = DH(k * 0.25, { 1 }, 120) end
+    for _, q in ipairs({ 2, 2.125, 2.25 }) do x[#x + 1] = DH(q, { 2 }, 120) end
+    for k = 0, 5 do x[#x + 1] = DH(2.5 + k * 0.25, { k < 3 and 3 or 4 }, 120) end
+    x[#x + 1] = DH(4, { 0, 4 }, 120)
+    local out = GenDrumsPlanTier('H', x, { fast_runs = 'rewrite', ctx = { toms = toms } })
+    local pos = {}
+    for _, ev in ipairs(out) do if ev.qn < 4 then pos[#pos + 1] = ('%g'):format(math.floor(ev.qn * 24 + 0.5)) end end
+    Test.expect(table.concat(pos, ' ') == '0 8 16 24 32 40 48 54 64 72 80 88',
+        'expected R on 8th triplets, two y 16ths, b/g on 8th triplets; got ' .. table.concat(pos, ' '))
+end)
+
+Test.it('Drums Hard rewrite: a cymbal of that color under the needed marker - the run is thinned and listed', function()
+    local x, toms = TomRunBar()
+    -- A Blue cymbal another tier keeps at beat 3.
+    local out, log = GenDrumsPlanTier('H', x, { fast_runs = 'rewrite', ctx = { toms = toms },
+                                                keep_cymbals = { [3] = { 2 } } })
+    Test.expect(#log.tom_conflict_bars == 1 and math.abs(log.tom_conflict_bars[1]) < 1e-6,
+        ('expected bar 0 listed, got %d'):format(#log.tom_conflict_bars))
+    Test.expect(#log.tom_markers == 0, 'no marker should change')
+    Test.expect((OnEighths(out)), 'the thinned run should sit on 8ths')
+end)
+
+Test.it('Drums Medium: a two-hand hit with a tom plays one gem at 140+, two toms off the beat at any tempo', function()
+    -- All three colors are toms over 0-2 at 150 BPM and 4-6 at 120 BPM; cymbals elsewhere.
+    local toms = { [2] = { { qn = 0, qn_e = 2 }, { qn = 4, qn_e = 6 } }, [3] = { { qn = 0, qn_e = 2 }, { qn = 4, qn_e = 6 } },
+                   [4] = { { qn = 0, qn_e = 2.6 }, { qn = 4, qn_e = 6.6 } } }
+    -- Snares on beat 3 and the "and" of 4 make five hits a bar (a bar with no more hits than
+    -- beats keeps its tom pairs - the next test) without three hand hits an 8th apart, which
+    -- Medium thins at 150 BPM (LowerEighthHands).
+    local up = { DH(0, { 3, 4 }, 150), DH(1, { 2, 3 }, 150), DH(2, { 1 }, 150), DH(2.5, { 2, 4 }, 150), DH(3.5, { 1 }, 150),  -- 150: bg, yb, Y + g
+                 DH(4, { 3, 4 }, 120), DH(5, { 1 }, 120), DH(5.5, { 3, 4 }, 120), DH(6.5, { 2, 4 }, 120), DH(7, { 1 }, 120) } -- 120: bg, bg off, Y + g off
+    local out = GenDrumsPlanTier('M', up, { ctx = { toms = toms }, between = 'keep' })
+    local function Gems(qn)
+        local ev = DAt(out, qn)
+        return ev and table.concat(ev.offs, ',') or '-'
+    end
+    Test.expect(Gems(0) == '4', '150 BPM bg: the Green tom stays, got ' .. Gems(0))
+    Test.expect(Gems(1) == '3', '150 BPM yb: the Blue tom stays, got ' .. Gems(1))
+    Test.expect(Gems(2.5) == '4', '150 BPM Y + g: the tom stays, got ' .. Gems(2.5))
+    Test.expect(Gems(4) == '3,4', '120 BPM bg on the beat: both stay, got ' .. Gems(4))
+    Test.expect(Gems(5.5) == '4', '120 BPM bg off the beat: the Green tom stays, got ' .. Gems(5.5))
+    Test.expect(Gems(6.5) == '2,4', '120 BPM Y + g off the beat: both stay (two-hand "and"), got ' .. Gems(6.5))
+end)
+
+Test.it('Drums Medium: a bar with fewer hits than beats keeps its tom pairs', function()
+    local toms = { [2] = { { qn = 0, qn_e = 1 } }, [3] = { { qn = 0, qn_e = 1 } } }
+    local up = { DH(0, { 0, 2, 3 }, 210), DH(0.5, { 2, 3 }, 210), DH(4, { 0, 4 }, 210) }
+    local out = GenDrumsPlanTier('M', up, { ctx = { toms = toms } })
+    local ev = DAt(out, 0.5)
+    Test.expect(ev and DHas(ev, 2) and DHas(ev, 3), 'the sparse bar should keep both toms')
+end)
+
+Test.it('Drums Medium: sparse counts hand notes - bg Rg bg R reduces; repeated tom pairs an 8th apart thin to the beats', function()
+    -- a 210 BPM test song (7 hand notes in 4/4): the tom pairs become the higher tom.
+    local toms = { [3] = { { qn = 0, qn_e = 8 } }, [4] = { { qn = 0, qn_e = 8 } } }
+    local busy = GenDrumsPlanTier('M', { DH(0, { 0, 3, 4 }, 211), DH(1, { 1, 4 }, 211), DH(2, { 0, 3, 4 }, 211),
+                                         DH(3, { 1, 4 }, 211), DH(4, { 1 }, 211) }, { ctx = { toms = toms } })
+    Test.expect(not DHas(DAt(busy, 0), 3) and DHas(DAt(busy, 0), 4), 'bar 47: bg -> g')
+    -- a 210 BPM test song (yb yb . yb yb, 8 notes): the repeats go, the doubles on the beats stay.
+    local yt = { [2] = { { qn = 0, qn_e = 8 } }, [3] = { { qn = 0, qn_e = 8 } } }
+    local rep = GenDrumsPlanTier('M', { DH(0, { 2, 3 }, 245), DH(0.5, { 2, 3 }, 245), DH(2, { 2, 3 }, 245),
+                                        DH(2.5, { 2, 3 }, 245), DH(4, { 1 }, 245) }, { ctx = { toms = yt } })
+    Test.expect(not DAt(rep, 0.5) and not DAt(rep, 2.5), 'bar 201: the 8th repeats go')
+    Test.expect(DHas(DAt(rep, 0), 2) and DHas(DAt(rep, 0), 3) and DHas(DAt(rep, 2), 2), 'bar 201: the doubles stay')
 end)
 
 Test.it('Drums Medium at 150 BPM: no run of four 8ths', function()
@@ -2178,4 +2682,35 @@ Test.it('Drums Easy: no kicks inside a drum fill', function()
     for _, ev in ipairs(out) do
         Test.expect(not (ev.qn >= 2 and ev.qn < 4 and DHas(ev, 0)), ('a kick in the fill at %g'):format(ev.qn))
     end
+end)
+
+Test.section('Generate planner - parameters documented')
+
+-- docs/difficulty_reduction.md says why each rule exists; the code says only what it does.
+-- Every tunable a planner reads must therefore be named there, in backticks, or its reason
+-- is lost the next time someone changes the number.
+local function ReadReductionDoc()
+    local f = SCRIPT_MDIR and io.open(SCRIPT_MDIR .. '../docs/difficulty_reduction.md', 'rb')
+    if not f then return nil end
+    local doc = f:read('a')
+    f:close()
+    return doc
+end
+
+local function ExpectKeysDocumented(doc, name, params)
+    local missing = {}
+    for k in pairs(params) do
+        if not doc:find('`' .. k .. '`', 1, true) then missing[#missing + 1] = k end
+    end
+    table.sort(missing)
+    Test.expect(#missing == 0, name .. ' keys missing from docs/difficulty_reduction.md: '
+        .. table.concat(missing, ', '))
+end
+
+Test.it('every GEN5_PARAMS and GEN_DRUMS_PARAMS key has an entry in the doc', function()
+    local doc = ReadReductionDoc()
+    Test.expect(doc ~= nil, 'could not read docs/difficulty_reduction.md')
+    if not doc then return end
+    ExpectKeysDocumented(doc, 'GEN5_PARAMS', GEN5_PARAMS)
+    ExpectKeysDocumented(doc, 'GEN_DRUMS_PARAMS', GEN_DRUMS_PARAMS)
 end)

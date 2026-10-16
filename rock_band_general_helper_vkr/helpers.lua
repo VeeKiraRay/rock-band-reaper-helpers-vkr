@@ -153,6 +153,7 @@ function SetDefaultDifficultyTracks()
         ['PART GUITAR']      = 'diff_gtr_idx',
         ['PART BASS']        = 'diff_bass_idx',
         ['PART DRUMS']       = 'diff_drums_idx',
+        ['PART DRUMS_2X']    = 'diff_drums2x_idx',
     }
     for i = 0, r.CountTracks(0) - 1 do
         local tr = r.GetTrack(0, i)

@@ -13,7 +13,7 @@ function DrawDifficultyGenerateTab(ctx, midi_tracks)
         .. 'with the same rules Validate uses.')
 
     SectionHeader('Instrument')
-    local lbl_col = LabelColWidth({ 'Instrument', 'Track', 'Expert track', 'Medium track', 'Hard 8th runs',
+    local lbl_col = LabelColWidth({ 'Instrument', 'Track', '2X track', 'Expert track', 'Medium track', 'Hard 8th runs',
                                     'Hard fast runs', 'Drums Medium' })
 
     local cur_key  = S.diff_gen_instrument
@@ -56,11 +56,21 @@ function DrawDifficultyGenerateTab(ctx, midi_tracks)
         S[cur_inst.idx_field] = TrackCombo('##diff_gen_track', S[cur_inst.idx_field], midi_tracks)
         Tooltip(TIPS.diff_gen_track)
         no_track = S[cur_inst.idx_field] < 0
+        if cur_inst.x2 then
+            -- Drums: the song's PART DRUMS_2X too, generated in the same run ((none): no 2X).
+            r.ImGui_Text(ctx, '2X track')
+            r.ImGui_SameLine(ctx, lbl_col)
+            r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
+            S[cur_inst.x2.idx_field] = TrackCombo('##diff_gen_track2x', S[cur_inst.x2.idx_field], midi_tracks)
+            Tooltip(TIPS.diff_gen_track2x)
+            no_track = no_track and S[cur_inst.x2.idx_field] < 0
+        end
     else
         r.ImGui_TextWrapped(ctx,
             'Uses each instrument\'s default track (PART GUITAR, PART BASS, PART REAL_KEYS_X/H/M/E, '
-            .. 'PART KEYS, PART DRUMS) and skips any that is missing or muted. Pro Keys runs before '
-            .. 'Keys, and Keys follows the Pro Keys it just generated.')
+            .. 'PART KEYS, PART DRUMS and PART DRUMS_2X) and skips any that is missing or muted. '
+            .. 'Pro Keys runs before Keys, and Keys follows the '
+            .. 'Pro Keys it just generated; Drums 2X takes its kicks from the PART DRUMS tiers just made.')
     end
 
     -- Two rows of radios, aligned on one per-option pitch (RadioGroupWidth).
@@ -76,9 +86,13 @@ function DrawDifficultyGenerateTab(ctx, midi_tracks)
         rows[#rows + 1] = { label = 'Drums Medium', field = 'diff_gen_drums_between', id = 'gen_dbtw',
                             tip = TIPS.diff_gen_drums_between,
                             opts = { { 'beats', 'Beats' }, { 'none', 'None' }, { 'keep', 'Keep' } } }
+        rows[#rows + 1] = { label = 'Drums fast 8ths', field = 'diff_gen_drums_eighths', id = 'gen_d8',
+                            tip = TIPS.diff_gen_drums_eighths,
+                            opts = { { 'hands', 'Hands' }, { 'beats', 'Beats' } } }
     end
     local all = {}
     for _, row in ipairs(rows) do for _, o in ipairs(row.opts) do all[#all + 1] = o[2] end end
+    local drums_rows = key_now == 'drums' or key_now == GEN_ALL_KEY
     local radio_w = RadioGroupWidth(all)
     for _, row in ipairs(rows) do
         r.ImGui_Text(ctx, row.label)
@@ -87,6 +101,12 @@ function DrawDifficultyGenerateTab(ctx, midi_tracks)
             if r.ImGui_RadioButton(ctx, o[2] .. '##' .. row.id, S[row.field] == o[1]) then S[row.field] = o[1] end
             Tooltip(row.tip)
         end
+    end
+    if drums_rows then
+        local _, v = r.ImGui_Checkbox(ctx, 'Only 2x bass pedal authored on PART DRUMS##gen_2x_on_1x',
+                                      S.diff_gen_drums_2x_on_1x)
+        S.diff_gen_drums_2x_on_1x = v
+        Tooltip(TIPS.diff_gen_drums_2x_on_1x)
     end
 
     SectionHeader('Generate')

@@ -7,8 +7,8 @@
 -- (difficulty_generate_retime.lua) are 240 ticks apart instead of 160, past the HOPO
 -- threshold, so a hammer-on run on Expert becomes strummed on Hard - harder than Expert
 -- in feel. Each Hard note whose Expert note was a HOPO but which no longer is one gets a
--- force-HOPO marker (F above the tier, lo + 5). From the user's hand reduction of the
--- chronosp_brutal_decay solo (bars 172-173 and 184-186), which this reproduces.
+-- force-HOPO marker (F above the tier, lo + 5). From the user's hand reduction of a
+-- 210 BPM guitar solo, which this reproduces.
 -- Hard only: the RBN docs say "Hopos should not be forced on Medium or Easy".
 
 -- The HOPO threshold is set per song in Magma, in ticks at 480 PPQ: 170 by default, or 90,
@@ -61,13 +61,11 @@ end
 -- consecutive notes that need one, from the first onset to the last note's end.
 -- A note needs one when Hard would not hammer it on by itself but can (a single note, a
 -- color the previous note does not have) and either
---   * Expert FORCED it - copied wherever the note survives: official Hard keeps 77% of
---     Expert's forced hammer-ons on single notes that survive (RB3 DLC, 7253 notes); or
+--   * Expert FORCED it - copied wherever the note survives; or
 --   * Expert hammered it on by itself and Generate's rewrite pulled it apart (8th
 --     triplets to 8ths), at most an 8th after the previous note, in a run of 2 or more.
---     Only rewritten notes: official Hard lets a lost hammer-on become a strum almost
---     always - of 14693 such notes, 4% are forced - and the RBN docs ask for markers
---     "sparingly".
+--     Only rewritten notes: elsewhere a lost hammer-on becomes a strum, and markers are
+--     used sparingly.
 function Gen5ForceHopoSpans(events, threshold_ticks)
     local spans, cur = {}, nil
     for i, ev in ipairs(events) do

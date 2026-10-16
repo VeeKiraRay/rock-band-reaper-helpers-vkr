@@ -9,24 +9,19 @@
 --   Pro Keys with a range low of 0). Output events have the same shape, so the next tier
 --   of a chain is built from them.
 --
--- Which onsets survive is Gen5SelectOnsets - the same rhythm as Guitar, Bass and Keys
--- (official Pro Keys and 5-lane Keys onsets agree 89-96% per tier). What this file adds
--- is pitch, measured on the official RB3 DLC Pro Keys charts (352 development songs,
--- hold-out excluded):
---   - Chords lose notes from the BOTTOM: the top note stays 70-80% of the time (Easy from
---     Medium 69.5%). The opposite of 5-lane Easy, which keeps the lowest gem.
---   - Hard keeps Expert's pitches (78% identical, 18% a subset, 1.4% an octave away) and
---     its lane shifts (87% identical to an Expert one). The RBN doc: remove the lane
---     shifts Hard no longer needs, except the first.
---   - Medium and Easy show one window for the whole song (every official note fits it;
---     Easy uses Medium's 95.5% of the time). Medium keeps Hard's window when Hard shows
---     one window all song (official 126 of 136 songs); otherwise the best fit.
---     Notes outside it move by whole octaves (97% of the out-of-window notes official
---     Medium keeps); notes inside never move.
---   - Sustains: the RBN doc's gaps - Hard 1/16 before a simple transition, 1/8 otherwise;
---     Medium and Easy a quarter. A sustain cut under 3/16 becomes a 1/16 note ("stubby").
---   - Interval jumps over the doc's limits are NOT fixed: official charts leave 72-89% of
---     them. Validate lists them as advisories.
+-- Which onsets survive is Gen5SelectOnsets - the same rhythm as Guitar, Bass and Keys.
+-- What this file adds is pitch (the sources and numbers: docs/difficulty_reduction.md,
+-- "Pro Keys"):
+--   - Chords lose notes from the BOTTOM - the opposite of 5-lane Easy, which keeps the
+--     lowest gem.
+--   - Hard keeps Expert's pitches and its lane shifts, dropping the ones it no longer
+--     needs, except the first.
+--   - Medium and Easy show one window for the whole song. Medium keeps Hard's window when
+--     Hard shows one window all song; otherwise the best fit. Easy keeps Medium's. Notes
+--     outside it move by whole octaves; notes inside never move.
+--   - Sustains: Hard 1/16 before a simple transition, 1/8 otherwise; Medium and Easy a
+--     quarter. A sustain cut under 3/16 becomes a 1/16 note ("stubby").
+--   - Interval jumps over the doc's limits are NOT fixed; Validate lists them as advisories.
 --
 -- Requires (globals, read at call time): PK_MAX_CHORD, PK_MAX_SPAN (actions_difficulty.lua),
 --   Gen5SelectOnsets (difficulty_generate_rhythm.lua), GenPlanOverlaps / GenNextAfterHold
@@ -42,8 +37,7 @@ GEN_PK_WINDOWS = {
     [9] = { lo = 57, hi = 72 },   -- A2-C4
 }
 -- Tie-break when two windows fit equally: the doc's preferred C, F and A ranges, then E
--- ("the most common" alternative), then D and G. Official Medium: C 93, F 98, A 61,
--- G 63, E 25, D 11 songs.
+-- ("the most common" alternative), then D and G.
 local WINDOW_ORDER = { 0, 5, 9, 4, 2, 7 }
 local PK_LO, PK_HI = 48, 72
 
@@ -97,12 +91,8 @@ end
 
 -- The upper tier's window when Medium/Easy simply keep it: the upper tier shows ONE window
 -- for the whole song (every lane shift the same). The charter chose it, so it stays, a
--- non-preferred one too: the doc prefers C, F and A, but "if lane shifts can be avoided
--- altogether, or a certain section fits better within a different range (E-2, E2-G3 range
--- is the most common), that is acceptable". Official Medium keeps a single Hard window in
--- 126 of 136 songs (C/F/A 94 of 97, D/E/G 32 of 39), and Easy keeps Medium's ("the
--- visible range should match that of Medium", official 95.5%). Notes outside fold by
--- octaves. nil when the upper tier shows several windows: the best fit decides.
+-- non-preferred one too; Easy keeps Medium's. Notes outside fold by octaves. nil when the
+-- upper tier shows several windows: the best fit decides.
 function GenPKUpperWindow(shifts)
     local w
     for _, sh in ipairs(shifts or {}) do
@@ -115,7 +105,7 @@ end
 -- Move each event into window w by whole octaves. A note or chord that fits stays where it
 -- is, so the same upper note always becomes the same note here: choosing the octave
 -- nearest the previous note moved notes that already fit and left one D3 an octave above
--- every other D (pojat_lemmikkih Medium, the user's review). One that does not fit moves
+-- every other D. One that does not fit moves
 -- as a whole by the smallest number of octaves that fits; a chord that fits no whole
 -- placement folds note by note and is reduced again. Returns how many events changed.
 local function FitWindow(out, w, dl)
@@ -243,7 +233,7 @@ local function FixLengths(dl, out)
 end
 
 -- True when a generated tier is the upper tier as it is: every onset, pitch and length
--- (within 1/96 QN). Happens on Hard when Expert is already simple (pojat_lemmikkih).
+-- (within 1/96 QN). Happens on Hard when Expert is already simple.
 function GenPKSameAsUpper(out, upper)
     if #out ~= #upper then return false end
     for i, ev in ipairs(out) do
@@ -256,12 +246,9 @@ function GenPKSameAsUpper(out, upper)
     return true
 end
 
--- Pull every sustain back, as some official charters reduce Hard: by a 1/16 before a
--- simple transition (or at a phrase end), by a 1/8 otherwise - the commonest official
--- pull-backs (1/8 -> 3/16 simple, 1/8 -> 1/4 complex). One left shorter than 3/16
--- becomes a 1/16 note, as official Hard does to about half the tails it shortens.
--- Official charters do this per song, nearly all or nothing: 41 of 275 songs pull back
--- 75%+ of Hard's sustains, 185 under 5%. Returns (pulled, cut).
+-- Pull every sustain back (the "Shorten sustains" answer when Hard would equal Expert): by
+-- a 1/16 before a simple transition (or at a phrase end), by a 1/8 otherwise. One left
+-- shorter than 3/16 becomes a 1/16 note. Returns (pulled, cut).
 local function PullBackSustains(out)
     local pulled, cut = 0, 0
     for i, ev in ipairs(out) do

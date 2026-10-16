@@ -174,6 +174,8 @@ S = {
     diff_gb_instrument    = 'gtr',  -- 'gtr' or 'bass' (persisted)
     -- Drums difficulty (not persisted - auto-detected by name)
     diff_drums_idx        = -1,
+    diff_drums2x_idx      = -1,   -- PART DRUMS_2X (double bass pedal), Generate only
+    diff_gen_drums_2x_on_1x = false,  -- Generate: PART DRUMS holds the 2x bass pedal chart (opt-in)
     -- Difficulty > Generate: instrument dropdown, a GEN_INSTRUMENTS key or 'all'
     -- (session only - not persisted, starts on Guitar)
     diff_gen_instrument   = 'gtr',
@@ -186,6 +188,10 @@ S = {
     -- on a beat, as official charts do) | 'none' (the RBN doc) | 'keep'. See
     -- difficulty_generate_drums.lua (opts.between).
     diff_gen_drums_between = 'beats',
+    -- (session only) Drums Medium/Easy at fast tempos: which of three hand hits an 8th apart
+    -- goes - 'hands' (the least important hand gems; default, user choice 2026-10-14) | 'beats'
+    -- (the "and"s, as official charts do). See difficulty_generate_drums.lua (opts.eighth_hands).
+    diff_gen_drums_eighths = 'hands',
     -- Difficulty tab: pending overwrite confirmation (not persisted, transient UI
     -- state). nil = no popup. Otherwise: { message = string, on_confirm = function()
     -- ... end, confirm_label = string? } - set by a Copy*Diff call or by
@@ -1214,13 +1220,37 @@ TIPS = {
     -- Difficulty tab - Generate
     diff_gen_instrument = "Which instrument to generate difficulties for.\n\n" ..
                           "All instruments uses each instrument's default track (PART GUITAR,\n" ..
-                          "PART BASS, PART REAL_KEYS_X/H/M/E, PART KEYS, PART DRUMS) and skips\n" ..
-                          "any that is missing or muted. Pro Keys runs before Keys, and Keys\n" ..
+                          "PART BASS, PART REAL_KEYS_X/H/M/E, PART KEYS, PART DRUMS,\n" ..
+                          "PART DRUMS_2X) and skips any that is missing or muted.\n" ..
+                          "Generate never writes to a muted track: a single instrument whose\n" ..
+                          "track is muted stops with a message to unmute it first.\n\n" ..
+                          "Pro Keys runs before Keys, and Keys\n" ..
                           "follows the Pro Keys it just generated. Drums are reduced on their\n" ..
-                          "own: they neither follow nor lead the other instruments.",
+                          "own: they neither follow nor lead the other instruments.\n\n" ..
+                          "Drums covers PART DRUMS_2X (double bass pedal) too: it runs\n" ..
+                          "after PART DRUMS, and each 2X difficulty plays the kicks of the\n" ..
+                          "PART DRUMS difficulty one step up. The result lists both tracks.",
     diff_gen_track      = "The instrument's track. Shared with that instrument's own\n" ..
                           "Difficulty sub-tab - changing it here changes it there too.",
-    diff_gen_tier       = "Generate this difficulty from the one above it as it is now\n" ..
+    diff_gen_drums_2x_on_1x = "For a song charted only in its double bass pedal version, on\n" ..
+                          "PART DRUMS (no PART DRUMS_2X). PART DRUMS is then generated the\n" ..
+                          "way a PART DRUMS_2X would be: its Expert stays, and each lower\n" ..
+                          "difficulty plays the kicks of a single-pedal version made in\n" ..
+                          "memory (what \"Remove 2x kicks\" would leave), one difficulty up.\n\n" ..
+                          "Stops without writing anything when the song also has a\n" ..
+                          "PART DRUMS_2X, or when PART DRUMS Expert has no double-bass\n" ..
+                          "kicks to remove (a single-pedal chart).",
+    diff_gen_track2x    = "The song's PART DRUMS_2X (double bass pedal) track, if it has one.\n" ..
+                          "Generated in the same run, after PART DRUMS: each 2X difficulty\n" ..
+                          "plays the kicks of the PART DRUMS difficulty one step up (Hard\n" ..
+                          "the single-pedal Expert's, Medium PART DRUMS Hard's, Easy its\n" ..
+                          "Medium's); the hands are reduced as usual.\n\n" ..
+                          "With no PART DRUMS ((none) in the Track row), only the 2X track\n" ..
+                          "is written:\n" ..
+                          "a single-pedal version is made in memory from the 2X Expert\n" ..
+                          "(fast kick runs thinned) and its kicks are used.\n\n" ..
+                          "(none): the song has no 2X track.",
+    diff_gen_tier       ="Generate this difficulty from the one above it as it is now\n" ..
                           "(Hard from Expert, Medium from Hard, Easy from Medium). Useful\n" ..
                           "after hand-editing a tier, to rebuild only the ones below it.\n\n" ..
                           "Thins notes the way official charts do - downbeats and beats\n" ..
@@ -1302,6 +1332,16 @@ TIPS = {
                           "None: drop them all - the RBN doc's rule (\"No kicks or snares in\n" ..
                           "between hihat/ride gems\").\n" ..
                           "Keep: keep them all.",
+    diff_gen_drums_eighths = "Drums Medium (from 150 BPM) and Easy (from 140 BPM): no three\n" ..
+                          "hand hits in a row an 8th apart - official charts at these\n" ..
+                          "tempos almost never ask for them. A pair stays; of three, one\n" ..
+                          "loses its hands (a kick under it stays).\n\n" ..
+                          "Beats: the hit on the \"and\" goes - what official charts do\n" ..
+                          "(beat, \"and\", beat keeps the two beats 89-100% of the time).\n" ..
+                          "Hands: the hit with the least important hands goes (crash,\n" ..
+                          "snare, toms, then ride and hi-hat; a beat wins a tie) - a hi-hat\n" ..
+                          "on the beat can go so two snares stay together. Not what\n" ..
+                          "official charts do; keeps more of the groove's movement.",
     diff_gen_busy_drop  = "How many notes a full bar of 8ths loses on Hard.\n" ..
                           "Drums: only when Hard would barely differ from Expert (over 95%\n" ..
                           "of its notes) - a bar of steady 8th hi-hats loses that many\n" ..

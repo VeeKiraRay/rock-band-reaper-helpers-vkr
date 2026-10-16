@@ -35,7 +35,8 @@
 --       one click. Pick an instrument - or All instruments, which uses PART
 --       GUITAR, PART BASS, PART REAL_KEYS_X/H/M/E, PART KEYS and PART DRUMS
 --       and skips any that is missing or muted - then generate one difficulty
---       or the whole Hard > Medium > Easy chain.
+--       or the whole Hard > Medium > Easy chain. Generate never writes to a
+--       muted track: a muted track picked for one instrument stops the run.
 --     - It reduces the way official charts do, not just enough to pass
 --       Validate. It keeps downbeats and beats first; Medium loses most 8ths
 --       and Easy about half the beats. Measured against the official RB3 DLC
@@ -158,21 +159,44 @@
 --       and 3 plus beat 4 where Expert has it, so the bar ends with a faster
 --       kick pattern; with quiet hands every beat keeps its kick, under the
 --       snare too) and plays Expert's disco-flip sections
---       as a normal beat. Medium moves the hi-hat to quarters from 130 BPM -
+--       as a normal beat. A tom the rewrite moves gets one tom marker over
+--       its whole run, and the result names those bars to check. Medium
+--       plays a two-hand hit with a tom as one gem from 140 BPM, and moves
+--       the hi-hat to quarters from 130 BPM -
 --       where official charts switch, earlier than the RBN doc's 140 - and on
 --       a slower song too when Medium would otherwise keep over 93% of Hard;
 --       it keeps kicks on quarter notes (half a bar apart under busy hands),
 --       at most two gems at once, and keeps a kick or snare
 --       between hi-hat notes only on the beat ("Drums Medium": Beats, None
 --       as the RBN doc says, or Keep). Easy plays kick + snare in verses on
---       the hi-hat and a two-hand beat elsewhere, read from the EVENTS
---       track's sections, and never pairs a gem with a kick. Medium and Easy
+--       the hi-hat or ride that have enough kick and snare (a sparse verse
+--       keeps its cymbal) and a two-hand beat elsewhere, read from the EVENTS
+--       track's sections, never pairs a gem with a kick, and from 140 BPM
+--       drops a lone drum on the "and" between two beat hits; from 110 BPM a
+--       bar with the snare on the "and"s plays only the "and"s, and from
+--       120 BPM a run of 5+ snare 8ths keeps only its beats. Medium and Easy
 --       drop a hi-hat sandwiched between snare accents, so the hands don't
---       alternate hat and accent on every 8th. Every difficulty
+--       alternate hat and accent on every 8th. On fast songs (Medium from
+--       150 BPM, Easy from 140) no three hand hits come an 8th apart - a
+--       pair stays; "Drums fast 8ths" picks which hit goes: Beats (the
+--       "and", as official charts do) or Hands (the hit with the least
+--       important hands, so two snares can stay together). Every difficulty
 --       thins the kicks in fills, plays rolls on its own grid with an even
 --       number of hits, and turns a double crash with no room before it into
 --       one crash. With "Hard fast runs" on Rewrite or Auto, tom and snare
---       fills are played one grid slower instead of thinned to 8ths.
+--       fills are played one grid slower instead of thinned to 8ths;
+--       Medium and Easy then reduce such a fill from Expert's notes, so
+--       it does not vanish from their 8th grid.
+--     - Drums also generates the song's PART DRUMS_2X (double bass pedal),
+--       after PART DRUMS: each 2X difficulty plays the kicks of the PART
+--       DRUMS difficulty one step up - Hard the single-pedal Expert's,
+--       Medium PART DRUMS Hard's, Easy its Medium's - so the 2X Hard stays
+--       harder than the normal one. With no PART DRUMS (or a muted one in All
+--       instruments), only
+--       the 2X track is written, its kicks taken from a single-pedal version
+--       made in memory the way "Remove 2x kicks" makes one. The result lists
+--       both tracks. "Only 2x bass pedal authored on PART DRUMS" treats
+--       PART DRUMS itself as the 2x chart, for a song charted only that way.
 --     - Drums Validate: "kick during a drum fill" is now an advisory, and
 --       only when a fill keeps every kick of the difficulty above (official
 --       charts thin them, they don't remove them).

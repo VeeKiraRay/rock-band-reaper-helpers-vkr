@@ -16,12 +16,9 @@
 --               1.5 in 6/8, 9/8 and 12/8).
 -- Output event: { qn, qn_e, offs } with offs relative to the TARGET tier's lowest pitch.
 --
--- What it aims for is what official charts do, not merely what Validate requires:
--- Validate's errors barely thin Guitar/Bass Medium and Easy, whose spacing rules are
--- advisories. The targets come from dev/calibration/run_difficulty_probe_vkr.lua over
--- the official RB3 DLC charts - Hard keeps nearly every beat and most 8ths, Medium drops
--- most remaining 8ths, Easy keeps the downbeats and about half the beats - and are
--- tuned against those charts with run_generate_eval_offline.lua.
+-- What it aims for is what official charts do, not merely what Validate requires
+-- (Validate's Guitar/Bass Medium/Easy spacing rules are advisories); the numbers are tuned
+-- with run_generate_eval_offline.lua. Each rule's source: docs/difficulty_reduction.md.
 --
 -- Which onsets survive is decided by Gen5SelectOnsets (difficulty_generate_rhythm.lua),
 -- shared with Pro Keys; the parameters live in difficulty_generate_params.lua. This
@@ -76,7 +73,7 @@ local function FixLengths(kind, dl, out)
             end
             -- A tail the tier above shortened for a note this tier drops comes back up to
             -- this tier's minimum when the original note was that long and there is room:
-            -- Easy inherited a 3/4 tail from Medium and lost the sustain (pojat bars 70/74).
+            -- Easy inherited a 3/4 tail from Medium and lost the sustain.
             local min_len = MinSustainQN(dl, ev.bpm)
             if ev.qn_e - ev.qn < min_len - EPS and (ev.qn_e_full or ev.qn_e) - ev.qn >= min_len - EPS
                and (not nx or nx.qn - ReleaseGapQN(kind, dl, ev) >= ev.qn + min_len - EPS) then

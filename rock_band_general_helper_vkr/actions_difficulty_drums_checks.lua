@@ -20,7 +20,8 @@ DRUMS_RULES = {
     roll_hard_16th_bpm     = 140,  -- H: avoid 16th-rate rolls at/above this
     roll_medium_max_qn     = 0.5,  -- M: rolls/fills never faster than 8th-rate (always, any tempo)
     roll_easy_quarter_bpm  = 120,  -- E: rolls/fills reduced to quarter-rate at/above this
-    general_hard_8th_bpm   = 170,  -- H: upper limit for constant 8th notes
+    general_hard_8th_bpm   = 170,  -- H: upper limit for constant 8th notes (where Expert is not faster)
+    hard_trip_stream_bpm   = 140,  -- H: constant 8th triplets copied from Expert from this tempo
     general_medium_8th_bpm = 140,  -- M: timekeeping reduced from 8th above this (also used by E)
     kick_grid_bpm          = 100,  -- M/E: kicks quarter-grid-only above this
     kick_per_measure_bpm   = 170,  -- M/E: max 1 kick per measure above this
@@ -249,14 +250,23 @@ local function CheckDrumsKickPerMeasure(events, offset_rng)
     return issues
 end
 
+-- A Yellow/Blue/Green gem (offset 2-4) at time t under its Pro Drums tom marker
+-- (110-112) - a tom, not a cymbal. toms: ReadDrumsNotes(track, 110, 112).
+local function UnderTom(toms, o, t)
+    for _, m in ipairs(toms or {}) do
+        if m.pitch == 108 + o and t >= m.s - 0.001 and t < m.e - 0.001 then return true end
+    end
+    return false
+end
+
 -- Medium only: a kick+crash(Green) chord is fine on-beat, but not off-beat/
--- syncopated.
-local function CheckDrumsOnBeatCrashKick(events, offset_rng)
+-- syncopated. A Green tom is no crash.
+local function CheckDrumsOnBeatCrashKick(events, offset_rng, toms)
     local issues = {}
     for _, ev in ipairs(events) do
         if #ev.pitches == 2 then
             local o1, o2 = ev.pitches[1] - offset_rng.lo, ev.pitches[2] - offset_rng.lo
-            if o1 == 0 and o2 == 4 then  -- kick + Green, pitches are sorted ascending
+            if o1 == 0 and o2 == 4 and not UnderTom(toms, 4, ev.s) then  -- kick + Green, pitches are sorted ascending
                 local frac = QNAt(ev.s) % 1.0
                 local off  = math.min(frac, 1.0 - frac)
                 if off > GRACE then
@@ -271,14 +281,16 @@ end
 
 -- Cascades H -> M -> E: a Green+Yellow or Green+Blue double crash needs a
 -- quarter-note gap before it to prepare, otherwise it should be reduced to a
--- single Green.
-local function CheckDrumsDoubleCrash(events, offset_rng)
+-- single Green. Cymbals only: a gem under its tom marker makes it a tom pair or a
+-- cymbal + tom, which official Hard keeps as is about half the time.
+local function CheckDrumsDoubleCrash(events, offset_rng, toms)
     local issues = {}
     for i = 1, #events do
         local ev = events[i]
         if #ev.pitches == 2 then
             local o1, o2 = ev.pitches[1] - offset_rng.lo, ev.pitches[2] - offset_rng.lo
-            if o2 == 4 and (o1 == 2 or o1 == 3) then  -- double crash, sorted ascending
+            if o2 == 4 and (o1 == 2 or o1 == 3)  -- double crash, sorted ascending
+               and not UnderTom(toms, o1, ev.s) and not UnderTom(toms, o2, ev.s) then
                 local ok_space = false
                 if i > 1 then
                     local gap_qn = QNAt(ev.s) - QNAt(events[i - 1].s)
@@ -415,29 +427,77 @@ end
 --   Hard:   ~170 BPM upper limit (own).
 --   Medium: >=140 BPM (own, stricter than Hard - no inheritance needed).
 --   Easy:   inherits Medium's 140 BPM (no own general-density override).
-local function CheckDrumsGeneralDensity(events, diff_label)
-    local bpm_threshold
-    if diff_label == 'H' then bpm_threshold = R.general_hard_8th_bpm
-    elseif diff_label == 'M' or diff_label == 'E' then bpm_threshold = R.general_medium_8th_bpm
-    else return {} end
-
+local function CheckDrumsGeneralDensity(events, diff_label, expert)
+    local medium = diff_label == 'M' or diff_label == 'E'
+    if diff_label ~= 'H' and not medium then return {} end
+    -- Medium/Easy: every hit, constant 8ths from general_medium_8th_bpm (absolute).
+    -- Hard, RELATIVE TO EXPERT (2026-10-14): hand notes only (a kick-only hit is no part of
+    -- the hands' "constant stream"), and a run of min_run_len hand hits at one spacing is a
+    -- problem only where Expert does not play faster over the same stretch - 8ths from
+    -- general_hard_8th_bpm, 8th triplets from hard_trip_stream_bpm. A reduction (Expert's 8th
+    -- triplets or 16ths played as 8ths) passes, a copy of Expert's own stream does not. The
+    -- Generate planner's BreakEighthRuns counts the same way. `expert`: Expert's hit events
+    -- (Hard only; without them every run counts, as before).
+    local spacings = medium and { { 0.5, R.general_medium_8th_bpm, '8th notes' } }
+                     or { { 0.5, R.general_hard_8th_bpm, '8th notes' }, { 1 / 3, R.hard_trip_stream_bpm, '8th triplets' } }
+    -- Hit events with a hand gem: anything but the kick (every tier's kick pitch - 60, 72,
+    -- 84, 96 - is a multiple of 12, so one test serves Hard and Expert alike).
+    local function Hands(list)
+        local out = {}
+        for _, ev in ipairs(list or {}) do
+            for _, p in ipairs(ev.pitches) do
+                if p % 12 ~= DRUMS_RANGE.X.lo % 12 then out[#out + 1] = ev; break end
+            end
+        end
+        return out
+    end
+    if not medium then events = Hands(events) end
+    local xq = {}
+    if not medium and expert then
+        for _, ev in ipairs(Hands(expert)) do xq[#xq + 1] = QNAt(ev.s) end
+    end
+    local function ExpertFaster(a, b, sp)
+        if medium or not expert then return false end
+        local q0, q1 = QNAt(events[a].s), QNAt(events[b].s)
+        local cnt, prev, closest = 0, nil, math.huge
+        for _, q in ipairs(xq) do
+            if q >= q0 - 0.01 and q <= q1 + 0.01 then
+                cnt = cnt + 1
+                if prev then closest = math.min(closest, q - prev) end
+                prev = q
+            end
+        end
+        return cnt > b - a + 1 or closest < sp - 0.01
+    end
     local issues = {}
     local i = 1
     while i < #events do
-        local run_start = i
+        local gap = QNAt(events[i + 1].s) - QNAt(events[i].s)
+        local sp
+        for _, c in ipairs(spacings) do if math.abs(gap - c[1]) <= c[1] * GRACE then sp = c end end
         local j = i
-        while j < #events do
-            local gap_qn = QNAt(events[j + 1].s) - QNAt(events[j].s)
-            if math.abs(gap_qn - 0.5) > 0.5 * GRACE then break end
-            j = j + 1
+        if sp then
+            while j < #events do
+                local g = QNAt(events[j + 1].s) - QNAt(events[j].s)
+                if math.abs(g - sp[1]) > sp[1] * GRACE then break end
+                j = j + 1
+            end
         end
-        local run_len = j - run_start + 1
-        if run_len >= R.min_run_len then
-            local bpm = 60.0 / GetDrumsBeatDur(events[run_start].s)
-            if bpm >= bpm_threshold then
-                issues[#issues + 1] = DiffIssue(events[run_start].s, events[run_start].pitches,
-                    ('%s-%s: %d consecutive 8th notes at %.0f BPM (reduce timekeeping density above %d BPM on %s)'):format(
-                    FormatTime(events[run_start].s), FormatTime(events[j].s), run_len, bpm, bpm_threshold, DIFF_NAMES[diff_label]))
+        local run_len = j - i + 1
+        if sp and run_len >= R.min_run_len then
+            local bpm = 60.0 / GetDrumsBeatDur(events[i].s)
+            if bpm >= sp[2] then
+                -- The first stretch of min_run_len hits Expert does not play faster.
+                local bad
+                for a = i, j - R.min_run_len + 1 do
+                    if not ExpertFaster(a, a + R.min_run_len - 1, sp[1]) then bad = a; break end
+                end
+                if bad then
+                    issues[#issues + 1] = DiffIssue(events[i].s, events[i].pitches,
+                        ('%s-%s: %d consecutive %s at %.0f BPM%s (reduce timekeeping density above %d BPM on %s)'):format(
+                        FormatTime(events[i].s), FormatTime(events[j].s), run_len, sp[3], bpm,
+                        medium and '' or ' where Expert plays them too', sp[2], DIFF_NAMES[diff_label]))
+                end
             end
             i = j + 1
         else
@@ -483,6 +543,9 @@ end
 function CollectDrumsChecks(diff_label, events, track, sel_s, sel_e, upper_events)
     local rng  = DRUMS_RANGE[diff_label]
     local cats = {}
+    -- Pro Drums tom markers, read whole: one that starts before the selection still covers
+    -- the gems in it.
+    local toms = ReadDrumsNotes(track, 110, 112)
 
     cats[#cats + 1] = { name = 'Notes outside valid range', rule = 'range', issues = CheckDrumsOutOfRange(events, rng.hi) }
 
@@ -496,14 +559,15 @@ function CollectDrumsChecks(diff_label, events, track, sel_s, sel_e, upper_event
         -- CheckDrumsYellowBlueInterleave is not wired in: as written it doesn't match
         -- the intended rule (too strong) - official Medium keeps a kick or snare between
         -- hi-hat notes when it falls on the beat (RB3 DLC: 83-94% of those survive).
-        cats[#cats + 1] = { name = 'On-beat crash+kick only', rule = 'crash_kick', issues = CheckDrumsOnBeatCrashKick(events, rng) }
+        cats[#cats + 1] = { name = 'On-beat crash+kick only', rule = 'crash_kick', issues = CheckDrumsOnBeatCrashKick(events, rng, toms) }
     elseif diff_label == 'E' then
         cats[#cats + 1] = { name = 'No gems paired with kick (Easy)', rule = 'kick_pairing', issues = CheckDrumsKickPairing(events, rng) }
     end
 
     if diff_label ~= 'X' then
-        cats[#cats + 1] = { name = 'Timekeeping density', rule = 'density', issues = CheckDrumsGeneralDensity(events, diff_label) }
-        cats[#cats + 1] = { name = 'Double crash prep space', rule = 'double_crash', issues = CheckDrumsDoubleCrash(events, rng) }
+        cats[#cats + 1] = { name = 'Timekeeping density', rule = 'density', issues = CheckDrumsGeneralDensity(events, diff_label,
+            diff_label == 'H' and (ReadDrumsTierEvents(track, 'X', sel_s, sel_e)) or nil) }
+        cats[#cats + 1] = { name = 'Double crash prep space', rule = 'double_crash', issues = CheckDrumsDoubleCrash(events, rng, toms) }
 
         local fills = ReadDrumsNotes(track, 120, 120, sel_s, sel_e)
         local rolls = ReadDrumsNotes(track, 126, 127, sel_s, sel_e)

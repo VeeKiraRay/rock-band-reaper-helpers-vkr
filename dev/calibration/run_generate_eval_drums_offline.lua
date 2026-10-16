@@ -1,11 +1,13 @@
 -- Offline evaluation of the Difficulty > Generate Drums planner (difficulty_generate_drums.lua)
 -- against the official RB3 DLC charts. Plain Lua 5.4, no REAPER:
 --
---   lua dev/calibration/run_generate_eval_drums_offline.lua [fast_runs] [holdout]
+--   lua dev/calibration/run_generate_eval_drums_offline.lua [fast_runs] [beats|hands|off] [holdout]
 --
 -- fast_runs: rewrite | auto | thin (default GEN5_PARAMS.fast_runs_default). 'thin' is the
 -- official-like behaviour (no note ever moves); 'rewrite' moves fill runs, which then
 -- never line up with an official onset - expect a lower Hard F1 there.
+-- beats | hands: the "Drums fast 8ths" setting (opts.eighth_hands; default
+-- GEN_DRUMS_PARAMS.lower_eighth_hands_default); off: that rule switched off.
 --
 -- For each tier it feeds the OFFICIAL upper tier to the planner (X>H, H>M, M>E) and
 -- compares the result with the official lower tier: onset precision / recall / F1, and per
@@ -23,9 +25,10 @@
 
 local _dir  = (arg and arg[0] or ''):match('^(.+[\\/])') or './'
 local _root = _dir .. '../../'
-local FAST, MODE, DIAG = nil, 'dev', false
+local FAST, MODE, DIAG, EIGHTH = nil, 'dev', false, nil
 for _, a in ipairs(arg or {}) do
-    if a == 'holdout' then MODE = 'holdout' elseif a == 'diag' then DIAG = true else FAST = a end
+    if a == 'holdout' then MODE = 'holdout' elseif a == 'diag' then DIAG = true
+    elseif a == 'beats' or a == 'hands' or a == 'off' then EIGHTH = a else FAST = a end
 end
 
 r = {}
@@ -37,6 +40,7 @@ dofile(_root .. 'rock_band_general_helper_vkr/actions_difficulty_drums_checks.lu
 dofile(_root .. 'rock_band_general_helper_vkr/difficulty_generate_params.lua')
 dofile(_root .. 'rock_band_general_helper_vkr/difficulty_generate_retime.lua')
 dofile(_root .. 'rock_band_general_helper_vkr/difficulty_generate_drums.lua')
+if EIGHTH == 'off' then GEN_DRUMS_PARAMS.lower_eighth_hands_bpm = nil end
 
 -- diag: keep rate by lane x beat class, generated vs official, from the same upper tier.
 local KEEP, MATCH = {}, 0.05
@@ -120,6 +124,13 @@ local function Has(ev, o) for _, x in ipairs(ev.offs) do if x == o then return t
 -- Returns { rule = count }.
 local function Violations(dl, evs, ctx)
     local v = {}
+    -- A gem under its Pro Drums tom marker is a tom, not a crash (as Validate's UnderTom).
+    local function Tom(o, qn)
+        for _, s in ipairs(ctx.toms and ctx.toms[o] or {}) do
+            if qn >= s.qn - 0.004 and qn < s.qn_e - 0.004 then return true end
+        end
+        return false
+    end
     local function Inc(k) v[k] = (v[k] or 0) + 1 end
     local low = dl == 'M' or dl == 'E'
     local kicks_bar = {}
@@ -132,11 +143,13 @@ local function Violations(dl, evs, ctx)
             kicks_bar[key] = b
             b.n = b.n + 1
         end
-        if dl == 'M' and #ev.offs == 2 and ev.offs[1] == 0 and ev.offs[2] == 4 and not NearInt(ev.qn, 0.05) then
+        if dl == 'M' and #ev.offs == 2 and ev.offs[1] == 0 and ev.offs[2] == 4 and not NearInt(ev.qn, 0.05)
+           and not Tom(4, ev.qn) then
             Inc('crash_kick')
         end
         if dl == 'E' and #ev.offs >= 2 and Has(ev, 0) then Inc('kick_pairing') end
-        if dl ~= 'X' and #ev.offs == 2 and ev.offs[2] == 4 and (ev.offs[1] == 2 or ev.offs[1] == 3) then
+        if dl ~= 'X' and #ev.offs == 2 and ev.offs[2] == 4 and (ev.offs[1] == 2 or ev.offs[1] == 3)
+           and not Tom(ev.offs[1], ev.qn) and not Tom(4, ev.qn) then
             local pv = evs[i - 1]
             if not pv or ev.qn - pv.qn < 0.95 then Inc('double_crash') end
         end
@@ -146,17 +159,55 @@ local function Violations(dl, evs, ctx)
     end
     if dl ~= 'X' then
         local lim = dl == 'H' and R.general_hard_8th_bpm or R.general_medium_8th_bpm
+        -- Hard counts hand notes only, as Validate does (a kick-only hit is no part of it).
+        local all = evs
+        if dl == 'H' then
+            evs = {}
+            for _, ev in ipairs(all) do
+                for _, o in ipairs(ev.offs) do if o ~= 0 then evs[#evs + 1] = ev; break end end
+            end
+        end
+        -- Hard: relative to Expert (ctx.x_events), 8ths from 170 and 8th triplets from 140,
+        -- as Validate's CheckDrumsGeneralDensity.
+        local spacings = dl == 'H' and { { 0.5, lim }, { 1 / 3, R.hard_trip_stream_bpm } } or { { 0.5, lim } }
+        local xq = {}
+        if dl == 'H' and ctx.x_events then
+            for _, ev in ipairs(ctx.x_events) do
+                for _, o in ipairs(ev.offs) do if o ~= 0 then xq[#xq + 1] = ev.qn; break end end
+            end
+        end
+        local function ExpertFaster(a, b, sp)
+            if dl ~= 'H' or not ctx.x_events then return false end
+            local cnt, prev, closest = 0, nil, math.huge
+            for _, q in ipairs(xq) do
+                if q >= evs[a].qn - 0.01 and q <= evs[b].qn + 0.01 then
+                    cnt = cnt + 1
+                    if prev then closest = math.min(closest, q - prev) end
+                    prev = q
+                end
+            end
+            return cnt > b - a + 1 or closest < sp - 0.01
+        end
         local i = 1
         while i < #evs do
+            local sp
+            for _, c in ipairs(spacings) do if math.abs(evs[i + 1].qn - evs[i].qn - c[1]) <= 0.025 then sp = c end end
             local j = i
-            while j < #evs and math.abs(evs[j + 1].qn - evs[j].qn - 0.5) <= 0.025 do j = j + 1 end
-            if j - i + 1 >= R.min_run_len then
-                if (evs[i].bpm or 120) >= lim then Inc('density') end
+            if sp then
+                while j < #evs and math.abs(evs[j + 1].qn - evs[j].qn - sp[1]) <= 0.025 do j = j + 1 end
+            end
+            if sp and j - i + 1 >= R.min_run_len then
+                if (evs[i].bpm or 120) >= sp[2] then
+                    for a = i, j - R.min_run_len + 1 do
+                        if not ExpertFaster(a, a + R.min_run_len - 1, sp[1]) then Inc('density'); break end
+                    end
+                end
                 i = j + 1
             else
                 i = i + 1
             end
         end
+        evs = all
         for _, roll in ipairs(ctx.rolls) do
             local gems, first, last, n = 0, nil, nil, 0
             for _, ev in ipairs(evs) do
@@ -226,22 +277,27 @@ for _, path in ipairs(files) do
                 if ok then
                     songs = songs + 1
                     local ctx = SmfDrumsContext(song, trk)
-                    local opts = { fast_runs = FAST, ctx = ctx }
+                    ctx.x_events = T.X   -- Hard's density check is relative to Expert
+                    local opts = { fast_runs = FAST, ctx = ctx, eighth_hands = EIGHTH }
                     local viol_song = 0
                     for _, dl in ipairs({ 'H', 'M', 'E' }) do
-                        local out = GenDrumsPlanTier(dl, T[UPPER[dl]], opts)
-                        Accumulate(stats[dl], dl, out, T[dl], ctx, true)
+                        -- log.ctx: the markers as this tier leaves them (Hard's rewrite may
+                        -- extend tom markers).
+                        local out, log = GenDrumsPlanTier(dl, T[UPPER[dl]], opts)
+                        Accumulate(stats[dl], dl, out, T[dl], log.ctx, true)
                         if DIAG then
                             KeepRates(dl, T[UPPER[dl]], out, T[dl])
                             if dl == 'E' then CompareBarTypes(out, T.E) end
                         end
                         Accumulate(stats['copy' .. dl], dl, T[UPPER[dl]], T[dl], ctx, false)
-                        for _, n in pairs(Violations(dl, out, ctx)) do viol_song = viol_song + n end
+                        for _, n in pairs(Violations(dl, out, log.ctx)) do viol_song = viol_song + n end
                     end
-                    local up = T.X
+                    local up, copts = T.X, { fast_runs = FAST, ctx = ctx, eighth_hands = EIGHTH }
                     for _, dl in ipairs({ 'H', 'M', 'E' }) do
-                        local out = GenDrumsPlanTier(dl, up, opts)
-                        Accumulate(stats['chain' .. dl], dl, out, T[dl], ctx, false)
+                        copts.expert = dl == 'M' and T.X or nil
+                        local out, log = GenDrumsPlanTier(dl, up, copts)
+                        copts.ctx = log.ctx
+                        Accumulate(stats['chain' .. dl], dl, out, T[dl], log.ctx, false)
                         up = out
                     end
                     if viol_song > 0 then per_song[#per_song + 1] = { name, viol_song } end
@@ -258,7 +314,8 @@ local function F1(st)
     local r_ = st.tp / math.max(1, st.off)
     return 100 * p, 100 * r_, p + r_ > 0 and 200 * p * r_ / (p + r_) or 0
 end
-P('Drums Generate evaluation - %d %s songs, fast runs: %s', songs, MODE, FAST or GEN5_PARAMS.fast_runs_default)
+P('Drums Generate evaluation - %d %s songs, fast runs: %s, fast 8ths: %s', songs, MODE, FAST or GEN5_PARAMS.fast_runs_default,
+  EIGHTH or GEN_DRUMS_PARAMS.lower_eighth_hands_default)
 P('')
 P('%-8s %7s %7s %7s  %8s   %s', 'tier', 'prec', 'recall', 'F1', 'notes', 'per lane recall / precision (K R Y B G)')
 for _, row in ipairs({ { 'H', 'H' }, { 'M', 'M' }, { 'E', 'E' }, { 'chain H', 'chainH' }, { 'chain M', 'chainM' },

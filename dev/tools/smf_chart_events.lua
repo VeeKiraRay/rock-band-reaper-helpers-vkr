@@ -145,6 +145,7 @@ end
 --   disco    Expert's disco-flip spans: [mix 3 drumsNd] up to the next [mix 3 drumsN]
 --            ("dnoflip" is not a flip for the lower tiers)
 --   sections { { qn, name }... }  [section x] / [prc_x] text events on EVENTS
+--   song_bpm the tempo at bar 1 (the song's authored tempo)
 function SmfDrumsContext(song, trk)
     local tpqn = song.tpqn
     local function Spans(lo, hi)
@@ -156,7 +157,7 @@ function SmfDrumsContext(song, trk)
     end
     local ctx = { fills = Spans(120, 120), rolls = Spans(126, 127),
                   toms = { [2] = Spans(110, 110), [3] = Spans(111, 111), [4] = Spans(112, 112) },
-                  disco = {}, sections = {} }
+                  disco = {}, sections = {}, song_bpm = SmfSongTiming(song).Bpm(0) }
     local open
     for _, t in ipairs(SmfTexts(trk)) do
         local suffix = t.text:match('^%[mix 3 drums%d(%a*)%]')

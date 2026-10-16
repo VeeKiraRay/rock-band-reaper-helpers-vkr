@@ -7,8 +7,8 @@
 -- at most 8 notes a bar and loses its color motion (a 210 BPM solo kept 5 of 14 notes).
 -- Instead each passage is played again on the next slower grid - 16ths become 8th triplets,
 -- 8th triplets become 8ths - keeping the order of the colors and dropping the tail of each
--- half bar. That is how the chronosp_brutal_decay solo was reduced by hand, and this rule
--- reproduces that hand reduction: every note position, and 165 of 170 colors.
+-- half bar - the way a hand reduction of a fast guitar solo did it, which this rule
+-- reproduces.
 
 -- The grids a run can be on, fastest first (quarter notes): 32nd triplets, 32nds, 16th
 -- triplets, 16ths, 8th triplets, 8ths. A bar moves ONE step slower: 16ths -> 8th triplets,
@@ -22,14 +22,20 @@ local LADDER = { 1 / 12, 1 / 8, 1 / 6, 1 / 4, 1 / 3, 1 / 2 }
 -- (bar 152 of the hand-reduced song has a note at 37/24 instead of 36/24) cannot make a
 -- bar of 16ths read as 16th triplets. With a single spacing, that one decides.
 -- Returns the ladder index.
+-- The LADDER index nearest one spacing.
+local function StepIndex(sp)
+    local best, bd = 1, math.huge
+    for k, g in ipairs(LADDER) do
+        local d = math.abs(math.log(sp / g))
+        if d < bd then best, bd = k, d end
+    end
+    return best
+end
+
 local function BarGrid(spacings)
     local count = {}
     for _, sp in ipairs(spacings) do
-        local best, bd = 1, math.huge
-        for k, g in ipairs(LADDER) do
-            local d = math.abs(math.log(sp / g))
-            if d < bd then best, bd = k, d end
-        end
+        local best = StepIndex(sp)
         count[best] = (count[best] or 0) + 1
     end
     local fallback
@@ -131,8 +137,8 @@ end
 --     from that beat, so it still leads into it;
 --   * Assign picks which notes go to which slot.
 -- Returns (events, retimed_bars): a new event list with the rewritten notes moved
--- (retimed = true) and the dropped ones gone, and { { start = bar start QN, grid }... } for
--- every bar that changed.
+-- (retimed = true, src = the event it came from) and the dropped ones gone, and
+-- { { start = bar start QN, grid }... } for every bar that changed.
 function Gen5RetimeDenseRuns(events, opts)
     local p, eps = GEN5_PARAMS, opts.eps
     -- opts.mode: 'auto' | 'thin' | 'rewrite' (GEN5_PARAMS.fast_runs_default when unset).
@@ -148,7 +154,7 @@ function Gen5RetimeDenseRuns(events, opts)
     end
     local function Fast(ev) return (ev.bpm or 120) > p.fast_8ths_bpm end
     -- A short flourish into 8ths is thinned on the 8th grid, not rewritten: a run of at
-    -- most 3 dense notes that starts on a beat and ends off it (chronosp bass bar 73:
+    -- most 3 dense notes that starts on a beat and ends off it (a 210 BPM bass line:
     -- G G R | R R, 16ths then 8ths). As triplets its last note ran on into the 8ths at the
     -- same spacing (G G R R evenly, then a lone R); thinned it keeps G R R, and the busy-bar
     -- rule then takes the bar's "and" of 2 and 4. Runs that end ON a beat lead into it and
@@ -166,7 +172,7 @@ function Gen5RetimeDenseRuns(events, opts)
                     -- At or below fast_8ths_bpm only a run lasting retime_min_run.slow of its
                     -- bar is rewritten ('auto': none); a shorter one is thinned as before -
                     -- and is NOT marked flourish, which would switch the busy-bar rule on in
-                    -- a slow song (korpiklaani changed 62 bars that way in a trial).
+                    -- a slow song.
                     if mode == 'auto'
                        or last.qn - first.qn + step < (first.bar_len or 4) * p.retime_min_run.slow - eps then
                         for k = i, j do dense[k] = nil end
@@ -188,10 +194,8 @@ function Gen5RetimeDenseRuns(events, opts)
     -- LONG runs: dense notes that keep going for half a bar or more (a 16th rest ends a
     -- run). Their rewrite stays inside the notes Expert plays - no slot before its first or
     -- after its last note - on one beat-aligned grid with no break where it crosses the
-    -- middle of the bar (user rules, 2026-10-07: korpiklaani keys bar 26's run of 16ths from
-    -- the "and" of 1 was laid out from the downbeat, a note where Expert has none; Pro Keys
-    -- bars 26/32/53/55 then broke at beat 3). Short groups keep the layouts below, which
-    -- the hand-reduced chronosp solo verified (bars 20-24, 162).
+    -- middle of the bar (a run of 16ths from the "and" of 1 is not laid out from the
+    -- downbeat, where Expert has no note). Short groups keep the layouts below.
     local long = {}
     do
         local i = 1
@@ -202,6 +206,89 @@ function Gen5RetimeDenseRuns(events, opts)
                 local step = j > i and (events[i + 1].qn - events[i].qn) or 0
                 if events[j].qn - events[i].qn + step >= (events[i].bar_len or 4) / 2 - eps then
                     for k = i, j do long[k] = true end
+                end
+                i = j + 1
+            else
+                i = i + 1
+            end
+        end
+    end
+
+    -- MIXED runs (16th snares, then three 32nd toms, then 16th toms): one grid per bar,
+    -- from its fastest spacing, would lay the 16ths out on 16th triplets - pairs faster than
+    -- Expert. A run whose spacing changes
+    -- is split into GROUPS, each on its own grid one step slower, inside its own first and
+    -- last Expert notes (a group that no longer fits loses notes: bar 34's three 32nds keep
+    -- two 16ths). A group is a stretch of at least two gaps of one ladder step; a note
+    -- between two groups joins the faster one (a fast figure includes its first and last
+    -- note); a single odd gap stays with its neighbours, as BarGrid ignores one stray
+    -- spacing. A run with one group is laid out as before. opts.min_grid(ev): the slowest
+    -- grid the instrument allows a group to keep (Drums: 16ths below 140 BPM, else 8th
+    -- triplets - 16th triplets are too fast for Hard).
+    local group_of, group_grid, group_long = {}, {}, {}
+    do
+        local i = 1
+        while i <= #events do
+            if dense[i] then
+                local j = i
+                while dense[j + 1] and events[j + 1].qn - events[j].qn < opts.gap(events[j]) - eps do j = j + 1 end
+                -- Gap runs: maximal stretches of gaps on one ladder step.
+                local gr = {}
+                for k = i, j - 1 do
+                    local st = StepIndex(events[k + 1].qn - events[k].qn)
+                    local last = gr[#gr]
+                    if last and last.step == st then last.b = k else gr[#gr + 1] = { step = st, a = k, b = k } end
+                end
+                -- A one-gap stretch joins its neighbours (merge into the previous, or the next).
+                local merged = {}
+                for _, g in ipairs(gr) do
+                    if g.b - g.a + 1 >= 2 then
+                        merged[#merged + 1] = g
+                    elseif merged[#merged] then
+                        merged[#merged].b = g.b
+                    else
+                        merged[#merged + 1] = g
+                    end
+                end
+                if #merged >= 2 and merged[1].b - merged[1].a + 1 < 2 then
+                    merged[2].a = merged[1].a
+                    table.remove(merged, 1)
+                end
+                -- Neighbours on one step after that (a stray gap between them) are one group.
+                for gi = #merged, 2, -1 do
+                    if merged[gi].step == merged[gi - 1].step then
+                        merged[gi - 1].b = merged[gi].b
+                        table.remove(merged, gi)
+                    end
+                end
+                -- The bar target: one step slower than the run's fastest group.
+                local fastest = math.huge
+                for _, g in ipairs(merged) do fastest = math.min(fastest, g.step) end
+                local target = math.min(fastest + 1, #LADDER)
+                if #merged >= 2 then
+                    -- Notes a .. b + 1 of each stretch; a shared note goes to the faster one.
+                    for gi, g in ipairs(merged) do
+                        local first, last = g.a, g.b + 1
+                        local pv, nx = merged[gi - 1], merged[gi + 1]
+                        if pv and pv.step < g.step then first = first + 1 end
+                        if nx and nx.step <= g.step then last = last - 1 end
+                        -- 'own' (opts.group_grid): every group one step slower than itself.
+                        -- Default: every group at the fastest group's target, or at its own
+                        -- spacing when that is slower - the hand-reduced 210 BPM
+                        -- solo: 16ths -> 8th triplets and the 8th
+                        -- triplets after them stay, one continuous triplet line (a bar of
+                        -- 8th triplets alone goes to 8ths there).
+                        local k = opts.group_grid == 'own' and math.min(g.step + 1, #LADDER)
+                                  or math.max(target, g.step)
+                        local grid = LADDER[k]
+                        if opts.min_grid then grid = math.max(grid, opts.min_grid(events[first]) or 0) end
+                        local step = LADDER[g.step]
+                        local is_long = last >= first and events[last].qn - events[first].qn + step
+                                        >= (events[first].bar_len or 4) / 2 - eps
+                        for n = first, last do
+                            group_of[n], group_grid[n], group_long[n] = gi + i * 1000, grid, is_long
+                        end
+                    end
                 end
                 i = j + 1
             else
@@ -243,6 +330,11 @@ function Gen5RetimeDenseRuns(events, opts)
         end
         if #spacings > 0 then
             local grid = TargetGrid(spacings)
+            if opts.min_grid then
+                for _, i in ipairs(b.idx) do
+                    if dense[i] then grid = math.max(grid, opts.min_grid(events[i]) or 0); break end
+                end
+            end
             -- Halves only when the middle of the bar is a beat: 4/4's beat 3, 6/8's second
             -- dotted quarter. A 3/4 bar is one segment (its middle is the and of 2).
             local half = b.len / 2
@@ -257,7 +349,19 @@ function Gen5RetimeDenseRuns(events, opts)
                 for _, i in ipairs(b.idx) do
                     local ev = events[i]
                     if ev.qn >= h0 - eps and ev.qn < h1 - eps then
-                        if dense[i] then
+                        local pv_i = cur and cur.idx[#cur.idx]
+                        if dense[i] and cur and group_of[i] and group_of[pv_i] and group_of[i] ~= group_of[pv_i] then
+                            -- A new group of a mixed run: the one before ends a grid step
+                            -- before this group's first note, this one starts a step after
+                            -- the last note of the one before. (Only inside one run: where
+                            -- two runs meet - 16ths, then an 8th, then 8th
+                            -- triplets - the half bar stays one stretch, as before.)
+                            cur.hi = ev.qn
+                            cur = { notes = {}, idx = {}, lo = events[pv_i].qn }
+                            runs[#runs + 1] = cur
+                            cur.notes[#cur.notes + 1] = ev
+                            cur.idx[#cur.idx + 1] = i
+                        elseif dense[i] then
                             -- A 16th rest the run restarts after, on the 8th grid: the rest
                             -- stays, and the run starts again where Expert starts it.
                             local pv = events[i - 1]
@@ -281,6 +385,8 @@ function Gen5RetimeDenseRuns(events, opts)
                     end
                 end
                 for _, run in ipairs(runs) do
+                    -- A group of a mixed run has its own grid and its own long-run flag.
+                    local grid = group_grid[run.idx[1]] or grid
                     local last_i = run.idx[#run.idx]
                     local last, nx = events[last_i], events[last_i + 1]
                     local land = last.bar_qn and OnBeat(last, eps)
@@ -301,10 +407,11 @@ function Gen5RetimeDenseRuns(events, opts)
                     -- on one grid aligned to the beats, between its first and last Expert
                     -- notes, laid out forward, and with no free step before the next half
                     -- bar while it carries on into it: no break in the middle of a run.
-                    -- Expert's first note drops when it falls between grid points (bar 55 of
-                    -- korpiklaani's Pro Keys: 12-72 -> 16 24 32 40 48 56 64 72, the user's
-                    -- drawing; chronosp's riff 12-90 -> 16 24 32 40 | 48, its hand reduction).
+                    -- Expert's first note drops when it falls between grid points (a Pro Keys
+                    -- run 12-72 -> 16 24 32 40 48 56 64 72, the user's drawing; a 210 BPM
+                    -- riff 12-90 -> 16 24 32 40 | 48, its hand reduction).
                     local is_long = long[run.idx[1]]
+                    if group_of[run.idx[1]] then is_long = group_long[run.idx[1]] end
                     local late_long = is_long and run.notes[1].qn > h0 + eps
                     if is_long then g0 = h0 end
                     local carries = is_long and events[last_i + 1] and dense[last_i + 1]
@@ -313,18 +420,16 @@ function Gen5RetimeDenseRuns(events, opts)
                     -- A group that runs straight into the next half bar's beat (beat 3, or
                     -- the next bar's downbeat) leads into it: its grid counts back from that
                     -- beat, so a group cut to one note keeps the one that hammers into the
-                    -- beat (36 G 42 G | 48 Y -> 40 G | 48 Y). From the user's hand reduction
-                    -- of chronosp_brutal_decay bars 21/23. A run that starts on its own beat
+                    -- beat (36 G 42 G | 48 Y -> 40 G | 48 Y). A run that starts on its own beat
                     -- keeps the forward grid - on a whole half bar both give the same slots.
                     local joins = nx and math.abs(nx.qn - h1) <= eps
                                   and nx.qn - last.qn < opts.gap(last) - eps
                     if joins and math.abs(run.notes[1].qn - h0) > eps and not late_long then
                         local floor = math.max(h0, run.start_at or (lo + grid))
                         -- Never before the group's first Expert note - the long-run limit, for
-                        -- short groups too (user rule 2026-10-10, every instrument). Drums'
-                        -- pojat_lemmikkih bar 36: 16ths from the "a" of 3 into the downbeat
-                        -- were laid out from the "and" of 3's triplet. It changed one verified
-                        -- 5-lane bar, chronosp_brutal_decay Guitar 162 (Expert 0:R 36:B 42:R 48:B
+                        -- short groups too, every instrument (a drum fill of 16ths from the "a"
+                        -- of 3 into the downbeat was laid out from the "and" of 3's triplet).
+                        -- Guitar example (Expert 0:R 36:B 42:R 48:B
                         -- 54:R): Hard 32:B 40:R 48:B 56:R -> 40:R 48:B 56:R, and Medium's
                         -- downbeat R is a sustain again; the user approved it.
                         floor = math.max(floor, run.notes[1].qn - eps)
@@ -374,7 +479,7 @@ function Gen5RetimeDenseRuns(events, opts)
                 out[#out + 1] = { qn = qn, qn_e = qn + (ev.qn_e - ev.qn), offs = ev.offs, bpm = ev.bpm,
                                   bar_qn = qn - bar_s, bar_len = ev.bar_len, pulse = ev.pulse,
                                   down = math.abs(qn - bar_s) <= eps, retimed = true,
-                                  hopo = ev.hopo }
+                                  hopo = ev.hopo, src = ev }
             else
                 out[#out + 1] = ev
             end
@@ -384,7 +489,7 @@ function Gen5RetimeDenseRuns(events, opts)
 
     -- A beat Expert plays that the rewrite left empty: the rewritten note nearest to it,
     -- within a 16th, records the beat (beat_qn), so Medium and Easy - which play the
-    -- beats - can put it back there (chronosp bar 20: beat 4 sat empty on Hard, the G that
+    -- beats - can put it back there (a 210 BPM guitar bar: beat 4 sat empty on Hard, the G that
     -- replaced it at 76/24, and Medium left a long pause). Expert's own color on that beat
     -- wins a tie, then the nearer note, then the earlier.
     local function Key(qn) return ('%.3f'):format(qn) end

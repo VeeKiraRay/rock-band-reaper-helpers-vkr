@@ -46,6 +46,7 @@ local function Loop()
         S.diff_gtr_idx       = -1
         S.diff_bass_idx      = -1
         S.diff_drums_idx     = -1
+        S.diff_drums2x_idx   = -1
         -- Metadata > Difficulty results describe the PREVIOUS project's charts. Leaving
         -- them on screen after a switch would attribute one song's ranks to another.
         S.diff_suggestions   = nil

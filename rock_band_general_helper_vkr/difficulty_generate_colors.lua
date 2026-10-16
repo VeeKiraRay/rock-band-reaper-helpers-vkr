@@ -24,8 +24,7 @@ local function SameOffs(a, b)
 end
 
 -- Reduce a chord to max_n notes. Two notes keep the outer pair; three keep the outer
--- pair and the middle note; one keeps the lowest (official Guitar/Bass Easy keeps the
--- lowest note of a chord far more often than any other).
+-- pair and the middle note; one keeps the lowest.
 function Gen5ReduceChordSize(offs, max_n)
     if #offs <= max_n then return offs end
     if max_n == 1 then return { offs[1] } end
@@ -33,14 +32,9 @@ function Gen5ReduceChordSize(offs, max_n)
     return { offs[1], offs[math.ceil(#offs / 2)], offs[#offs] }
 end
 
--- Keys (5-lane) Hard and Medium: reduce a chord to max_n notes by keeping its TOP notes, as
--- Pro Keys does. Official Keys differs from Guitar/Bass here (RB3 DLC, hold-out excluded):
--- going to one note it keeps the top - Expert>Hard 70% vs 25% for the bottom, Hard>Medium 52%
--- vs 32% - and Hard>Medium 3>2 keeps the top two 35%, the outer pair 33%, the bottom two 23%.
--- Easy is a tie (Medium>Easy keeps the lowest 40%, the top 38%); Keys Easy keeps the top too,
--- and Gen5KeysEasyMotion then keeps its line moving. The RBN Keys doc does not say which notes
--- stay. User decisions 2026-10-08/09; Expert>Hard 3>2 alone leans the other way (outer 39%,
--- top 33%).
+-- Keys (5-lane): reduce a chord to max_n notes by keeping its TOP notes, as Pro Keys does -
+-- on every tier, Easy's single note included; Gen5KeysEasyMotion then keeps Easy's line
+-- moving.
 function Gen5ReduceChordSizeKeys(offs, max_n)
     if #offs <= max_n then return offs end
     local out = {}
@@ -55,10 +49,8 @@ end
 --   2. a different chord whose note would repeat the previous Easy note -> another note of
 --      the chord, from the top down (GR then GY: G then Y);
 --   3. otherwise the note the chord rule chose.
--- Picking one note per chord on its own made repeats Medium does not have: 10.2% of Easy
--- steps against official 2.4% (official Keys Easy repeats a lane on 27.9% of steps,
--- Generate 35.8%). With both rules: 27.0% and 1.4%, and Easy colors agree with official
--- more often (RB3 DLC, hold-out excluded; user decision 2026-10-09). Returns notes changed.
+-- Picking one note per chord on its own made repeats Medium does not have. Returns notes
+-- changed.
 function Gen5KeysEasyMotion(out, upper_offs)
     local changed = 0
     for i = 2, #out do
@@ -87,7 +79,7 @@ end
 
 -- Guitar/Bass Medium/Easy: shift each passage down as a whole until it fits under
 -- the tier's focus ceiling, so the shape of the line survives (Orange>Blue,
--- Blue>Yellow ... as official charts do) instead of only the top notes collapsing.
+-- Blue>Yellow ...) instead of only the top notes collapsing.
 -- Notes that would fall below Green stay on Green.
 function Gen5ShiftSegments(out, ceiling)
     local p = GEN5_PARAMS
@@ -149,8 +141,8 @@ end
 -- Guitar/Bass Medium/Easy: move only the notes and chords above `top` down - unless that makes
 -- a note repeat its neighbour's color where the tier above changes color; then the whole
 -- bar moves down (Gen5ShiftBars), so the line keeps its shape. From the user's review:
--- pojat_lemmikkih bar 3 (G O Y B -> G B Y B, approved) moves only the Orange, chronosp
--- bar 10 (G Y B O -> G Y B B, rejected: a Blue repeat Hard never had) moves the bar
+-- G O Y B -> G B Y B (approved) moves only the Orange, while
+-- G Y B O -> G Y B B (rejected: a Blue repeat Hard never had) moves the bar
 -- (G R Y B). The neighbour across a bar line counts too.
 -- Returns the number of events whose colors changed.
 function Gen5ClampOrShiftBars(out, top)
@@ -164,7 +156,7 @@ function Gen5ClampOrShiftBars(out, top)
     local orig = {}
     for k, ev in ipairs(out) do orig[k] = Copy(ev.offs) end
     -- A note or chord above `top` moves down as a whole, so a chord keeps its shape
-    -- (Y+O -> R+B, as the verified pojat_lemmikkih charts have it, not Y+B).
+    -- (Y+O -> R+B, as the user's verified charts have it, not Y+B).
     local function Clamped(offs)
         local hi = 0
         for _, o in ipairs(offs) do if o > hi then hi = o end end
@@ -182,8 +174,8 @@ function Gen5ClampOrShiftBars(out, top)
         if hi > top then
             -- A new repeat: clamped equal to the note just before or after it in the same
             -- bar, at most a quarter note away, where the originals differ. Not across a
-            -- bar line, and not further apart: the verified pojat charts keep RB | RB over
-            -- a bar line (bar 84) and Easy's Y . . Y a half note or more apart (bars 69, 74).
+            -- bar line, and not further apart: the user's verified charts keep RB | RB over
+            -- a bar line and Easy's Y . . Y a half note or more apart.
             local in_bar = {}
             for _, k in ipairs(idx) do in_bar[k] = true end
             local function Near(a, b) return in_bar[b] and math.abs(out[a].qn - out[b].qn) <= 1.02 end

@@ -221,8 +221,10 @@ for _, name in ipairs(files) do
                 -- marker context (fills, rolls, toms, disco flip, EVENTS sections).
                 local ctx = SmfDrumsContext(song, trk)
                 local upper = SmfTierEvents(trk, LO.X, song.tpqn, timing, { skip_zero = true })
+                local expert = upper
                 for _, dl in ipairs({ 'H', 'M', 'E' }) do
-                    local gen = GenDrumsPlanTier(dl, upper, { ctx = ctx })
+                    local gen, log = GenDrumsPlanTier(dl, upper, { ctx = ctx, expert = dl == 'M' and expert or nil })
+                    ctx = log.ctx   -- Hard's rewrite may extend tom markers
                     local want = SmfTierEvents(trk, LO[dl], song.tpqn, timing)
                     Test.it(('Drums %s'):format(({ H = 'Hard', M = 'Medium', E = 'Easy' })[dl]), function()
                         SHAPE_DRUMS = true
