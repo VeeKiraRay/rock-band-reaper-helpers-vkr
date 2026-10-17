@@ -45,6 +45,12 @@ GEN5_PARAMS = {
     -- (3 + 2.5) outweighs a beat single (5) but not a downbeat (8). Bass and Keys follow
     -- Guitar's Medium in bars of the same rhythm (opts.rhythm_ref).
     chord_bonus = { M = 2.5 },
+    -- The bar's last note on its last "and", before an empty next downbeat (it ends the
+    -- phrase), is worth this much more on Medium and Easy - an "and" (3 + 5) then outweighs
+    -- a beat-4 chord (5 + 2.5) - and on Easy needs only phrase_end_gap after the previous
+    -- kept note.
+    phrase_end_bonus = { M = 5, E = 5 },
+    phrase_end_gap = { E = 1.5 },
     -- Medium keeps a note per beat in busy bars (FillBeats).
     fill_beats = { M = true },
     -- A keys lick that starts on an "and" (Gen5AndPhrases): Medium reduces the phrase on

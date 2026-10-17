@@ -503,7 +503,13 @@ the triplet".
 **Busy bars lose one or two notes** - `ThinBusyBars`, `busy_bar_onsets` 6, "Hard 8th runs"
 A bar of 6+ onsets the gap left whole loses 1 or 2 notes (Auto: 2 when the song starts above 160
 BPM), minus the 8th slots it already leaves empty - none when two or more are. The "and" of 2 and
-the "and" of 4 go first; a sustain, or a chord in a bar mixing chords and single notes, goes last.
+the "and" of 4 go first; a chord in a bar mixing chords and single notes goes later, and last of
+all a sustain or the bar's last note when the next downbeat is empty - so a run of chords ending
+on the "and" of 4 before a rest keeps that note, held or short, and an earlier note goes.
+*Official charts:* in busy Hard bars that lost an off-beat, the "and" of 4 before an empty downbeat
+is kept 69-98% when short and 87-100% when held (Guitar, Bass and Keys, every tempo band), against
+1-16% when a note follows on the downbeat; the "and" of 2 is then kept 3-46%. (Fewer cases: 6-33
+songs per instrument and tempo band.)
 *RBN doc:* "If the song is fast (over 160 bpm), the player shouldn't be expected to play
 continuous 8th notes. Thin the chart out by removing every fourth note per half measure."
 *Official charts:* Hard keeps 7 or 6 of 8 straight 8ths about equally often at every tempo -
@@ -549,6 +555,16 @@ A chord next to a single note within the gap is worth more, so an 8th-later chor
 beat single but not over a downbeat. *Official charts:* Medium keeps the chord of a beat single +
 8th-later chord 83%, but a downbeat single over the chord before it 59%.
 
+**The note that ends a phrase** - `phrase_end_bonus` 5, `PhraseEnds` (Medium and Easy)
+The bar's last note on its last "and", before an empty next downbeat, is worth 5 more - a phrase
+end (3 + 5) then outweighs a beat-4 chord next to it (5 + 2.5), so Medium plays `1 2 3 &4` where
+the tier above ends a run of chords on the "and" of 4, held or short. Only when the note after it
+is at least the tier's gap away, so keeping the phrase end never costs the note that starts the
+next phrase. Same position in other simple meters (the "and" of 3 in 3/4).
+*Official charts:* where Hard has both beat 4 and the "and" of 4 before an empty downbeat, Medium
+keeps the "and" 90-100% for a held note and 49-92% for a short one (Guitar and Bass 140+ BPM:
+67-92%), beat 4 0-49%, both rarely (0-18%; Keys held notes 41%).
+
 **Isolated off-beats, and a Medium that barely differs from Hard** - `offbeat_fallback_keep` 0.95
 A Medium keeping more than 95% of Hard first drops its isolated off-beats, then is eased by color
 (top note Yellow). *User rule:* official Medium on such simple parts keeps every isolated off-beat
@@ -587,6 +603,12 @@ returns to that beat on Medium and Easy, so the beat is not left empty below Har
 *User rule* to follow it: before, Medium and Easy were identical in steady 6/8 bars.
 
 ### Easy
+
+**The note that ends a phrase** - `phrase_end_bonus` 5, `phrase_end_gap` 1.5
+As on Medium, and it may sit 1.5 quarter notes after the previous kept note where Easy's gap
+would ask for more (at 154 BPM, 1.8) - beat 3 and the "and" of 4 both stay.
+*Official charts:* Easy keeps an "and" of 4 before an empty downbeat 69-100% (held notes 94-100%);
+the commonest gap back to the previous Easy note is 1.5 quarter notes at every tempo.
 
 **No chords.** Guitar/Bass keep the lowest note; Keys the top note (see Keys).
 *RBN doc:* "There are no chords in easy."

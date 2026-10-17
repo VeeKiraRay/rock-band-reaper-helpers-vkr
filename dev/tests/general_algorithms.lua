@@ -830,6 +830,53 @@ Test.it('Drop 1 with a rest already in the bar still takes the and of 4', functi
     Test.expect(got == '4&', 'removed [' .. got .. '], expected [4&]')
 end)
 
+Test.it('a busy bar of chords keeps its sustain on the and of 4; an earlier chord goes', function()
+    -- A bar mixing chords and one single note protects every chord as an accent, and the
+    -- held single note on the "and" of 4 used to lose to the position order - leaving a
+    -- bar and a half of silence where Expert holds the note. A sustain now goes last.
+    local bpm, events = 154, {}
+    local chords = { { 0, { 1, 3 } }, { 1, { 0, 1 } }, { 1.5, { 0, 1 } }, { 2, { 1, 2 } }, { 2.5, { 0, 1 } }, { 3, { 0, 1 } } }
+    for _, c in ipairs(chords) do events[#events + 1] = Ev(c[1], 0.125, c[2], bpm, 0) end
+    events[#events + 1] = Ev(3.5, 3.5, { 2 }, bpm, 0)
+    events[#events + 1] = Ev(8, 0.125, { 1, 3 }, bpm, 8)
+    local out = Gen5PlanTier('gb', 'H', events)
+    local function At(qn) for _, ev in ipairs(out) do if math.abs(ev.qn - qn) < 1e-6 then return ev end end end
+    local held = At(3.5)
+    Test.expect(held ~= nil, 'the sustain on the and of 4 should stay')
+    Test.expect(held == nil or held.qn_e - held.qn >= 0.5, 'and stay a sustain')
+    Test.expect(At(1.5) == nil, 'the and of 2 chord (the RBN position) should go instead')
+end)
+
+Test.it('Medium and Easy keep the note that ends a phrase on the and of 4', function()
+    -- Hard: chords on 1, 2, 3, 3& and 4, a held single note on 4&, then a bar of rest. Medium
+    -- plays 1 2 3 4& (the phrase end beats the beat-4 chord); Easy 1 3 4& (1.5 QN after beat 3).
+    local bpm, hard = 154, {}
+    for _, q in ipairs({ 0, 1, 2, 2.5, 3 }) do hard[#hard + 1] = Ev(q, 0.125, { 0, 1 }, bpm, 0) end
+    hard[#hard + 1] = Ev(3.5, 3.5, { 2 }, bpm, 0)
+    hard[#hard + 1] = Ev(8, 0.125, { 1, 3 }, bpm, 8)
+    local function Onsets(out)
+        local t = {}
+        for _, ev in ipairs(out) do if ev.qn < 4 then t[#t + 1] = ('%g'):format(ev.qn) end end
+        return table.concat(t, ' ')
+    end
+    local med = Gen5PlanTier('gb', 'M', hard)
+    Test.expect(Onsets(med) == '0 1 2 3.5', 'Medium: ' .. Onsets(med))
+    local easy = Gen5PlanTier('gb', 'E', med)
+    Test.expect(Onsets(easy) == '0 2 3.5', 'Easy: ' .. Onsets(easy))
+end)
+
+Test.it('a busy bar keeps its last note when the next downbeat is empty, short or not', function()
+    -- Straight 8th single notes, then a bar of rest: official Hard keeps such an "and" of 4
+    -- 69-98% (3-16% when a note follows on the downbeat) and takes the "and" of 2 instead.
+    local bpm, events = 135, {}
+    for k = 0, 7 do events[#events + 1] = Ev(k * 0.5, 0.125, { k % 3 }, bpm, 0) end
+    events[#events + 1] = Ev(8, 0.125, { 1 }, bpm, 8)
+    local out = Gen5PlanTier('gb', 'H', events)
+    local function At(qn) for _, ev in ipairs(out) do if math.abs(ev.qn - qn) < 1e-6 then return ev end end end
+    Test.expect(At(3.5) ~= nil, 'the "and" of 4 before the rest should stay')
+    Test.expect(At(1.5) == nil, 'the "and" of 2 should go instead')
+end)
+
 Test.it('bass follows guitar in a bar of the same rhythm, but keeps its own sustain', function()
     -- Guitar: a full bar with a chord on 4&, so it drops 1& and 2&. Bass plays the same
     -- rhythm as single notes - on its own it would drop 2& and 4&.
@@ -948,7 +995,9 @@ Test.it('fast runs: a short flourish from a beat into 8ths is thinned, not rewri
     -- G G R (16ths from the beat) then R R (8ths): as triplets G G R R ran on evenly. Thinned
     -- it is G R R R per half, and the busy-bar rule (Drop 2 at 210) takes 2& and 4&.
     local x = Bar24('0:G 6:G 12:R 24:R 36:R 48:G 54:G 60:R 72:R 84:R', 1)
-    x[#x + 1] = Ev(5, 0.1, { 0 }, 210, 4)
+    -- The next note on the downbeat, as in the song: after an empty downbeat the and of 4
+    -- would end a phrase and stay (ProtectedSet).
+    x[#x + 1] = Ev(4, 0.1, { 0 }, 210, 4)
     local got = Hard24(Gen5PlanTier('gb', 'H', x))
     Test.expect(got == '0:G 12:R 24:R 48:G 60:R 72:R', 'bar 73 Hard: ' .. got)
 end)
@@ -961,7 +1010,7 @@ Test.it('fast runs: a bar of 8ths after a 16th run still loses its two notes (ba
         ev.qn, ev.qn_e = ev.qn + 4, ev.qn_e + 4
         x[#x + 1] = ev
     end
-    x[#x + 1] = Ev(9, 0.1, { 0 }, 210, 8)
+    x[#x + 1] = Ev(8, 0.1, { 0 }, 210, 8)   -- on the downbeat, as in the song
     local hard = Gen5PlanTier('gb', 'H', x)
     local kept = KeptByBar(hard)[1] or {}
     Test.expect(table.concat(kept, ' ') == '0.00 0.50 1.00 2.00 2.50 3.00',
@@ -1120,7 +1169,7 @@ end)
 
 Test.it('Medium: a beat Hard\'s rewrite left empty comes back from Expert (bar 20)', function()
     local x = Bar24('0:GR 12:G 18:G 24:G 30:G 36:G 42:G 48:Y 60:G 66:G 72:G 78:G 84:R', 1)
-    x[#x + 1] = Ev(5, 0.1, { 0 }, 210, 4)
+    x[#x + 1] = Ev(4, 0.1, { 0 }, 210, 4)   -- the next bar starts on its downbeat, as in the song
     local hard = Gen5PlanTier('gb', 'H', x)
     Test.expect(KeptAt(hard, 3) == nil, 'precondition: Hard has no beat 4: ' .. Hard24(hard))
     local med = Gen5PlanTier('gb', 'M', hard)

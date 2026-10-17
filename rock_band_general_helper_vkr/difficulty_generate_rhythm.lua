@@ -199,16 +199,25 @@ end
 
 -- The notes in a bar that go last. A sustain always (it holds the line); a chord only in
 -- a bar that mixes chords and single notes, where it is the accent. In a bar of all
--- chords or all single notes they are all alike and the usual "and" notes go.
+-- chords or all single notes they are all alike and the usual "and" notes go. The value
+-- ranks them: a sustain (2) goes after an accent chord (1) - in a mixed bar every chord
+-- is protected too, and the sustain must not then lose to the position order. The bar's
+-- last note before an empty next downbeat (not the song's last note) ranks as a sustain,
+-- short or not: it ends the phrase, and without it the bar falls silent early.
 local function ProtectedSet(events, idx)
     local chords, singles = 0, 0
     for _, i in ipairs(idx) do
         if #events[i].offs >= 2 then chords = chords + 1 else singles = singles + 1 end
     end
     local mixed, prot = chords > 0 and singles > 0, {}
+    local last = idx[#idx]
     for _, i in ipairs(idx) do
         local ev = events[i]
-        if ev.qn_e - ev.qn >= SUSTAIN_QN - EPS or (mixed and #ev.offs >= 2) then prot[i] = true end
+        local nx = events[i + 1]
+        local bar_end = ev.qn - (ev.bar_qn or 0) + (ev.bar_len or 4)
+        local phrase_end = i == last and nx ~= nil and nx.qn > bar_end + EPS
+        if ev.qn_e - ev.qn >= SUSTAIN_QN - EPS or phrase_end then prot[i] = 2
+        elseif mixed and #ev.offs >= 2 then prot[i] = 1 end
     end
     return prot
 end
@@ -286,7 +295,7 @@ local function ThinBusyBars(events, keep, min_onsets, protect_isolated, n_drop, 
                             -- by PosRate alone (in 3/4 the and of 3, not the and of 2).
                             local key = BarPosKey(events[i])
                             local doc = Gen5Is44(events[i]) and (key == '1.500' or key == '3.500')
-                            cands[#cands + 1] = { i = i, r = PosRate(events[i]), p = prot[i] and 1 or 0,
+                            cands[#cands + 1] = { i = i, r = PosRate(events[i]), p = prot[i] or 0,
                                                   doc = doc and 0 or 1 }
                         end
                     end
@@ -603,7 +612,25 @@ end
 -- keeps the beats - with one beat-wide gap for every onset the two came out the same in
 -- steady 6/8 bars. So the 8th after a beat needs only Hard's gap, a beat a quarter after
 -- the kept note before it, and every other onset the usual beat-wide gap.
-local function TierGapQN(dl, ev)
+-- The onsets that end a phrase: the bar's last note, on its last "and" (simple meters),
+-- with a later onset but none on the next downbeat - and that later onset at least tier
+-- dl's gap away, so keeping the phrase end never costs the note that starts the next
+-- phrase. { [event] = true }.
+local TierGapQN
+local function PhraseEnds(dl, events)
+    local set = {}
+    for i, ev in ipairs(events) do
+        local nx, len = events[i + 1], ev.bar_len or 4
+        if nx and OnAnd(ev) and math.abs(BarPos(ev) - (len - 0.5)) <= EPS
+           and nx.qn > ev.qn - BarPos(ev) + len + EPS
+           and nx.qn - ev.qn >= TierGapQN(dl, nx) - EPS then
+            set[ev] = true
+        end
+    end
+    return set
+end
+
+TierGapQN = function(dl, ev)
     local pulse = ev.pulse or 1
     if dl == 'M' and pulse > 1 and ev.bar_qn then
         local pos = ev.bar_qn % pulse
@@ -749,9 +776,18 @@ function Gen5SelectOnsets(kind, dl, events, opts, log)
             end
         end
         weights = Weights(kind, dl, events, shifted)
+        -- Medium/Easy: a note ending a phrase is worth more (phrase_end_bonus), and on Easy
+        -- may sit closer to the note before it (phrase_end_gap).
+        local ends = (GEN5_PARAMS.phrase_end_bonus[dl] or GEN5_PARAMS.phrase_end_gap[dl]) and PhraseEnds(dl, events) or {}
+        for i, ev in ipairs(events) do
+            if ends[ev] then weights[i] = weights[i] + (GEN5_PARAMS.phrase_end_bonus[dl] or 0) end
+        end
+        local end_gap = GEN5_PARAMS.phrase_end_gap[dl]
         keep = SelectByGap(events, function(ev, earlier)
             if ev.retimed or earlier.retimed then return MIN_LEN_QN end
-            return TierGapQN(dl, ev)
+            local gap = TierGapQN(dl, ev)
+            if end_gap and ends[ev] then gap = math.min(gap, end_gap) end
+            return gap
         end, weights)
     end
 
