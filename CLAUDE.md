@@ -388,7 +388,8 @@ that dofiles the code under test and the set.
 **Golden charts for Difficulty > Generate** (`run_generate_golden.lua`, also runnable
 offline: `lua dev/tests/run_generate_golden.lua`): every MIDI in the gitignored
 `dev/tests/golden/` holds hand-verified Hard/Medium/Easy. The suite regenerates each
-Guitar/Bass/Keys/Pro Keys part from its Expert and fails on any rhythm, color/pitch or length
+Guitar/Bass/Keys/Pro Keys/Drums part (and PART DRUMS_2X, with its kicks from PART DRUMS one
+tier up) from its Expert and fails on any rhythm, color/pitch/gem or length
 difference, listed by bar, and on any difference in Guitar/Bass Hard's force-HOPO markers or
 Pro Keys' lane-shift markers. Run it after every planner change: a failure means a rule change altered
 an approved chart — either regenerate and re-verify the song, or rework the rule. The

@@ -17,11 +17,12 @@
 --
 -- Requires (globals): Test, r, GOLDEN_DIR, SmfReadFile, SmfFindTrack, SmfNotesInRange,
 --   SmfSongTiming, SmfTierEvents, SmfProKeysEvents, SmfDrumsContext, Gen5PlanTier,
---   GenPKPlanTier, GenPKSameAsUpper, Gen5MarkHopos, Gen5ForceHopoSpans, GenDrumsPlanTier.
+--   GenPKPlanTier, GenPKSameAsUpper, Gen5MarkHopos, Gen5ForceHopoSpans, GenDrumsPlanTier,
+--   GenDrums2xInput.
 --
--- Drums are compared only in the songs listed in GOLDEN_DIR/drums_verified.txt (one MIDI
--- file name per line; the list lives beside the charts, so it is local too): most golden
--- songs' drum tiers predate the Drums planner and were never checked against it.
+-- PART DRUMS_2X (double bass pedal) is planned as the action plans it: each 2X tier from
+-- the 2X tier above, with the kicks of the PART DRUMS tier one step up - the PART DRUMS
+-- tiers this same run just planned, as the action reads the ones it just wrote.
 
 -- Parts compared. verify = false lists a part Generate cannot build yet: it is reported as
 -- skipped, never failed. Flip it to true once that instrument's planner is ready.
@@ -30,6 +31,7 @@ local PARTS = {
     { track = 'PART BASS',        kind = 'gb', label = 'Bass',     verify = true  },
     { track = 'PART KEYS',        kind = 'k5', label = 'Keys',     verify = true  },
     { track = 'PART DRUMS',       kind = 'drums', label = 'Drums', verify = true  },
+    { track = 'PART DRUMS_2X',    kind = 'drums2x', label = 'Drums 2X', verify = true },
     { track = 'PART REAL_KEYS_X', kind = 'pk', label = 'Pro Keys', verify = true  },
 }
 local NOTE_NAMES = { 'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B' }
@@ -172,19 +174,6 @@ local function Compare(gen, want, song, timing)
     return counts, lines
 end
 
--- Songs whose drum tiers someone checked against the Drums planner (see the header).
-local DRUMS_VERIFIED = {}
-do
-    local f = io.open(GOLDEN_DIR .. 'drums_verified.txt', 'r')
-    if f then
-        for line in f:lines() do
-            local name = line:match('^%s*(.-)%s*$')
-            if name ~= '' and not name:match('^#') then DRUMS_VERIFIED[name:lower()] = true end
-        end
-        f:close()
-    end
-end
-
 local files = ListMidi(GOLDEN_DIR)
 if #files == 0 then
     r.ShowConsoleMsg('  (no golden charts in dev/tests/golden/ - nothing to compare)\n')
@@ -209,24 +198,34 @@ for _, name in ipairs(files) do
                 refs.M = select(2, Gen5PlanTier('gb', 'M', gh)).rhythm_bars
             end
         end
+        local drums1x   -- PART DRUMS as planned here, X/H/M/E: the 2X track's kicks
         for _, part in ipairs(PARTS) do
             local trk = SmfFindTrack(song, part.track)
             SHAPE_PK = part.kind == 'pk'
             if trk and not part.verify then
                 r.ShowConsoleMsg(('  SKIP  %s: no Generate planner yet\n'):format(part.label))
-            elseif trk and part.kind == 'drums' and not DRUMS_VERIFIED[name:lower()] then
-                r.ShowConsoleMsg(('  SKIP  %s: not listed in drums_verified.txt\n'):format(part.label))
-            elseif trk and part.kind == 'drums' then
+            elseif trk and part.kind == 'drums2x' and not drums1x then
+                r.ShowConsoleMsg('  SKIP  Drums 2X: no PART DRUMS to take the kicks from\n')
+            elseif trk and (part.kind == 'drums' or part.kind == 'drums2x') then
                 -- Drums: the chain as the button runs it, default options, with the song's
                 -- marker context (fills, rolls, toms, disco flip, EVENTS sections).
+                local x2 = part.kind == 'drums2x'
                 local ctx = SmfDrumsContext(song, trk)
                 local upper = SmfTierEvents(trk, LO.X, song.tpqn, timing, { skip_zero = true })
                 local expert = upper
+                if not x2 then drums1x = { X = upper } end
                 for _, dl in ipairs({ 'H', 'M', 'E' }) do
-                    local gen, log = GenDrumsPlanTier(dl, upper, { ctx = ctx, expert = dl == 'M' and expert or nil })
+                    local opts = { ctx = ctx, expert = dl == 'M' and expert or nil }
+                    local plan_in = upper
+                    if x2 then
+                        plan_in = GenDrums2xInput(upper, drums1x[({ H = 'X', M = 'H', E = 'M' })[dl]])
+                        opts.keep_kicks = true
+                    end
+                    local gen, log = GenDrumsPlanTier(dl, plan_in, opts)
                     ctx = log.ctx   -- Hard's rewrite may extend tom markers
+                    if not x2 then drums1x[dl] = gen end
                     local want = SmfTierEvents(trk, LO[dl], song.tpqn, timing)
-                    Test.it(('Drums %s'):format(({ H = 'Hard', M = 'Medium', E = 'Easy' })[dl]), function()
+                    Test.it(('%s %s'):format(part.label, ({ H = 'Hard', M = 'Medium', E = 'Easy' })[dl]), function()
                         SHAPE_DRUMS = true
                         local c, lines = Compare(gen, want, song, timing)
                         SHAPE_DRUMS = false
