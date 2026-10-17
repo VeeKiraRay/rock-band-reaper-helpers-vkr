@@ -2176,6 +2176,56 @@ Test.it('Drums Hard: under busy hands an 8th kick paired with beat 3 stays (befo
         'K..KKK.. should become K...K...')
 end)
 
+-- One 4/4 bar of ride 8ths (Blue, snare on 3) with kicks on the given 8th slots, then the next
+-- downbeat; Hard's kicks on the bar's 8th grid as 'K' / '.'.
+local function RideBar(kicks, bpm)
+    local evs = {}
+    for k = 0, 7 do
+        local offs = k == 4 and { 1, 3 } or { 3 }
+        if kicks[k] then table.insert(offs, 1, 0) end
+        evs[#evs + 1] = DH(k * 0.5, offs, bpm)
+    end
+    evs[#evs + 1] = DH(4, { 0, 4 }, bpm)
+    return evs
+end
+local function HardKicks(out)
+    local t = {}
+    for k = 0, 7 do t[#t + 1] = DHas(DAt(out, k * 0.5), 0) and 'K' or '.' end
+    return table.concat(t)
+end
+
+Test.it('Drums Hard: quarter kicks under 8th hands go to 1 and 3, with no end-of-bar kick', function()
+    -- Official Hard: 1 and 3 in 424 of 524 such bars at 140-169 BPM; 1, 3 and 4 is not an answer.
+    local out = GenDrumsPlanTier('H', RideBar({ [0] = 1, [2] = 1, [4] = 1, [6] = 1 }, 154), { fast_runs = 'thin' })
+    Test.expect(HardKicks(out) == 'K...K...', HardKicks(out))
+end)
+
+Test.it('Drums Hard: 8th kicks under 8th hands go to a kick on every beat', function()
+    -- One step slower than Expert, so a build from quarter kicks to 8th kicks stays audible.
+    local all = {}
+    for k = 0, 7 do all[k] = 1 end
+    for _, bpm in ipairs({ 120, 154, 180 }) do
+        local out = GenDrumsPlanTier('H', RideBar(all, bpm), { fast_runs = 'thin' })
+        Test.expect(HardKicks(out) == 'K.K.K.K.', ('%d BPM: %s'):format(bpm, HardKicks(out)))
+    end
+end)
+
+Test.it('Drums Hard: the paired kick reads Expert, not the rewritten fill', function()
+    -- 8th kicks on beats 1-2, then 16th snares with kicks on the 8ths from beat 3: the fill
+    -- rewrite moves the "and" of 3 off the 8th grid, which once made the "and" of 2 kick
+    -- come back next to beat 3. Expert has both "and"s, so neither is paired with beat 3.
+    local x = {}
+    for k = 0, 3 do x[#x + 1] = DH(k * 0.5, { 0, 3 }, 154) end
+    for k = 0, 7 do
+        local q = 2 + k * 0.25
+        x[#x + 1] = DH(q, k % 2 == 0 and { 0, 1 } or { 1 }, 154)
+    end
+    x[#x + 1] = DH(4, { 0, 4 }, 154)
+    local out = GenDrumsPlanTier('H', x, { fast_runs = 'rewrite' })
+    Test.expect(not DHas(DAt(out, 1.5), 0), 'the "and" of 2 kick should not come back')
+    Test.expect(DHas(DAt(out, 2), 0), 'beat 3 keeps its kick')
+end)
+
 Test.it('Drums Hard: a rewritten roll into the downbeat never starts before its first Expert note', function()
     -- a 160 BPM test song (just over 160 BPM): 16th snares from the "a" of 3 into the
     -- downbeat were laid out from the "and" of 3's triplet; now from beat 4.

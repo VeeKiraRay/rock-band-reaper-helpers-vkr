@@ -138,13 +138,26 @@ beat becomes kicks on 1 and 3.
 
 **The bar's last beat keeps its kick** - `EndOfBarKick`, `hard_end_of_bar_kick`
 When the spacing removed the kick on beat 4 and the "and" after it has none, the beat-4 kick
-comes back; a kick less than 3/4 of a quarter after it goes.
+comes back; a kick less than 3/4 of a quarter after it goes. Not when Expert's kicks are on
+exactly the four beats: that bar keeps 1 and 3.
 *Official charts:* Expert kicks on 1, 3, 4 and the "and" of 4 under steady hats (316 bars): Hard
-keeps beat 4 33%, the "and" 27%, both 1%, neither 39%. *User rule* to keep it.
+keeps beat 4 33%, the "and" 27%, both 1%, neither 39%. *User rule* to keep it. Expert's kicks on
+the four beats with the hands on every 8th: Hard plays 1 and 3 in 858 of 1,270 bars under 140 BPM,
+424 of 524 at 140-169, 98 of 105 from 170; 1 and 3 plus beat 4 is not among the answers.
+
+**Kicks on every 8th become kicks on every beat** - `HardEighthKicks`, `hard_eighth_kicks`
+A bar whose Expert kicks and hands both play every 8th keeps a kick on each beat, and none
+between. The busy-hands spacing would leave 1 and 3, the same as a bar of quarter kicks, so an
+outro or build that goes from quarter kicks to 8th kicks would sound the same on Hard; this keeps
+it one step slower than Expert.
+*Official charts:* fewer bars, spread over few songs: quarters are the commonest answer under 140
+BPM (102 of 322 bars, 12 songs) and from 170 (58 of 63, 2 songs); at 140-169 the 57 bars are mixed
+(from 2-7 songs each). *User rule* with that support.
 
 **One 8th kick paired with beat 3** - `PairedKick`, `hard_paired_kick`
 The busy-hands spacing's dropped kick on the "and" of 2 (leading into beat 3) comes back, else the
-"and" of 3 - not when Expert has both.
+"and" of 3 - not when Expert has both (read from Expert itself: Hard's fill rewrite can move
+either "and" off the 8th grid).
 *Official charts:* `K . . K K . . .` kept as it is 93% at 140+ BPM, 55% below; `K . . . K K . K`
 -> `K . . . K K . .` 46% / 62%.
 

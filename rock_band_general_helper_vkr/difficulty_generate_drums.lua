@@ -60,6 +60,8 @@ GEN_DRUMS_PARAMS = {
     hard_end_of_bar_kick = true,
     -- Hard: one 8th kick paired with beat 3's kick comes back (PairedKick).
     hard_paired_kick = true,
+    -- Hard: Expert's kicks and hands both on every 8th -> a kick on every beat (HardEighthKicks).
+    hard_eighth_kicks = true,
     -- Hard drops hat-only "and"s in steady 8th-hat bars per "Hard 8th runs" (HardHatDrops):
     -- 'always' (every such bar), 'fallback' (only when Hard would keep more than
     -- hard_fallback_keep of Expert's notes), 'off'.
@@ -934,10 +936,70 @@ local function HardHatDrops(evs, n_drop)
     return n
 end
 
+-- The tier above's 4/4 bars on the 8th grid, read before any rule moves a note (Hard's fill
+-- rewrite puts notes on other grids): bars[key] = { kick = { [slot] = true }, hands = {...} },
+-- slot 0-7 = the bar's 8ths. Keyed like the kick rules' bars (the bar line's QN).
+local function UpperEighths(events)
+    local bars = {}
+    for _, ev in ipairs(events) do
+        if ev.bar_qn and Gen5Is44(ev) then
+            local key = ('%.3f'):format(ev.qn - ev.bar_qn)
+            local b = bars[key] or { kick = {}, hands = {} }
+            bars[key] = b
+            local s = ev.bar_qn * 2
+            local slot = math.floor(s + 0.5)
+            if math.abs(s - slot) <= EPS then
+                for _, o in ipairs(ev.offs) do
+                    if o == KICK then b.kick[slot] = true else b.hands[slot] = true end
+                end
+            end
+        end
+    end
+    return bars
+end
+
+local function AllSlots(set, slots)
+    for _, s in ipairs(slots) do if not set[s] then return false end end
+    return true
+end
+local EVERY_8TH = { 0, 1, 2, 3, 4, 5, 6, 7 }
+local EVERY_BEAT = { 0, 2, 4, 6 }
+
+-- Expert's kicks on exactly the four beats (no 8th kick between).
+local function QuarterKickBar(up)
+    if not (up and AllSlots(up.kick, EVERY_BEAT)) then return false end
+    for _, s in ipairs({ 1, 3, 5, 7 }) do if up.kick[s] then return false end end
+    return true
+end
+
+-- Hard: a bar whose Expert kicks AND hands both play every 8th keeps a kick on every beat -
+-- one step slower, where the busy-hands spacing would leave 1 and 3, the same as Expert's
+-- quarter-kick bars, and a build from quarter kicks to 8th kicks would vanish.
+local function HardEighthKicks(evs, upper)
+    local n = 0
+    for _, ev in ipairs(evs) do
+        local up = ev.bar_qn and upper[('%.3f'):format(ev.qn - ev.bar_qn)]
+        if up and AllSlots(up.kick, EVERY_8TH) and AllSlots(up.hands, EVERY_8TH) then
+            local s = ev.bar_qn * 2
+            local slot = math.floor(s + 0.5)
+            -- On a beat Expert has a kick (EVERY_8TH); the hit there may be another note the
+            -- fill rewrite moved onto the beat, so it is not asked whether it lost one.
+            if math.abs(s - slot) <= EPS and slot % 2 == 0 then
+                if not Has(ev, KICK) then Add(ev, KICK); ev.kick_dropped = nil; n = n + 1 end
+            elseif Has(ev, KICK) then
+                Drop(ev, KICK)
+                ev.kick_dropped = true
+            end
+        end
+    end
+    return n
+end
+
 -- Hard: the busy-hands spacing keeps the kicks on 1 and 3; one 8th kick paired with beat
 -- 3's kick - the one leading into it (the "and" of 2), else the one right after it (the
--- "and" of 3) - comes back. Not when Expert has both: then 1 and 3 only.
-local function PairedKick(evs)
+-- "and" of 3) - comes back. Not when Expert has both: then 1 and 3 only - read from the
+-- tier above itself, since the fill rewrite can move either "and" off the 8th grid.
+local function PairedKick(evs, upper)
     local bars = {}
     for _, ev in ipairs(evs) do
         if ev.bar_qn and ev.bar_len and Gen5Is44(ev) then
@@ -949,9 +1011,10 @@ local function PairedKick(evs)
             end
         end
     end
-    for _, b in pairs(bars) do
+    for key, b in pairs(bars) do
         local mid, pre, post = b.mid, b.before, b.after
-        if mid and Has(mid, KICK) then
+        local up = upper[key]
+        if mid and Has(mid, KICK) and not (up and up.kick[3] and up.kick[5]) then
             local pre_k = pre and pre.kick_dropped and not Has(pre, KICK)
             local post_k = post and post.kick_dropped and not Has(post, KICK)
             if pre_k and not post_k then Add(pre, KICK)
@@ -963,8 +1026,8 @@ end
 -- Hard: a bar whose busy-hands spacing left no kick on its last beat or the "and" after it
 -- gets the last-beat kick back when Expert had one there - the end of the bar keeps a
 -- faster kick pattern than its start. With no Expert kick on beat 4 the "and" alone is left
--- thinned.
-local function EndOfBarKick(evs)
+-- thinned, and with Expert's kicks on exactly the four beats the bar keeps 1 and 3.
+local function EndOfBarKick(evs, upper)
     local bars = {}
     for _, ev in ipairs(evs) do
         if ev.bar_qn and ev.bar_len then
@@ -977,10 +1040,11 @@ local function EndOfBarKick(evs)
             elseif math.abs(ev.bar_qn - (last + 0.5)) <= EPS then b.after = ev end
         end
     end
-    for _, b in pairs(bars) do
+    for key, b in pairs(bars) do
         local ev = b.last
         -- Not in a backbeat-on-the-"and"s bar: kicks on beats 1 and 3 there (HardAndBackbeat).
-        if ev and ev.kick_dropped and not Has(ev, KICK) and not (b.after and Has(b.after, KICK)) and not ev.and_beat then
+        if ev and ev.kick_dropped and not Has(ev, KICK) and not (b.after and Has(b.after, KICK)) and not ev.and_beat
+           and not QuarterKickBar(upper[key]) then
             Add(ev, KICK)
             -- The beat's kick wins over a 16th kick right after it, which the spacing kept
             -- only because the beat's had gone (KY on beat 4 + K on its "e").
@@ -1891,6 +1955,7 @@ PlanTier = function(dl, events, opts)
     evs = Rolls(evs, dl, log)
 
     if dl == 'H' then
+        local upper8 = UpperEighths(events)
         evs, ctx = RetimeFills(evs, opts.fast_runs, log, ctx, opts.keep_cymbals)
         evs = HardSixteenths(evs)
         log.and_backbeat = HardAndBackbeat(evs, DRUMS_RULES.general_hard_8th_bpm)
@@ -1915,8 +1980,9 @@ PlanTier = function(dl, events, opts)
                 if class == '8th' or class == '16th' then return P.hard_kick_gap_8th end
                 return P.hard_kick_gap
             end)
-            if GEN_DRUMS_PARAMS.hard_end_of_bar_kick then EndOfBarKick(evs) end
-            if GEN_DRUMS_PARAMS.hard_paired_kick then PairedKick(evs) end
+            if GEN_DRUMS_PARAMS.hard_eighth_kicks then log.eighth_kicks = HardEighthKicks(evs, upper8) end
+            if GEN_DRUMS_PARAMS.hard_end_of_bar_kick then EndOfBarKick(evs, upper8) end
+            if GEN_DRUMS_PARAMS.hard_paired_kick then PairedKick(evs, upper8) end
         end
         if opts.hat_drops and opts.hat_drops > 0 then log.hat_drops = HardHatDrops(evs, opts.hat_drops) end
         -- More than two hand gems on one hit is unplayable (two hands, one foot) and never in an
