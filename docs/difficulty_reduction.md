@@ -376,19 +376,27 @@ A run of four hits an 8th apart loses its least valuable hit. *RBN doc* (Medium 
 ### Drums 2X (double bass pedal)
 
 Part of the Drums selection: the "2X track" row picks PART DRUMS_2X, generated after PART DRUMS.
-- **Each 2X difficulty plays the kicks of the PART DRUMS difficulty one step up** - 2X Hard gets
-  PART DRUMS Expert's kicks, 2X Medium its Hard's, 2X Easy its Medium's - under the 2X hands
-  reduced as usual (`GenDrums2xInput`, `opts.keep_kicks`). *User rule:* Harmonix's own charts
-  have no double-bass versions; community RBN releases did ship "(2x Bass Pedal)" versions, as
-  separate songs whose MIDI has only a PART DRUMS track, and the RBN docs give no rules for
-  reducing them - so they are left out of the measurements. Those kicks are already a reduced
-  tier's, so the rules that *choose* kicks are skipped: Hard's kick spacing, busy hands,
+Below, 1X is PART DRUMS (one pedal) and 2X is PART DRUMS_2X (double pedal).
+- **Each 2X difficulty plays the kicks of the 1X difficulty one step up** - 2X Hard gets 1X
+  Expert's kicks, 2X Medium 1X Hard's, 2X Easy 1X Medium's (`GenDrums2xInput`,
+  `opts.keep_kicks`). The hands are reduced from 2X's own difficulty above by the usual rules;
+  the extra kicks can change which hand hits a difficulty keeps. The 1X kicks are already a
+  reduced tier's, so the rules that *choose* kicks are skipped: Hard's kick spacing, busy hands,
   end-of-bar and paired kicks, and Medium/Easy's quarter-note and half-bar spacing. The rules
   that say what a tier may *contain* still apply, because the tier one step up is allowed more:
   on Medium and Easy, kicks only on quarter notes above 100 BPM, one kick a bar from 170 BPM, no
   kick under an off-beat crash, a three-limb hit loses its kick; on Easy no gem with a kick (all
-  RBN doc rules, which Validate also checks). *User rule:* official charts have nothing to measure -
-  the game never supported two pedals.
+  RBN doc rules, which Validate also checks).
+
+  *User rule, unlike community practice.* Harmonix's own charts have no double-bass versions and
+  the RBN docs give no rules for reducing them. Community RBN releases did ship "(2x Bass
+  Pedal)" versions. Compared with their 1x releases (30 songs with both versions), their Hard,
+  Medium and Easy are the 1x song's, unchanged - the same kicks and the same hands; only Expert
+  differs. These have no documented shared guideline and a few authors account for many of
+  them, so they show what was done, not a clear rule that should be followed for 2x kick
+  reductions. Generate keeps the ladder on purpose: going from 2x Expert straight to
+  the 1x Hard kicks is a big drop, and the ladder gives a player not yet ready for Expert a
+  step toward its fast kick patterns.
 - **Without a PART DRUMS** ((none) picked, or none in the song), the kicks come from a single-pedal
   version made in memory exactly as "Remove 2x kicks" makes one (`SinglePedalTiers`,
   `DoubleBassPlan`).
