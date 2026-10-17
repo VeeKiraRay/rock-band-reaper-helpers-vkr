@@ -1747,7 +1747,7 @@ local PlanTier
 -- go; the hands stay. Any change to that rule belongs there, so the button and Generate
 -- cannot disagree. Returns new events.
 function GenDrumsSinglePedal(events)
-    local out, kicks, qns, down = {}, {}, {}, {}
+    local out, kicks, qns, down, pos = {}, {}, {}, {}, {}
     for _, ev in ipairs(events) do
         local c = Copy(ev)
         out[#out + 1] = c
@@ -1755,12 +1755,17 @@ function GenDrumsSinglePedal(events)
             kicks[#kicks + 1] = c
             qns[#qns + 1] = c.qn
             down[#qns] = c.down or false
+            pos[#qns] = c.bar_qn
         end
     end
     -- DoubleBassPlan asks only about the kicks' own positions.
-    local by_qn = {}
-    for k, q in ipairs(qns) do by_qn[q] = down[k] end
-    local marks = DoubleBassPlan(qns, function(qn) return by_qn[qn] or false end)
+    local by_qn, pos_qn, all_pos = {}, {}, true
+    for k, q in ipairs(qns) do
+        by_qn[q], pos_qn[q] = down[k], pos[k]
+        if pos[k] == nil then all_pos = false end
+    end
+    local marks = DoubleBassPlan(qns, function(qn) return by_qn[qn] or false end,
+        all_pos and function(qn) return pos_qn[qn] end or nil)
     for k, ev in ipairs(kicks) do if marks[k] then Drop(ev, KICK) end end
     return Compact(out)
 end

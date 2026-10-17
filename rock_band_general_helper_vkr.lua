@@ -197,6 +197,12 @@
 --       made in memory the way "Remove 2x kicks" makes one. The result lists
 --       both tracks. "Only 2x bass pedal authored on PART DRUMS" treats
 --       PART DRUMS itself as the 2x chart, for a song charted only that way.
+--     - General > Actions "Remove 2x kicks": in a 16th double-bass figure the
+--       kicks that stay are now chosen by beat position - downbeat, beat,
+--       "and", then the 16ths - instead of every second kick counted from the
+--       figure's start, so a kick on the beat (often under a crash) is no
+--       longer the one removed. Straight 8th runs and triplet figures still
+--       alternate as before.
 --     - Drums Validate: "kick during a drum fill" is now an advisory, and
 --       only when a fill keeps every kick of the difficulty above (official
 --       charts thin them, they don't remove them).

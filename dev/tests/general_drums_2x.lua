@@ -432,11 +432,14 @@ Test.section('DoubleBassPlan - the rules, pure')
 -- DoubleBassPlan takes quarter-note positions and an is_downbeat predicate, so
 -- these need no project at all. 4/4 assumed: a bar downbeat is every 4 QN.
 local function Bar4(qn) return math.abs(qn % 4) < 1e-6 or math.abs(qn % 4 - 4) < 1e-6 end
+local function Bar4Pos(qn) return qn % 4 end
 
 -- 'o' = stays a kick, 'X' = becomes the second foot. Same notation the reference
--- chart was read in, so a case here can be compared with the song by eye.
-local function PlanStr(qns, downbeat)
-    local marks = DoubleBassPlan(qns, downbeat or Bar4)
+-- chart was read in, so a case here can be compared with the song by eye. Bar
+-- positions are passed, so every case also runs rule 6 (the bar-position ranking);
+-- `count_only` leaves them out, to test the alternation of rules 4-5 alone.
+local function PlanStr(qns, downbeat, count_only)
+    local marks = DoubleBassPlan(qns, downbeat or Bar4, not count_only and Bar4Pos or nil)
     local out = {}
     for i = 1, #qns do out[i] = marks[i] and 'X' or 'o' end
     return table.concat(out)
@@ -551,9 +554,46 @@ end)
 
 Test.it('a hole does not trigger the tie-break when a phase is already clean', function()
     -- Same kind of gap, but the line neither starts nor ends on a downbeat, so
-    -- the ordinary phase rule applies and the answer counts played notes.
+    -- the ordinary phase rule applies and the answer counts played notes. Rules
+    -- 4-5 alone: with bar positions, rule 6 re-chooses this line (next section).
     local qns = { 4.25, 4.5, 4.75, 5.25, 5.5, 5.75 }
-    Test.expect(PlanStr(qns) == 'oXoXoX', PlanStr(qns))
+    Test.expect(PlanStr(qns, nil, true) == 'oXoXoX', PlanStr(qns, nil, true))
+end)
+
+Test.it('rule 6: a mixed figure keeps the beat the count would take', function()
+    -- 16th kicks on the e and a of beat 2, then beat 3, its e and its "and" (beat 3
+    -- carries a crash in the song this came from). Counting sets the lone e aside
+    -- and takes beat 3; ranking by bar position keeps the beat and the "and".
+    local qns = { 1.25, 1.75, 2.0, 2.25, 2.5 }
+    Test.expect(PlanStr(qns, nil, true) == 'ooXoX', 'count-only: ' .. PlanStr(qns, nil, true))
+    Test.expect(PlanStr(qns) == 'oXoXo', PlanStr(qns))
+end)
+
+Test.it('rule 6: a 1/16 stream still halves to the 1/8s on the beat side', function()
+    local qns = Grid(1.0, 0.25, 8)          -- 1.0 .. 2.75, no downbeat
+    Test.expect(PlanStr(qns) == 'oXoXoXoX', PlanStr(qns))
+end)
+
+Test.it('rule 6: a tie keeps more kicks', function()
+    -- e & a, no beat, e & a: the two "and"s weigh the same as the four 16ths.
+    local qns = { 4.25, 4.5, 4.75, 5.25, 5.5, 5.75 }
+    Test.expect(PlanStr(qns) == 'oXooXo', PlanStr(qns))
+end)
+
+Test.it('rule 6: a line with triplets keeps the alternation', function()
+    -- An "and" with a 16th-triplet pickup into the downbeat: off the 1/16 grid,
+    -- so the ranking does not apply and rules 4-5 decide.
+    local qns = { 3.5, 3.5 + 1 / 6, 3.5 + 2 / 6, 4.0 }
+    Test.expect(PlanStr(qns) == PlanStr(qns, nil, true), PlanStr(qns) .. ' vs ' .. PlanStr(qns, nil, true))
+end)
+
+Test.it('rule 6: a downbeat is never taken', function()
+    -- 16ths either side of a bar line, the strongest position the line has.
+    local qns = Grid(3.25, 0.25, 7)         -- 3.25 .. 4.75
+    local marks = DoubleBassPlan(qns, Bar4, Bar4Pos)
+    for i, qn in ipairs(qns) do
+        if Bar4(qn) then Test.expect(not marks[i], 'the downbeat became the second foot') end
+    end
 end)
 
 Test.it('an off-grid kick falls back to plain alternation, not to nonsense', function()

@@ -173,6 +173,18 @@ end
 --      grid position instead of note count, so the feet stay on the same
 --      subdivisions across the gap. See PickAlternating for why this is a
 --      tie-break and must not become the general rule.
+--   6. Rules 4-5 count kicks, so where the count starts decides which kicks stay:
+--      a mixed figure (a lone 1/8, then 1/16s into a crash on beat 3) can lose the
+--      beat and keep the 16ths around it. So in a line on the straight 1/16 grid,
+--      the kicks that stay are chosen by bar position instead - downbeat > beat >
+--      "and" > 1/16 - the highest total with every kept kick at least twice the
+--      line's tightest gap from the next (a 1/16 stream still halves to 1/8s). A
+--      tie keeps more kicks. Not used on a line with any kick off the 1/16 grid
+--      (triplets: the beat comes every third note, so ranking by position cannot
+--      alternate evenly) or with a straight run of more than MAX_EIGHTH_RUN 1/8s
+--      (rule 3's long 1/8 runs keep their alternation). Fitted on community
+--      "(2x Bass Pedal)" releases against their own one-pedal versions; both
+--      reference charts the rules were derived from are unchanged by it.
 --
 -- MAX_EIGHTH_RUN is the one value the reference charts could not settle: their
 -- straight-1/8 runs are 2, 3, 13, 61 and 110 kicks long, so anything from 3 to
@@ -197,6 +209,15 @@ local function MakeBarDownbeatTest()
         -- A hair under the bar line reads as the end of this measure, not the
         -- start of the next; treat it as the downbeat it is about to be.
         return per_meas ~= nil and (per_meas - beat_in_meas) < BEAT_EPS
+    end
+end
+
+-- Quarter notes from the bar line at qn, for rule 6. TimeMap_QNToMeasures reads the
+-- project's own measures, so time-signature changes are counted correctly.
+local function MakeBarPosition()
+    return function(qn)
+        local _, bar_start = r.TimeMap_QNToMeasures(0, qn)
+        return qn - (bar_start or 0)
     end
 end
 
@@ -312,10 +333,76 @@ local function PickAlternating(run, qns, is_downbeat)
     return picks
 end
 
+local POS_EPS = 1e-4   -- quarter notes; a bar position "on" a grid step
+local PRIORITY_W = { down = 8, beat = 5, eighth = 3, sixteenth = 1.5 }   -- rule 6
+
+local function OnStep(pos, step)
+    local x = pos / step
+    return math.abs(x - math.floor(x + 0.5)) * step < POS_EPS
+end
+
+-- Rule 6. Returns the line positions to take (1-based within `line`), or nil when
+-- the rule does not apply and the alternation stands.
+local function PriorityPicks(line, qns, is_downbeat, bar_pos)
+    local w = {}
+    for i, idx in ipairs(line) do
+        local qn = qns[idx]
+        if is_downbeat(qn) then w[i] = PRIORITY_W.down
+        else
+            local pos = bar_pos(qn)
+            if     OnStep(pos, 1)             then w[i] = PRIORITY_W.beat
+            elseif OnStep(pos, EIGHTH_QN)     then w[i] = PRIORITY_W.eighth
+            elseif OnStep(pos, SIXTEENTH_QN)  then w[i] = PRIORITY_W.sixteenth
+            else return nil end   -- off the 1/16 grid
+        end
+    end
+    local eighths = 1
+    for i = 2, #line do
+        if math.abs(qns[line[i]] - qns[line[i - 1]] - EIGHTH_QN) < QN_EPS then
+            eighths = eighths + 1
+            if eighths > MAX_EIGHTH_RUN then return nil end
+        else
+            eighths = 1
+        end
+    end
+
+    -- Weighted interval scheduling: best[i] = the highest total of a kept set
+    -- ending on kick i; a tie keeps more kicks.
+    local min_gap = 2 * TightestGap(line, qns) - QN_EPS
+    local best, count, prev = {}, {}, {}
+    local function Better(wa, ca, wb, cb)
+        return wa > wb + 1e-9 or (math.abs(wa - wb) <= 1e-9 and ca > cb)
+    end
+    local last
+    for i = 1, #line do
+        best[i], count[i] = w[i], 1
+        for j = 1, i - 1 do
+            if qns[line[i]] - qns[line[j]] >= min_gap
+                and Better(best[j] + w[i], count[j] + 1, best[i], count[i]) then
+                best[i], count[i], prev[i] = best[j] + w[i], count[j] + 1, j
+            end
+        end
+        if not last or Better(best[i], count[i], best[last], count[last]) then last = i end
+    end
+    local keep, i = {}, last
+    while i do keep[i] = true; i = prev[i] end
+
+    local picks = {}
+    for k = 1, #line do
+        if not keep[k] then
+            if is_downbeat(qns[line[k]]) then return nil end   -- never; kept as a guard
+            picks[#picks + 1] = k
+        end
+    end
+    return picks
+end
+
 -- The whole rule set, pure: quarter-note positions in, a parallel array of
 -- "this one is the second foot" booleans out. `is_downbeat(qn)` is injected so
--- tests can drive the rules against a plain grid with no project at all.
-function DoubleBassPlan(qns, is_downbeat)
+-- tests can drive the rules against a plain grid with no project at all;
+-- `bar_pos(qn)` (quarter notes from the bar line) likewise, and without it rule 6
+-- is skipped.
+function DoubleBassPlan(qns, is_downbeat, bar_pos)
     local marks = {}
     for i = 1, #qns do marks[i] = false end
     if #qns < 2 then return marks end
@@ -331,11 +418,18 @@ function DoubleBassPlan(qns, is_downbeat)
     end
     runs[#runs + 1] = cur
 
-    for _, run in ipairs(runs) do
+    for _, line in ipairs(runs) do
+        local run = {}
+        for k, idx in ipairs(line) do run[k] = idx end   -- TrimRunEdges edits its table
         run = TrimRunEdges(run, qns, is_downbeat)
         if IsDoubleBassLine(run, qns) then
-            for _, i in ipairs(PickAlternating(run, qns, is_downbeat)) do
-                marks[run[i]] = true
+            local picks = PickAlternating(run, qns, is_downbeat)
+            -- Rule 6 re-chooses a line the alternation takes kicks from, edges included.
+            local by_rank = bar_pos and #picks > 0 and PriorityPicks(line, qns, is_downbeat, bar_pos)
+            if by_rank then
+                for _, i in ipairs(by_rank) do marks[line[i]] = true end
+            else
+                for _, i in ipairs(picks) do marks[run[i]] = true end
             end
         end
     end
@@ -380,7 +474,7 @@ function MarkDoubleBassKicks()
 
     local qns = {}
     for i, k in ipairs(kicks) do qns[i] = k.qn end
-    local marks = DoubleBassPlan(qns, MakeBarDownbeatTest())
+    local marks = DoubleBassPlan(qns, MakeBarDownbeatTest(), MakeBarPosition())
 
     local to_mark, already, review = {}, 0, {}
     for i, k in ipairs(kicks) do
@@ -545,7 +639,7 @@ function Remove2XKicks()
 
     local qns = {}
     for i, k in ipairs(src_kicks) do qns[i] = k.qn end
-    local marks = DoubleBassPlan(qns, MakeBarDownbeatTest())
+    local marks = DoubleBassPlan(qns, MakeBarDownbeatTest(), MakeBarPosition())
 
     local second_foot = {}
     for i, k in ipairs(src_kicks) do
