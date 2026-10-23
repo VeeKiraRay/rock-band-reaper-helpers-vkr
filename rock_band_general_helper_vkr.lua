@@ -218,6 +218,11 @@
 --       time went).
 --     - It is a starting point, not a finished chart. Official charters make
 --       judgement calls no rule captures - play it through and adjust.
+--     - Tab Input, Vocal guide: a passage that already fits C1-C5 keeps its
+--       pitch. It used to be moved to the octave nearest C3, as Pro Keys
+--       does, so a note on the high e string's 5th fret (A3) came out as A2.
+--       Now it shifts only when notes fall outside the range, and then by
+--       the smallest octave step.
 --
 --   v0.9.62
 --     - Difficulty > Keys and Guitar/Bass: Validate now agrees with official

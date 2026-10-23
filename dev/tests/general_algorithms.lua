@@ -526,6 +526,51 @@ Test.it('4-note and 6-note fallback shapes share one conflict group', function()
 end)
 
 ----------------------------------------------------------------------
+-- Tab Input vocal guide (actions_keys_guides.lua): octave shift
+----------------------------------------------------------------------
+-- A vocal passage that already fits C1-C5 keeps its pitch. The guide used
+-- to share Pro Keys' "centre on C3" tie-break, which moved a high-e fret 5
+-- (A3, MIDI 69) down to A2.
+Test.section('VocalTabBestShift (Tab Input vocal guide)')
+
+local function voc_events(tab)
+    local events = {}
+    for _, rev in ipairs(ParseTabHorizontal(tab)) do
+        events[#events + 1] = { raws = rev.pitches }
+    end
+    return events
+end
+
+Test.it('a note already in range is not shifted', function()
+    local sh, out = VocalTabBestShift(voc_events('- - - - - 5'))  -- MIDI 69, A3
+    Test.expect(sh == 0, 'no shift; got ' .. sh)
+    Test.expect(out == 0, 'nothing out of range; got ' .. out)
+end)
+
+Test.it('the whole range C1-C5 is kept as it is', function()
+    local sh = VocalTabBestShift({ { raws = { 36 } }, { raws = { 84 } } })
+    Test.expect(sh == 0, 'no shift at either edge; got ' .. sh)
+end)
+
+Test.it('a passage below C1 moves up by the smallest octave that fits', function()
+    local sh, out = VocalTabBestShift({ { raws = { 30 } }, { raws = { 34 } } })
+    Test.expect(sh == 12, 'up one octave; got ' .. sh)
+    Test.expect(out == 0, 'all fit after the shift; got ' .. out)
+end)
+
+Test.it('a passage above C5 moves down by the smallest octave that fits', function()
+    local sh = VocalTabBestShift({ { raws = { 88 } }, { raws = { 92 } } })
+    Test.expect(sh == -12, 'down one octave; got ' .. sh)
+end)
+
+Test.it('a passage too wide to fit takes the shift with fewest notes out', function()
+    -- 30 and 90 cannot both fit; no shift leaves both out, +/-12 leaves one.
+    local sh, out = VocalTabBestShift({ { raws = { 30 } }, { raws = { 90 } } })
+    Test.expect(out == 1, 'one note stays out; got ' .. out)
+    Test.expect(sh == -12, 'tie between -12 and +12 goes down first; got ' .. sh)
+end)
+
+----------------------------------------------------------------------
 -- Difficulty > Generate planner (difficulty_generate_5lane.lua): the Hard keep cap
 ----------------------------------------------------------------------
 Test.section('Generate planner - Hard keep cap')

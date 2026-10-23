@@ -48,6 +48,8 @@ dofile(_mdir .. 'actions_guitar.lua')  -- BuildShapeGemMap, SortedChordPitches (
 dofile(_mdir .. 'actions_guitar_guide.lua')  -- ParseTabHorizontal (pure; GuitarTabGuide
                                              -- itself is not exercised)
 
+dofile(_mdir .. 'actions_keys_guides.lua')  -- VocalTabBestShift (pure; the guides
+                                            -- themselves read S and are not called)
 dofile(_mdir .. 'actions_difficulty_shared.lua')    -- DiffReleaseGapQN (pure)
 dofile(_mdir .. 'actions_difficulty_gtrbass.lua')   -- GB_* rule tables (r only inside functions)
 dofile(_mdir .. 'actions_difficulty_5k.lua')        -- K5_* rule tables (r only inside functions)

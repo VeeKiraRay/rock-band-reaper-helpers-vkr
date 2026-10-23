@@ -263,26 +263,15 @@ end
 local VOC_MIN = 36   -- C1
 local VOC_MAX = 84   -- C5
 
-function VocalTabGuide()
-    local events = ParseTabToRaws('Vocal guide')
-    if not events then return end
-
-    -- Find best octave shift (minimize notes outside C1-C5)
-    local SHIFTS = { -48, -36, -24, -12, 0, 12, 24 }
-    local best_shift       = 0
-    local best_out_count   = math.huge
-    local best_median_dist = math.huge
-
-    local function median_dist_voc(shift)
-        local pitches = {}
-        for _, ev in ipairs(events) do
-            for _, raw in ipairs(ev.raws) do pitches[#pitches + 1] = raw + shift end
-        end
-        table.sort(pitches)
-        local mid = pitches[math.ceil(#pitches / 2)]
-        return math.abs(mid - 60)  -- 60 = C3 = midpoint of C1-C5 range
-    end
-
+-- Octave shift for the vocal guide: the one leaving the fewest notes outside
+-- C1-C5; on a tie, the smallest shift (no shift first, then down before up).
+-- Unlike Pro Keys, which centres the passage on C3 because its lanes are a
+-- range window, a vocal note's pitch is what the singer sings - a passage that
+-- already fits must not move.
+-- events: { { raws = { pitch, ... } }, ... }. Returns shift, out_count.
+function VocalTabBestShift(events)
+    local SHIFTS = { 0, -12, 12, -24, 24, -36, -48 }  -- smallest first: ties keep the earlier
+    local best_shift, best_out = 0, math.huge
     for _, sh in ipairs(SHIFTS) do
         local out = 0
         for _, ev in ipairs(events) do
@@ -291,13 +280,16 @@ function VocalTabGuide()
                 if p < VOC_MIN or p > VOC_MAX then out = out + 1 end
             end
         end
-        local md = median_dist_voc(sh)
-        if out < best_out_count or (out == best_out_count and md < best_median_dist) then
-            best_shift       = sh
-            best_out_count   = out
-            best_median_dist = md
-        end
+        if out < best_out then best_shift, best_out = sh, out end
     end
+    return best_shift, best_out
+end
+
+function VocalTabGuide()
+    local events = ParseTabToRaws('Vocal guide')
+    if not events then return end
+
+    local best_shift, best_out_count = VocalTabBestShift(events)
 
     -- Apply shift
     local total_notes = 0
