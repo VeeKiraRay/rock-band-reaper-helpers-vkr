@@ -223,6 +223,11 @@
 --       does, so a note on the high e string's 5th fret (A3) came out as A2.
 --       Now it shifts only when notes fall outside the range, and then by
 --       the smallest octave step.
+--     - Tab Input, Pro Keys and Vocal guides: the result lists one row per
+--       note or chord, like the Guitar guide - the tab line you typed, its
+--       pitches, and on the same row any note out of range or chord wider
+--       than an octave - instead of all pitches on one line and the problems
+--       in a separate list.
 --
 --   v0.9.62
 --     - Difficulty > Keys and Guitar/Bass: Validate now agrees with official

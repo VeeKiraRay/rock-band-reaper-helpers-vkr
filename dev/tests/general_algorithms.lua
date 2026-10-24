@@ -570,6 +570,46 @@ Test.it('a passage too wide to fit takes the shift with fewest notes out', funct
     Test.expect(sh == -12, 'tie between -12 and +12 goes down first; got ' .. sh)
 end)
 
+-- The Pro Keys and Vocal guides print one row per event, as the guitar guide
+-- does: the tab line as typed, its pitches, and what is wrong with it.
+Test.section('TabGuideEventRows (Tab Input Pro Keys / Vocal guides)')
+
+local function guide_rows(tab, lo, hi)
+    local events = {}
+    for _, rev in ipairs(ParseTabHorizontal(tab)) do
+        table.sort(rev.pitches)
+        events[#events + 1] = rev
+    end
+    return TabGuideEventRows(events, lo, hi)
+end
+
+Test.it('one row per event, starting with the tab line as typed', function()
+    local rows = guide_rows('- - - - - 5\n- - - - 1 -', 36, 84)
+    Test.expect(#rows == 4, 'blank + phrase header + 2 rows; got ' .. #rows)
+    Test.expect(rows[2]:find('*** Phrase 1', 1, true), 'phrase header; got ' .. rows[2])
+    Test.expect(rows[3]:find('- - - - - 5', 1, true) and rows[3]:find('A3', 1, true),
+        'row carries tab line and pitch; got ' .. rows[3])
+    Test.expect(rows[4]:find('C3', 1, true), 'B string fret 1 is C3; got ' .. rows[4])
+    Test.expect(not rows[3]:find('<-', 1, true), 'no flag on an in-range note')
+end)
+
+Test.it('a blank line starts a new phrase header', function()
+    local rows = guide_rows('- - - - - 5\n\n- - - - - 7', 36, 84)
+    Test.expect(rows[5] and rows[5]:find('*** Phrase 2', 1, true),
+        'second phrase header; got ' .. tostring(rows[5]))
+end)
+
+Test.it('out-of-range notes and wide chords are flagged on their row', function()
+    local rows = guide_rows('- - - - - 22\n8 - - - - 12', 36, 84)
+    Test.expect(rows[3]:find('D5 above C5', 1, true), 'out of range flagged; got ' .. rows[3])
+    Test.expect(rows[4]:find('spans 28 semitones', 1, true), 'wide chord flagged; got ' .. rows[4])
+end)
+
+Test.it('vertical input (no tab line) shows the event number', function()
+    local rows = TabGuideEventRows({ { pitches = { 60 }, phrase_idx = 1 } }, 36, 84)
+    Test.expect(rows[3]:find('#1', 1, true), 'event number; got ' .. rows[3])
+end)
+
 ----------------------------------------------------------------------
 -- Difficulty > Generate planner (difficulty_generate_5lane.lua): the Hard keep cap
 ----------------------------------------------------------------------

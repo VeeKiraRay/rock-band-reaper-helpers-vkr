@@ -14,6 +14,77 @@ local function PkEventLabel(pitches)
     return '[' .. table.concat(parts, '+') .. ']'
 end
 
+local TAB_SPAN_MAX = 12  -- widest chord Expert allows, in semitones (one octave)
+
+-- The notes of one event outside lo..hi, each as "C1 below C2" / "D5 above C5".
+local function TabOutOfRange(pitches, lo, hi)
+    local bad = {}
+    for _, p in ipairs(pitches) do
+        if p < lo then
+            bad[#bad + 1] = PitchName(p) .. ' below ' .. PitchName(lo)
+        elseif p > hi then
+            bad[#bad + 1] = PitchName(p) .. ' above ' .. PitchName(hi)
+        end
+    end
+    return bad
+end
+
+-- "(no shift)" or "-1 oct (-12 semitones)".
+local function TabShiftLabel(shift)
+    if shift == 0 then return '(no shift)' end
+    return ('%+d oct (%+d semitones)'):format(shift / 12, shift)
+end
+
+-- First line of both guides: the octave shift and how much was entered.
+local function TabGuideHeader(shift, events, total_notes)
+    local n_phrases  = events[#events].phrase_idx
+    local phrase_str = n_phrases == 1 and '1 phrase' or (n_phrases .. ' phrases')
+    local event_str  = #events == 1 and '1 event' or (#events .. ' events')
+    local note_str   = total_notes == #events
+        and event_str
+        or  ('%s, %d notes total'):format(event_str, total_notes)
+    return ('Octave shift: %s  (%s, %s)'):format(TabShiftLabel(shift), note_str, phrase_str)
+end
+
+-- One row per event, laid out like the guitar guide's: the tab line as typed
+-- (or "#n" for vertical input, which has no line per event), the pitches after
+-- the shift, and anything wrong with it - notes outside lo..hi, or a chord
+-- wider than an octave. Each phrase starts with a "*** Phrase n" line.
+-- events: sorted pitches, phrase_idx and (optional) tab_str per event.
+-- Returns the lines; the first one is blank.
+function TabGuideEventRows(events, lo, hi)
+    local lines  = {}
+    local phrase = nil
+    for i, ev in ipairs(events) do
+        if ev.phrase_idx ~= phrase then
+            phrase = ev.phrase_idx
+            lines[#lines + 1] = ''
+            lines[#lines + 1] = ('  *** Phrase %d'):format(phrase)
+        end
+        local flags = TabOutOfRange(ev.pitches, lo, hi)
+        local span  = ev.pitches[#ev.pitches] - ev.pitches[1]
+        if span > TAB_SPAN_MAX then
+            flags[#flags + 1] = ('spans %d semitones (Expert max %d)'):format(span, TAB_SPAN_MAX)
+        end
+        local row = ('  %-10s  %s'):format(ev.tab_str or ('#' .. i), PkEventLabel(ev.pitches))
+        if #flags > 0 then row = row .. '  <- ' .. table.concat(flags, '; ') end
+        lines[#lines + 1] = row
+    end
+    return lines
+end
+
+-- Closing line when any chord is wider than Expert allows (each is marked on its row).
+local function AppendSpanSummary(lines, events)
+    local n = 0
+    for _, ev in ipairs(events) do
+        if ev.pitches[#ev.pitches] - ev.pitches[1] > TAB_SPAN_MAX then n = n + 1 end
+    end
+    if n > 0 then
+        lines[#lines + 1] = ('%d chord(s) span more than %d semitones (Expert max) - marked above.'):format(
+            n, TAB_SPAN_MAX)
+    end
+end
+
 local function ParseTabToRaws(status_prefix)
     local text = S.mc_gtr_tab_format == 0 and S.mc_gtr_tab_input_h or S.mc_gtr_tab_input_v
     if not text or text:match('^%s*$') then
@@ -35,7 +106,7 @@ local function ParseTabToRaws(status_prefix)
         local raws = {}
         for _, p in ipairs(rev.pitches) do raws[#raws + 1] = p end
         table.sort(raws)
-        events[#events + 1] = { raws = raws, phrase_idx = rev.phrase_idx }
+        events[#events + 1] = { raws = raws, phrase_idx = rev.phrase_idx, tab_str = rev.tab_str }
     end
     return events
 end
@@ -87,17 +158,7 @@ function ProKeysTabGuide()
 
     -- Steps 5-7: branch on animation vs. standard mode
 
-    -- Shared: build event labels and note span
-    local shift_label
-    if best_shift == 0 then
-        shift_label = '(no shift)'
-    else
-        local oct = best_shift / 12
-        shift_label = ('%+d oct (%+d semitones)'):format(oct, best_shift)
-    end
-
-    local ev_labels = {}
-    for _, ev in ipairs(events) do ev_labels[#ev_labels + 1] = PkEventLabel(ev.pitches) end
+    local shift_label = TabShiftLabel(best_shift)
 
     local min_p, max_p = math.huge, -math.huge
     for _, ev in ipairs(events) do
@@ -107,62 +168,20 @@ function ProKeysTabGuide()
         end
     end
 
-    -- Chord span warnings (> 12 semitones = exceeds octave rule); shared by both modes
-    local span_warns = {}
-    for i, ev in ipairs(events) do
-        if #ev.pitches > 1 then
-            local span = ev.pitches[#ev.pitches] - ev.pitches[1]
-            if span > 12 then
-                span_warns[#span_warns + 1] = ('  Event %d: %s spans %d semitones (max 12 for Expert)'):format(
-                    i, PkEventLabel(ev.pitches), span)
-            end
-        end
-    end
-
-    local n_phrases = events[#events].phrase_idx
-    local phrase_str = n_phrases == 1 and '1 phrase' or (n_phrases .. ' phrases')
-    local note_str   = total_notes == #events
-        and ('%d events'):format(#events)
-        or  ('%d events, %d notes total'):format(#events, total_notes)
-
-    local lines = {}
-    lines[#lines + 1] = ('Events after shift %s:'):format(shift_label)
-    lines[#lines + 1] = table.concat(ev_labels, '  ')
-    lines[#lines + 1] = ('(%s, %s)'):format(note_str, phrase_str)
-    lines[#lines + 1] = ''
+    local lines = { TabGuideHeader(best_shift, events, total_notes) }
 
     if S.pk_tab_animation then
         -- Animation mode: report against full C2-C4 range, skip lane window scoring
         lines[#lines + 1] = 'Animation mode - full C2-C4 range (no lane window).'
+        for _, l in ipairs(TabGuideEventRows(events, PK_MIN, PK_MAX)) do lines[#lines + 1] = l end
         lines[#lines + 1] = ''
         if best_out_count == 0 then
             lines[#lines + 1] = 'All notes fit within C2-C4.'
         else
-            lines[#lines + 1] = (best_out_count .. ' note(s) fall outside C2-C4 even after best shift.')
+            lines[#lines + 1] = (best_out_count .. ' note(s) fall outside C2-C4 even after best shift - marked above.')
             lines[#lines + 1] = 'Consider re-voicing those notes.'
-            -- List out-of-range events
-            lines[#lines + 1] = ''
-            for i, ev in ipairs(events) do
-                local bad = {}
-                for _, p in ipairs(ev.pitches) do
-                    if p < PK_MIN or p > PK_MAX then
-                        local dir = p < PK_MIN and ('below ' .. PitchName(PK_MIN))
-                                                or ('above ' .. PitchName(PK_MAX))
-                        bad[#bad + 1] = PitchName(p) .. ' ' .. dir
-                    end
-                end
-                if #bad > 0 then
-                    lines[#lines + 1] = ('  Event %d (phrase %d): %s - %s'):format(
-                        i, ev.phrase_idx, PkEventLabel(ev.pitches), table.concat(bad, '; '))
-                end
-            end
         end
-
-        if #span_warns > 0 then
-            lines[#lines + 1] = ''
-            lines[#lines + 1] = 'Chord span warnings (Expert max: 12 semitones):'
-            for _, s in ipairs(span_warns) do lines[#lines + 1] = s end
-        end
+        AppendSpanSummary(lines, events)
 
         local status_fit = best_out_count == 0 and 'all fit C2-C4' or
                            (best_out_count .. ' out of C2-C4')
@@ -196,44 +215,34 @@ function ProKeysTabGuide()
             end
         end
 
-        -- Step 6: collect out-of-range events for the suggested lane range
-        local oor      = {}
+        -- Step 6: count the events that fit the suggested lane range
         local in_count = 0
-        for i, ev in ipairs(events) do
-            local bad = {}
-            for _, p in ipairs(ev.pitches) do
-                if p < best_range.lo or p > best_range.hi then
-                    local dir = p < best_range.lo
-                        and 'below ' .. PitchName(best_range.lo)
-                        or  'above ' .. PitchName(best_range.hi)
-                    bad[#bad + 1] = PitchName(p) .. ' ' .. dir
-                end
-            end
-            if #bad > 0 then
-                oor[#oor + 1] = ('  Event %d (phrase %d): %s - %s'):format(
-                    i, ev.phrase_idx, PkEventLabel(ev.pitches), table.concat(bad, '; '))
-            else
+        for _, ev in ipairs(events) do
+            if #TabOutOfRange(ev.pitches, best_range.lo, best_range.hi) == 0 then
                 in_count = in_count + 1
             end
         end
+        local all_fit = in_count == #events
 
-        -- Step 7: build lane-range report lines
+        -- Step 7: suggested range, one row per event (out-of-range notes marked), advice
         local note_center  = (min_p + max_p) / 2
         local range_center = (best_range.lo + best_range.hi) / 2
         local centre_label = math.abs(note_center - range_center) <= 2 and ', best centred' or ''
+        local fit_label    = all_fit and 'all fit'
+                             or ('%d/%d events fit'):format(in_count, #events)
 
-        if #oor == 0 then
-            lines[#lines + 1] = ('Suggested range: %s  %s  (all fit%s)'):format(
-                best_range.name, PK_PREF_LABEL[best_range.pref], centre_label)
-            lines[#lines + 1] = ''
+        lines[#lines + 1] = ('Suggested range: %s  %s  (%s%s)'):format(
+            best_range.name, PK_PREF_LABEL[best_range.pref], fit_label, centre_label)
+        for _, l in ipairs(TabGuideEventRows(events, best_range.lo, best_range.hi)) do
+            lines[#lines + 1] = l
+        end
+        lines[#lines + 1] = ''
+
+        if all_fit then
             lines[#lines + 1] = ('All %d events fit within %s.'):format(#events, best_range.name)
         else
-            lines[#lines + 1] = ('Suggested range: %s  %s  (%d/%d events fit%s)'):format(
-                best_range.name, PK_PREF_LABEL[best_range.pref], in_count, #events, centre_label)
-            lines[#lines + 1] = ''
-            lines[#lines + 1] = ('Out of range for %s:'):format(best_range.name)
-            for _, s in ipairs(oor) do lines[#lines + 1] = s end
-            lines[#lines + 1] = ''
+            lines[#lines + 1] = ('%d event(s) out of range for %s - marked above.'):format(
+                #events - in_count, best_range.name)
             if best_out_count > 0 then
                 lines[#lines + 1] = 'Note: no octave shift fits all notes in C2-C4.'
                 lines[#lines + 1] = 'Consider splitting the passage or re-voicing out-of-range notes.'
@@ -241,14 +250,9 @@ function ProKeysTabGuide()
                 lines[#lines + 1] = 'Consider shifting 1 oct or splitting at a phrase boundary.'
             end
         end
+        AppendSpanSummary(lines, events)
 
-        if #span_warns > 0 then
-            lines[#lines + 1] = ''
-            lines[#lines + 1] = 'Chord span warnings (Expert max: 12 semitones):'
-            for _, s in ipairs(span_warns) do lines[#lines + 1] = s end
-        end
-
-        local status_in = #oor == 0 and 'all fit' or (in_count .. '/' .. #events .. ' fit')
+        local status_in = all_fit and 'all fit' or (in_count .. '/' .. #events .. ' fit')
         S.status = ('Pro Keys guide: %s - suggested %s (%s)'):format(
             shift_label, best_range.name, status_in)
     end
@@ -300,70 +304,20 @@ function VocalTabGuide()
         total_notes = total_notes + #ev.pitches
     end
 
-    local shift_label
-    if best_shift == 0 then
-        shift_label = '(no shift)'
-    else
-        local oct = best_shift / 12
-        shift_label = ('%+d oct (%+d semitones)'):format(oct, best_shift)
-    end
-
-    local ev_labels = {}
-    for _, ev in ipairs(events) do ev_labels[#ev_labels + 1] = PkEventLabel(ev.pitches) end
-
-    local span_warns = {}
-    for i, ev in ipairs(events) do
-        if #ev.pitches > 1 then
-            local span = ev.pitches[#ev.pitches] - ev.pitches[1]
-            if span > 12 then
-                span_warns[#span_warns + 1] = ('  Event %d: %s spans %d semitones (max 12 for Expert)'):format(
-                    i, PkEventLabel(ev.pitches), span)
-            end
-        end
-    end
-
-    local n_phrases = events[#events].phrase_idx
-    local phrase_str = n_phrases == 1 and '1 phrase' or (n_phrases .. ' phrases')
-    local note_str   = total_notes == #events
-        and ('%d events'):format(#events)
-        or  ('%d events, %d notes total'):format(#events, total_notes)
-
-    local lines = {}
-    lines[#lines + 1] = ('Events after shift %s:'):format(shift_label)
-    lines[#lines + 1] = table.concat(ev_labels, '  ')
-    lines[#lines + 1] = ('(%s, %s)'):format(note_str, phrase_str)
+    local lines = { TabGuideHeader(best_shift, events, total_notes) }
+    for _, l in ipairs(TabGuideEventRows(events, VOC_MIN, VOC_MAX)) do lines[#lines + 1] = l end
     lines[#lines + 1] = ''
 
     if best_out_count == 0 then
         lines[#lines + 1] = 'All notes fit within C1-C5.'
     else
-        lines[#lines + 1] = (best_out_count .. ' note(s) fall outside C1-C5 even after best shift.')
+        lines[#lines + 1] = (best_out_count .. ' note(s) fall outside C1-C5 even after best shift - marked above.')
         lines[#lines + 1] = 'Consider re-voicing those notes or splitting the passage.'
-        lines[#lines + 1] = ''
-        for i, ev in ipairs(events) do
-            local bad = {}
-            for _, p in ipairs(ev.pitches) do
-                if p < VOC_MIN or p > VOC_MAX then
-                    local dir = p < VOC_MIN and ('below ' .. PitchName(VOC_MIN))
-                                             or ('above ' .. PitchName(VOC_MAX))
-                    bad[#bad + 1] = PitchName(p) .. ' ' .. dir
-                end
-            end
-            if #bad > 0 then
-                lines[#lines + 1] = ('  Event %d (phrase %d): %s - %s'):format(
-                    i, ev.phrase_idx, PkEventLabel(ev.pitches), table.concat(bad, '; '))
-            end
-        end
     end
-
-    if #span_warns > 0 then
-        lines[#lines + 1] = ''
-        lines[#lines + 1] = 'Chord span warnings (Expert max: 12 semitones):'
-        for _, s in ipairs(span_warns) do lines[#lines + 1] = s end
-    end
+    AppendSpanSummary(lines, events)
 
     local status_fit = best_out_count == 0 and 'all fit C1-C5' or
                        (best_out_count .. ' out of C1-C5')
-    S.status = ('Vocal guide: %s - %s'):format(shift_label, status_fit)
+    S.status = ('Vocal guide: %s - %s'):format(TabShiftLabel(best_shift), status_fit)
     S.last_result = table.concat(lines, '\n')
 end
