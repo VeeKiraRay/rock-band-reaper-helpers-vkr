@@ -240,7 +240,17 @@ function OdValidateModel(model, opts)
     -- Drums and fills
     ------------------------------------------------------------------
     local drums = model.inst.drums
-    for _, f in ipairs(model.fills) do
+    for i, f in ipairs(model.fills) do
+        -- Magma refuses to build the song: "Drum fill at ... too close (N ms) to end of
+        -- preceding fill. Must be 2.5 sec between drum fills".
+        local pf = model.fills[i - 1]
+        if pf and #bars > 0 then
+            local gap = OdQNToSec(bars, f.s) - OdQNToSec(bars, pf.e)
+            if gap < OD_FILL_MIN_GAP_SEC - 1e-3 then
+                Err('fill gap', ('Drums: fill at %s starts %.2f s after the previous fill ends - Magma needs %.1f s.'):format(
+                    OdWhere(f.s), gap, OD_FILL_MIN_GAP_SEC))
+            end
+        end
         local fa = OdBarAt(bars, f.s)
         local fbar_s = fa and bars[fa].qn_s or f.s
         for _, od in ipairs(drums.od) do

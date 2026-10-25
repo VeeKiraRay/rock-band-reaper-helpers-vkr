@@ -11,8 +11,8 @@
 -- spacing 4 bars.
 --
 -- Pure over the model from OdBuildModel.
--- Requires (globals): OD_QN_EPS, OdAnyOverlap, OdSpansOverlap, OdSameQN, OdBarAt
--- (overdrive_read.lua)
+-- Requires (globals): OD_QN_EPS, OdAnyOverlap, OdSpansOverlap, OdSameQN, OdBarAt,
+-- OdQNToSec (overdrive_read.lua)
 
 OD_FILL_PACINGS = {
     [1] = { label = 'Half bar every 2 bars', every = 2, len = 0.5 },
@@ -20,13 +20,20 @@ OD_FILL_PACINGS = {
     [3] = { label = '2 bars every 8 bars',   every = 8, len = 2   },
 }
 
--- Tempo thresholds for Auto. The doc says only "very fast" and "very slow"; these
--- are where a one-bar fill stops fitting comfortably in either direction.
-local FAST_BPM = 170
+-- Magma refuses to build a song when a fill starts less than 2.5 s after the previous
+-- fill ends ("Drum fill ... too close ... Must be 2.5 sec between drum fills").
+OD_FILL_MIN_GAP_SEC = 2.5
+
+-- Tempo threshold for Auto's half-bar fills. The doc says "very slow"; this is where
+-- a one-bar fill stops fitting comfortably.
+--
+-- No fast threshold: the doc's "2 measures every 8 when very fast" is not what
+-- official charts do. Over the RB3 DLC (591 songs), fills at 170+ BPM are one bar
+-- long 91-98% of the time and 2 bars ~0%, and 69-82% come every 4 bars - the same
+-- as at 120-170 BPM. "2 bars every 8" stays available as a manual choice.
 local SLOW_BPM = 75
 
 function OdAutoFillPacing(bpm)
-    if bpm >= FAST_BPM then return 3 end
     if bpm <= SLOW_BPM then return 1 end
     return 2
 end
@@ -35,8 +42,10 @@ end
 --
 -- opts:
 --   pacing          1..3, an OD_FILL_PACINGS index
---   align           end a fill on a [prc_*] section start within reach of the grid
---                   slot, or, when there is none, on a drum crash; off = the plain grid
+--   align           end a fill on a [prc_*] section change within reach of the grid
+--                   slot, or, when there is none, on a drum crash; off = the plain grid.
+--                   Only a real change counts (model.section_change_bars): chorus_1a
+--                   -> chorus_1b is one section split for practice, not a change
 --   keepout_end     a fill's crash must land at least this many measures before the
 --                   drums' last measure (2). Official charts: the last fill lands a
 --                   median 4 measures before it; on the final measure itself in 1%
@@ -51,8 +60,17 @@ end
 --   * fall in a drum solo (no fills there) or over a drum roll
 --   * lead into a bar where the drums do not come back in (the fill would waste
 --     the drummer's overdrive on a rest)
+--   * start less than OD_FILL_MIN_GAP_SEC after the previous fill ends (Magma error)
 -- Skipping keeps the grid: the next fill is still counted from where this one would
 -- have ended, so one blocked slot does not shift every fill after it.
+--
+-- THE PACING IS A MINIMUM. Two fills never end closer than `every` bars apart (user
+-- rule). A section change closer than that to the previous fill still gets its fill,
+-- and the previous fill is removed instead - the section is where the drummer should
+-- be able to deploy, and a gap of 6 or 7 bars to the fill before is fine. A previous
+-- fill that itself leads into a section change is kept, and the closer section gets
+-- none. Before this rule the alignment let a fill end half the pacing after the
+-- previous one, which with 2-bar fills at 193 BPM left 2.49 s between them.
 --
 -- FILLS ARE PLANNED BEFORE INSTRUMENT OVERDRIVE, the order drum authoring happens in
 -- anyway. The instrument planner then keeps drum phrases and unisons out of fill bars
@@ -88,8 +106,9 @@ function OdPlanFills(model, opts)
         if drums.onset[b] then last_drum = b; break end
     end
 
-    local section_bars = model.section_bars or {}
-    local min_gap = math.max(2, math.ceil(P.every / 2))
+    local section_bars = model.section_change_bars or {}
+    local all_starts = model.section_bars or {}   -- subsections too
+    local min_gap = math.max(2, math.ceil(P.every / 2))   -- earliest crash, after a skipped slot
     local len_bars = math.max(1, math.ceil(P.len))
     local function Skip(reason)
         plan.skipped[reason] = (plan.skipped[reason] or 0) + 1
@@ -101,10 +120,15 @@ function OdPlanFills(model, opts)
     local prev = first
     while true do
         local e = prev + P.every
+        local last = plan.fills[#plan.fills]
+        -- No fill ends closer than `every` bars after the last kept one - except at a
+        -- section change, where the last one gives way (see THE PACING IS A MINIMUM).
+        local min_e = last and last.bar + P.every or -math.huge
         local crash_near   -- a crash beside a section start that has none of its own
+        local at_section
         if opts.align then
             -- SECTIONS FIRST, CRASHES AS THE FALLBACK. Within reach of the grid slot, a
-            -- [prc_*] section start moves the fill. Only when no section is in reach
+            -- [prc_*] section change moves the fill. Only when no section is in reach
             -- does a drum crash (nearest the slot first) move it.
             --
             -- Measured against 60 reference songs: sections first puts 76% of fills
@@ -117,19 +141,30 @@ function OdPlanFills(model, opts)
             -- of its own but one on the neighbouring downbeat is reported: that
             -- usually means the section event is a measure off (placed by the vocals
             -- rather than the band), and moving it moves the fill with it.
-            local lo_b, hi_b = prev + min_gap, prev + P.every + 2
+            --
+            -- A SUBSECTION (chorus_1a -> chorus_1b) still lines a fill up, but only at
+            -- the full pacing or later - it never replaces the last fill. Official
+            -- charters often put a fill into one: over the RB3 DLC (hold-out excluded),
+            -- ignoring subsections entirely matched 76.0% of official fill ends, this
+            -- 77.1%, and letting them replace fills like a real change 78.2%.
+            local hi_b = prev + P.every + 2
+            -- A section change may replace the last fill, unless that one leads into a
+            -- section change itself.
+            local sec_lo = prev + 1
+            if last and last.section then sec_lo = math.max(sec_lo, min_e) end
             local sec_b
-            for b = lo_b, hi_b do
-                if section_bars[b] then sec_b = b; break end
+            for b = sec_lo, hi_b do
+                if section_bars[b] or (all_starts[b] and b >= min_e) then sec_b = b; break end
             end
             if sec_b then
-                e = sec_b
+                e, at_section = sec_b, section_bars[sec_b] or nil
                 if not crash_bars[sec_b] then
                     for _, c in ipairs({ sec_b + 1, sec_b - 1 }) do
                         if not crash_near and crash_bars[c] then crash_near = c end
                     end
                 end
             else
+                local lo_b = math.max(prev + min_gap, min_e)
                 for d = 0, P.every do
                     local hit
                     for _, b in ipairs(d == 0 and { e } or { e - d, e + d }) do
@@ -173,10 +208,23 @@ function OdPlanFills(model, opts)
                 end
             end
         end
+        -- The fill this one would follow: the last kept fill, or the one before it
+        -- when this section fill replaces it.
+        local replaces = not reason and last and e < min_e
+        local before = replaces and plan.fills[#plan.fills - 1] or last
+        if not reason and before
+           and OdQNToSec(bars, s_qn) - OdQNToSec(bars, before.e) < OD_FILL_MIN_GAP_SEC - 1e-3 then
+            reason = ('under %.1f s after the previous fill'):format(OD_FILL_MIN_GAP_SEC)
+        end
         if reason then
             Skip(reason)
         else
-            plan.fills[#plan.fills + 1] = { s = s_qn, e = e_qn, bar = e, crash_near = crash_near }
+            if replaces then
+                plan.fills[#plan.fills] = nil
+                Skip('gave way to a fill into a section change')
+            end
+            plan.fills[#plan.fills + 1] = { s = s_qn, e = e_qn, bar = e, crash_near = crash_near,
+                                            section = at_section }
         end
         prev = e
     end

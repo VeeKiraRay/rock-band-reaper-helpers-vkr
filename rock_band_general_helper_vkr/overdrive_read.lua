@@ -423,6 +423,33 @@ function OdCrashBars(bars, drum_events, tom_markers)
     return out
 end
 
+-- The section a [prc_*] name belongs to, without its number or subsection letter:
+-- chorus_1, chorus_1a, chorus_2b -> chorus; intro_a, intro_b -> intro; gtr_solo_2a ->
+-- gtr_solo. Charters split a section into practice subsections (chorus_1a, chorus_1b)
+-- that are not a change in the music, and official charts write them often (verse_1 ->
+-- verse_1a 143 times, intro_a -> intro_b 58 times in the RB3 DLC). The last word is
+-- dropped when it is a number, a number and one letter, or a single letter.
+-- A name with no other word (a bare "1a") is kept whole.
+function OdSectionFamily(name)
+    local words = {}
+    for w in name:lower():gmatch('[^_%s]+') do words[#words + 1] = w end
+    if #words > 1 and words[#words]:match('^%d*%a?$') then words[#words] = nil end
+    return table.concat(words, '_')
+end
+
+-- Seconds at a QN position, from the bars' start times (linear inside a bar, which is
+-- exact unless the tempo changes mid-bar). Pure, so the planners need no REAPER call.
+function OdQNToSec(bars, qn)
+    local b = OdBarAt(bars, qn) or (qn < bars[1].qn_s and 1 or #bars)
+    local bar = bars[b]
+    local nxt = bars[b + 1]
+    local dur = nxt and (nxt.t_s - bar.t_s)
+             or (b > 1 and (bar.t_s - bars[b - 1].t_s) * (bar.qn_e - bar.qn_s)
+                           / (bars[b - 1].qn_e - bars[b - 1].qn_s))
+             or 0
+    return bar.t_s + (qn - bar.qn_s) / (bar.qn_e - bar.qn_s) * dur
+end
+
 -- Derived per-instrument fields. Split out so a test can build a model by hand
 -- (bars, inst[key].events, ...) and get the same derivation.
 function OdFinishModel(model)
@@ -434,9 +461,18 @@ function OdFinishModel(model)
     model.rolls = model.rolls or {}
     model.drum_solos = model.drum_solos or {}
     model.sections = model.sections or {}
-    model.section_bars = {}
+    -- section_bars: every section start (the interest score's context term).
+    -- section_change_bars: only starts where the section really changes - what fills
+    -- and the unison before a section line up with. See OdSectionFamily.
+    model.section_bars, model.section_change_bars = {}, {}
+    local prev_family
     for _, sec in ipairs(model.sections) do
-        if sec.bar then model.section_bars[sec.bar] = true end
+        local family = OdSectionFamily(sec.name or '')
+        if sec.bar then
+            model.section_bars[sec.bar] = true
+            if family ~= prev_family then model.section_change_bars[sec.bar] = true end
+        end
+        prev_family = family
     end
     local drums = model.inst.drums
     model.crash_bars = OdCrashBars(model.bars, drums and drums.events or {}, model.tom_markers or {})

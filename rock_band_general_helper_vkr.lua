@@ -228,6 +228,22 @@
 --       pitches, and on the same row any note out of range or chord wider
 --       than an octave - instead of all pitches on one line and the problems
 --       in a separate list.
+--     - Overdrive, drum fills: Generate no longer places a fill less than 2.5 s
+--       after the previous one ends, which Magma refuses to build ("Must be
+--       2.5 sec between drum fills"). A fast song could get there through
+--       section alignment; across the official RB3 DLC songs the old layout
+--       would have hit it in about one song in four. Validate reports it as
+--       an error.
+--     - The fill pacing is now a minimum: fills never end closer together
+--       than it. A section change that comes sooner still gets its fill, and
+--       the fill before it is removed instead.
+--     - Practice subsections no longer count as a section change: chorus_1a
+--       -> chorus_1b, intro_a -> intro_b, or chorus_1 -> chorus_2 back to
+--       back. They can still line a fill up at the normal spacing, but never
+--       pull one earlier.
+--     - Auto fill pacing: fast songs now get one measure every 4, as official
+--       charts do at every tempo, instead of 2 measures every 8 from 170 BPM.
+--       "2 bars every 8 bars" is still there to pick by hand.
 --
 --   v0.9.62
 --     - Difficulty > Keys and Guitar/Bass: Validate now agrees with official

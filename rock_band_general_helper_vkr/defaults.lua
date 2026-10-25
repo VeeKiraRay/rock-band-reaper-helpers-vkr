@@ -1510,15 +1510,23 @@ TIPS = {
                            "over a drum roll, before a rest, or in a Big Rock Ending - its\n" ..
                            "lanes after [coda] are never touched.",
     od_fill_pacing       = "How often fills come and how long they are.\n\n" ..
-                           "Auto follows the RBN drum doc: half a measure every 2 for very\n" ..
-                           "slow songs, 2 measures every 8 for very fast ones, and one\n" ..
-                           "measure every 4 otherwise.",
+                           "Auto: half a measure every 2 for very slow songs (75 BPM or\n" ..
+                           "less), one measure every 4 otherwise. The RBN drum doc suggests\n" ..
+                           "2 measures every 8 for very fast songs, but official charts keep\n" ..
+                           "one measure every 4 there too - pick it by hand if you want it.\n\n" ..
+                           "The spacing is a minimum: fills never end closer together,\n" ..
+                           "and never start less than 2.5 s after the previous fill ends\n" ..
+                           "(Magma refuses to build the song otherwise).",
     od_fill_sections     = "Line fills up with the song instead of keeping strictly to the\n" ..
                            "grid - e.g. a verse with two extra measures gets its fill\n" ..
                            "into the chorus.\n\n" ..
-                           "A fill ends on a [prc_*] section start (EVENTS track) within\n" ..
+                           "A fill ends on a [prc_*] section change (EVENTS track) within\n" ..
                            "reach of the grid slot. Where there is none, it ends on a drum\n" ..
                            "crash (a blue or green cymbal on a downbeat) instead.\n\n" ..
+                           "Practice subsections are not a change: chorus_1a -> chorus_1b,\n" ..
+                           "intro_a -> intro_b, or chorus_1 -> chorus_2 back to back (the\n" ..
+                           "number or letter at the end is ignored). A section change that comes too soon\n" ..
+                           "after the previous fill takes its place - that fill is removed.\n\n" ..
                            "If a section start has no crash but the next or previous\n" ..
                            "measure does, the result points it out: the section event may\n" ..
                            "be a measure off, and moving it moves the fill with it.",

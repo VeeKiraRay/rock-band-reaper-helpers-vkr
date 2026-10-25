@@ -214,7 +214,7 @@ function OdPlanInstruments(model, opts)
     -- b - only when b is the last measure before a section, the fill is the one leading
     -- into that section, and nothing else blocks the bar. Otherwise nil.
     local function YieldableFill(b)
-        if not opts.together or b >= nb or not (model.section_bars or {})[b + 1] then return nil end
+        if not opts.together or b >= nb or not (model.section_change_bars or {})[b + 1] then return nil end
         for i, f in ipairs(fills) do
             if OdSameQN(f.e, bars[b + 1].qn_s) then
                 if not FillBlocks(b, i) then return i end

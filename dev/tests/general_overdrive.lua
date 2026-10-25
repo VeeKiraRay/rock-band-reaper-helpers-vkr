@@ -228,8 +228,109 @@ Test.it('a section start wins over a crash, and a crash beside it is reported', 
         if f.crash_near then flagged = f end
     end
     local list = table.concat(ends, ',')
-    Test.expect(list:find('^5,9,12,') ~= nil, list)
+    -- Bar 12 is only 3 bars after the fill into bar 9, so that fill gives way. The next
+    -- one moves to the crash at 17, the nearest at least 4 bars on.
+    Test.expect(list:find('^5,12,17,') ~= nil, list)
     Test.expect(flagged and flagged.bar == 12 and flagged.crash_near == 13, 'crash at 13 not reported')
+end)
+
+Test.it('section family drops a trailing number, number + letter, or letter', function()
+    local cases = {
+        chorus_1 = 'chorus', chorus_1a = 'chorus', chorus_12b = 'chorus', intro_a = 'intro',
+        gtr_solo_2a = 'gtr_solo', gtr_solo = 'gtr_solo', gtr_break = 'gtr_break',
+        outro_chorus_a = 'outro_chorus', bre = 'bre', ['1a'] = '1a', main_riff = 'main_riff',
+    }
+    for name, want in pairs(cases) do
+        local got = OdSectionFamily(name)
+        Test.expect(got == want, ('%s -> %s, want %s'):format(name, got, want))
+    end
+end)
+
+Test.it('a practice subsection does not pull a fill', function()
+    local bars = MkBars(40)
+    local model = MkModel(40, { drums = 'all' }, { sections = {
+        { name = 'verse_1',   s = bars[3].qn_s,  bar = 3 },
+        { name = 'chorus_1a', s = bars[11].qn_s, bar = 11 },
+        { name = 'chorus_1b', s = bars[15].qn_s, bar = 15 },
+        { name = 'chorus_2',  s = bars[18].qn_s, bar = 18 },   -- same section, renumbered
+    } })
+    Test.expect(model.section_bars[15] and not model.section_change_bars[15], 'subsection read as a change')
+    Test.expect(not model.section_change_bars[18], 'chorus_1b -> chorus_2 read as a change')
+    local ends = {}
+    for _, f in ipairs(OdPlanFills(model, { pacing = 2, align = true, drum_od = {} }).fills) do
+        ends[#ends + 1] = f.bar
+    end
+    -- 3 (section), 7, 11 (section), 15, 19 ... - not pulled to 18.
+    local list = table.concat(ends, ',')
+    Test.expect(list:find('^3,7,11,15,19,') ~= nil, list)
+end)
+
+Test.it('a subsection lines a fill up at the full pacing, never earlier', function()
+    local bars = MkBars(40)
+    local model = MkModel(40, { drums = 'all' }, { sections = {
+        { name = 'verse_1a', s = bars[1].qn_s,  bar = 1 },
+        { name = 'verse_1b', s = bars[8].qn_s,  bar = 8 },    -- 3 bars after the fill at 5: ignored
+        { name = 'verse_1c', s = bars[14].qn_s, bar = 14 },   -- 5 bars after the fill at 9: used
+    } })
+    local plan = OdPlanFills(model, { pacing = 2, align = true, drum_od = {} })
+    local ends = {}
+    for _, f in ipairs(plan.fills) do ends[#ends + 1] = f.bar end
+    local list = table.concat(ends, ',')
+    Test.expect(list:find('^5,9,14,18,') ~= nil, list)
+    Test.expect((plan.skipped['gave way to a fill into a section change'] or 0) == 0, 'a subsection replaced a fill')
+end)
+
+Test.it('a section right after a section fill gets none; the pacing is a minimum', function()
+    local bars = MkBars(40)
+    local model = MkModel(40, { drums = 'all' }, { sections = {
+        { name = 'prechorus_1', s = bars[9].qn_s,  bar = 9 },
+        { name = 'chorus_1',    s = bars[11].qn_s, bar = 11 },
+    } })
+    local plan = OdPlanFills(model, { pacing = 2, align = true, drum_od = {} })
+    local ends = {}
+    for _, f in ipairs(plan.fills) do ends[#ends + 1] = f.bar end
+    local list = table.concat(ends, ',')
+    Test.expect(list:find('^5,9,13,') ~= nil, list)
+    for i = 2, #plan.fills do
+        Test.expect(plan.fills[i].bar - plan.fills[i - 1].bar >= 4, 'fills closer than 4 bars: ' .. list)
+    end
+end)
+
+Test.it('the replaced fill is counted, and the fill before it stays', function()
+    local bars = MkBars(40)
+    local model = MkModel(40, { drums = 'all' },
+        { sections = { { name = 'chorus_1', s = bars[16].qn_s, bar = 16 } } })
+    local plan = OdPlanFills(model, { pacing = 2, align = true, drum_od = {} })
+    local ends = {}
+    for _, f in ipairs(plan.fills) do ends[#ends + 1] = f.bar end
+    -- Grid 5, 9, 13; the chorus at 16 replaces 13 (3 bars before it): 9 -> 16 is 7 bars.
+    local list = table.concat(ends, ',')
+    Test.expect(list:find('^5,9,16,20,') ~= nil, list)
+    Test.expect((plan.skipped['gave way to a fill into a section change'] or 0) == 1, 'replacement not counted')
+end)
+
+-- Bars at a fixed tempo: MkBars' start times are 120 BPM.
+local function AtBpm(model, bpm)
+    for _, b in ipairs(model.bars) do b.t_s = b.qn_s * 60 / bpm end
+    return model
+end
+
+Test.it('no fill starts under 2.5 s after the previous one ends (Magma)', function()
+    -- Half a bar every 2 at 193 BPM leaves 6 QN = 1.87 s between fills.
+    local model = AtBpm(MkModel(40, { drums = 'all' }), 193)
+    local plan = OdPlanFills(model, { pacing = 1, align = false, drum_od = {} })
+    Test.expect(#plan.fills > 0, 'no fills at all')
+    for i = 2, #plan.fills do
+        local gap = OdQNToSec(model.bars, plan.fills[i].s) - OdQNToSec(model.bars, plan.fills[i - 1].e)
+        Test.expect(gap >= OD_FILL_MIN_GAP_SEC - 1e-3, ('gap %.2f s before bar %d'):format(gap, plan.fills[i].bar))
+    end
+    Test.expect((plan.skipped['under 2.5 s after the previous fill'] or 0) > 0, 'skip not counted')
+end)
+
+Test.it('Auto pacing: one bar every 4 at fast tempos, half a bar only when very slow', function()
+    Test.expect(OdAutoFillPacing(193) == 2, 'fast song')
+    Test.expect(OdAutoFillPacing(120) == 2, 'mid tempo')
+    Test.expect(OdAutoFillPacing(70) == 1, 'slow song')
 end)
 
 Test.it('with no section in reach, a fill moves to a nearby crash', function()
@@ -475,7 +576,9 @@ end)
 Test.it('together: a unison takes the measure before a section; that fill gives way', function()
     local bars = MkBars(80)
     local secs = {}
-    for _, b in ipairs({ 21, 41, 61 }) do secs[#secs + 1] = { name = 'chorus', s = bars[b].qn_s, bar = b } end
+    for i, b in ipairs({ 21, 41, 61 }) do
+        secs[#secs + 1] = { name = ({ 'chorus_1', 'bridge', 'chorus_2' })[i], s = bars[b].qn_s, bar = b }
+    end
     local model = MkModel(80, ALL4, { sections = secs })
     local fills = OdPlanFills(model, { pacing = 2, align = true, drum_od = {} }).fills
     local base = { gen = { guitar = true, bass = true, drums = true, keys = true },
@@ -490,7 +593,7 @@ Test.it('together: a unison takes the measure before a section; that fill gives 
     for _, b in ipairs(on.unison_bars) do un[b] = true end
     for _, f in ipairs(on.yielded) do
         local landing = OdBarStartingAt(model.bars, f.e)
-        Test.expect(landing and model.section_bars[landing] and un[landing - 1],
+        Test.expect(landing and model.section_change_bars[landing] and un[landing - 1],
                     'yielded fill is not the one before a section with a unison')
     end
     Test.expect(#fills == #OdPlanFills(model, { pacing = 2, align = true, drum_od = {} }).fills,
@@ -545,6 +648,17 @@ Test.it('flags a drum phrase overlapping a fill', function()
     model.inst.drums.od[#model.inst.drums.od + 1] = { s = f.s, e = f.e }
     local rep = OdValidateModel(model, STD)
     Test.expect(table.concat(rep.errors, '\n'):find('overlaps a fill', 1, true) ~= nil, 'not flagged')
+end)
+
+Test.it('flags fills under 2.5 s apart (Magma)', function()
+    local model = AtBpm(GeneratedModel(), 193)
+    local f = model.fills[3]
+    -- A second 2-bar fill ending 4 bars after it: 2 bars (2.49 s at 193 BPM) between.
+    local b = OdBarStartingAt(model.bars, f.e)
+    table.insert(model.fills, 4, { s = model.bars[b + 2].qn_s, e = model.bars[b + 4].qn_s, lanes = 5 })
+    local errs = table.concat(OdValidateModel(model, STD).errors, '\n')
+    Test.expect(errs:find('Magma needs 2.5 s', 1, true) ~= nil, 'not flagged')
+    Test.expect(OdValidateModel(GeneratedModel(), STD).n_errors == 0, 'flagged a clean song')
 end)
 
 Test.it('flags PART KEYS and PART REAL_KEYS_X that differ', function()
