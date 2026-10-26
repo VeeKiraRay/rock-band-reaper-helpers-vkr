@@ -1,7 +1,7 @@
 -- @description Rock Band Venue Events - Tests
 -- @author VeeKiraRay
 -- @about
---   Tests for the Venue > Events sub-tab: section_events.lua vocabulary vs
+--   Tests for the Events > Manual gen sub-tab: section_events.lua vocabulary vs
 --   the full RB3 events list, NextSectionEvent suffix logic, and EVENTS-track
 --   insert integration (skipped if the open project already has an EVENTS
 --   track). Run from the REAPER Actions list for a fully isolated Lua
@@ -33,6 +33,7 @@ dofile(_tdir .. 'framework.lua')
 dofile(_tdir .. 'fixture_helpers.lua')
 dofile(_root .. 'lib/reaper_imgui_helpers.lua')   -- FormatTime (venue_awareness)
 dofile(_gdir .. 'defaults.lua')                   -- S
+dofile(_root .. 'lib/reaper_helper_common.lua')   -- FindTrackByName, GetTakePPQPerQN
 dofile(_gdir .. 'helpers.lua')                    -- FindTrackByName
 dofile(_gdir .. 'venue_awareness.lua')            -- ReadEventSections (merge test)
 dofile(_gdir .. 'venue_themes.lua')               -- GetSectionPreset, BuildLightingPool

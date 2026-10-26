@@ -35,11 +35,11 @@ r = {}
 dofile(_root .. 'dev/tools/smf_reader.lua')
 dofile(_root .. 'dev/tools/smf_chart_events.lua')
 dofile(_dir  .. 'difficulty_holdout.lua')
-dofile(_root .. 'rock_band_general_helper_vkr/actions_difficulty_shared.lua')
-dofile(_root .. 'rock_band_general_helper_vkr/actions_difficulty_drums_checks.lua')   -- DRUMS_RULES
-dofile(_root .. 'rock_band_general_helper_vkr/difficulty_generate_params.lua')
-dofile(_root .. 'rock_band_general_helper_vkr/difficulty_generate_retime.lua')
-dofile(_root .. 'rock_band_general_helper_vkr/difficulty_generate_drums.lua')
+dofile(_root .. 'rock_band_instrument_helper_vkr/actions_difficulty_shared.lua')
+dofile(_root .. 'rock_band_instrument_helper_vkr/actions_difficulty_drums_checks.lua')   -- DRUMS_RULES
+dofile(_root .. 'rock_band_instrument_helper_vkr/difficulty_generate_params.lua')
+dofile(_root .. 'rock_band_instrument_helper_vkr/difficulty_generate_retime.lua')
+dofile(_root .. 'rock_band_instrument_helper_vkr/difficulty_generate_drums.lua')
 if EIGHTH == 'off' then GEN_DRUMS_PARAMS.lower_eighth_hands_bpm = nil end
 
 -- diag: keep rate by lane x beat class, generated vs official, from the same upper tier.

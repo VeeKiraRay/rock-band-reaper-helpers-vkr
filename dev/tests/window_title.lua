@@ -28,6 +28,7 @@
 -- deliberately.
 local WINDOWS = {
     { 'Rock Band General Helper', 'rock_band_general_helper_vkr.lua' },
+    { 'Rock Band Instrument Helper', 'rock_band_instrument_helper_vkr.lua' },
     { 'Rock Band Vocal Helper',   'rock_band_vocal_helper_vkr.lua' },
     { 'RB Music Theory Helper',   'rock_band_music_theory_helper_vkr.lua' },
     { 'Rock Band Venue Preview',  'rock_band_preview_vkr.lua' },

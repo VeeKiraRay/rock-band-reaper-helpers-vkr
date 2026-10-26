@@ -8,23 +8,23 @@
 local function ResolveTracks()
     local tracks = GetTrackList()
     if #tracks == 0 then return nil, 'No tracks in project.' end
-    if S.audio_idx >= #tracks or S.midi_idx >= #tracks then
-        return nil, 'Track selection out of range.'
+    if not TrackAtIndex(S.audio_idx) or not TrackAtIndex(S.midi_idx) then
+        return nil, 'Pick an audio source track and a MIDI destination track.'
     end
     if S.audio_idx == S.midi_idx then
         return nil, 'Pick different tracks for audio and MIDI.'
     end
-    local atr = r.GetTrack(0, tracks[S.audio_idx + 1].idx)
-    local mtr = r.GetTrack(0, tracks[S.midi_idx  + 1].idx)
+    local atr = TrackAtIndex(S.audio_idx)
+    local mtr = TrackAtIndex(S.midi_idx)
     local rtr
     if S.pitch_mode == MODE_REFERENCE then
-        if S.ref_idx >= #tracks then
-            return nil, 'Reference MIDI track index out of range.'
+        if not TrackAtIndex(S.ref_idx) then
+            return nil, 'Pick a reference MIDI track.'
         end
         if S.ref_idx == S.audio_idx or S.ref_idx == S.midi_idx then
             return nil, 'Reference MIDI track must be different from audio and destination tracks.'
         end
-        rtr = r.GetTrack(0, tracks[S.ref_idx + 1].idx)
+        rtr = TrackAtIndex(S.ref_idx)
     end
     return { audio = atr, midi = mtr, ref = rtr }
 end
@@ -33,27 +33,27 @@ end
 local function ResolveApplyPitchTracks()
     local tracks = GetTrackList()
     if #tracks == 0 then return nil, 'No tracks in project.' end
-    if S.midi_idx >= #tracks then
-        return nil, 'Destination track index out of range.'
+    if not TrackAtIndex(S.midi_idx) then
+        return nil, 'Pick a MIDI destination track.'
     end
-    local mtr = r.GetTrack(0, tracks[S.midi_idx + 1].idx)
+    local mtr = TrackAtIndex(S.midi_idx)
     local rtr, atr
     if S.pitch_mode == MODE_REFERENCE then
-        if S.ref_idx >= #tracks then
-            return nil, 'Reference MIDI track index out of range.'
+        if not TrackAtIndex(S.ref_idx) then
+            return nil, 'Pick a reference MIDI track.'
         end
         if S.ref_idx == S.midi_idx then
             return nil, 'Reference MIDI track must be different from the destination track.'
         end
-        rtr = r.GetTrack(0, tracks[S.ref_idx + 1].idx)
+        rtr = TrackAtIndex(S.ref_idx)
     elseif S.pitch_mode == MODE_YIN then
-        if S.audio_idx >= #tracks then
-            return nil, 'Audio track index out of range.'
+        if not TrackAtIndex(S.audio_idx) then
+            return nil, 'Pick an audio source track.'
         end
         if S.audio_idx == S.midi_idx then
             return nil, 'Pick different tracks for audio and MIDI.'
         end
-        atr = r.GetTrack(0, tracks[S.audio_idx + 1].idx)
+        atr = TrackAtIndex(S.audio_idx)
     end
     return { midi = mtr, ref = rtr, audio = atr }
 end

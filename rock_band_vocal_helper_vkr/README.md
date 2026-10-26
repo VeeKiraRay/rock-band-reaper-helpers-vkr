@@ -13,8 +13,8 @@ Designed for authoring Rock Band-style vocal charts — it defaults to the RB3 v
 
 1. Open a REAPER project with a vocal stem on one track and a destination track with a MIDI item on it.
 2. Run the script. The window opens and attempts to auto-select the right tracks (it looks for tracks named `VOCALS AUDIO` / `DRYVOX1` for audio and `PART VOCALS` for MIDI destination).
-3. Open the **Tuner** tab and press play — it reads back the detected pitch live as you play, no notes required.
-4. Once you have notes on the destination track (placed by hand, or via the experimental Note Placement tab), use **Pitch**, **Lyrics**, **Pitch slide**, **Harmonies**, and **Validation** to refine them.
+3. Open **Pitch → Tuner** and press play — it reads back the detected pitch live as you play, no notes required.
+4. Once you have notes on the destination track (placed by hand, or via the experimental Note Placement tab), use **Pitch**, **Lyrics**, **Harmonies**, and **Validation** to refine them.
 5. Automatic note detection/generation (Dry run / Generate) is currently experimental — enable it via General → Settings → **Show WIPs?** (see [README_WIP.md](README_WIP.md)).
 
 ---
@@ -29,13 +29,11 @@ The script window has a persistent track-selector row at the top and a status/re
 | ---------------------- | ----------------------------------------------------------------------------------------------------- |
 | Track selectors        | Above the tab bar — Audio source, MIDI destination; always visible                                  |
 | **General** tab        | Save / Load project settings; Refresh tracks; Show WIPs toggle; buttons that open the other tools   |
-| **Tuner** tab          | Live pitch detector — reads audio at the playhead and shows the current note, Hz, and history       |
-| **Pitch** tab          | Pitch source for Apply pitch changes: Built-in detection (YIN) or Reference MIDI; Snap to Key Scale |
+| **Pitch** tab          | Tuner (live pitch detector), Snap to Key Scale, Slide scan, and the pitch source for Apply pitch changes: Built-in detection (YIN) or Reference MIDI |
 | **Lyrics** tab         | Select a lyrics file, assign or clear lyric events                                                  |
-| **Pitch slide** tab    | Scan existing notes for pitch slides (glides, scoops, bends)                                        |
 | **Harmonies** tab      | Copy lead vocal notes to up to three harmony tracks, transposed or keeping the target's own pitches |
 | **Validation** tab     | Validate phrase markers; check phrase similarity to catch copy errors                               |
-| Status / Undo          | Below the tab bar — result of the last action, and the Undo button                                  |
+| Status / Undo          | Below the tab bar — the active time selection, the result of the last action, and the Undo button |
 
 <a id="wip-tabs"></a>
 
@@ -105,20 +103,26 @@ A tool that isn't installed next to this script is greyed out with a note saying
 
 ---
 
-## Tuner tab
+## Pitch tab
 
-![Tuner tab](../assets/v_tuner.jpg)
+The Pitch tab controls how **Apply pitch changes** re-pitches existing notes on the destination track. **Generate and Dry run always use the Default pitch** (set on the Note Placement tab) and are not affected by anything on this tab.
 
-The **Tuner** tab is a live pitch detector. While active it reads audio from the selected source track at the current playhead position every 100 ms and displays the detected note.
+The tab has five sub-tabs, in this order: **Tuner**, **Snap**, **Slide**, **Placement - Built-in** and **Placement - Reference**. (Tuner and Slide were tabs of their own — Tuner and Pitch slide — before v1.21.)
 
-### Starting and stopping
+### Tuner sub-tab
+
+![Tuner sub-tab](../assets/v_tuner.jpg)
+
+The **Tuner** sub-tab is a live pitch detector. While active it reads audio from the selected source track at the current playhead position every 100 ms and displays the detected note.
+
+#### Starting and stopping
 
 Click **Start Tuner** to begin. The button label changes to **Stop Tuner**. The tuner also stops automatically in two situations:
 
-- You navigate away from the Tuner tab.
+- You leave the Tuner sub-tab (another Pitch sub-tab, or another tab).
 - No new pitch has been detected for 60 seconds while the playhead is stationary (e.g. you stopped playback and stepped away).
 
-### Display
+#### Display
 
 | Element             | Description                                                                                                                                                                                                                                                                                 |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -126,17 +130,17 @@ Click **Start Tuner** to begin. The button label changes to **Stop Tuner**. The 
 | **History strip**   | The last 10 detected notes, newest on the left, dimmed. Only real pitches appear — silence is not logged.                                                                                                                                                                                   |
 | **Quiet indicator** | "Quiet — no pitch detected" appears in the status bar at the bottom of the window when audio is silent or not clearly pitched. When playing, it waits 1.5 seconds before appearing so brief syllable gaps and breaths do not trigger it. When the playhead is stopped it appears instantly. |
 
-The Tuner tab shows its own **state indicator** ("Tuner: Active" in green, "Tuner: Stopped" in grey) directly below the Start/Stop button — you do not need to watch the bottom status bar while tuning. The status bar is only used for auto-stop and error messages.
+The Tuner sub-tab shows its own **state indicator** ("Tuner: Active" in green, "Tuner: Stopped" in grey) directly below the Start/Stop button — you do not need to watch the bottom status bar while tuning. The status bar is only used for auto-stop and error messages.
 
 > **Tip:** The display and history stay visible after you stop. Use this as a quick reference — play a few bars, stop, read the results, then jump to the MIDI editor.
 
-### Scrubbing
+#### Scrubbing
 
 Dragging the playhead while playback is stopped is also detected — the tuner reads the edit cursor position, so clicking anywhere on the timeline immediately samples that point. The "Quiet — no pitch detected" message in the status bar also appears immediately when you scrub to a silent spot (no 1.5 s delay), giving instant feedback when stepping through the timeline manually.
 
-### Vocal style preset
+#### Vocal style preset
 
-A **Vocal style preset** combo sits above the YIN sliders on this tab, on the Pitch tab's Built-in detection sub-tab, and on the Pitch slide tab — the same combo and preset list in all three places, since they all share the same underlying YIN settings. Picking a preset fills in a starting point in one click; the combo itself resets to "Apply preset..." afterward and every slider stays editable, so treat it as a starting point to fine-tune rather than a locked mode.
+A **Vocal style preset** combo sits above the YIN sliders on this sub-tab, on Placement - Built-in, and on Slide — the same combo and preset list in all three places, since they all share the same underlying YIN settings. Picking a preset fills in a starting point in one click; the combo itself resets to "Apply preset..." afterward and every slider stays editable, so treat it as a starting point to fine-tune rather than a locked mode.
 
 | Preset                          | Sets                                                                                             |
 | -------------------------------- | -------------------------------------------------------------------------------------------------- |
@@ -151,9 +155,9 @@ A **Vocal style preset** combo sits above the YIN sliders on this tab, on the Pi
 
 The five voice-range presets (Low male through High female) also enable the Min/Max pitch range constraints at the listed values — useful as a first line of defense against YIN's octave-snap errors. The two style-only presets and Piano/keys leave pitch-range constraints as they were. Piano/keys additionally shows a soft warning if the selected tracks look vocal-named, since it's meant for a quiet single-note instrument stem instead.
 
-### YIN Detection settings
+#### YIN Detection settings
 
-These are the same settings used by the Pitch tab's Built-in detection mode. Adjusting them here changes the behaviour of both the tuner and Apply pitch changes.
+These are the same settings used by Placement - Built-in. Adjusting them here changes the behaviour of both the tuner and Apply pitch changes.
 
 | Slider                 | Range       | Default | Notes                                                                                                                                                                                       |
 | ---------------------- | ----------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -163,26 +167,65 @@ These are the same settings used by the Pitch tab's Built-in detection mode. Adj
 | **Window (ms)**        | 10 – 100    | 30 ms   | Analysis window per sample. YIN needs at least one pitch cycle — at 80 Hz that is ~12 ms minimum. Longer windows are more stable; shorter windows track faster.                             |
 | **Min RMS level**      | 0.001 – 0.1 | 0.005   | Minimum signal level before pitch detection runs. Raise if silent gaps frequently trigger spurious detections; lower if very quiet passages are being ignored. Saved with project settings. |
 
-### Pitch Range constraints
+#### Pitch Range constraints
 
-The same Min pitch / Max pitch checkbox+slider pairs from the Pitch tab. When enabled, detected pitches outside the range are octave-shifted back in before display. Useful for voices where YIN occasionally lands an octave too low or high.
+The same Min pitch / Max pitch checkbox+slider pairs as Placement - Built-in. When enabled, detected pitches outside the range are octave-shifted back in before display. Useful for voices where YIN occasionally lands an octave too low or high.
 
 <a id="standalone-pitch-tuner"></a>
 
-### Standalone Pitch Tuner
+#### Standalone Pitch Tuner
 
-`rock_band_pitch_tuner_vkr.lua` (repo root) is a separate script that opens just this tab in its own window — load it the same way as the main scripts (**Actions → Show action list → Load ReaScript**). Handy for keeping the live readout visible while you work in another tab (Pitch, Lyrics) or in the MIDI editor, instead of the tuner stopping the moment you navigate away. Same underlying behaviour as the Tuner tab above, with two differences:
+`rock_band_pitch_tuner_vkr.lua` (repo root) is a separate script that opens just this sub-tab in its own window — load it the same way as the main scripts (**Actions → Show action list → Load ReaScript**). Handy for keeping the live readout visible while you work in another tab (Pitch, Lyrics) or in the MIDI editor, instead of the tuner stopping the moment you navigate away. Same underlying behaviour as the Tuner tab above, with two differences:
 
 - It has its own **Audio source track** selector and **Refresh tracks** button at the top, since it isn't sharing the main window's track selectors.
 - It never stops on tab navigation — there are no tabs. The 60-second idle auto-stop still applies, and closing the window stops the tuner.
 
 It reads the same per-project settings the vocal helper saves, so YIN thresholds, confidence, Min RMS level and pitch range carry over. Saving stays in the vocal helper's General tab — this window never writes settings, so changes made here apply for the session only.
 
----
+### Snap sub-tab
 
-## Pitch tab
+<!-- TODO: screenshot of the Snap to Key Scale sub-tab -->
+![Snap to Key Scale sub-tab](../assets/v_pitch_placement_snap.jpg)
 
-The Pitch tab controls how **Apply pitch changes** re-pitches existing notes on the destination track. **Generate and Dry run always use the Default pitch** (set on the Note Placement tab) and are not affected by anything on this tab.
+**Snap to Key Scale** shifts every vocal note in scope to the nearest pitch in a chosen key, moving each note by the fewest semitones needed to land on a scale degree. On a tie (a note equidistant between two scale degrees), the lower pitch wins.
+
+Set the **Key** (root note) and **Scale** (Major or Minor) to match the song — look these up on Tunebat or a chord chart and verify by ear.
+
+**Scope:** with an active time selection, only notes within the selection are snapped. This is useful for songs with key changes or chromatic passages where you want to snap one section at a time. Without a time selection, clicking **Snap to Key (full item)** shows a confirmation dialog before processing the whole MIDI item.
+
+**Avoid matching neighbor (within phrase)** — after snapping, if two adjacent notes within the same phrase land on the same pitch (but had different pitches before snapping), the note that moved more semitones is redirected to the next-closest scale degree instead. Notes on either side of a phrase boundary are not compared — a phrase-ending note and the following phrase-opening note may legitimately share a scale degree.
+
+Phrase markers (pitch 105) are never moved or deleted. Per-note velocity and lyrics are preserved through the operation.
+
+### Slide sub-tab
+
+![Slide sub-tab](../assets/v_pitch_slide.jpg)
+
+The **Slide** sub-tab scans existing MIDI notes on the destination track and reports any where the detected pitch moves significantly during the note — slides, scoops, bends, and other pitch curves that a Rock Band vocal chart may need to represent explicitly.
+
+> **This action is read-only.** It never modifies notes; it only reports findings.
+
+#### How to use it
+
+1. Generate notes onto the destination track first.
+2. (Optional) Make a time selection to limit the scan.
+3. Click **Scan pitch slides**.
+
+If no time selection is active, a confirmation dialog appears before scanning the whole song.
+
+The result panel lists every note where a slide was detected, with its position, length, pitch, and movement type (Slide up, Slide down, Scoop, Bend, or Complex). Use the measure numbers to jump directly to each note in REAPER.
+
+#### Slide Scan settings
+
+| Slider              | Range       | Default | What it does                                                                                       |
+| ------------------- | ----------- | ------- | ----------------------------------------------------------------------------------------------------- |
+| **Min note length** | 20 – 300 ms | 80 ms   | Notes shorter than this are skipped entirely.                                                      |
+| **Min segment**     | 5 – 100 ms  | 20 ms   | A detected pitch run shorter than this is discarded. Increase to suppress false positives.         |
+| **Edge skip**       | 0 – 50 ms   | 20 ms   | Skip the start and end of each note before sampling. Hides consonant artifacts at note boundaries. |
+| **Sample step**     | 5 – 50 ms   | 10 ms   | How often pitch is sampled along the note. Smaller = more resolution but slower.                   |
+| **Sample window**   | 10 – 50 ms  | 20 ms   | YIN analysis window per sample point. Longer = more stable detection.                              |
+
+The scan also uses the **YIN threshold**, **Min frequency**, and **Max frequency** settings shared with the other Pitch sub-tabs.
 
 ### Placement sub-tabs
 
@@ -194,7 +237,7 @@ Pitch source is chosen by which sub-tab is open when you click Apply pitch chang
 
 The script analyses the audio directly using the [YIN algorithm](http://audition.ens.fr/adc/pdf/2002_JASA_YIN.pdf) to estimate the fundamental frequency of each note. No external MIDI reference needed. This is the default.
 
-A **Vocal style preset** combo (see [Tuner tab](#vocal-style-preset)) sits above the sliders here too, sharing the same settings.
+A **Vocal style preset** combo (see [Tuner sub-tab](#vocal-style-preset)) sits above the sliders here too, sharing the same settings.
 
 | Slider            | Range         | Default | Notes                                                                                                                   |
 | ----------------- | ------------- | ------- | ------------------------------------------------------------------------------------------------------------------------- |
@@ -257,21 +300,6 @@ Two optional checkbox+slider pairs clamp or octave-shift pitches into a target r
 
 The button is always active. Both pitch sources are meaningful for re-pitching existing notes.
 
-### Snap sub-tab: Snap to Key Scale
-
-<!-- TODO: screenshot of the Snap to Key Scale sub-tab -->
-![Snap to Key Scale sub-tab](../assets/v_pitch_placement_snap.jpg)
-
-**Snap to Key Scale** shifts every vocal note in scope to the nearest pitch in a chosen key, moving each note by the fewest semitones needed to land on a scale degree. On a tie (a note equidistant between two scale degrees), the lower pitch wins.
-
-Set the **Key** (root note) and **Scale** (Major or Minor) to match the song — look these up on Tunebat or a chord chart and verify by ear.
-
-**Scope:** with an active time selection, only notes within the selection are snapped. This is useful for songs with key changes or chromatic passages where you want to snap one section at a time. Without a time selection, clicking **Snap to Key (full item)** shows a confirmation dialog before processing the whole MIDI item.
-
-**Avoid matching neighbor (within phrase)** — after snapping, if two adjacent notes within the same phrase land on the same pitch (but had different pitches before snapping), the note that moved more semitones is redirected to the next-closest scale degree instead. Notes on either side of a phrase boundary are not compared — a phrase-ending note and the following phrase-opening note may legitimately share a scale degree.
-
-Phrase markers (pitch 105) are never moved or deleted. Per-note velocity and lyrics are preserved through the operation.
-
 ---
 
 ## Lyrics tab
@@ -331,38 +359,6 @@ After **Assign lyrics** the result panel shows:
   If no phrase marker notes are present the check reports that it cannot validate.
 
 > **Tip:** Place phrase markers on your destination MIDI track before running Assign lyrics. The script reads them but never modifies them, so they are safe to have in place throughout the whole authoring process.
-
----
-
-## Pitch slide tab
-
-![Pitch slide section](../assets/v_pitch_slide.jpg)
-
-The **Pitch slide** tab scans existing MIDI notes on the destination track and reports any where the detected pitch moves significantly during the note — slides, scoops, bends, and other pitch curves that a Rock Band vocal chart may need to represent explicitly.
-
-> **This action is read-only.** It never modifies notes; it only reports findings.
-
-### How to use it
-
-1. Generate notes onto the destination track first.
-2. (Optional) Make a time selection to limit the scan.
-3. Click **Scan pitch slides**.
-
-If no time selection is active, a confirmation dialog appears before scanning the whole song.
-
-The result panel lists every note where a slide was detected, with its position, length, pitch, and movement type (Slide up, Slide down, Scoop, Bend, or Complex). Use the measure numbers to jump directly to each note in REAPER.
-
-### Slide Scan settings
-
-| Slider              | Range       | Default | What it does                                                                                       |
-| ------------------- | ----------- | ------- | ----------------------------------------------------------------------------------------------------- |
-| **Min note length** | 20 – 300 ms | 80 ms   | Notes shorter than this are skipped entirely.                                                      |
-| **Min segment**     | 5 – 100 ms  | 20 ms   | A detected pitch run shorter than this is discarded. Increase to suppress false positives.         |
-| **Edge skip**       | 0 – 50 ms   | 20 ms   | Skip the start and end of each note before sampling. Hides consonant artifacts at note boundaries. |
-| **Sample step**     | 5 – 50 ms   | 10 ms   | How often pitch is sampled along the note. Smaller = more resolution but slower.                   |
-| **Sample window**   | 10 – 50 ms  | 20 ms   | YIN analysis window per sample point. Longer = more stable detection.                              |
-
-The scan also uses the **YIN threshold**, **Min frequency**, and **Max frequency** settings from the Pitch tab.
 
 ---
 
@@ -530,7 +526,7 @@ The **Undo** button sits in the status bar at the bottom of the window, always v
 
 ## Tips
 
-- **Use a time selection to work section by section.** Chorus and verse may need different pitch or scan settings — most actions on Pitch, Pitch slide, and Harmonies scope to the active selection.
+- **Use a time selection to work section by section.** Chorus and verse may need different pitch or scan settings — most actions on Pitch and Harmonies scope to the active selection.
 - **Finish timing and pitch before assigning lyrics.** Assign lyrics runs on notes as they are at the moment you click — if you later split, merge, or reorder notes, re-run Assign lyrics to realign the words. The whole-take clear-and-reassign approach keeps this safe and idempotent.
 - **Name your lyrics file `lyrics.txt` and save it in the project folder.** Auto-detect will find it every time you open the script or switch project tabs, saving you the Browse step entirely.
 

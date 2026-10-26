@@ -1,4 +1,4 @@
--- EVENTS-track event vocabulary for the Venue > Events sub-tab.
+-- EVENTS-track event vocabulary for the Events > Manual gen sub-tab.
 -- Derived from the community "Text Events List - Events" reference (ground
 -- truth); dev/tests/venue_events.lua re-verifies every generatable string
 -- against it when a local copy is present, and skips when it is not.

@@ -1189,6 +1189,22 @@ over 5. See `CLAUDE.md` → "Changelog / `@about` trimming" for the rule.
 
 `rock_band_vocal_helper_vkr.lua`
 
+**v1.16**
+
+- Harmonies: each destination's two dropdowns are now labelled Target
+  track and Copy style, aligned into the same column as Source and Key.
+- Harmonies: new Copy style, "Preserve target pitches". It copies the
+  source's positions, lengths, splits and lyrics as usual but takes each
+  note's pitch from the note already on the destination track, so a
+  harmony part that was authored by hand can be re-synced after the lead's
+  timing changes without losing its pitches. Where a copied note overlaps
+  a destination note, that note's pitch is used; where it doesn't, the
+  nearest destination note within one measure donates its pitch; a note
+  split in two for a slide keeps the destination pitch on the first half
+  and carries the source's own interval onto the rest; and where nothing
+  is close enough, the source pitch is copied unchanged. The result panel
+  counts all four cases separately.
+
 **v1.15**
 
 Pitch detection overhaul. Every figure below is from the synthetic test
@@ -1373,6 +1389,12 @@ harness in `dev/tests/dsp_algorithms.lua`.
 ## Rock Band Venue Preview
 
 `rock_band_preview_vkr.lua`
+
+**v0.2**
+  - Added the "Active players" row below the preview: a colored dot per
+    instrument shows its state at the playhead - active (green), idle
+    (blue), track muted or missing (red), or no play-state events
+    (orange) - matching the general helper's Venue tab.
 
 **v0.1**
   - Initial release. Reuses the general helper's module files directly

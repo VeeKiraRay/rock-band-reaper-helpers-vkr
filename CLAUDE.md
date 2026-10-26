@@ -1,15 +1,18 @@
 # Rock Band Authoring Tools — Project Documentation
 
-Two REAPER ReaScript (Lua) tools for Rock Band audio authoring, sharing a common `lib/` folder.
+REAPER ReaScript (Lua) tools for Rock Band audio authoring, sharing a common `lib/` folder.
 
 | Script | Purpose |
 |---|---|
 | `rock_band_vocal_helper_vkr.lua` | MIDI note generation from vocal audio — syllable detection, pitch assignment, lyrics |
-| `rock_band_general_helper_vkr.lua` | Tempo map generation from drum audio, audio alignment, VENUE event validation |
+| `rock_band_general_helper_vkr.lua` | Song-wide tools: stem import, audio alignment, tempo map from drum audio, workflow checklist, VENUE/EVENTS, Metadata |
+| `rock_band_instrument_helper_vkr.lua` | Instrument parts: difficulty generation and validation, overdrive and drum fills, tab input, MIDI utilities |
+| `rock_band_music_theory_helper_vkr.lua` | Read-only drum / guitar / piano reference |
 
 **Read the script-specific file before making changes:**
 - Working on `rock_band_vocal_helper_vkr` → read `.claude/CLAUDE_vocal.md`
 - Working on `rock_band_general_helper_vkr` → read `.claude/CLAUDE_general.md`
+- Working on `rock_band_instrument_helper_vkr` → read `.claude/CLAUDE_instrument.md`
 - Working on `rock_band_music_theory_helper_vkr` → read `.claude/CLAUDE_music_theory.md`
 
 This file documents shared runtime, architecture, and conventions only.
@@ -18,7 +21,7 @@ This file documents shared runtime, architecture, and conventions only.
 
 ## Runtime requirements
 
-Both scripts require **REAPER 6.x or later** and **ReaImGui 0.7 or later**. Each entry point validates both at startup:
+Every script requires **REAPER 6.x or later** and **ReaImGui 0.7 or later**. Each entry point validates both at startup:
 
 ```lua
 if not r.ImGui_CreateContext then   -- extension missing entirely
@@ -39,11 +42,11 @@ Each window shows that version in its title bar, so a bug report carries it with
 
 The returned string ends in `###<name>`, and that suffix is load-bearing rather than cosmetic: ImGui derives a window's identity from its `Begin` label, so without a stable id after `###` every version bump would read as a brand-new window and reset the user's saved size, position and dock state. The id is the bare window name — exactly what the label used to be, so existing windows keep their geometry. **Never change an existing window's `###` id.** `ImGui_CreateContext` labels stay version-free for the same reason: ReaImGui keys per-context saved state off that name.
 
-**Bumping a helper means checking its standalones.** Three windows ship as their own entry points but own almost no code: `rock_band_preview_vkr.lua` and `rock_band_midi_pattern_vkr.lua` draw modules out of `rock_band_general_helper_vkr/`, and `rock_band_pitch_tuner_vkr.lua` draws them out of `rock_band_vocal_helper_vkr/`. A fix in one of those shared modules changes what the standalone does **without touching the standalone's own file**, so its `@version` silently stops describing the code it runs.
+**Bumping a helper means checking its standalones.** Three windows ship as their own entry points but own almost no code: `rock_band_preview_vkr.lua` draws modules out of `rock_band_general_helper_vkr/`, `rock_band_midi_pattern_vkr.lua` out of `rock_band_instrument_helper_vkr/`, and `rock_band_pitch_tuner_vkr.lua` out of `rock_band_vocal_helper_vkr/`. All three also load shared `lib/` files, so a change to one of those (`lib/reaper_helper_common.lua`, `lib/reaper_helper_ui.lua`, ...) counts too. A fix in one of those shared modules changes what the standalone does **without touching the standalone's own file**, so its `@version` silently stops describing the code it runs.
 
 So whenever you bump a helper's `@version` and write its `@about` entry, finish the job:
 
-1. Check each standalone's load list — the `_files` table in its entry point, also written out in `.claude/CLAUDE_general.md` and `.claude/CLAUDE_vocal.md` under "Second/Third entry point". This is a lookup, not a judgment call: if a file you changed is in the list, that standalone is affected.
+1. Check each standalone's load list — the `_files` table in its entry point, also written out in `.claude/CLAUDE_general.md`, `.claude/CLAUDE_instrument.md` and `.claude/CLAUDE_vocal.md` under "Second/Third entry point". This is a lookup, not a judgment call: if a file you changed is in the list, that standalone is affected.
 2. Bump that standalone's `@version` too, in the same task.
 3. Give it its **own** `@about` entry describing the change from that window's point of view — not a copy of the helper's wording. The helper's entry may say "Venue > Preview sub-tab now ..."; the standalone's says what its window now does. Cross-referencing the helper version it shipped alongside is useful (`rock_band_preview_vkr.lua` v0.4 does this) but is not a substitute for saying what changed.
 
@@ -94,23 +97,27 @@ Items 1 and 2 are covered by `dev/tests/script_links.lua`, which checks the regi
 
 | File | Contents |
 |---|---|
-| `lib/reaper_imgui_helpers.lua` | `PitchName`, `Tooltip`, `SliderTooltip`, `ScriptWindowTitle`, `Btn`, `BtnWidth`, `BtnGroupWidth`, `LabelColWidth`, `RadioGroupWidth`, `SectionHeader`, `SortedByLabel`, `ComboGroupHeader`, `GetTrackList`, `TrackCombo`, `FormatTime`, `GetTimeSelection` |
+| `lib/reaper_imgui_helpers.lua` | `PitchName`, `Tooltip`, `SliderTooltip`, `ScriptWindowTitle`, `Btn`, `BtnWidth`, `BtnGroupWidth`, `LabelColWidth`, `RadioGroupWidth`, `SectionHeader`, `SortedByLabel`, `ComboGroupHeader`, `GetTrackList`, `FormatTime`, `GetTimeSelection` |
+| `lib/reaper_helper_common.lua` | `FindTrackByName`, `TrackAtIndex`, `GetTakePPQPerQN`, `GetTempoContextBefore`, `TrackHasAudio`, `TrackHasMIDI`, `RefreshTrackLists`, `RunAction` — track and action helpers the General, Instrument and Vocal helpers share. Writes the caller's `S` (`*_track_list`, `status`, `last_result`), so each script declares those fields. `RunAction` calls the script's optional global `RunActionErrorCleanup()` after a failed action (the vocal helper closes its open YIN context there) |
+| `lib/reaper_helper_ui.lua` | `TrackCombo`, `MidiEditorTrackWarning`, `DrawStatusResultPanel` — UI every helper and the MIDI Pattern / Pitch Tuner windows draw. `TrackCombo` matches by REAPER track index and offers `(none)` (`-1`): an optional input left unset, or a required one not picked yet — actions resolve indices through `TrackAtIndex` and ask for a track when it returns nil. `DrawStatusResultPanel(show_undo)` draws the live time selection, the status line with Undo, and the result panel (a line with a tab renders as two columns) |
 | `lib/reaper_dsp.lua` | `ComputeRMSContour`, `OpenYINContext`, `YINWindowSize`, `ReadMonoWindow`, `QuickRMS`, `ComputeCMND`, `SearchYINTau`, `MedianVote`, `DetectPitchYIN`, `SampleYINAt`, `GateAndSplit`, `ApplyMinOffset` |
 | `lib/reaper_midi_helpers.lua` | `FindMIDIItem`, `FindFirstMIDIItem`, `ReadAllMIDINotesOnTrack`, `ClearNotesAtPitchesInRange`, `InsertNotes`, … |
 | `lib/reaper_guitar_theory.lua` | `GuitarShapeToPitches`, `GuitarNormalizeIntervals`, `GuitarClassifyChordType`, `GuitarSuggestRBMapping`, `GuitarAnalyzeShape`, `GuitarParseFretInput`, `GuitarAnalyzeShapeAllTunings` — pure, no `r`/`ctx`/`S` |
 | `lib/reaper_music_notation.lua` | Staff notation model: `NOTATION_CLEFS`, `KEY_SIGNATURES`, `NotationStepToNatural`, `NotationStepToPitch`, `NotationNoteName`, `NotationKeySigAlteration(s)`, `NotationSoundingStep`, `NotationKeySigSlots`, `RBPitchName`, `PianoKeyLayout` — pure, no `r`/`ctx`/`S` |
-| `lib/reaper_script_links.lua` | `SCRIPT_LINK_GROUPS`, `ScriptLinkBasename`, `IsRunningScriptLink`, `FilterScriptLinkGroups`, `LaunchReaScript`, `DrawGeneralLinksTab` — the General > Other tools sub-tab, shared by both helpers |
+| `lib/reaper_script_links.lua` | `SCRIPT_LINK_GROUPS`, `ScriptLinkBasename`, `IsRunningScriptLink`, `FilterScriptLinkGroups`, `LaunchReaScript`, `DrawGeneralLinksTab` — the General > Other tools sub-tab, shared by the general, instrument and vocal helpers |
 | `lib/reaper_karplus_strong.lua` | `KarplusStrongVoice`, `SynthesizeChordSamples`, `SYNTH_TONES`, `SYNTH_TONE_ORDER`, `SynthToneOpts`, `SynthTonesInFamily` — struck/plucked-string synthesis and its per-instrument tone presets, for chord audition |
 | `lib/reaper_difficulty_score.lua` | `ScoreChart`, `SCORE_FACTOR_KEYS`, `NormalizeSpans`, `EventsInSegments`, `DeriveSpansFromEvents`, `ProRemapEvents`, `Percentile`, `TotalSpanSeconds`, `SpanOverlapSeconds`, `DIFFICULTY_PRIMITIVES` — chart difficulty factors for guitar/bass/drums/keys/Pro Keys. Pure, no `r`/`ctx`/`S`. `DIFFICULTY_PRIMITIVES` exports four per-event building blocks (`PitchSetChanged`, `ShapeKey`, `MotionKey`, `ConditionalEntropy`) for the general helper's Overdrive tab, which scores single bars. Exported rather than copied, so the models stay tied to one implementation |
 | `lib/reaper_difficulty_score_vocals.lua` | `ScoreVocalChart`, `NormalizeVocalPhrases`, `VocalClassifyLyric`, `VocalPitchClassDistance`, `VocalNoteIsPitched`, `VocalSubtractPercussion` — the vocal factor set. Pure. **Load after `reaper_difficulty_score.lua`**: it uses that file's span helpers and appends its columns to `SCORE_FACTOR_KEYS` |
 | `lib/reaper_difficulty_tiers.lua` | `RANK_TIER_THRESHOLDS`, `TIER_NAMES`, `TierForRank`, `TierName`, `TierBand`, `TierPosition` — rank to displayed tier (0 Warmup … 6 Impossible), from `_external_docs/InstrumentDifficulty.ts`. Pure. **Both open-ended bands are closed by the model, not the tier table**: tier 6 by `rank_hi`, tier 0 by `rank_lo`. Measured from rank 1 instead, every floor-clamped Warmup chart computed 0.85–0.97 and read as almost-Apprentice while having fallen off the *bottom* of the scale (drums: 97% of a 1–124 band whose model floor is 120). Both args are optional and omitting them keeps the tier table's own 1-and-infinity |
 | `lib/reaper_difficulty_predict.lua` | `DIFFICULTY_SCALE_INV`, `DifficultyModelInputs`, `DifficultyPredictRank`, `DifficultyFactorZ`, `DifficultyOutOfRange` — how to apply a frozen model. Pure. Coefficients are in **standardized** units, so nothing may apply them by hand |
 | `lib/reaper_difficulty_models.lua` | **Generated** — `RB_DIFFICULTY_MODELS`, `RB_DIFFICULTY_MODEL_ORDER`, `RB_DIFFICULTY_MODELS_SCHEMA`. The six frozen fitted models. The file states its own format version in `RB_DIFFICULTY_MODELS_SCHEMA`, which is the only place to read it — a copy quoted here drifts the first time the exporter bumps it. Carries coefficients, standardization stats, rank clamp, per-factor `bounds`, concentration thresholds, and `corr` (pairwise factor correlations at \|r\| ≥ 0.70, used to stop the explanation panel restating one observation twice). Rewritten only by `dev/calibration/export_production_models.lua`; never hand-edit |
+| `lib/reaper_difficulty_read.lua` | `FindTrackExact`, `ReadGemEvents`, `RB_CHART_SPECS`, `ScoreChartForSpec`, `ReadVocalNotes`, … — the chart readers. Used by the General Helper's Metadata > Difficulty, the Instrument Helper's Generate and Overdrive, and `dev/calibration/`; touches `r` only inside functions |
 | `lib/reaper_wav_writer.lua` | `WriteMonoWAV16` |
 
-The three `reaper_difficulty_*` modules are shared with the calibration harness in
+The `reaper_difficulty_*` scoring modules are shared with the calibration harness in
 `dev/calibration/` rather than with a second shipped script — the one case where `lib/`
-serves a dev consumer. That is deliberate and load-bearing: the fitted coefficients the
+serves a dev consumer (`reaper_difficulty_read.lua` serves both: the two helpers and the
+harness). That is deliberate and load-bearing: the fitted coefficients the
 suggester ships only mean anything paired with the exact factor implementation they were
 measured against, so a second copy would silently invalidate them. `dev/calibration/`
 keeps one-line loaders at the old paths so its entry points need no edits. See
@@ -393,7 +400,7 @@ tier up) from its Expert and fails on any rhythm, color/pitch/gem or length
 difference, listed by bar, and on any difference in Guitar/Bass Hard's force-HOPO markers or
 Pro Keys' lane-shift markers. Run it after every planner change: a failure means a rule change altered
 an approved chart — either regenerate and re-verify the song, or rework the rule. The
-synthetic tests in `general_algorithms.lua` pin individual rules; the golden charts are
+synthetic tests in `instrument_algorithms.lua` pin individual rules; the golden charts are
 what catch a change's effect on real songs. See `dev/tests/golden/README.md`.
 
 **A runner must dofile everything its modules need at load time** — including
@@ -438,8 +445,10 @@ Before that isolation, two runners went unnoticed missing a library for months.
 
 ```
 [repo root]/
-  lib/                                       ← shared by both scripts
+  lib/                                       ← shared by the scripts
     reaper_imgui_helpers.lua
+    reaper_helper_common.lua                 ← track/action helpers: general, instrument, vocal
+    reaper_helper_ui.lua                     ← TrackCombo, status panel: every helper
     reaper_dsp.lua
     reaper_midi_helpers.lua
     reaper_guitar_theory.lua
@@ -451,6 +460,7 @@ Before that isolation, two runners went unnoticed missing a library for months.
     reaper_difficulty_tiers.lua                the fitted coefficients cannot drift apart
     reaper_difficulty_predict.lua            ← applies a frozen model
     reaper_difficulty_models.lua             ← GENERATED by the calibration exporter
+    reaper_difficulty_read.lua               ← chart readers (both helpers + calibration)
     reaper_wav_writer.lua
 
   rock_band_vocal_helper_vkr.lua             ← entry point (only file users run)
@@ -462,12 +472,19 @@ Before that isolation, two runners went unnoticed missing a library for months.
   rock_band_general_helper_vkr/
     defaults.lua     helpers.lua     venue.lua
     settings.lua     tempomap.lua    actions.lua    ui.lua
-    ui_common.lua                            ← pieces shared with the standalone
-    ui_midi_pattern.lua                        MIDI Pattern window (see below)
-    difficulty_read.lua                      ← Metadata > Difficulty: chart readers
-    difficulty_explain.lua                     (shared with dev/calibration/), wording,
-    difficulty_report.lua                      the pasteable text report, the read-only
-    difficulty_suggester.lua                   adapter, and the tab body
+    difficulty_explain.lua                   ← Metadata > Difficulty: wording, the
+    difficulty_report.lua                      pasteable text report, the read-only
+    difficulty_suggester.lua                   adapter (readers: lib/reaper_difficulty_read.lua)
+    metadata_genres.lua                      ← Metadata > Genre: supported vocabulary
+    metadata_genres_ext.lua                    (transcribed), the authored extended
+    metadata_genres_lookup.lua                 vocabulary + mapping, and the lookup
+    ui_metadata_genre.lua                    ← Metadata > Genre tab body
+    ui_metadata.lua                          ← Metadata tab shell (Genre + Difficulty)
+
+  rock_band_instrument_helper_vkr.lua        ← entry point (only file users run)
+  rock_band_instrument_helper_vkr/
+    defaults.lua     settings.lua    helpers.lua    ui.lua
+    ui_midi_pattern.lua                      ← shared with the standalone MIDI Pattern window
     difficulty_generate_params.lua           ← Difficulty > Generate: shared parameters,
     difficulty_generate_retime.lua             Hard's fast-run rewrite, chords and
     difficulty_generate_colors.lua             colors, which onsets every planner keeps,
@@ -478,11 +495,6 @@ Before that isolation, two runners went unnoticed missing a library for months.
     difficulty_generate_drums.lua              planner (limb by limb, independent of
     actions_difficulty_generate.lua            the band), the REAPER action, and the
     ui_difficulty_generate.lua                 sub-tab body
-    metadata_genres.lua                      ← Metadata > Genre: supported vocabulary
-    metadata_genres_ext.lua                    (transcribed), the authored extended
-    metadata_genres_lookup.lua                 vocabulary + mapping, and the lookup
-    ui_metadata_genre.lua                    ← Metadata > Genre tab body
-    ui_metadata.lua                          ← Metadata tab shell (Genre + Difficulty)
     overdrive_read.lua                       ← Overdrive tab: song model (QN), per-bar
     overdrive_interest.lua                     interest score, the fill / vocal /
     actions_overdrive_fills.lua                instrument planners (pure) with the
@@ -510,9 +522,10 @@ Before that isolation, two runners went unnoticed missing a library for months.
 
   rock_band_midi_pattern_vkr.lua             ← standalone MIDI Pattern window
                                                (same exception — reuses
-                                               rock_band_general_helper_vkr/
-                                               ui_common.lua + ui_midi_pattern.lua
-                                               and their dependencies; never ui.lua)
+                                               rock_band_instrument_helper_vkr/
+                                               ui_midi_pattern.lua + lib/
+                                               reaper_helper_ui.lua and their
+                                               dependencies; never ui.lua)
 
   quick_actions/                             ← single-file, no-UI hotkey scripts
     lib/
@@ -527,6 +540,7 @@ Before that isolation, two runners went unnoticed missing a library for months.
   .claude/
     CLAUDE_vocal.md               ← vocal helper details
     CLAUDE_general.md             ← general helper details
+    CLAUDE_instrument.md          ← instrument helper details
     CLAUDE_music_theory.md        ← music theory helper details
     CLAUDE_venue_theme_generation.md  ← venue theme authoring guide
 ```

@@ -1,6 +1,6 @@
 -- Tuner tab body: YIN detection settings, pitch range, and the live readout.
 --
--- Drawn by both the vocal helper's Tuner tab and the standalone
+-- Drawn by both the vocal helper's Pitch > Tuner sub-tab and the standalone
 -- rock_band_pitch_tuner_vkr.lua window, so it renders its own body only -
 -- no Begin/End, no BeginTabItem. The caller owns the window and the tab item,
 -- and is responsible for setting S.tuner_tab_active and calling RunTuner()

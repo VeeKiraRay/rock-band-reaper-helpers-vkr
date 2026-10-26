@@ -22,6 +22,7 @@ rem copy does not carry (dev\calibration, .github\workflows\release.yml).
 robocopy "%SRC%lib"                                     "%DST%\lib"                                      *.lua    /MIR /NJH /NJS
 robocopy "%SRC%rock_band_vocal_helper_vkr"              "%DST%\rock_band_vocal_helper_vkr"           *.lua    /MIR /NJH /NJS
 robocopy "%SRC%rock_band_general_helper_vkr"            "%DST%\rock_band_general_helper_vkr"         *.lua    /MIR /NJH /NJS
+robocopy "%SRC%rock_band_instrument_helper_vkr"         "%DST%\rock_band_instrument_helper_vkr"      *.lua    /MIR /NJH /NJS
 robocopy "%SRC%resources\themes"                        "%DST%\resources\themes"                     *.rbtheme /MIR /NJH /NJS
 rem The workflow files are not copied by default so they don't override your custom setup if you made changes. 
 rem robocopy "%SRC%resources\workflow"                       "%DST%\resources\workflow"                   *.txt    /MIR /NJH /NJS
@@ -32,6 +33,7 @@ robocopy "%SRC%resources\img"                           "%DST%\resources\img"   
 robocopy "%SRC%resources\audio\drums"                   "%DST%\resources\audio\drums"                *.ogg    /MIR /NJH /NJS
 copy /Y  "%SRC%rock_band_vocal_helper_vkr.lua"          "%DST%\rock_band_vocal_helper_vkr.lua"        >nul
 copy /Y  "%SRC%rock_band_general_helper_vkr.lua"        "%DST%\rock_band_general_helper_vkr.lua"      >nul
+copy /Y  "%SRC%rock_band_instrument_helper_vkr.lua"     "%DST%\rock_band_instrument_helper_vkr.lua"   >nul
 copy /Y  "%SRC%rock_band_preview_vkr.lua"               "%DST%\rock_band_preview_vkr.lua"             >nul
 copy /Y  "%SRC%rock_band_pitch_tuner_vkr.lua"           "%DST%\rock_band_pitch_tuner_vkr.lua"         >nul
 copy /Y  "%SRC%rock_band_midi_pattern_vkr.lua"          "%DST%\rock_band_midi_pattern_vkr.lua"        >nul

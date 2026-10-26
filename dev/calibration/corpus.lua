@@ -2,7 +2,7 @@
 -- song's MIDI, and restoring the tempo map afterwards.
 --
 -- The chart READERS that used to live here now sit in
--- rock_band_general_helper_vkr/difficulty_read.lua, because the shipped Metadata >
+-- lib/reaper_difficulty_read.lua, because the shipped Metadata >
 -- Difficulty suggestion has to read charts exactly the way the corpus was scored - see
 -- that file's header. What is left here is everything the product must never do: corpus
 -- discovery, MIDI import, track cleanup, songs.dta walking.
@@ -23,7 +23,7 @@ local _self = debug.getinfo(1, 'S').source:match('^@(.*)$')
 local _dir  = _self and _self:match('^(.+[\\/])') or ''
 local function _up(d) return d:match('^(.*[/\\])[^/\\]+[/\\]$') or '' end
 
-dofile(_up(_up(_dir)) .. 'rock_band_general_helper_vkr/difficulty_read.lua')
+dofile(_up(_up(_dir)) .. 'lib/reaper_difficulty_read.lua')
 
 ----------------------------------------------------------------------
 -- Import / cleanup

@@ -1,6 +1,6 @@
 -- @description Rock Band Vocal Helper
 -- @author VeeKiraRay
--- @version 1.20
+-- @version 1.21
 -- @about
 --   Analyses a vocal audio track and appends MIDI notes to an existing MIDI
 --   item on a destination track, one note per detected syllable or phrase.
@@ -13,6 +13,21 @@
 --   This @about block keeps only the 5 most recent versions.
 --   Full history: CHANGELOG.md in the repo.
 --
+--   v1.21
+--     - The Tuner and Pitch slide tabs are now sub-tabs of the Pitch tab,
+--       which reads Tuner, Snap, Slide, Placement - Built-in, Placement -
+--       Reference. The sub-tabs work exactly as the tabs did; leaving the
+--       Tuner sub-tab still stops a running tuner.
+--     - The track dropdowns now have a "(none)" entry, like the other
+--       helpers'. An action run with a needed track set to (none), or with
+--       a track that was deleted, says which track to pick instead of
+--       failing.
+--     - The time selection is shown in the status panel at the bottom of the
+--       window, as in the other helpers, instead of under the track
+--       dropdowns.
+--     - The track dropdowns, status panel, Refresh tracks and error handling
+--       now share their code with the General and Instrument helpers, so a
+--       fix to one reaches all of them.
 --   v1.20
 --     - The window title now carries the script version - "Rock Band Vocal
 --       Helper v1.20". A bug report that quotes the title says which version
@@ -62,20 +77,6 @@
 --       tab is unchanged; both load the same module files.
 --     - Fixed: closing either window with the tuner running left its audio
 --       accessor open, holding the source audio file until REAPER exited.
---   v1.16
---     - Harmonies: each destination's two dropdowns are now labelled Target
---       track and Copy style, aligned into the same column as Source and Key.
---     - Harmonies: new Copy style, "Preserve target pitches". It copies the
---       source's positions, lengths, splits and lyrics as usual but takes each
---       note's pitch from the note already on the destination track, so a
---       harmony part that was authored by hand can be re-synced after the lead's
---       timing changes without losing its pitches. Where a copied note overlaps
---       a destination note, that note's pitch is used; where it doesn't, the
---       nearest destination note within one measure donates its pitch; a note
---       split in two for a slide keeps the destination pitch on the first half
---       and carries the source's own interval onto the rest; and where nothing
---       is close enough, the source pitch is copied unchanged. The result panel
---       counts all four cases separately.
 --
 --   Workflow:
 --     1. Pick the audio source track and the MIDI destination track.
@@ -121,6 +122,8 @@ for _, _f in ipairs({
     _dir  .. 'lib/reaper_imgui_helpers.lua',
     _dir  .. 'lib/reaper_dsp.lua',
     _dir  .. 'lib/reaper_midi_helpers.lua',
+    _dir  .. 'lib/reaper_helper_common.lua',
+    _dir  .. 'lib/reaper_helper_ui.lua',
     _dir  .. 'lib/reaper_script_links.lua',
     _mdir .. 'defaults.lua',
     _mdir .. 'tips.lua',
@@ -155,6 +158,8 @@ end
 dofile(_dir  .. 'lib/reaper_imgui_helpers.lua')
 dofile(_dir  .. 'lib/reaper_dsp.lua')
 dofile(_dir  .. 'lib/reaper_midi_helpers.lua')
+dofile(_dir  .. 'lib/reaper_helper_common.lua')
+dofile(_dir  .. 'lib/reaper_helper_ui.lua')
 dofile(_dir  .. 'lib/reaper_script_links.lua')
 
 -- Window title with this script's own @version, read from the header above.

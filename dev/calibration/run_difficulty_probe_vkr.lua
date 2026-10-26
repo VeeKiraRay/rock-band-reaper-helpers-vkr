@@ -100,7 +100,7 @@ local function _strip(d)
     return (d:match('^(.+)[/\\]+$') or d):match('^(.+[/\\])') or d
 end
 local _root   = _strip(_strip(_dir))                    -- repo root
-local _mdir   = _root .. 'rock_band_general_helper_vkr/'
+local _mdir   = _root .. 'rock_band_instrument_helper_vkr/'
 SCRIPT_MDIR   = _mdir
 SCRIPT_DIR    = _root
 
@@ -116,10 +116,10 @@ ctx = nil
 dofile(_root .. 'lib/reaper_imgui_helpers.lua')     -- FormatTime, PitchName
 dofile(_root .. 'lib/reaper_midi_helpers.lua')
 dofile(_root .. 'lib/reaper_guitar_theory.lua')
-dofile(_root .. 'lib/reaper_difficulty_score.lua')  -- NormalizeSpans, for difficulty_read.lua
+dofile(_root .. 'lib/reaper_difficulty_score.lua')  -- NormalizeSpans, for lib/reaper_difficulty_read.lua
 dofile(_root .. 'lib/reaper_difficulty_score_vocals.lua')
 dofile(_mdir .. 'defaults.lua')
-dofile(_mdir .. 'helpers.lua')                      -- GetTempoContextBefore
+dofile(_root .. 'lib/reaper_helper_common.lua')     -- GetTempoContextBefore
 dofile(_mdir .. 'actions_guitar.lua')               -- GetBPMAt
 dofile(_mdir .. 'actions_guitar_validate.lua')      -- SustainThresholds
 dofile(_mdir .. 'actions_difficulty_shared.lua')
@@ -128,7 +128,7 @@ dofile(_mdir .. 'actions_difficulty_gtrbass.lua')
 dofile(_dir  .. 'difficulty_holdout.lua')           -- DiffIsHeldOut, DIFF_HOLDOUT_MOD
 dofile(_dir  .. 'songs_dta.lua')                    -- ParseSongsDta, DtaRank
 dofile(_dir  .. 'corpus.lua')                       -- WalkCorpus, ImportSongMidi, CleanupImport,
-                                                    -- FindTrackExact (via difficulty_read.lua)
+                                                    -- FindTrackExact (via lib/reaper_difficulty_read.lua)
 
 ----------------------------------------------------------------------
 -- Selection

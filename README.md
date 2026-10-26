@@ -1,11 +1,12 @@
 # Rock Band Authoring Tools for REAPER
 
-Three REAPER ReaScript tools for custom Rock Band song authoring, sharing a common library.
+Four REAPER ReaScript tools for custom Rock Band song authoring, sharing a common library.
 
 | Script                                                                 | What it does                                                                                              |
 | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | **[Rock Band Vocal Helper](rock_band_vocal_helper_vkr/README.md)**     | Generate timing-aligned MIDI notes from a vocal stem, with pitch assignment and lyric assignment built in |
-| **[Rock Band General Helper](rock_band_general_helper_vkr/README.md)** | Audio alignment, audio-driven tempo map generation from a drum stem, difficulty reduction and validation, ASCII tab input, MIDI utilities, VENUE track validation, and genre/difficulty-rank suggestions |
+| **[Rock Band General Helper](rock_band_general_helper_vkr/README.md)** | Stem import and audio alignment, audio-driven tempo map generation from a drum stem, a per-project workflow checklist, VENUE/EVENTS authoring and validation, and genre/difficulty-rank suggestions |
+| **[Rock Band Instrument Helper](rock_band_instrument_helper_vkr/README.md)** | Guitar, Bass, Drums, Keys and Pro Keys: difficulty generation, reduction and validation, overdrive and drum fills, ASCII tab input, and MIDI utilities |
 | **Rock Band Music Theory Helper**                                       | Interactive instrument reference — drum notation legend, common drum patterns, and a guitar chord-shape explorer, with hover highlighting and audio playback (playback needs [SWS](#sws-extension-audio-playback-only)) |
 
 ---
@@ -43,18 +44,18 @@ reaper.ShowConsoleMsg('CF_CreatePreview: ' .. tostring(reaper.CF_CreatePreview) 
 Four smaller scripts round out the toolset, loaded the same way as the main scripts:
 
 - **[Standalone Venue Preview](rock_band_general_helper_vkr/README.md#standalone-venue-preview)** (`rock_band_preview_vkr.lua`) — the General Helper's Venue → Preview sub-tab in its own window, so it can sit next to the generation tabs.
-- **[Standalone Pitch Tuner](rock_band_vocal_helper_vkr/README.md#standalone-pitch-tuner)** (`rock_band_pitch_tuner_vkr.lua`) — the Vocal Helper's Tuner tab in its own window, so the live readout stays visible while you work in another tab.
-- **[Standalone MIDI Pattern](rock_band_general_helper_vkr/README.md#standalone-midi-pattern)** (`rock_band_midi_pattern_vkr.lua`) — the General Helper's MIDI → Pattern sub-tab in its own window, so it stays beside REAPER's MIDI editor.
+- **[Standalone Pitch Tuner](rock_band_vocal_helper_vkr/README.md#standalone-pitch-tuner)** (`rock_band_pitch_tuner_vkr.lua`) — the Vocal Helper's Pitch → Tuner sub-tab in its own window, so the live readout stays visible while you work in another tab.
+- **[Standalone MIDI Pattern](rock_band_instrument_helper_vkr/README.md#standalone-midi-pattern)** (`rock_band_midi_pattern_vkr.lua`) — the Instrument Helper's MIDI → Pattern sub-tab in its own window, so it stays beside REAPER's MIDI editor.
 - **[Quick actions](rock_band_vocal_helper_vkr/README.md#quick-actions)** (`quick_actions/`) — four no-UI hotkey scripts for fast vocal-note editing in the MIDI editor.
 
-You don't have to go back to the Actions list to switch between the windowed tools: the General Helper and the Vocal Helper each have a **General → Other tools** sub-tab with buttons that open any of the others. The tool you're already in isn't listed. Opening one from there also adds it to REAPER's Action list, so you can give it a shortcut afterwards.
+You don't have to go back to the Actions list to switch between the windowed tools: the General Helper, the Instrument Helper and the Vocal Helper each have a **General → Other tools** sub-tab with buttons that open any of the others. The tool you're already in isn't listed. Opening one from there also adds it to REAPER's Action list, so you can give it a shortcut afterwards.
 
 ---
 
 ## Installation
 
 1. Download and extract `rb_helper_scripts_vkr.zip` into your REAPER Scripts folder (or any folder you use for ReaScripts). Keep all the `.lua` entry points together in that one folder — **General → Other tools** looks for its sibling tools beside the script that's running, and greys out any it can't find.
-2. In REAPER: **Actions → Show action list → Load ReaScript** and select the script(s) you want: `rock_band_vocal_helper_vkr.lua`, `rock_band_general_helper_vkr.lua`, or `rock_band_music_theory_helper_vkr.lua`. Loading just one is enough to reach the rest — open it, then use **General → Other tools**.
+2. In REAPER: **Actions → Show action list → Load ReaScript** and select the script(s) you want: `rock_band_vocal_helper_vkr.lua`, `rock_band_general_helper_vkr.lua`, `rock_band_instrument_helper_vkr.lua`, or `rock_band_music_theory_helper_vkr.lua`. Loading just one is enough to reach the rest — open it, then use **General → Other tools**.
 3. Optionally assign either action to a toolbar button or keyboard shortcut.
 
 ---

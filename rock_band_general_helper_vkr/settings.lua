@@ -1,5 +1,10 @@
 -- Settings save/load (project state)
 -- Requires: S (from defaults.lua), r (global)
+--
+-- The Instrument Helper saves its tabs' settings under its own key
+-- (rock_band_instrument_helper_vkr/settings.lua). Projects saved before the
+-- split still carry those tabs' fields in this blob; DeserializeSettings
+-- ignores keys it does not know, and the next Save drops them.
 
 local PROJ_KEY_SECTION = 'RBHelperVKR'
 local PROJ_KEY_NAME    = 'settings_v1'
@@ -20,36 +25,6 @@ local function SerializeSettings()
         'tmofs='   .. (S.tm_override_failsafe and '1' or '0'),
         'tmatd='   .. S.tm_autotune_density,
         'tmfbflx=' .. (S.tm_fb_use_flux and '1' or '0'),
-        -- MIDI converter
-        'mcgt='  .. S.mc_ghost_thresh,
-        'mcc2g=' .. (S.mc_crash_to_green and '1' or '0'),
-        'mcpd='  .. (S.mc_pro_drums and '1' or '0'),
-        'mcdpv=' .. (S.mc_drum_preview and '1' or '0'),
-        'mcksc=' .. (S.mc_keys_split_by_ch and '1' or '0'),
-        'mcksp=' .. S.mc_keys_split_pitch,
-        'mckpv=' .. (S.mc_keys_preview and '1' or '0'),
-        'mcpkis=' .. (S.mc_pk_insert_shifts and '1' or '0'),
-        'mc5kpg=' .. S.mc_5k_phrase_gap_ms,
-        'mc5kmc=' .. S.mc_5k_max_chord,
-        -- MIDI converter: guitar
-        'mcgwg=' .. S.mc_gtr_wrap_gap_ms,
-        'mcgmc=' .. S.mc_gtr_max_chord,
-        'mcga14=' .. (S.mc_gtr_allow_14 and '1' or '0'),
-        'mcgwf='  .. S.mc_gtr_workflow,
-        -- Tab Input guide
-        'mcgtf='  .. S.mc_gtr_tab_format,
-        'tabim='  .. S.tab_input_mode,
-        -- Difficulty tab: Guitar/Bass instrument selector
-        'dgbi='   .. S.diff_gb_instrument,
-        -- Difficulty tab: Keys Copy reduced-using-Pro-Keys checkbox
-        'd5kpkr=' .. (S.diff_5k_pk_reduce and '1' or '0'),
-        -- MIDI alignment
-        'mama='  .. S.ma_mode,
-        -- MIDI note length/sustain adjustment
-        'mndi='  .. S.mn_diff_idx,
-        'mnnt='  .. S.mn_note_type,
-        'mnnd='  .. S.mn_note_denom,
-        'mns32=' .. S.mn_sustain_32nds,
         -- Venue theme
         'vthn='  .. S.venue_theme_name,
         'vkfa='  .. S.venue_keyframe_align,
@@ -68,23 +43,6 @@ local function SerializeSettings()
         'wffn=' .. S.workflow_file_name,
         'wfsts=' .. (S.workflow_show_ts and '1' or '0'),
         'wfhd=' .. (S.workflow_hide_done and '1' or '0'),
-        -- Overdrive tab
-        'odgrp=' .. S.od_group,
-        'odiph=' .. (S.od_inc_phrases and '1' or '0'),
-        'odifl=' .. (S.od_inc_fills and '1' or '0'),
-        'odivo=' .. (S.od_inc_vocals and '1' or '0'),
-        'odbpp=' .. S.od_beats_per_phrase,
-        'odush=' .. S.od_unison_share,
-        'odkod=' .. S.od_keepout_od,
-        'odkun=' .. S.od_keepout_unison,
-        'odkst=' .. S.od_keepout_start,
-        'odtog=' .. (S.od_together and '1' or '0'),
-        'odvol=' .. S.od_vocal_overlap,
-        'odfpc=' .. S.od_fill_pacing,
-        'odfsc=' .. (S.od_fill_sections and '1' or '0'),
-        'odfse=' .. (S.od_fill_skip_early and '1' or '0'),
-        'odfke=' .. S.od_fill_keepout_end,
-        'odvev=' .. S.od_vocal_every,
     }, ';')
 end
 
@@ -103,41 +61,6 @@ local function DeserializeSettings(str)
         elseif k == 'tmofs' then S.tm_override_failsafe  = (v == '1')
         elseif k == 'tmatd'   then S.tm_autotune_density   = tonumber(v) or 0
         elseif k == 'tmfbflx' then S.tm_fb_use_flux        = (v == '1')
-        -- MIDI converter
-        elseif k == 'mcgt'  then S.mc_ghost_thresh     = tonumber(v) or S.mc_ghost_thresh
-        elseif k == 'mcc2g' then S.mc_crash_to_green   = (v == '1')
-        elseif k == 'mcpd'  then S.mc_pro_drums        = (v == '1')
-        elseif k == 'mcdpv' then S.mc_drum_preview     = (v == '1')
-        elseif k == 'mcksc' then S.mc_keys_split_by_ch  = (v == '1')
-        elseif k == 'mcksp' then S.mc_keys_split_pitch  = tonumber(v) or S.mc_keys_split_pitch
-        elseif k == 'mckpv' then S.mc_keys_preview      = (v == '1')
-        elseif k == 'mcpkis' then S.mc_pk_insert_shifts = (v == '1')
-        elseif k == 'mc5kpg' then S.mc_5k_phrase_gap_ms = tonumber(v) or S.mc_5k_phrase_gap_ms
-        elseif k == 'mc5kmc' then S.mc_5k_max_chord     = tonumber(v) or S.mc_5k_max_chord
-        -- MIDI converter: guitar
-        elseif k == 'mcgwg' then S.mc_gtr_wrap_gap_ms  = tonumber(v) or S.mc_gtr_wrap_gap_ms
-        elseif k == 'mcgmc' then S.mc_gtr_max_chord    = tonumber(v) or S.mc_gtr_max_chord
-        elseif k == 'mcga14' then S.mc_gtr_allow_14   = (v == '1')
-        elseif k == 'mcgwf'  then S.mc_gtr_workflow    = tonumber(v) or 0
-        -- Tab Input guide
-        elseif k == 'mcgtf'  then S.mc_gtr_tab_format  = tonumber(v) or 0
-        elseif k == 'tabim'  then S.tab_input_mode     = tonumber(v) or 0
-        -- Difficulty tab: Guitar/Bass instrument selector
-        elseif k == 'dgbi'   then S.diff_gb_instrument = (v == 'bass') and 'bass' or 'gtr'
-        -- Difficulty tab: Keys Copy reduced-using-Pro-Keys checkbox
-        elseif k == 'd5kpkr' then S.diff_5k_pk_reduce  = (v == '1')
-        -- MIDI alignment
-        elseif k == 'mama'  then S.ma_mode             = tonumber(v) or 0
-        -- MIDI note length/sustain adjustment
-        elseif k == 'mndi'  then S.mn_diff_idx         = tonumber(v) or S.mn_diff_idx
-        elseif k == 'mnnt'  then S.mn_note_type        = tonumber(v) or S.mn_note_type
-        -- Note size: only the values the combo still offers (1/8 was dropped
-        -- when 1/8 became the sustain threshold) - an older project's 1/8
-        -- would render as a blank selection, so keep the current value instead.
-        elseif k == 'mnnd'  then
-            local d = tonumber(v)
-            if d == 16 or d == 32 or d == 64 or d == 128 then S.mn_note_denom = d end
-        elseif k == 'mns32' then S.mn_sustain_32nds    = tonumber(v) or S.mn_sustain_32nds
         -- Venue theme
         elseif k == 'vthn'  then S.venue_theme_name      = v
         elseif k == 'vkfa'  then S.venue_keyframe_align  = tonumber(v) or 0
@@ -156,29 +79,6 @@ local function DeserializeSettings(str)
         elseif k == 'wffn'   then S.workflow_file_name      = v
         elseif k == 'wfsts'  then S.workflow_show_ts        = (v == '1')
         elseif k == 'wfhd'   then S.workflow_hide_done      = (v == '1')
-        -- Overdrive tab
-        elseif k == 'odgrp' then
-            local g = tonumber(v)
-            if g and g >= 0 and g < 6 then S.od_group = math.floor(g) end
-        elseif k == 'odiph' then S.od_inc_phrases      = (v == '1')
-        elseif k == 'odifl' then S.od_inc_fills        = (v == '1')
-        elseif k == 'odivo' then S.od_inc_vocals       = (v == '1')
-        elseif k == 'odbpp' then S.od_beats_per_phrase = tonumber(v) or S.od_beats_per_phrase
-        elseif k == 'odush' then S.od_unison_share     = tonumber(v) or S.od_unison_share
-        elseif k == 'odkod' then S.od_keepout_od       = tonumber(v) or S.od_keepout_od
-        elseif k == 'odkun' then S.od_keepout_unison   = tonumber(v) or S.od_keepout_unison
-        elseif k == 'odkst' then S.od_keepout_start    = tonumber(v) or S.od_keepout_start
-        elseif k == 'odtog' then S.od_together         = (v == '1')
-        elseif k == 'odvol' then
-            local m = tonumber(v)
-            if m and m >= 0 and m <= 2 then S.od_vocal_overlap = math.floor(m) end
-        elseif k == 'odfpc' then
-            local p = tonumber(v)
-            if p and p >= 0 and p <= 3 then S.od_fill_pacing = math.floor(p) end
-        elseif k == 'odfsc' then S.od_fill_sections    = (v == '1')
-        elseif k == 'odfse' then S.od_fill_skip_early  = (v == '1')
-        elseif k == 'odfke' then S.od_fill_keepout_end = tonumber(v) or S.od_fill_keepout_end
-        elseif k == 'odvev' then S.od_vocal_every      = tonumber(v) or S.od_vocal_every
         end
     end
 end

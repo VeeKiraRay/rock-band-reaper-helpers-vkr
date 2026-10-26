@@ -116,7 +116,7 @@ dofile(_dir .. 'corpus.lua')
 -- WHAT IS SCORED, AND WHERE THAT LIVES NOW.
 --
 -- The instrument table and every pitch constant this run used to declare here moved to
--- rock_band_general_helper_vkr/difficulty_read.lua (RB_CHART_SPECS, EXPERT_LO, SOLO_PITCH,
+-- lib/reaper_difficulty_read.lua (RB_CHART_SPECS, EXPERT_LO, SOLO_PITCH,
 -- TOM_MARKERS, LANE_SHIFT_BASES, ...), which corpus.lua loads. They had to: the shipped
 -- Metadata > Difficulty suggestion reads charts too, and a second copy of "which pitches
 -- are gems" would eventually disagree with this one - at which point the suggestion would
@@ -238,7 +238,7 @@ end
 -- Scoring one instrument on one already-imported song
 ----------------------------------------------------------------------
 
--- Reading and scoring now happens in ScoreChartForSpec (difficulty_read.lua), shared with
+-- Reading and scoring now happens in ScoreChartForSpec (lib/reaper_difficulty_read.lua), shared with
 -- the product. What stays here is everything the product has no equivalent of: the
 -- official rank, the corpus origin, and the CSV row layout.
 local function ScoreInstrument(song, spec, from_idx)

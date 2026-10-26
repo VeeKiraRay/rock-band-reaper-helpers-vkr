@@ -17,7 +17,7 @@
 local _self = (arg and arg[0] or ''):gsub('\\', '/')
 if not _self:match('^%a:') and not _self:match('^/') then _self = './' .. _self end
 local _root = _self:match('^(.*/)dev/tools/[^/]+$') or './'
-local M     = _root .. 'rock_band_general_helper_vkr/'
+local M     = _root .. 'rock_band_instrument_helper_vkr/'
 
 r = {}  -- the rule tables only touch r inside functions this tool never calls
 

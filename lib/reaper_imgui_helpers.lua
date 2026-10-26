@@ -180,22 +180,6 @@ function GetTrackList()
     return list
 end
 
-function TrackCombo(label, sel_idx, tracks)
-    local preview = (#tracks > 0 and sel_idx < #tracks)
-        and tracks[sel_idx + 1].label or '<no tracks>'
-    if r.ImGui_BeginCombo(ctx, label, preview) then
-        for i, t in ipairs(tracks) do
-            local is_sel = (i - 1 == sel_idx)
-            if r.ImGui_Selectable(ctx, t.label, is_sel) then
-                sel_idx = i - 1
-            end
-            if is_sel then r.ImGui_SetItemDefaultFocus(ctx) end
-        end
-        r.ImGui_EndCombo(ctx)
-    end
-    return sel_idx
-end
-
 -- Format a project time position as "mNN  Xm SS.MMMsec" (measure + wall time).
 -- Durations (not positions) should stay in plain seconds.
 function FormatTime(t)

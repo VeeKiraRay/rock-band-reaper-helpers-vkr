@@ -6,7 +6,7 @@
 -- block covers a whole run, every instrument and tier included.
 --
 -- Requires (globals): S, r, GetTimeSelection, FindFirstMIDIItem, ClearNotesInRange,
---   InsertNotes, FindTrackExact (difficulty_read.lua), Gen5PlanTier, GenPKPlanTier,
+--   InsertNotes, FindTrackExact (lib/reaper_difficulty_read.lua), Gen5PlanTier, GenPKPlanTier,
 --   GenDrumsPlanTier (difficulty_generate_drums.lua), DRUMS_RANGE / ReadDrumsTierEvents /
 --   CollectDrumsChecks (actions_difficulty_drums_checks.lua),
 --   GEN_PK_WINDOWS, GB_RANGE / K5_RANGE, ReadGBTierEvents / ReadK5TierEvents,

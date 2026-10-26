@@ -1,16 +1,18 @@
--- UI pieces shared by the main helper window and the standalone MIDI Pattern
--- window (rock_band_midi_pattern_vkr.lua). Anything both entry points draw
--- lives here rather than in ui.lua, which cannot be dofile'd by a standalone:
--- its last line is a bare r.defer(Loop) that would spawn the full helper
--- window. Same reasoning as rock_band_vocal_helper_vkr/ui_common.lua, which
--- exists for the standalone Pitch Tuner.
+-- UI pieces shared by every helper (General, Instrument, Vocal) and the
+-- standalone windows that draw their modules (MIDI Pattern, Pitch Tuner).
+-- Anything more than one entry point draws lives here rather than in a ui.lua,
+-- which cannot be dofile'd by another entry point: its last line is a bare
+-- r.defer(Loop) that would spawn that helper's whole window.
 --
 -- Requires globals: r, ctx, S, Btn, BtnWidth, Tooltip, BTN_H, FormatTime,
 --                   GetTimeSelection (lib/reaper_imgui_helpers.lua - load first)
 
--- Local variant of TrackCombo: matches by REAPER track index (t.idx), supports
--- reaper_idx = -1 as "(none)". Shadowing the lib's TrackCombo which uses array
--- indices and has no "(none)" entry.
+-- Track dropdown: stores and matches by REAPER track index (t.idx, from
+-- RefreshTrackLists), so a selection survives the filtered lists being rebuilt.
+-- reaper_idx = -1 is "(none)": an optional input left unset, or a required one
+-- not picked yet (the action then asks for a track - see TrackAtIndex). A
+-- selection missing from this filtered list still previews by name from
+-- S.all_track_list.
 function TrackCombo(label, reaper_idx, tracks)
     local preview = reaper_idx < 0 and '(none)' or '<no tracks>'
     if reaper_idx >= 0 then

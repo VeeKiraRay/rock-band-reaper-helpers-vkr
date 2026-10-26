@@ -83,8 +83,10 @@ settings.lua:
                                   SaveSettings, LoadSettings (global)
 
 helpers.lua:
-  7.  Helpers                     IsOnGrid, GetTakePPQPerQN, SetDefaultTracks, AutoDetectLyricsFile
-                                  TrackHasAudio, TrackHasMIDI (local)
+  7.  Helpers                     IsOnGrid, SetDefaultTracks, AutoDetectLyricsFile,
+                                  RunActionErrorCleanup (RunAction's error hook: closes
+                                  S.action_yctx). GetTakePPQPerQN, TrackHasAudio/MIDI,
+                                  RefreshTrackLists, RunAction: lib/reaper_helper_common.lua
 
 pipeline.lua:
   8.  Range/target resolution     ResolveAnalysisRange, FindMIDIItem, FindFirstMIDIItem,
@@ -130,21 +132,20 @@ actions_snap_key.lua:
   22. Snap to key action          SnapToKeyAction, NearestScalePitch; NextScalePitch (local)
 
 ui_common.lua:
-  23. Shared widgets              FilteredTrackCombo, YINPresetCombo,
-                                  DrawStatusResultPanel (global);
-                                  KeysPresetTrackWarnings (local)
+  23. Shared widgets              YINPresetCombo (global); KeysPresetTrackWarnings (local).
+                                  TrackCombo and DrawStatusResultPanel: lib/reaper_helper_ui.lua
 
 ui_tuner.lua:
-  24. Tuner tab                   DrawTunerTab()
+  24. Pitch > Tuner sub-tab       DrawTunerTab()
 
 ui_slides.lua:
-  25. Pitch slide tab             DrawPitchSlideTab(ctx)
+  25. Pitch > Slide sub-tab       DrawPitchSlideTab(ctx)
 
 ui_harmonies.lua:
   26. Harmonies tab               DrawHarmoniesTab(ctx)
 
 ui_pitch.lua:
-  27. Pitch tab                   DrawPitchTab(ctx) — Placement / Snap sub-tabs
+  27. Pitch tab                   DrawPitchTab(ctx) — Tuner / Snap / Slide / Placement sub-tabs
 
 ui.lua:
   28. UI                          Loop
@@ -161,7 +162,7 @@ ui.lua:
 | `rock_band_vocal_helper_vkr/defaults.lua`           | `DEFAULTS`, `S`, `ResetXxx()`, constants (`MODE_*`, `RB3_*`, `LYRIC_IGNORE`)                                                                |
 | `rock_band_vocal_helper_vkr/tips.lua`               | `TIPS` (global) — all tooltip strings                                                                                                        |
 | `rock_band_vocal_helper_vkr/settings.lua`           | `SaveSettings`, `LoadSettings`                                                                                                               |
-| `rock_band_vocal_helper_vkr/helpers.lua`            | `IsOnGrid`, `GetTakePPQPerQN`, `SetDefaultTracks`, `AutoDetectLyricsFile`; `TrackHasAudio`, `TrackHasMIDI` (local)                            |
+| `rock_band_vocal_helper_vkr/helpers.lua`            | `IsOnGrid`, `SetDefaultTracks`, `AutoDetectLyricsFile`, `RunActionErrorCleanup` — the track/action helpers it used to carry are in `lib/reaper_helper_common.lua` |
 | `rock_band_vocal_helper_vkr/pipeline.lua`           | `ResolveAnalysisRange`, `ResolveApplyPitchTarget`, `RunDetection`, `AssignPitches`, `ApplyPitchRange`, `FindNearestRefPitch`, `FormatResult` |
 | `rock_band_vocal_helper_vkr/autotune.lua`           | `AutoTune`, `AutoTuneYIN`, `ApplyAutoTuneResult`, format helpers                                                                             |
 | `rock_band_vocal_helper_vkr/tuner.lua`              | `StartTuner`, `StopTuner`, `RunTuner`; `FindItemAtPos`, `OpenContextForItem` (local)                                                         |
@@ -172,7 +173,7 @@ ui.lua:
 | `rock_band_vocal_helper_vkr/actions_harmonies.lua`  | `HarmoniesAction`, `DiatonicThirdOffset`, `ResolvePreservedPitches`; `ApplyLyricSuffix`, `ResolveHarmTracks`, `MeasureLengthAt`, `ReadTargetNotesInRange` (local) |
 | `rock_band_vocal_helper_vkr/actions_slides.lua`     | `ScanPitchSlidesAction`; `ClassifySlide` (local)                                                                                             |
 | `rock_band_vocal_helper_vkr/actions_snap_key.lua`   | `SnapToKeyAction`, `NearestScalePitch`; `NextScalePitch` (local)                                                                             |
-| `rock_band_vocal_helper_vkr/ui_common.lua`          | `FilteredTrackCombo`, `YINPresetCombo`, `DrawStatusResultPanel(show_undo)` (global); `KeysPresetTrackWarnings` (local) — shared with the standalone tuner |
+| `rock_band_vocal_helper_vkr/ui_common.lua`          | `YINPresetCombo` (global); `KeysPresetTrackWarnings` (local) — shared with the standalone tuner |
 | `rock_band_vocal_helper_vkr/ui_tuner.lua`           | `DrawTunerTab()` — body only (no `Begin`/`BeginTabItem`), shared with the standalone tuner                                                    |
 | `rock_band_vocal_helper_vkr/ui_slides.lua`          | `DrawPitchSlideTab(ctx)`                                                                                                                     |
 | `rock_band_vocal_helper_vkr/ui_harmonies.lua`       | `DrawHarmoniesTab(ctx)`                                                                                                                      |
@@ -188,7 +189,6 @@ ui.lua:
 - `actions_harmonies.lua`: `ApplyLyricSuffix`, `ResolveHarmTracks`, `MeasureLengthAt`, `ReadTargetNotesInRange`
 - `actions_slides.lua`: `ClassifySlide`
 - `actions_snap_key.lua`: `NextScalePitch`
-- `helpers.lua`: `TrackHasAudio`, `TrackHasMIDI`
 - `settings.lua`: `bool_to_num`, `num_to_bool`, `SerializeSettings`, `DeserializeSettings`
 - `autotune.lua`: `FineCandidates`, `EvaluateParams`
 - `tuner.lua`: `FindItemAtPos`, `OpenContextForItem`
@@ -197,10 +197,13 @@ ui.lua:
 **Load order:**
 
 ```
-lib/reaper_imgui_helpers.lua   → PitchName, Tooltip, TrackCombo, SectionHeader,
+lib/reaper_imgui_helpers.lua   → PitchName, Tooltip, SectionHeader, GetTrackList,
                                   FormatTime, GetTimeSelection
 lib/reaper_dsp.lua             → audio analysis, YIN
 lib/reaper_midi_helpers.lua    → MIDI read/write helpers
+lib/reaper_helper_common.lua   → TrackAtIndex, GetTakePPQPerQN, TrackHasAudio, TrackHasMIDI,
+                                  RefreshTrackLists, RunAction (shared with every helper)
+lib/reaper_helper_ui.lua       → TrackCombo, DrawStatusResultPanel (shared with every helper)
 lib/reaper_script_links.lua    → SCRIPT_LINK_GROUPS, ScriptLinkBasename, IsRunningScriptLink,
                                   FilterScriptLinkGroups, LaunchReaScript, DrawGeneralLinksTab
                                   (General > Other tools sub-tab; shared with the general
@@ -208,7 +211,7 @@ lib/reaper_script_links.lua    → SCRIPT_LINK_GROUPS, ScriptLinkBasename, IsRun
 defaults.lua                   → S, DEFAULTS, constants
 tips.lua                       → TIPS
 settings.lua                   → SaveSettings, LoadSettings
-helpers.lua                    → IsOnGrid, GetTakePPQPerQN, SetDefaultTracks, AutoDetectLyricsFile
+helpers.lua                    → IsOnGrid, SetDefaultTracks, AutoDetectLyricsFile, RunActionErrorCleanup
 pipeline.lua                   → RunDetection, AssignPitches, FormatResult
 autotune.lua                   → AutoTune, AutoTuneYIN
 tuner.lua                      → StartTuner, StopTuner, RunTuner
@@ -221,7 +224,7 @@ actions_validation.lua         → ValidatePhrases, PhraseSimilarityAction
 actions_harmonies.lua          → HarmoniesAction
 actions_slides.lua             → ScanPitchSlidesAction
 actions_snap_key.lua           → SnapToKeyAction
-ui_common.lua                  → FilteredTrackCombo, YINPresetCombo, DrawStatusResultPanel
+ui_common.lua                  → YINPresetCombo
 ui_tuner.lua                   → DrawTunerTab
 ui_slides.lua                  → DrawPitchSlideTab
 ui_harmonies.lua               → DrawHarmoniesTab
@@ -232,7 +235,7 @@ ui.lua                         → Loop (also calls r.defer(Loop))
 
 **Second entry point: `rock_band_pitch_tuner_vkr.lua` (repo root).** Standalone Pitch
 Tuner window. It has no module folder of its own — it dofiles a subset of this
-helper's modules: `lib/reaper_imgui_helpers.lua`, `lib/reaper_dsp.lua`, then
+helper's modules: `lib/reaper_imgui_helpers.lua`, `lib/reaper_dsp.lua`, `lib/reaper_helper_common.lua`, `lib/reaper_helper_ui.lua`, then
 `defaults.lua`, `tips.lua`, `settings.lua`, `helpers.lua`, `tuner.lua`,
 `ui_common.lua`, `ui_tuner.lua`, and runs its own minimal `Loop` calling
 `DrawTunerTab()` + `DrawStatusResultPanel(false)` under its own audio-source
@@ -245,8 +248,8 @@ track combo. Consequences when editing those files:
   general helper's `settings.lua` guards `SaveSectionConfigs`.
 - **`ui.lua` is deliberately not in the list** and must never be added: its last
   line is a bare `r.defer(Loop)`, which would spawn the full helper window. That
-  is the whole reason `FilteredTrackCombo`, `YINPresetCombo` and the status/result
-  panel were moved out into `ui_common.lua`.
+  is the whole reason `YINPresetCombo` lives in `ui_common.lua` (and the track
+  dropdown and status/result panel in `lib/reaper_helper_ui.lua`).
 - The standalone calls `LoadSettings()` at startup and on project switch, but
   never `SaveSettings()` (saving stays in the vocal helper's General tab).
 - It pins `S.tuner_tab_active = true` every frame — see the Tab-navigation stop
@@ -260,7 +263,7 @@ track combo. Consequences when editing those files:
 
 ## Public-facing concepts
 
-### Pitch Tuner (Tuner tab)
+### Pitch Tuner (Pitch > Tuner sub-tab)
 
 Read-only — never modifies the project. Polls `SampleYINAt` at the current playhead position every 100 ms and displays the detected pitch.
 
@@ -286,13 +289,13 @@ Read-only — never modifies the project. Polls `SampleYINAt` at the current pla
 
 **Auto-stop:** Timer (`tuner_last_detect_t`) resets on every successful pitch detection. If 60 s pass without any new pitch while the playhead is stationary, `StopTuner` is called automatically with a reason written to `S.status`.
 
-**Tab-navigation stop:** `S.tuner_tab_active` is set `false` before the tab bar each frame and `true` inside the Tuner `BeginTabItem` block. `RunTuner()` checks the previous frame's value at the top of `Loop` — one frame after the user leaves the tab, the tuner stops. The standalone `rock_band_pitch_tuner_vkr.lua` has no tab bar, so it pins the flag `true` every frame before calling `RunTuner()`; without that the tuner would stop itself on the first frame after starting.
+**Tab-navigation stop:** `S.tuner_tab_active` is set `false` before the tab bar each frame and `true` inside the Tuner sub-tab's `BeginTabItem` block in `DrawPitchTab` (`ui_pitch.lua`). `RunTuner()` checks the previous frame's value at the top of `Loop` — one frame after the user leaves the sub-tab (for another Pitch sub-tab or another tab), the tuner stops. The standalone `rock_band_pitch_tuner_vkr.lua` has no tab bar, so it pins the flag `true` every frame before calling `RunTuner()`; without that the tuner would stop itself on the first frame after starting.
 
 **Window-close stop:** closing either window ends its defer chain, so both call `StopTuner()` when `ImGui_Begin`'s `open` is false. Without it the `CreateTakeAudioAccessor` handle in `S.tuner_yctx` is never destroyed and holds the source audio file open until REAPER exits.
 
-**Standalone window:** the Tuner tab body lives in `ui_tuner.lua` as `DrawTunerTab()` and is drawn by both the tab and `rock_band_pitch_tuner_vkr.lua`. The standalone adds its own audio-source combo + "Refresh tracks" button above it (the main window's live above the tab bar) and a status/result panel below it without the Undo button — it makes no project edits.
+**Standalone window:** the Tuner sub-tab body lives in `ui_tuner.lua` as `DrawTunerTab()` and is drawn by both the sub-tab and `rock_band_pitch_tuner_vkr.lua`. The standalone adds its own audio-source combo + "Refresh tracks" button above it (the main window's live above the tab bar) and a status/result panel below it without the Undo button — it makes no project edits.
 
-**YIN and pitch range settings** — shared with the Pitch and Pitch slide tabs (`S.yin_*`, `S.min_pitch`, `S.max_pitch`). Changes on the Tuner tab are immediately reflected elsewhere and vice versa.
+**YIN and pitch range settings** — shared with the other Pitch sub-tabs (`S.yin_*`, `S.min_pitch`, `S.max_pitch`). Changes on the Tuner sub-tab are immediately reflected elsewhere and vice versa.
 
 **State fields:** `S.tuner_pitch`, `S.tuner_prev_pitch`, `S.tuner_pitch_name`, `S.tuner_pitch_hz`, `S.tuner_pitch_ts`, `S.tuner_quiet_since`, `S.tuner_history` — session-only, not saved. `S.tuner_rms_threshold` — persisted.
 
@@ -335,7 +338,7 @@ An alternative workflow when you already have roughly-placed notes with the righ
 
 #### YIN vocal-style presets
 
-One-shot preset combo shown above the YIN sliders on the **Pitch → Placement**, **Tuner**, and **Pitch slide** tabs/sub-tabs. Preset data: `YIN_PRESETS` in `defaults.lua`; applier: `ApplyYINPreset(preset)` in `defaults.lua`; combo widget: `YINPresetCombo(id_suffix, col)` (global, `ui.lua`) — `col` is optional and, when given, draws the "Vocal style preset" label to the left via `LabelColWidth`-style alignment instead of ImGui's native trailing label.
+One-shot preset combo shown above the YIN sliders on the **Pitch → Placement - Built-in**, **Pitch → Tuner** and **Pitch → Slide** sub-tabs. Preset data: `YIN_PRESETS` in `defaults.lua`; applier: `ApplyYINPreset(preset)` in `defaults.lua`; combo widget: `YINPresetCombo(id_suffix, col)` (global, `ui.lua`) — `col` is optional and, when given, draws the "Vocal style preset" label to the left via `LabelColWidth`-style alignment instead of ImGui's native trailing label.
 
 - Voice-range presets (low male → soprano) set all four YIN sliders **and** set + enable the Min/Max pitch constraints. Frequency bounds follow standard voice-classification ranges; raising min freq above the subharmonic range is the primary fix for octave-down errors.
 - Style-only presets (breathy/raspy, clean) set only threshold and window — `nil` fields in a preset entry are left unchanged.
@@ -354,7 +357,7 @@ Lives on the Placement - Built-in sub-tab. Reads existing notes from the MIDI de
 - **Parameters swept.** `yin_threshold`, `yin_min_hz`, `yin_max_hz`, `yin_window_ms`. Pitch range constraints excluded — they address octave correction, not pitch-class accuracy.
 - **`FineCandidates`** — module-level function shared by both `AutoTune` and `AutoTuneYIN`.
 
-### Slide Scan parameters (Pitch slide tab)
+### Slide Scan parameters (Pitch > Slide sub-tab)
 
 | Setting                  | Range    | Default | What it does                                                                      |
 | ------------------------ | -------- | ------- | --------------------------------------------------------------------------------- |
@@ -364,7 +367,7 @@ Lives on the Placement - Built-in sub-tab. Reads existing notes from the MIDI de
 | **Sample step (ms)**     | 5 – 50   | 10 ms   | Pitch sampling interval along the note.                                           |
 | **Sample window (ms)**   | 10 – 50  | 20 ms   | YIN analysis window per sample point.                                             |
 
-Uses current YIN threshold and frequency range from the Pitch tab.
+Uses the current YIN threshold and frequency range, shared with the other Pitch sub-tabs.
 
 ### Pitch range constraints
 
@@ -650,7 +653,7 @@ Assign Lyrics only ever guarantees word *i* ↔ the *i*-th vocal-range note — 
 - [ ] Lyrics — Create phrases: in a tight spot, both phrases keep at least a 1/32-note sliver of individual lead-in/tail before the gap between them grows toward its own 1/8-note ideal (not maximized individual spacing at the gap's expense).
 - [ ] Lyrics — Create phrases: first/last phrase grows freely on its outer (no-neighbor) side.
 - [ ] Lyrics — Create phrases is greyed out when no lyrics file selected, same as Assign lyrics.
-- [ ] Tab bar: 8 tabs (General, Tuner, Note Placement, Pitch, Lyrics, Pitch slide, Harmonies, Validation); switching doesn't clear `S.status` / `S.last_result`. General has Actions/Settings/Other tools sub-tabs (Other tools shows five buttons — never the Vocal Helper itself); Pitch has Placement - Built-in/Placement - Reference/Snap sub-tabs; Note Placement (WIP) has Auto Detection/Draft Snap sub-tabs.
+- [ ] Tab bar: 6 tabs (General, Pitch, Lyrics, Harmonies, Validation, and the WIP Note Placement); switching doesn't clear `S.status` / `S.last_result`. General has Actions/Settings/Other tools sub-tabs (Other tools shows six buttons — never the Vocal Helper itself); Pitch has Tuner/Snap/Slide/Placement - Built-in/Placement - Reference sub-tabs, and leaving Tuner stops a running tuner; Note Placement (WIP) has Auto Detection/Draft Snap sub-tabs.
 - [ ] Generate (replace): clears all existing vocal-range notes in the range, then inserts fresh detections; result panel says "Replaced".
 - [ ] Draft Snap: rough hand-drawn notes snap to audio onsets; pitches assigned from configured pitch source.
 - [ ] Snap to Key Scale: notes shift to nearest scale degree; phrase markers preserved; avoid-collision pushes duplicates to next scale degree.
@@ -659,8 +662,8 @@ Assign Lyrics only ever guarantees word *i* ↔ the *i*-th vocal-range note — 
 - [ ] Validate phrases: runs without error; flags violations grouped by phrase position; no project modification.
 - [ ] Phrase Similarity: groups similar phrases; flags differing notes; same-key vs contour mode both work.
 - [ ] Scan pitch slides: shows warning when no time selection; result in global panel.
-- [ ] YIN threshold changed on Pitch slide tab is visible on Pitch tab (same `S.yin_*` state).
-- [ ] YIN presets: combo appears on Pitch, Tuner, and Pitch slide tabs; a voice-range preset sets all four YIN sliders and enables Min/Max pitch; a style-only preset changes only threshold and window; status bar reports the preset label.
+- [ ] YIN threshold changed on Pitch > Slide is visible on Pitch > Placement - Built-in (same `S.yin_*` state).
+- [ ] YIN presets: combo appears on the Placement - Built-in, Tuner and Slide sub-tabs; a voice-range preset sets all four YIN sliders and enables Min/Max pitch; a style-only preset changes only threshold and window; status bar reports the preset label.
 - [ ] Piano preset: with "PART VOCALS" MIDI destination and/or a "VOCALS"-named audio source selected, applying it shows the vocal-track warning(s) in the result panel (both when both match); with keys-named tracks, no warning; settings apply in every case.
 - [ ] Save → modify slide sliders → reload project → values restored.
 - [ ] Result summary shows current Min note length value, not a hardcoded string.

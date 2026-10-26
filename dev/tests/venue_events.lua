@@ -1,4 +1,4 @@
--- Tests for section_events.lua + actions_venue_events.lua (Venue > Events
+-- Tests for section_events.lua + actions_venue_events.lua (Events > Manual gen
 -- sub-tab): vocabulary validation against the full RB3 events list, the pure
 -- NextSectionEvent / ValidatePlainInsert validation logic, and EVENTS-track
 -- integration (inserts, quick actions).

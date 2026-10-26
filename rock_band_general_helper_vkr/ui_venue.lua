@@ -154,18 +154,11 @@ function DrawVenueTab(ctx)
         ------------------------------------------------
         if r.ImGui_BeginTabItem(ctx, 'Actions') then
             SectionHeader('Analyze')
-            local bw_analyze = BtnGroupWidth({
-                'List venue events', 'List event sections', 'List lighting/postproc',
-            })
+            local bw_analyze = BtnGroupWidth({ 'List venue events', 'List lighting/postproc' })
             if Btn('List venue events', BTN_H, bw_analyze) then
                 RunAction(ListVenueEvents)
             end
             Tooltip(TIPS.list_venue)
-            r.ImGui_SameLine(ctx)
-            if Btn('List event sections', BTN_H, bw_analyze) then
-                RunAction(ListEventSections)
-            end
-            Tooltip(TIPS.venue_sections)
             r.ImGui_SameLine(ctx)
             if Btn('List lighting/postproc', BTN_H, bw_analyze) then
                 RunAction(ListLightingPostProcEvents)
@@ -233,14 +226,6 @@ function DrawVenueTab(ctx)
             end
             Tooltip(TIPS.venue_subtrack_copy_from_one)
 
-            r.ImGui_EndTabItem(ctx)
-        end
-
-        ------------------------------------------------
-        -- Venue > Events sub-tab (ui_venue_events.lua)
-        ------------------------------------------------
-        if r.ImGui_BeginTabItem(ctx, 'Events') then
-            DrawVenueEventsTab()
             r.ImGui_EndTabItem(ctx)
         end
 

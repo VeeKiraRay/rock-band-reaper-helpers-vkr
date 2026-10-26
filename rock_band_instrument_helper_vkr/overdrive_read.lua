@@ -9,7 +9,7 @@
 -- The planners in actions_overdrive*.lua take this model and return plans without
 -- touching the project, so dev/tests can drive them with a hand-built model.
 --
--- Requires (globals): r, FindTrackExact, ReadGemEvents (difficulty_read.lua)
+-- Requires (globals): r, FindTrackExact, ReadGemEvents (lib/reaper_difficulty_read.lua)
 
 OD_PITCH        = 116
 OD_FILL_LO      = 120   -- drum fill lanes; the same pitches are BRE lanes after [coda]

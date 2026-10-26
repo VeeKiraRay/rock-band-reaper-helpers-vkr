@@ -1,6 +1,6 @@
 -- @description Rock Band Venue Preview
 -- @author VeeKiraRay
--- @version 0.6
+-- @version 0.7
 -- @about
 --   Standalone window for the Venue > Preview sub-tab of the Rock Band
 --   General Helper. Shows previous / current / next VENUE events (camera,
@@ -13,6 +13,11 @@
 --   This @about block keeps only the 5 most recent versions.
 --   Full history: CHANGELOG.md in the repo.
 --
+--   v0.7
+--     - No change to this window. The General Helper's instrument tabs moved
+--       to the new Instrument Helper (General Helper v0.9.63), and the track
+--       lookup this window uses moved into the shared lib folder with them;
+--       this window now loads it from there.
 --   v0.6
 --     - No change to this window. It loads the general helper's settings files,
 --       which gained the new Overdrive tab's options in general helper v0.9.60;
@@ -47,11 +52,6 @@
 --       "No suitable event" card now explains what the game falls back to.
 --       Same change as the general helper's Venue > Preview sub-tab (v0.9.51),
 --       which this window shares its implementation with.
---   v0.2
---     - Added the "Active players" row below the preview: a colored dot per
---       instrument shows its state at the playhead - active (green), idle
---       (blue), track muted or missing (red), or no play-state events
---       (orange) - matching the general helper's Venue tab.
 
 r = reaper  -- global so all dofile'd modules can use it
 
@@ -89,6 +89,7 @@ SCRIPT_MDIR   = _mdir  -- global: module folder (general helper's)
 
 local _files = {
     _dir  .. 'lib/reaper_imgui_helpers.lua',
+    _dir  .. 'lib/reaper_helper_common.lua',
     _mdir .. 'defaults.lua',
     _mdir .. 'settings.lua',
     _mdir .. 'helpers.lua',

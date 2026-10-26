@@ -90,7 +90,7 @@ function RunTuner()
 
     -- Auto-stop when user navigates away (checked using previous frame's flag).
     if not S.tuner_tab_active then
-        StopTuner('Pitch tuner stopped: navigated away from Tuner tab.')
+        StopTuner('Pitch tuner stopped: navigated away from the Tuner sub-tab.')
         return
     end
 

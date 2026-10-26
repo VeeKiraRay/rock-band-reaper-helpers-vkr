@@ -55,6 +55,7 @@ jobs:
           cp LICENSE LICENSE.txt
           zip -r rb_helper_scripts_vkr.zip \
             rock_band_general_helper_vkr.lua \
+            rock_band_instrument_helper_vkr.lua \
             rock_band_vocal_helper_vkr.lua \
             rock_band_music_theory_helper_vkr.lua \
             rock_band_preview_vkr.lua \
@@ -62,12 +63,14 @@ jobs:
             rock_band_midi_pattern_vkr.lua \
             lib/ \
             rock_band_general_helper_vkr/ \
+            rock_band_instrument_helper_vkr/ \
             rock_band_vocal_helper_vkr/ \
             rock_band_music_theory_helper_vkr/ \
             quick_actions/ \
             resources/ \
             LICENSE.txt \
             -x "rock_band_general_helper_vkr/README.md" \
+            -x "rock_band_instrument_helper_vkr/README.md" \
             -x "rock_band_vocal_helper_vkr/README.md"
 
       - name: Upload zip to release

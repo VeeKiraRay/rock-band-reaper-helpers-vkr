@@ -43,7 +43,7 @@ if not CORPUS:match('[/\\]$') then CORPUS = CORPUS .. '/' end
 -- Mock REAPER
 --
 -- Deliberately the same shape as dev/tools/verify_suggester_vs_csv.lua's: one track per
--- SMF track, one item, one take, PPQ as the SMF tick. Only the calls difficulty_read.lua
+-- SMF track, one item, one take, PPQ as the SMF tick. Only the calls lib/reaper_difficulty_read.lua
 -- actually makes are implemented, so a missing one is a loud nil-call rather than a
 -- plausible default that quietly changes a measurement.
 ----------------------------------------------------------------------
@@ -116,7 +116,7 @@ r = {
 dofile(_root .. 'dev/tools/smf_reader.lua')
 dofile(_root .. 'lib/reaper_difficulty_score.lua')
 dofile(_root .. 'lib/reaper_difficulty_score_vocals.lua')
-dofile(_root .. 'rock_band_general_helper_vkr/difficulty_read.lua')
+dofile(_root .. 'lib/reaper_difficulty_read.lua')
 dofile(_root .. 'dev/calibration/songs_dta.lua')
 
 -- BIG ROCK ENDING variant, for the round-23b Stage A preview. An ENVIRONMENT VARIABLE

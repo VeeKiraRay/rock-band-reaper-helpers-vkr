@@ -1,6 +1,6 @@
 -- Launcher for the other Rock Band helper scripts (shared library).
--- Backs the "General > Other tools" sub-tab of BOTH the general helper and the
--- vocal helper, so the registry and the launch mechanism exist exactly once.
+-- Backs the "General > Other tools" sub-tab of the general, instrument and
+-- vocal helpers, so the registry and the launch mechanism exist exactly once.
 --
 -- Requires globals: r (reaper), ctx (ImGui context), S (status reporting),
 --   Btn, BtnGroupWidth, BTN_H, SectionHeader, Tooltip
@@ -8,7 +8,7 @@
 -- The registry and the pure helpers above the "Path resolution" section touch
 -- none of those, so a Lua-only test context can dofile this file on its own.
 --
--- Why a Rock Band specific registry sits in lib/: both helpers draw this same
+-- Why a Rock Band specific registry sits in lib/: every helper draws this same
 -- tab, so it cannot live in either one's module folder without being
 -- duplicated - the same reasoning that has rock_band_preview_vkr.lua reach into
 -- the general helper's ui_venue_preview.lua rather than copy it.
@@ -41,8 +41,9 @@
 -- IMPORTANT: both strings may name only features a user sees WITHOUT enabling
 -- "Show WIPs?" - this tab is an advert, and pointing someone at a tab that is
 -- hidden by default (or worse, one known to be half-finished) is a broken
--- promise. Excluded for that reason: the general helper's Tempo Map, Drums,
--- Keys and Guitar tabs, and the vocal helper's Note Placement tab - which is
+-- promise. Excluded for that reason: the general helper's Tempo Map tab, the
+-- instrument helper's Drums, Keys and Guitar tabs, and the vocal helper's
+-- Note Placement tab - which is
 -- where its audio-driven syllable detection and Generate buttons live, so the
 -- vocal entry describes the editing tabs instead. Re-check this when a tab
 -- graduates out of WIP or a new one lands behind the flag.
@@ -53,9 +54,14 @@ SCRIPT_LINK_GROUPS = {
         entries = {
             { file  = 'rock_band_general_helper_vkr.lua',
               label = 'General Helper',
-              short = 'Tab input, MIDI, difficulty, VENUE',
-              desc  = 'Tab input, audio alignment,\n' ..
-                      'difficulty tiers, MIDI utilities, VENUE / EVENTS authoring.' },
+              short = 'Stems, alignment, VENUE, metadata',
+              desc  = 'Stem import and audio alignment, workflow checklist,\n' ..
+                      'VENUE / EVENTS authoring, genre and difficulty rank suggestions.' },
+            { file  = 'rock_band_instrument_helper_vkr.lua',
+              label = 'Instrument Helper',
+              short = 'Difficulty, overdrive, tab input, MIDI',
+              desc  = 'Guitar, bass, drums, keys and Pro Keys: generate and validate\n' ..
+                      'difficulty tiers, overdrive and drum fills, tab input, MIDI utilities.' },
             { file  = 'rock_band_vocal_helper_vkr.lua',
               label = 'Vocal Helper',
               short = 'Lyrics, pitch, harmonies, validation',
@@ -79,12 +85,12 @@ SCRIPT_LINK_GROUPS = {
             { file  = 'rock_band_pitch_tuner_vkr.lua',
               label = 'Pitch Tuner',
               short = 'Live pitch readout in its own window',
-              desc  = "The Vocal Helper's Tuner tab in its own window, so the live\n" ..
+              desc  = "The Vocal Helper's Pitch > Tuner sub-tab in its own window, so the live\n" ..
                       'readout stays visible while you work in another tab.' },
             { file  = 'rock_band_midi_pattern_vkr.lua',
               label = 'MIDI Pattern',
               short = 'Find/replace note patterns',
-              desc  = "The General Helper's MIDI > Pattern sub-tab in its own\n" ..
+              desc  = "The Instrument Helper's MIDI > Pattern sub-tab in its own\n" ..
                       'window, so it stays beside the MIDI editor while you work.' },
         },
     },

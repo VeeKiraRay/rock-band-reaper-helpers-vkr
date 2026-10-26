@@ -1,6 +1,6 @@
 # Difficulty reduction - how Generate makes Hard, Medium and Easy
 
-The general helper's **Difficulty > Generate** sub-tab writes a song's lower difficulties from
+The instrument helper's **Difficulty > Generate** sub-tab writes a song's lower difficulties from
 the one above: Expert to Hard, Hard to Medium, Medium to Easy. This document lists every rule it
 applies, per instrument and difficulty, and where each rule comes from.
 

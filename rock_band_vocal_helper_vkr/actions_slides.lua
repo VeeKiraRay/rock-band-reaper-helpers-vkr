@@ -31,12 +31,12 @@ end
 function ScanPitchSlidesAction()
     local tracks = GetTrackList()
     if #tracks == 0 then S.status = 'No tracks in project.'; S.last_result = nil; return end
-    if S.audio_idx >= #tracks or S.midi_idx >= #tracks then
-        S.status = 'Track selection out of range.'; S.last_result = nil; return
+    if not TrackAtIndex(S.audio_idx) or not TrackAtIndex(S.midi_idx) then
+        S.status = 'Pick an audio source track and a MIDI destination track.'; S.last_result = nil; return
     end
 
-    local audio_track = r.GetTrack(0, tracks[S.audio_idx + 1].idx)
-    local midi_track  = r.GetTrack(0, tracks[S.midi_idx  + 1].idx)
+    local audio_track = TrackAtIndex(S.audio_idx)
+    local midi_track  = TrackAtIndex(S.midi_idx)
 
     -- Find MIDI item and establish scan range (respects time selection)
     local sel_start, sel_end = GetTimeSelection()

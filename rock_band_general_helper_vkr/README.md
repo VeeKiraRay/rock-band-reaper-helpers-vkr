@@ -2,30 +2,31 @@
 
 ← [Back to overview and installation](../README.md)
 
-**Utility actions for custom song authoring in REAPER.** A REAPER ReaScript covering audio alignment, difficulty validation, tab-input reference guides, MIDI alignment/pattern tools, and VENUE/EVENTS track generation, spread across five always-visible tabs plus four experimental (work-in-progress) tabs.
+**Utility actions for custom song authoring in REAPER.** A REAPER ReaScript covering stem import and audio alignment, a per-project workflow checklist, VENUE/EVENTS track generation, and genre/difficulty-rank suggestions, spread across five always-visible tabs plus one experimental (work-in-progress) tab.
+
+The instrument tools — Difficulty, Overdrive, Tab Input and MIDI — are in the **[Instrument Helper](../rock_band_instrument_helper_vkr/README.md)**.
 
 ---
 
 ## Quick start
 
 1. Open a REAPER project with your audio stems already imported.
-2. Run the script. The window opens with five tabs: **General | Difficulty | Tab Input | MIDI | Venue**.
+2. Run the script. The window opens with five tabs: **General | Workflow | Events | Venue | Metadata**, plus the WIP tab below.
 3. Try General → Actions → **Align all audio** to line up your stems, or jump straight to **Venue** to start authoring VENUE/EVENTS events.
-4. **Tempo Map**, **Drums**, **Keys**, and **Guitar** are experimental and hidden by default — enable them via General → Settings → **Show WIPs?** (see [README_WIP.md](README_WIP.md) for their full documentation).
+4. **Tempo Map** is experimental and hidden by default — enable it via General → Settings → **Show WIPs?** (see [README_WIP.md](README_WIP.md) for its full documentation).
 
 ---
 
 ## UI overview
 
-The window is organized into tabs plus a status panel at the bottom. Six tabs are always visible; four more (Tempo Map, Drums, Keys, Guitar) are work-in-progress and hidden until enabled.
+The window is organized into tabs plus a status panel at the bottom. Five tabs are always visible; one more (Tempo Map) is work-in-progress and hidden until enabled.
 
 | Tab            | Purpose                                                                              |
 | -------------- | ------------------------------------------------------------------------------------ |
-| **General**    | Audio alignment, song fade out, settings save/load, a workflow checklist, and buttons that open the other tools |
-| **Difficulty** | Copy notes down a tier and validate Pro Keys / Keys / Guitar-Bass / Drums tracks at each difficulty level |
-| **Tab Input**  | Reference guide: parse ASCII tab notation for Guitar/Bass, Keys/Pro Keys, or Vocal  |
-| **MIDI**       | Align, length-sync, or find-and-replace patterns on MIDI items                      |
-| **Venue**      | Validate and generate text events on the VENUE and EVENTS tracks                    |
+| **General**    | Stem import, audio alignment, song fade out, settings save/load, and buttons that open the other tools |
+| **Workflow**   | A per-project authoring checklist from a template you can edit                      |
+| **Events**     | List the song sections and insert EVENTS-track markers at the playhead               |
+| **Venue**      | Validate and generate text events on the VENUE track                                |
 | **Metadata**   | Convert a real-world genre to the closest supported Rock Band genre, and suggest a difficulty rank and tier for each finished Expert chart |
 
 <a id="wip-tabs"></a>
@@ -33,11 +34,8 @@ The window is organized into tabs plus a status panel at the bottom. Six tabs ar
 | WIP tab (hidden by default) | Purpose                                                            |
 | ---------------------------- | ------------------------------------------------------------------ |
 | **Tempo Map**                | Detect BPM from drum audio and generate REAPER tempo markers measure-by-measure |
-| **Drums**                    | Convert GM MIDI drum notes to Rock Band 5-lane format               |
-| **Keys**                     | Convert piano MIDI to Rock Band Pro Keys, 5-Lane Keys, or split into hand tracks |
-| **Guitar**                   | Convert raw guitar MIDI pitches to Rock Band Expert gem notes       |
 
-These four function at a basic level but have known issues and aren't ready for general use. Enable them via **Show WIPs? = Yes** in General → Settings; they appear after Venue in the tab bar. Full documentation for these tabs (including Tips, Troubleshooting, and Known limitations specific to them) lives in **[README_WIP.md](README_WIP.md)**.
+It functions at a basic level but has known issues and isn't ready for general use. Enable it via **Show WIPs? = Yes** in General → Settings; it appears after Metadata in the tab bar. Full documentation for it (including Tips, Troubleshooting, and Known limitations) lives in **[README_WIP.md](README_WIP.md)**. The Drums, Keys and Guitar WIP tabs moved to the [Instrument Helper](../rock_band_instrument_helper_vkr/README_WIP.md).
 
 The bottom of the window always shows the active time selection (or "No time selection") and the result panel from the last action.
 
@@ -45,7 +43,7 @@ The bottom of the window always shows the active time selection (or "No time sel
 
 ## General tab
 
-Contains four sub-tabs: **Actions**, **Settings**, **Workflow**, and **Other tools**.
+Contains three sub-tabs: **Actions**, **Settings**, and **Other tools**.
 
 ### Actions sub-tab
 
@@ -90,7 +88,7 @@ The result panel adds a heads-up if the selected range looks unusual for a game 
 
 **Venue preview** — the default preview size (1×/2×) and sprite display mode (Animated/Still), shared with the Venue → Preview sub-tab and the standalone Venue Preview window (see [below](#standalone-venue-preview)).
 
-**Show WIPs?** — toggles whether the Tempo Map, Drums, Keys, and Guitar tabs appear (see [WIP tabs](#wip-tabs)). Default No.
+**Show WIPs?** — toggles whether the Tempo Map tab appears (see [WIP tabs](#wip-tabs)). Default No.
 
 **Save** writes the current slider values to the project using REAPER's project state. **Load** restores them. Settings are loaded automatically when the script opens (if a save exists) and when you switch REAPER project tabs.
 
@@ -98,13 +96,28 @@ The result panel adds a heads-up if the selected range looks unusual for a game 
 
 **What is not saved:** track selections. The script re-detects KICK, SNARE, KIT, and Fallback tracks by name on each open and project switch.
 
-### Workflow sub-tab
+### Other tools sub-tab
 
-![Workflow sub-tab](../assets/g_general_workflow.jpg)
+Buttons that open the other tools in this set, so you don't have to go back to REAPER's Actions list to switch between them. Two groups:
+
+- **Main tools** — Instrument Helper, Vocal Helper, Music Theory Helper.
+- **Standalone windows** — Venue Preview, Pitch Tuner, MIDI Pattern.
+
+Each opens in its own window and runs independently of this one — closing the General Helper doesn't close them, and they keep their own settings. The General Helper itself isn't listed, since you're already in it.
+
+Opening a tool for the first time also **registers it in REAPER's Action list**, which is what lets you give it a keyboard shortcut or a toolbar button afterwards (**Actions → Show action list**, then search for its name). It's never removed again — un-registering would delete the entry along with any shortcut you'd bound to it, and re-adding it later produces a different internal ID, so the shortcut couldn't be restored. Clicking a tool that's already open just says so instead of opening a second copy.
+
+A tool that isn't installed next to this script is greyed out with a note saying which file is missing, rather than failing when you click it. Put the `.lua` files back in one folder and the button re-enables on its own within a couple of seconds — no need to restart the script.
+
+---
+
+## Workflow tab
+
+![Workflow tab](../assets/g_general_workflow.jpg)
 
 A per-project authoring checklist: a list of steps, grouped into sections, that you check off as you finish them — handy for picking up where you left off after a break, or when juggling several songs at once. The checklist comes from a plain-text template file, so you can tailor the list of steps to how you actually work (e.g. a shorter checklist for an instrumental song with no vocals).
 
-#### Choosing a template
+### Choosing a template
 
 **Workflow** combo — pick a `.txt` file from `resources/workflow/`. The script ships with one starter template, `Default.txt`, covering a typical full-band song end to end. If the folder has no `.txt` files, the tab shows a disabled hint instead. If your saved project doesn't have a template selected yet (first use, or the file it had selected was deleted), a template literally named `Default` is picked automatically; if there's no `Default`, the first template alphabetically is used instead.
 
@@ -114,7 +127,7 @@ A per-project authoring checklist: a list of steps, grouped into sections, that 
 
 A **progress line** ("10 / 40 completed - 25%") sits below the checkboxes once a template is selected, counting the whole template regardless of whether "Show only unfinished" is hiding some of it.
 
-#### Checking off items
+### Checking off items
 
 Click the checkbox or the item's label text to toggle it — both work. Checking an item saves immediately to the project (its own save slot, independent of this tab's own Save/Load buttons below), so you don't need to remember to hit Save before closing REAPER. Unchecking an item clears its recorded time.
 
@@ -122,7 +135,7 @@ Checked state is tracked per **section + item**, not by the item's text alone �
 
 If you switch to a different template, any step whose section heading *and* step text match exactly what you had checked before carries its checked state and timestamp over. Anything reworded, moved to a different section, or new to the template starts unchecked — you decide whether to re-check it.
 
-#### Writing your own template
+### Writing your own template
 
 A template is a plain `.txt` file in `resources/workflow/`, one entry per line:
 
@@ -144,165 +157,33 @@ Switching templates (via the combo) immediately drops checked history for any st
 
 ---
 
-### Other tools sub-tab
+## Events tab
 
-Buttons that open the other tools in this set, so you don't have to go back to REAPER's Actions list to switch between them. Two groups:
+Works on the **EVENTS** track: the song sections and markers that Venue's section-based generation and the game read. Contains two sub-tabs: **General** and **Manual gen**.
 
-- **Main tools** — Vocal Helper, Music Theory Helper.
-- **Standalone windows** — Venue Preview, Pitch Tuner, MIDI Pattern.
+### General sub-tab
 
-Each opens in its own window and runs independently of this one — closing the General Helper doesn't close them, and they keep their own settings. The General Helper itself isn't listed, since you're already in it.
+**List event sections** reads `[prc_*]` markers from the EVENTS track and lists all detected song sections with time ranges. Letter-suffix variants (`[prc_verse_1a]`, `[prc_verse_1b]`) are merged into a single section entry.
 
-Opening a tool for the first time also **registers it in REAPER's Action list**, which is what lets you give it a keyboard shortcut or a toolbar button afterwards (**Actions → Show action list**, then search for its name). It's never removed again — un-registering would delete the entry along with any shortcut you'd bound to it, and re-adding it later produces a different internal ID, so the shortcut couldn't be restored. Clicking a tool that's already open just says so instead of opening a second copy.
+### Manual gen sub-tab
 
-A tool that isn't installed next to this script is greyed out with a note saying which file is missing, rather than failing when you click it. Put the `.lua` files back in one folder and the button re-enables on its own within a couple of seconds — no need to restart the script.
+![Events - Manual gen sub-tab](../assets/g_venue_events.jpg)
 
----
+Inserts section, crowd, and global marker events on the EVENTS track at the playhead.
 
-## Difficulty tab
+- **Use letter suffix** checkbox (default on) — when on, **Add** inserts only lettered part forms (`[prc_verse_1a]`, then `[prc_verse_1b]`, …), used to split a long section into parts that merge back into one section in Section gen. When off, Add inserts only the plain form and refuses if it already exists. Events with no lettered variants (e.g. `[prc_bre]`) always insert the plain form either way.
+- One row per event group — **Intro, Structure, Solo, Break, Tempo/Energy, Interlude/Jam, Outro/Ending, Misc** (numbered `[prc_*]` section markers), **Generic** (`[prc_a]`–`[prc_k]`, lettered-only, for parts that fit no named category), **Crowd** (`[crowd_*]`), and **Global** (`[music_start]`, `[music_end]`, `[end]`, `[coda]`). Each row has a base-name combo, a number stepper where applicable, a live `-> <event>` indicator showing exactly what the next Add will insert (or `-> (blocked)` with the reason on hover), and an **Add** button.
+- Inserts are validated: no duplicates (reports the existing event's location), no mixing plain and lettered forms of the same event, numbers/letters must be used in sequence, and only one text event per position (crowd events are exempt and may stack anywhere).
+- **Insert bookends** removes any existing instances of the six bookend events, then inserts the minimal per-song set: `[prc_intro]` + `[crowd_normal]` at measure 1, `[music_start]` at measure 3, and `[prc_outro]`/`[music_end]`/`[end]` near the end of the song. Skips the end trio on items under 7 full measures; occupied target spots are skipped and reported.
+- **Clear all** removes every text event from the EVENTS track (the track-name event itself is kept).
 
-Contains four sub-tabs: **Pro Keys**, **Keys**, **Guitar/Bass**, and **Drums**. Each has the same two rows:
-
-- **Copy to Hard / Medium / Easy** — actually writes notes: copies from the immediately higher tier (Copy to Hard ← Expert, Copy to Medium ← Hard, Copy to Easy ← Medium) onto the target tier's own track/range, giving you a real starting point to hand-reduce rather than a read-only suggestion. If the source tier has no notes, it does nothing and reports that; if the target tier already has notes, a confirmation popup asks before clearing and overwriting them. Pro Keys is the one exception — it copies its whole note set (gems and lane-shift markers alike) verbatim, since the markers aren't optional there.
-- **Validate Expert / Hard / Medium / Easy / All** — checks the actually-authored notes in that difficulty's own pitch range against RBN rules (read-only). Also cross-checks against the tier above and flags an un-reduced copy (identical note count/shape) so you know the difficulty still needs work.
-
-All actions respect time selection.
-
-### Pro Keys sub-tab
-
-![Pro Keys sub-tab](../assets/g_difficulty_prokeys.jpg)
-
-Validates PART REAL_KEYS_X/H/M/E (one track per difficulty, auto-detected by name). Checks chord count/span, interval jumps, spacing (Medium/Easy), and lane range markers. Only notes in the playable C2–C4 range are read as chord/gem events.
-
-### Keys sub-tab
-
-![Keys sub-tab](../assets/g_difficulty_keys.jpg)
-
-Validates PART KEYS, which carries all four difficulties in separate pitch ranges:
-
-| Difficulty | Pitch range |
-| ---------- | ----------- |
-| Expert     | 96–100      |
-| Hard       | 84–88       |
-| Medium     | 72–75       |
-| Easy       | 60–62       |
-
-Checks chord count, spacing, note length, and sustain gaps. A **Reduce using Pro Keys (same tier)** checkbox (on by default) makes Copy to Hard/Medium/Easy keep only the copied events that land on a note in the matching-tier Pro Keys track — mirroring a reduction you've already hand-charted on Pro Keys onto the Keys copy — instead of copying every event from the tier above unfiltered.
-
-### Guitar/Bass sub-tab
-
-![Guitar/Bass sub-tab](../assets/g_difficulty_gb.jpg)
-
-An instrument radio switch validates either PART GUITAR or PART BASS (Guitar and Bass share one rule set). Checks chord count/shape (per-difficulty max span), note length, overlap, sustain gaps, an advisory note-density check, force-HOPO markers, and trill/tremolo marker velocity. Pitch ranges: Expert 96–100, Hard 84–88, Medium 72–75 (no Orange), Easy 60–62 (Green/Red/Yellow only).
-
-### Drums sub-tab
-
-![Drums sub-tab](../assets/g_difficulty_drums.jpg)
-
-Validates PART DRUMS (Expert 96–100, Hard 84–88, Medium 72–76, Easy 60–64). Checks base chord/kick-pairing rules plus a set of layered density and grid rules that cascade from Hard down through Medium and Easy, and shows a block of non-pass/fail authoring hints for the more qualitative RBN guidance (e.g. "favor crash over kick" on Easy).
-
----
-
-## Tab Input tab
-
-A **reference guide, not a converter** — every mode here parses ASCII tab text and reports the resulting gem/pitch assignment in the result panel. Nothing is ever written to the project. Use the Guitar, Keys, or Drums tabs (or hand-authoring) to actually write notes; use Tab Input to plan chord shapes and check range/spacing before you do.
-
-Three sub-tabs — **Guitar / Bass**, **Keys / Pro Keys**, **Vocal** — share the same input area:
-
-### Accepted formats
-
-- **Horizontal tab** — one line per event, six space-separated tokens (fret number, or `-`/`x` for unplayed), left = lowest string (E) up to right = highest (e). This is standard chord notation: `x 3 2 0 1 0` is C major. Multi-digit frets are supported; a blank line marks a phrase break.
-- **Vertical tab** — six rows (one per string), standard ASCII tab layout so the top row is the high e and the bottom the low E. Space-separated tokens per row, columns read left-to-right as events; an all-dash column marks a phrase break.
-
-The two formats run in opposite directions because the two notations really are written that way — a one-line fret shape starts at the low E, ASCII tab puts the high e on top. Both match how you'd find them printed anywhere else, so neither is the odd one out.
-
-**Add note** appends an empty slot to the input (an all-dash line/column) — it doesn't touch the project either.
-
-### Guitar / Bass
-
-![Guitar / Bass sub-tab](../assets/g_tab_input_gb.jpg)
-
-**Run guide** reports the per-event gem assignment and reasoning. Each chord is classified whole, by its distinct **pitch classes** — the gem count follows from the harmony (2 for a dyad, 3 for a real triad), never from how many strings were struck, so octave doublings don't consume a gem. A power chord always gets a matching 1-3 lane spread whether it's voiced on two strings or five, and the report calls out the recognized chord name. This is the same analysis the Music Theory helper's **Shape Search** performs, and the two tools agree on every shape.
-
-Chord-shape ranking then assigns lane position by pitch (higher pitch trends toward Orange, lower toward Green, mirroring real fretboard hand movement). When a passage has more distinct shapes than available lane combos, the shapes that appear first each claim their own combo; any later shape reuses whichever combo it conflicts with the least, based on which chords are actually back-to-back in the passage — two genuinely adjacent chords only ever end up looking identical when it's truly unavoidable, flagged with `(*Wrap)` in the report.
-
-The Guitar tab converter's **Max chord**, **Allow 1-4**, and **Phrase gap** settings do not apply here — this tab writes nothing, so there is nothing to fit to a chart. Phrase breaks come from blank lines in the tab input.
-
-### Keys / Pro Keys
-
-![Keys / Pro Keys sub-tab](../assets/g_tab_input_keys.jpg)
-
-An extra **"For animation (full C2–C4, no lane windows)"** checkbox: off scores against a 10th-wide Pro Keys lane window and suggests the best lane range; on scores against the full C2–C4 range instead (for planning `PART KEYS_ANIM_RH/LH` notes). **Run guide** finds the best octave shift to fit the notes into C2–C4 (MIDI 48–72), lists anything still out of range, and flags chords wider than the 12-semitone Expert max.
-
-### Vocal
-
-![Vocal sub-tab](../assets/g_tab_input_vocal.jpg)
-
-**Run guide** finds the best octave shift to fit the notes into the wider C1–C5 vocal range (MIDI 36–84), lists anything still out of range, and flags overly wide chords. Blank lines separate phrases.
-
----
-
-## MIDI tab
-
-Three sub-tabs: **Alignment**, **Length**, and **Pattern**.
-
-### Alignment sub-tab
-
-![Alignment sub-tab](../assets/g_midi_alignment.jpg)
-
-Aligns a single imported MIDI item to the project grid.
-
-#### Modes
-
-- **Move only** — shifts the item so its first note lands at the time selection start. Useful for rough alignment when tempo is known.
-- **Move + Stretch** — also adjusts the take playback rate so the last note aligns with the time selection end. Use this when the MIDI was recorded at a slightly different tempo and needs to stretch to fit the project grid.
-
-#### Workflow
-
-1. Set a time selection over the target range.
-2. Select the source track in the dropdown.
-3. Click **Align MIDI**.
-
-The result panel reports the shift amount in milliseconds and, when stretching, the playback rate change. Fully undoable.
-
-### Length sub-tab
-
-![Length sub-tab](../assets/g_midi_length.jpg)
-
-Resizes MIDI items to match a reference track's length — useful after aligning several imported MIDI tracks whose items ended up different lengths.
-
-1. Select the **Reference track** — the MIDI track already sized to the full song length.
-2. Click **Resize all MIDI**.
-
-For every other track, the first MIDI item is resized (its right edge moved) to match the reference item's length exactly — notes are never moved or deleted. Items that don't start at project position 0 are skipped and reported (those are Alignment's job, not Length's). Fully undoable; the result warns if any item was shrunk, so you can verify no notes were cut off.
-
-### Pattern sub-tab
-
-![Pattern sub-tab](../assets/g_midi_pattern.jpg)
-
-Finds and replaces a recurring note pattern across a MIDI track, or tiles a pattern across a range.
-
-1. Select the **Source track**.
-2. Make a time selection over an example of the pattern you want to search for, then click **Set Search** to capture it.
-3. Make a time selection over the pattern you want to replace it with, then click **Set Replace** to capture it. Both patterns must span the same duration — if they don't, **Replace All** refuses to run and tells you so; re-capture whichever one is wrong. Capturing one never clears the other.
-4. Click **Replace All** to scan the track (within the time selection if one is active, otherwise the whole item) and swap in the Replace pattern wherever the Search pattern matches exactly (same pitches, same relative timing).
-5. Or click **Fill Range** to tile the Replace pattern repeatedly across the current time selection — no Search pattern needed.
-
-A live readout under the buttons shows what's currently captured (e.g. "M4–M6 (2 measures with 5 notes)" or "not set"). All actions are fully undoable.
-
-<a id="standalone-midi-pattern"></a>
-
-#### Standalone MIDI Pattern window
-
-`rock_band_midi_pattern_vkr.lua` (repo root) is a separate script that opens just this sub-tab in its own window — load it the same way as the main scripts (**Actions → Show action list → Load ReaScript**), or click **MIDI Pattern** in [General → Other tools](#other-tools-sub-tab). Handy for keeping it beside REAPER's MIDI editor without the helper's other tabs coming along. Same underlying behavior as above, plus its own **Refresh tracks** button (the main window keeps that in General → Actions) and its own status line with an Undo button.
-
-It has no settings of its own to save — this sub-tab has never had any — and switching REAPER projects clears the captured Search and Replace patterns rather than leaving them pointing at the previous project's MIDI item.
+All Events actions are fully undoable.
 
 ---
 
 ## Venue
 
-The Venue tab contains seven sub-tabs, in this order: Actions, Events, Themes gen, Section gen, Manual gen, Keyframes, Preview. The script finds the VENUE and EVENTS tracks automatically by name — no dropdown needed.
+The Venue tab contains six sub-tabs, in this order: Actions, Themes gen, Section gen, Manual gen, Keyframes, Preview. (The EVENTS-track tools moved to the [Events tab](#events-tab) in v0.9.63.) The script finds the VENUE and EVENTS tracks automatically by name — no dropdown needed.
 
 An **Active players** row is shown below every sub-tab (see [below](#active-players-row)).
 
@@ -320,8 +201,6 @@ Inspection and utility actions that don't fit the generation sub-tabs.
 - **Directed cut spacing** — directed cuts within 2 s of the next camera event.
 - **Camera gap statistics** — average, slowest, and fastest cut durations for coop→any and directed→coop transitions.
 - **Event frequency count** — how many times each event is used, sorted by frequency.
-
-**List event sections** reads `[prc_*]` markers from the EVENTS track and lists all detected song sections with time ranges. Letter-suffix variants (`[prc_verse_1a]`, `[prc_verse_1b]`) are merged into a single section entry.
 
 **List lighting/postproc** finds every `[lighting*]` and `*.pp]` (postproc) text event on the VENUE track and lists them in timeline order of appearance, each with its measure/timestamp location.
 
@@ -357,20 +236,6 @@ The whole track is always read — deciding whether an event is a change, and wh
 - The **Subtrack** dropdown plus **Copy to** / **Copy from** buttons work on one category at a time. Copy to clears just that subtrack and copies the matching events from VENUE into it, creating the subtrack if needed. Copy from clears only that category's events from VENUE (not everything) before copying the subtrack's contents in, but — unlike Copy to — won't create a missing subtrack. For Special, both directions also carry VENUE's MIDI notes along with its text events.
 - All of the above always process the whole song. Fully undoable.
 
-### Events sub-tab
-
-![Events sub-tab](../assets/g_venue_events.jpg)
-
-The only sub-tab that writes to the **EVENTS** track instead of VENUE — inserts section, crowd, and global marker events at the playhead.
-
-- **Use letter suffix** checkbox (default on) — when on, **Add** inserts only lettered part forms (`[prc_verse_1a]`, then `[prc_verse_1b]`, …), used to split a long section into parts that merge back into one section in Section gen. When off, Add inserts only the plain form and refuses if it already exists. Events with no lettered variants (e.g. `[prc_bre]`) always insert the plain form either way.
-- One row per event group — **Intro, Structure, Solo, Break, Tempo/Energy, Interlude/Jam, Outro/Ending, Misc** (numbered `[prc_*]` section markers), **Generic** (`[prc_a]`–`[prc_k]`, lettered-only, for parts that fit no named category), **Crowd** (`[crowd_*]`), and **Global** (`[music_start]`, `[music_end]`, `[end]`, `[coda]`). Each row has a base-name combo, a number stepper where applicable, a live `-> <event>` indicator showing exactly what the next Add will insert (or `-> (blocked)` with the reason on hover), and an **Add** button.
-- Inserts are validated: no duplicates (reports the existing event's location), no mixing plain and lettered forms of the same event, numbers/letters must be used in sequence, and only one text event per position (crowd events are exempt and may stack anywhere).
-- **Insert bookends** removes any existing instances of the six bookend events, then inserts the minimal per-song set: `[prc_intro]` + `[crowd_normal]` at measure 1, `[music_start]` at measure 3, and `[prc_outro]`/`[music_end]`/`[end]` near the end of the song. Skips the end trio on items under 7 full measures; occupied target spots are skipped and reported.
-- **Clear all** removes every text event from the EVENTS track (the track-name event itself is kept).
-
-All Events actions are fully undoable.
-
 ### Themes gen sub-tab
 
 ![Themes gen sub-tab](../assets/g_venue_themes_gen.jpg)
@@ -382,7 +247,7 @@ Whole-song generation driven by a `.rbtheme` file.
 - **Keyframe align** — global alignment mode for `[first]`/`[next]` keyframe events. Options: Section start, Closest beat, Downbeat, and five instrument-aware modes (Guitar notes, Bass notes, Keys notes, Drum kicks, Drum snare) that place `[next]` only at beats where notes exist on the corresponding PART track.
 - **Generate venue events** — generates camera cuts, lighting changes, manual-lighting keyframes, and post-process effects on the VENUE track. Camera pools are filtered by which PART instrument tracks are present and unmuted. Respects time selection (partial regeneration). Fully undoable.
 
-A section never re-states the lighting or post proc preset already running. If a section's theme pool offers alternatives, it picks one of those instead; if the pool holds only the running preset, that section simply keeps it and writes no event at all (the report counts these as *Kept running preset*). This matters because two identical events back to back is exactly how a blend anchor is written — a repeat would read as a fade you never asked for. Its keyframes are still generated, so a manual preset keeps animating across the boundary. If you genuinely want a duplicate, add it with **Blend** on the [Manual gen sub-tab](#manual-gen-sub-tab).
+A section never re-states the lighting or post proc preset already running. If a section's theme pool offers alternatives, it picks one of those instead; if the pool holds only the running preset, that section simply keeps it and writes no event at all (the report counts these as *Kept running preset*). This matters because two identical events back to back is exactly how a blend anchor is written — a repeat would read as a fade you never asked for. Its keyframes are still generated, so a manual preset keeps animating across the boundary. If you genuinely want a duplicate, add it with **Blend** on the [Manual gen sub-tab](#venue-manual-gen).
 
 ### Section gen sub-tab
 
@@ -404,6 +269,8 @@ Per-section manual configuration. Sections are read from `[prc_*]` markers on th
 - **Generate section** — generates events for the selected section only. Fully undoable.
 
 Like Themes gen, this never re-states a preset that's already running: in Template mode the roll avoids it, and if your chosen Lighting or Post-process is the one already playing the event is skipped and the report says which preset it kept. Keyframes are still generated either way.
+
+<a id="venue-manual-gen"></a>
 
 ### Manual gen sub-tab
 
@@ -449,7 +316,7 @@ Live readout of current, previous, and next venue events relative to the playhea
 - **blending now** — the playhead is inside that fade right now.
 - **hard cut to next** — no anchor, the game switches instantly. Perfectly valid, not an error.
 
-Camera cards never show this line; a camera cut never fades. To add an anchor by hand, use **Blend** on the [Manual gen sub-tab](#manual-gen-sub-tab); to find changes that don't have one, use **Validate lighting/blends** on the [Actions sub-tab](#actions-sub-tab).
+Camera cards never show this line; a camera cut never fades. To add an anchor by hand, use **Blend** on the [Manual gen sub-tab](#venue-manual-gen); to find changes that don't have one, use **Validate lighting/blends** on the [Actions sub-tab](#actions-sub-tab).
 
 Sprite previews require JPEG spritesheets installed under `resources/img/spritesheets/`. If no spritesheets are found, event names are shown as text with no image.
 

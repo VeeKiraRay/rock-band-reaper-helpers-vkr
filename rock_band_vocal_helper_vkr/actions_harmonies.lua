@@ -145,7 +145,7 @@ end
 local function ResolveHarmTracks()
     local tracks = GetTrackList()
     if #tracks == 0 then return nil, 'No tracks in project.' end
-    if S.harm_src_idx >= #tracks then return nil, 'Source track index out of range.' end
+    if not TrackAtIndex(S.harm_src_idx) then return nil, 'Pick a source track.' end
 
     local dsts, any = {}, false
     local cfg = {
@@ -159,13 +159,13 @@ local function ResolveHarmTracks()
     for _, c in ipairs(cfg) do
         if S[c.en] then
             any = true
-            if S[c.idx] >= #tracks then
-                return nil, ('Destination %d track index out of range.'):format(c.n)
+            if not TrackAtIndex(S[c.idx]) then
+                return nil, ('Pick a track for destination %d.'):format(c.n)
             end
             if S[c.idx] == S.harm_src_idx then
                 return nil, ('Destination %d is the same as the source track.'):format(c.n)
             end
-            local tr   = r.GetTrack(0, tracks[S[c.idx] + 1].idx)
+            local tr   = TrackAtIndex(S[c.idx])
             local item, take = FindFirstMIDIItem(tr)
             if not take then
                 return nil, ('No MIDI item on destination %d track.'):format(c.n)
@@ -180,7 +180,7 @@ local function ResolveHarmTracks()
     end
     if not any then return nil, 'No destination tracks enabled.' end
 
-    return { src = r.GetTrack(0, tracks[S.harm_src_idx + 1].idx), dsts = dsts }
+    return { src = TrackAtIndex(S.harm_src_idx), dsts = dsts }
 end
 
 function HarmoniesAction()

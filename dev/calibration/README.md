@@ -978,7 +978,7 @@ Order matters: everything downstream reads the CSV the first script writes.
     part in the rank model's partitions.
 
 12. **`run_generate_eval_offline.lua`** — scores the Difficulty > Generate planner
-    (`rock_band_general_helper_vkr/difficulty_generate_5lane.lua`, loaded as-is) against the
+    (`rock_band_instrument_helper_vkr/difficulty_generate_5lane.lua`, loaded as-is) against the
     official Guitar, Bass and Keys tiers. Offline, reading `.mid` files through
     `dev/tools/smf_reader.lua`; about 30 seconds:
 
@@ -1014,7 +1014,7 @@ Order matters: everything downstream reads the CSV the first script writes.
     further tuning turns it into a development set.
 
 13. **`run_generate_eval_drums_offline.lua`** — the same for the Drums planner
-    (`rock_band_general_helper_vkr/difficulty_generate_drums.lua`), against the official
+    (`rock_band_instrument_helper_vkr/difficulty_generate_drums.lua`), against the official
     PART DRUMS tiers:
 
     ```
@@ -1057,7 +1057,7 @@ invalidate every model here.
 | `lib/reaper_difficulty_tiers.lua` | Rank to displayed tier (0 Warmup … 6 Impossible) plus `TierBand` / `TierPosition`, ported from the community `InstrumentDifficulty.ts`. Pure. |
 | `lib/reaper_difficulty_predict.lua` | `DifficultyPredictRank`, `DifficultyFactorZ`, `DifficultyOutOfRange` — how to apply a frozen model. Pure. Coefficients are in **standardized** units; nothing should ever apply them by hand. |
 | `lib/reaper_difficulty_models.lua` | **Generated.** The six frozen models: factor order, standardization statistics, coefficients, ridge, rank clamp, per-factor support bounds, concentration thresholds, maturity badge. Rewritten only by `export_production_models.lua`. |
-| `rock_band_general_helper_vkr/difficulty_read.lua` | The chart readers: track lookup, gems grouped into chord events, marker spans, animation states, vocal notes with tick-matched lyrics, phrase and percussion ranges, Pro Keys lane shifts. Touches `r.*`; no `S`, no `ctx`. Attaches the `qn` field, which is the one thing the pure scorer cannot compute for itself. |
+| `lib/reaper_difficulty_read.lua` | The chart readers: track lookup, gems grouped into chord events, marker spans, animation states, vocal notes with tick-matched lyrics, phrase and percussion ranges, Pro Keys lane shifts. Touches `r.*`; no `S`, no `ctx`. Attaches the `qn` field, which is the one thing the pure scorer cannot compute for itself. |
 
 `difficulty_score.lua`, `difficulty_score_vocals.lua` and `rank_tiers.lua` remain in this
 folder as **one-line loaders** pointing at the above, so every entry point and test runner

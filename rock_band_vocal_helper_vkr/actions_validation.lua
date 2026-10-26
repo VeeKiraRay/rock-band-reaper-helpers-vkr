@@ -5,10 +5,10 @@
 ----------------------------------------------------------------------
 function ValidatePhrases()
     local tracks = GetTrackList()
-    if #tracks == 0 or S.midi_idx >= #tracks then
-        S.status = 'Error'; S.last_result = 'Invalid MIDI destination track.'; return
+    if #tracks == 0 or not TrackAtIndex(S.midi_idx) then
+        S.status = 'Error'; S.last_result = 'Pick a MIDI destination track.'; return
     end
-    local midi_track = r.GetTrack(0, tracks[S.midi_idx + 1].idx)
+    local midi_track = TrackAtIndex(S.midi_idx)
     local _, midi_take = FindFirstMIDIItem(midi_track)
     if not midi_take then
         S.status = 'Error'
@@ -174,10 +174,10 @@ end
 
 function PhraseSimilarityAction()
     local tracks = GetTrackList()
-    if #tracks == 0 or S.midi_idx >= #tracks then
-        S.status = 'Error'; S.last_result = 'Invalid MIDI destination track.'; return
+    if #tracks == 0 or not TrackAtIndex(S.midi_idx) then
+        S.status = 'Error'; S.last_result = 'Pick a MIDI destination track.'; return
     end
-    local midi_track = r.GetTrack(0, tracks[S.midi_idx + 1].idx)
+    local midi_track = TrackAtIndex(S.midi_idx)
     local _, midi_take = FindFirstMIDIItem(midi_track)
     if not midi_take then
         S.status = 'Error'

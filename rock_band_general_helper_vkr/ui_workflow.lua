@@ -1,4 +1,4 @@
--- General > Workflow sub-tab rendering.
+-- Workflow tab rendering (a General sub-tab before v0.9.63).
 -- Requires: workflow.lua (LoadWorkflowFiles), actions_workflow.lua
 --           (SelectWorkflowFile, ToggleWorkflowItem, CompositeKey,
 --           ComputeWorkflowStats), lib/reaper_imgui_helpers.lua

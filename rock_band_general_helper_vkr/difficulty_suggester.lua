@@ -11,7 +11,7 @@
 -- point, so an author can ask for it mid-edit without it appearing in their undo history.
 --
 -- Requires (globals): r, RB_CHART_SPECS, ScoreChartForSpec, FindTrackExact,
---                     ReadVocalNotes (difficulty_read.lua),
+--                     ReadVocalNotes (lib/reaper_difficulty_read.lua),
 --                     RB_DIFFICULTY_MODELS, RB_DIFFICULTY_MODEL_ORDER
 --                     (lib/reaper_difficulty_models.lua),
 --                     DifficultyPredictRank (lib/reaper_difficulty_predict.lua),

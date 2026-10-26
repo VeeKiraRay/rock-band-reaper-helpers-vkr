@@ -1,17 +1,24 @@
 -- @description Rock Band Pitch Tuner
 -- @author VeeKiraRay
--- @version 0.2
+-- @version 0.3
 -- @about
---   Standalone window for the Tuner tab of the Rock Band Vocal Helper. Reads
---   audio from the selected source track at the playhead and shows the
---   detected note, frequency, confidence and a short history strip.
+--   Standalone window for the Pitch > Tuner sub-tab of the Rock Band Vocal
+--   Helper. Reads audio from the selected source track at the playhead and
+--   shows the detected note, frequency, confidence and a short history strip.
 --
---   The tuner remains available as a tab inside the vocal helper; this entry
---   point offers the same UI in its own window so it can stay visible while
---   you work in another tab (Pitch, Lyrics) or another window.
+--   The tuner remains available as a sub-tab inside the vocal helper; this
+--   entry point offers the same UI in its own window so it can stay visible
+--   while you work in another tab (Lyrics, Pitch > Snap) or another window.
 --
 --   Built with Claude (Anthropic) - https://claude.ai
 --
+--   v0.3
+--     - No change to what this window does. The Vocal Helper moved its
+--       Tuner tab under Pitch (Vocal Helper v1.21), so the Start/Stop
+--       tooltip and the helper's auto-stop message now say Tuner sub-tab.
+--     - The audio source dropdown has a "(none)" entry, and the status panel
+--       at the bottom shows the active time selection, as in the helpers -
+--       both now share their code with every helper.
 --   v0.2
 --     - The window title now carries the script version - "Rock Band Pitch
 --       Tuner v0.2". A bug report that quotes the title says which version
@@ -64,6 +71,8 @@ local _mdir   = _dir .. 'rock_band_vocal_helper_vkr/'
 local _files = {
     _dir  .. 'lib/reaper_imgui_helpers.lua',
     _dir  .. 'lib/reaper_dsp.lua',
+    _dir  .. 'lib/reaper_helper_common.lua',
+    _dir  .. 'lib/reaper_helper_ui.lua',
     _mdir .. 'defaults.lua',
     _mdir .. 'tips.lua',
     _mdir .. 'settings.lua',
@@ -146,7 +155,7 @@ local function Loop()
     if visible then
         r.ImGui_Text(ctx, 'Audio source track')
         r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
-        S.audio_idx = FilteredTrackCombo('##audio_tur', S.audio_idx, S.audio_track_list)
+        S.audio_idx = TrackCombo('##audio_tur', S.audio_idx, S.audio_track_list)
         r.ImGui_SameLine(ctx)
         if Btn('Refresh tracks', BTN_H) then
             RefreshTrackLists()

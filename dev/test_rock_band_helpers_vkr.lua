@@ -32,10 +32,12 @@ local _script = ({reaper.get_action_context()})[2]
 local _dir    = _script:match('^(.+[\\/])')
 local _tdir   = _dir .. 'tests/'
 
-local results = { vocal = nil, general = nil, vocal_midi = nil, general_midi = nil,
-                  general_drums_2x = nil, general_overdrive = nil,
+local results = { vocal = nil, general = nil, instrument = nil,
+                  vocal_midi = nil, general_midi = nil, instrument_midi = nil,
+                  instrument_drums_2x = nil, instrument_overdrive = nil,
                   general_stem_import = nil,
                   dsp_algo = nil, vocal_algo = nil, general_algo = nil,
+                  instrument_algo = nil,
                   quick_actions = nil, spritesheet = nil, venue_events = nil,
                   venue_subtracks = nil, venue_phrase_pacing = nil,
                   venue_labels = nil, workflow = nil,
@@ -123,6 +125,14 @@ function Loop()
         draw_status(results.general)
 
         r.ImGui_Spacing(ctx)
+
+        if r.ImGui_Button(ctx, 'Run Instrument Smoke', 155, 24) then
+            run('run_instrument.lua', 'instrument')
+        end
+        r.ImGui_SameLine(ctx)
+        draw_status(results.instrument)
+
+        r.ImGui_Spacing(ctx)
         r.ImGui_Separator(ctx)
         r.ImGui_Spacing(ctx)
 
@@ -142,17 +152,25 @@ function Loop()
 
         r.ImGui_Spacing(ctx)
 
-        if r.ImGui_Button(ctx, 'Drums 2x Tests', 155, 24) then
-            run('run_general_drums_2x.lua', 'general_drums_2x')
+        if r.ImGui_Button(ctx, 'Instrument MIDI Tests', 155, 24) then
+            run('run_instrument_midi.lua', 'instrument_midi')
         end
         r.ImGui_SameLine(ctx)
-        draw_status(results.general_drums_2x)
+        draw_status(results.instrument_midi)
+
+        r.ImGui_Spacing(ctx)
+
+        if r.ImGui_Button(ctx, 'Drums 2x Tests', 155, 24) then
+            run('run_instrument_drums_2x.lua', 'instrument_drums_2x')
+        end
+        r.ImGui_SameLine(ctx)
+        draw_status(results.instrument_drums_2x)
 
         if r.ImGui_Button(ctx, 'Overdrive Tests', 155, 24) then
-            run('run_general_overdrive.lua', 'general_overdrive')
+            run('run_instrument_overdrive.lua', 'instrument_overdrive')
         end
         r.ImGui_SameLine(ctx)
-        draw_status(results.general_overdrive)
+        draw_status(results.instrument_overdrive)
 
         if r.ImGui_Button(ctx, 'Stem Import Tests', 155, 24) then
             run('run_general_stem_import.lua', 'general_stem_import')
@@ -191,6 +209,14 @@ function Loop()
         end
         r.ImGui_SameLine(ctx)
         draw_status(results.general_algo)
+
+        r.ImGui_Spacing(ctx)
+
+        if r.ImGui_Button(ctx, 'Instrument Algo Tests', 155, 24) then
+            run('run_instrument_algorithms.lua', 'instrument_algo')
+        end
+        r.ImGui_SameLine(ctx)
+        draw_status(results.instrument_algo)
 
         r.ImGui_Spacing(ctx)
 

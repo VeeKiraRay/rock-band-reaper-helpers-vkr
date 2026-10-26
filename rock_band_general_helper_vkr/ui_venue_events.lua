@@ -1,8 +1,12 @@
-﻿-- Venue > Events sub-tab
--- Inserts EVENTS-track section/crowd/global text events at the playhead, one
--- row per event group, with number stepper, letter suffixes, and insert
--- validation. Also hosts the Clear all / Insert bookends quick actions.
+﻿-- Events tab: DrawEventsTab (the tab's sub-tab bar and its General sub-tab)
+-- and DrawVenueEventsTab, the Manual gen sub-tab body.
+-- Manual gen inserts EVENTS-track section/crowd/global text events at the
+-- playhead, one row per event group, with number stepper, letter suffixes, and
+-- insert validation. Also hosts the Clear all / Insert bookends quick actions.
+-- Before v0.9.63 Manual gen was the Venue > Events sub-tab, and the General
+-- sub-tab's button sat in Venue > Actions.
 -- Requires globals: r, ctx, S, TIPS, Tooltip, SliderTooltip, RunAction,
+--                   ListEventSections,
 --                   SECTION_EVENT_GROUPS, SECTION_EVENT_BASE, MakeProjectPoll,
 --                   FindEventsTake, ScanEventsTextEvents, NextSectionEvent,
 --                   ValidatePlainInsert, InsertEventsEvent, AddSectionEvent,
@@ -191,5 +195,29 @@ function DrawVenueEventsTab()
         else
             _draw_prc_row(g, scan, cur_t, cur_ppq, no_take, use_letters, lbl_col)
         end
+    end
+end
+
+-- Events > General sub-tab: song-section listing.
+local function DrawEventsGeneralTab()
+    SectionHeader('Sections')
+    if Btn('List event sections', BTN_H) then
+        RunAction(ListEventSections)
+    end
+    Tooltip(TIPS.venue_sections)
+end
+
+-- Events main tab. Body only: the caller owns BeginTabItem / EndTabItem.
+function DrawEventsTab()
+    if r.ImGui_BeginTabBar(ctx, '##events_subtabs') then
+        if r.ImGui_BeginTabItem(ctx, 'General') then
+            DrawEventsGeneralTab()
+            r.ImGui_EndTabItem(ctx)
+        end
+        if r.ImGui_BeginTabItem(ctx, 'Manual gen') then
+            DrawVenueEventsTab()
+            r.ImGui_EndTabItem(ctx)
+        end
+        r.ImGui_EndTabBar(ctx)
     end
 end

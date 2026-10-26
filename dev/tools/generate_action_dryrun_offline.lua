@@ -24,7 +24,7 @@
 local _self = (arg and arg[0] or ''):gsub('\\', '/')
 if not _self:match('^%a:') and not _self:match('^/') then _self = './' .. _self end
 local _root = _self:match('^(.*/)dev/tools/[^/]+$') or './'
-local M     = _root .. 'rock_band_general_helper_vkr/'
+local M     = _root .. 'rock_band_instrument_helper_vkr/'
 
 dofile(_root .. 'dev/tools/smf_reader.lua')
 
@@ -260,6 +260,7 @@ for _, f in ipairs({
     _root .. 'lib/reaper_imgui_helpers.lua', _root .. 'lib/reaper_midi_helpers.lua',
     _root .. 'lib/reaper_guitar_theory.lua', _root .. 'lib/reaper_difficulty_score.lua',
     _root .. 'lib/reaper_difficulty_score_vocals.lua',
+    _root .. 'lib/reaper_helper_common.lua',
     M .. 'defaults.lua', M .. 'helpers.lua', M .. 'actions_guitar.lua', M .. 'actions_guitar_validate.lua',
     M .. 'actions_difficulty_shared.lua', M .. 'actions_difficulty.lua', M .. 'actions_difficulty_5k.lua',
     M .. 'actions_difficulty_gtrbass.lua', M .. 'actions_difficulty_drums_checks.lua',
@@ -267,7 +268,7 @@ for _, f in ipairs({
     M .. 'difficulty_generate_colors.lua', M .. 'difficulty_generate_rhythm.lua',
     M .. 'difficulty_generate_5lane.lua', M .. 'difficulty_generate_prokeys.lua',
     M .. 'difficulty_generate_hopo.lua', M .. 'actions_drums_2x.lua', M .. 'difficulty_generate_drums.lua',
-    M .. 'actions_difficulty_generate.lua', M .. 'difficulty_read.lua',
+    M .. 'actions_difficulty_generate.lua', _root .. 'lib/reaper_difficulty_read.lua',
     _root .. 'dev/calibration/difficulty_holdout.lua',
 }) do dofile(f) end
 

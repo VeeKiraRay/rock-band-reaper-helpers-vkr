@@ -1,12 +1,12 @@
 -- MIDI > Pattern sub-tab rendering.
 --
 -- Body only - no Begin/End, no BeginTabItem: the caller owns the window and the
--- tab item. Drawn both by the general helper's MIDI tab (ui_midi.lua) and by the
+-- tab item. Drawn both by the instrument helper's MIDI tab (ui_midi.lua) and by the
 -- standalone rock_band_midi_pattern_vkr.lua window, so it must not assume either
 -- context. Same contract as ui_venue_preview.lua's DrawVenuePreviewTab.
 --
--- Requires globals: r, ctx, S, TIPS, RunAction, TrackCombo (ui_common.lua),
---   MidiEditorTrackWarning (ui_common.lua), GetPatternPitchRange and the seven
+-- Requires globals: r, ctx, S, TIPS, RunAction, TrackCombo (lib/reaper_helper_ui.lua),
+--   MidiEditorTrackWarning (lib/reaper_helper_ui.lua), GetPatternPitchRange and the seven
 --   action functions (actions_midi_replace.lua), Btn / BtnGroupWidth /
 --   LabelColWidth / Tooltip / BTN_H / WIDTH_STD / WIDTH_SHORT (lib).
 

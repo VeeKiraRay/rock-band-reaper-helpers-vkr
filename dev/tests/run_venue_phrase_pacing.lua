@@ -33,6 +33,7 @@ dofile(_tdir .. 'fixture_helpers.lua')
 dofile(_root .. 'lib/reaper_imgui_helpers.lua')   -- SortedByLabel: venue_camera.lua and
                                                   -- venue_lighting.lua call it at load time
 dofile(_gdir .. 'defaults.lua')                   -- S
+dofile(_root .. 'lib/reaper_helper_common.lua')   -- FindTrackByName, GetTakePPQPerQN
 dofile(_gdir .. 'helpers.lua')                    -- FindTrackByName
 dofile(_gdir .. 'venue.lua')                      -- IsBlendAnchor (actions_venue_manual reads it)
 dofile(_gdir .. 'venue_camera.lua')               -- GenerateCameraEvents, RB3_PHRASE_PITCH

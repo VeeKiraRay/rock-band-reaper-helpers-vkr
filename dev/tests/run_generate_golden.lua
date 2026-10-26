@@ -30,7 +30,7 @@ local _root = _in_dev_tests and _strip(_strip(_ctx_dir))
            or _in_dev       and _strip(_ctx_dir)
            or _ctx_dir
 local _tdir = _root .. 'dev/tests/'
-local _mdir = _root .. 'rock_band_general_helper_vkr/'
+local _mdir = _root .. 'rock_band_instrument_helper_vkr/'
 GOLDEN_DIR  = _tdir .. 'golden/'
 
 ctx = nil

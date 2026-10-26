@@ -1,4 +1,5 @@
-﻿-- Pitch tab rendering (Placement - Built-in / Placement - Reference / Snap sub-tabs)
+﻿-- Pitch tab rendering: Tuner / Snap / Slide / Placement - Built-in /
+-- Placement - Reference sub-tabs. Tuner and Slide were main tabs before v1.21.
 
 local function DrawApplyPitchButton()
     r.ImGui_Separator(ctx)
@@ -13,6 +14,79 @@ function DrawPitchTab(ctx)
     local midi_tracks = S.midi_track_list
 
     if r.ImGui_BeginTabBar(ctx, '##pitch_subtabs') then
+
+        ------------------------------------------------
+        -- Sub-tab: Tuner (ui_tuner.lua; also the standalone Pitch Tuner window)
+        ------------------------------------------------
+        if r.ImGui_BeginTabItem(ctx, 'Tuner') then
+            -- RunTuner stops a running tuner on the first frame this is not set.
+            S.tuner_tab_active = true
+            DrawTunerTab()
+            r.ImGui_EndTabItem(ctx)
+        end
+
+        ------------------------------------------------
+        -- Sub-tab: Snap
+        ------------------------------------------------
+        if r.ImGui_BeginTabItem(ctx, 'Snap') then
+            r.ImGui_Spacing(ctx)
+            SectionHeader('Snap to Key Scale')
+
+            local lbl_col_key = LabelColWidth({ 'Key' })
+            local lbl_col_sac = LabelColWidth({ 'Avoid matching neighbor (within phrase)' })
+
+            r.ImGui_Text(ctx, 'Key')
+            Tooltip(TIPS.snap_key_root)
+            r.ImGui_SameLine(ctx, lbl_col_key)
+            r.ImGui_SetNextItemWidth(ctx, WIDTH_SHORT)
+            if r.ImGui_BeginCombo(ctx, '##snap_kr', HARM_NOTE_NAMES[S.snap_key_root + 1]) then
+                for i, name in ipairs(HARM_NOTE_NAMES) do
+                    local is_sel = (i - 1 == S.snap_key_root)
+                    if r.ImGui_Selectable(ctx, name, is_sel) then S.snap_key_root = i - 1 end
+                    if is_sel then r.ImGui_SetItemDefaultFocus(ctx) end
+                end
+                r.ImGui_EndCombo(ctx)
+            end
+            Tooltip(TIPS.snap_key_root)
+            r.ImGui_SameLine(ctx)
+            if r.ImGui_RadioButton(ctx, 'Major##skq', S.snap_key_quality == 0) then
+                S.snap_key_quality = 0
+            end
+            r.ImGui_SameLine(ctx)
+            if r.ImGui_RadioButton(ctx, 'Minor##skq', S.snap_key_quality == 1) then
+                S.snap_key_quality = 1
+            end
+
+            r.ImGui_Text(ctx, 'Avoid matching neighbor (within phrase)')
+            r.ImGui_SameLine(ctx, lbl_col_sac)
+            local _, new_sac = r.ImGui_Checkbox(ctx, '##sac', S.snap_avoid_collision)
+            S.snap_avoid_collision = new_sac
+            Tooltip(TIPS.snap_avoid_collision)
+
+            r.ImGui_Spacing(ctx)
+            local snap_label = sel_s and 'Snap to Key (time sel)' or 'Snap to Key (full item)'
+            if Btn(snap_label, 24) then
+                if not sel_s then
+                    local res = r.ShowMessageBox(
+                        'No time selection is active.\n\nAll notes in the full MIDI item will be snapped to the key.\n\nContinue?',
+                        'Snap to Key', 1)
+                    if res == 1 then RunAction(SnapToKeyAction) end
+                else
+                    RunAction(SnapToKeyAction)
+                end
+            end
+            Tooltip(TIPS.snap_apply)
+
+            r.ImGui_EndTabItem(ctx)
+        end
+
+        ------------------------------------------------
+        -- Sub-tab: Slide (ui_slides.lua)
+        ------------------------------------------------
+        if r.ImGui_BeginTabItem(ctx, 'Slide') then
+            DrawPitchSlideTab(ctx)
+            r.ImGui_EndTabItem(ctx)
+        end
 
         ------------------------------------------------
         -- Sub-tab: Placement - Built-in
@@ -134,7 +208,7 @@ function DrawPitchTab(ctx)
             r.ImGui_Text(ctx, 'Reference MIDI track')
             r.ImGui_SameLine(ctx, lbl_col_ref)
             r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
-            S.ref_idx = FilteredTrackCombo('##refmidi', S.ref_idx, midi_tracks)
+            S.ref_idx = TrackCombo('##refmidi', S.ref_idx, midi_tracks)
             Tooltip(TIPS.ref_track)
 
             r.ImGui_Text(ctx, 'Search tolerance (ms)')
@@ -146,61 +220,6 @@ function DrawPitchTab(ctx)
             SliderTooltip(TIPS.ref_search)
 
             DrawApplyPitchButton()
-
-            r.ImGui_EndTabItem(ctx)
-        end
-
-        ------------------------------------------------
-        -- Sub-tab: Snap
-        ------------------------------------------------
-        if r.ImGui_BeginTabItem(ctx, 'Snap') then
-            r.ImGui_Spacing(ctx)
-            SectionHeader('Snap to Key Scale')
-
-            local lbl_col_key = LabelColWidth({ 'Key' })
-            local lbl_col_sac = LabelColWidth({ 'Avoid matching neighbor (within phrase)' })
-
-            r.ImGui_Text(ctx, 'Key')
-            Tooltip(TIPS.snap_key_root)
-            r.ImGui_SameLine(ctx, lbl_col_key)
-            r.ImGui_SetNextItemWidth(ctx, WIDTH_SHORT)
-            if r.ImGui_BeginCombo(ctx, '##snap_kr', HARM_NOTE_NAMES[S.snap_key_root + 1]) then
-                for i, name in ipairs(HARM_NOTE_NAMES) do
-                    local is_sel = (i - 1 == S.snap_key_root)
-                    if r.ImGui_Selectable(ctx, name, is_sel) then S.snap_key_root = i - 1 end
-                    if is_sel then r.ImGui_SetItemDefaultFocus(ctx) end
-                end
-                r.ImGui_EndCombo(ctx)
-            end
-            Tooltip(TIPS.snap_key_root)
-            r.ImGui_SameLine(ctx)
-            if r.ImGui_RadioButton(ctx, 'Major##skq', S.snap_key_quality == 0) then
-                S.snap_key_quality = 0
-            end
-            r.ImGui_SameLine(ctx)
-            if r.ImGui_RadioButton(ctx, 'Minor##skq', S.snap_key_quality == 1) then
-                S.snap_key_quality = 1
-            end
-
-            r.ImGui_Text(ctx, 'Avoid matching neighbor (within phrase)')
-            r.ImGui_SameLine(ctx, lbl_col_sac)
-            local _, new_sac = r.ImGui_Checkbox(ctx, '##sac', S.snap_avoid_collision)
-            S.snap_avoid_collision = new_sac
-            Tooltip(TIPS.snap_avoid_collision)
-
-            r.ImGui_Spacing(ctx)
-            local snap_label = sel_s and 'Snap to Key (time sel)' or 'Snap to Key (full item)'
-            if Btn(snap_label, 24) then
-                if not sel_s then
-                    local res = r.ShowMessageBox(
-                        'No time selection is active.\n\nAll notes in the full MIDI item will be snapped to the key.\n\nContinue?',
-                        'Snap to Key', 1)
-                    if res == 1 then RunAction(SnapToKeyAction) end
-                else
-                    RunAction(SnapToKeyAction)
-                end
-            end
-            Tooltip(TIPS.snap_apply)
 
             r.ImGui_EndTabItem(ctx)
         end

@@ -225,7 +225,7 @@ S = {
 
     -- Pitch Tuner (session-only, not persisted)
     tuner_active         = false,
-    tuner_tab_active = false,   -- updated each frame inside General BeginTabItem
+    tuner_tab_active = false,   -- set each frame while Pitch > Tuner is open
     action_yctx          = nil,     -- YIN context held by an in-progress action (cleared by RunAction on error)
     tuner_yctx           = nil,     -- YIN context; open while active
     tuner_audio_item     = nil,     -- item the context is currently open on

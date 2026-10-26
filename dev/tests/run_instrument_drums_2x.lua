@@ -1,4 +1,4 @@
--- @description Rock Band General Helper - Drums 2x Kicks Tests
+-- @description Rock Band Instrument Helper - Drums 2x Kicks Tests
 -- @author VeeKiraRay
 -- @about
 --   Tests for Remove2XKicks (actions_drums_2x.lua): the General > Actions button
@@ -28,20 +28,20 @@ local _root = _in_dev_tests and _strip(_strip(_ctx_dir))
            or _in_dev       and _strip(_ctx_dir)
            or _ctx_dir
 local _tdir = _root .. 'dev/tests/'
-local _gdir = _root .. 'rock_band_general_helper_vkr/'
+local _gdir = _root .. 'rock_band_instrument_helper_vkr/'
 
 ctx = nil                       -- runners set this; the launcher saves/restores it
 
 r.ClearConsole()
-r.ShowConsoleMsg('======  General Helper - Drums 2x kicks tests  ======\n')
+r.ShowConsoleMsg('======  Instrument Helper - Drums 2x kicks tests  ======\n')
 
 dofile(_tdir .. 'framework.lua')
 dofile(_tdir .. 'fixture_helpers.lua')
 dofile(_gdir .. 'defaults.lua')                   -- S
-dofile(_gdir .. 'helpers.lua')                    -- FindTrackByName, GetTakePPQPerQN
+dofile(_root .. 'lib/reaper_helper_common.lua')   -- FindTrackByName, GetTakePPQPerQN
 dofile(_gdir .. 'actions_drums_2x.lua')           -- Remove2XKicks, DoubleBassPlan
 
 EnableFixtureAutoCleanup()  -- one aborted test must not poison the rest
 
-dofile(_tdir .. 'general_drums_2x.lua')
+dofile(_tdir .. 'instrument_drums_2x.lua')
 Test.report()

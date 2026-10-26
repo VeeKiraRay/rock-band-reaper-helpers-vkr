@@ -30,17 +30,17 @@ r = {}  -- the difficulty modules only touch r inside functions this script neve
 dofile(_root .. 'dev/tools/smf_reader.lua')
 dofile(_root .. 'dev/tools/smf_chart_events.lua')
 dofile(_dir  .. 'difficulty_holdout.lua')
-dofile(_root .. 'rock_band_general_helper_vkr/actions_difficulty_shared.lua')
-dofile(_root .. 'rock_band_general_helper_vkr/actions_difficulty_gtrbass.lua')
-dofile(_root .. 'rock_band_general_helper_vkr/actions_difficulty_5k.lua')
-dofile(_root .. 'rock_band_general_helper_vkr/actions_difficulty.lua')   -- PK_MAX_CHORD / PK_MAX_SPAN
-dofile(_root .. 'rock_band_general_helper_vkr/difficulty_generate_params.lua')
-dofile(_root .. 'rock_band_general_helper_vkr/difficulty_generate_overlaps.lua')
-dofile(_root .. 'rock_band_general_helper_vkr/difficulty_generate_retime.lua')
-dofile(_root .. 'rock_band_general_helper_vkr/difficulty_generate_colors.lua')
-dofile(_root .. 'rock_band_general_helper_vkr/difficulty_generate_rhythm.lua')
-dofile(_root .. 'rock_band_general_helper_vkr/difficulty_generate_5lane.lua')
-dofile(_root .. 'rock_band_general_helper_vkr/difficulty_generate_prokeys.lua')
+dofile(_root .. 'rock_band_instrument_helper_vkr/actions_difficulty_shared.lua')
+dofile(_root .. 'rock_band_instrument_helper_vkr/actions_difficulty_gtrbass.lua')
+dofile(_root .. 'rock_band_instrument_helper_vkr/actions_difficulty_5k.lua')
+dofile(_root .. 'rock_band_instrument_helper_vkr/actions_difficulty.lua')   -- PK_MAX_CHORD / PK_MAX_SPAN
+dofile(_root .. 'rock_band_instrument_helper_vkr/difficulty_generate_params.lua')
+dofile(_root .. 'rock_band_instrument_helper_vkr/difficulty_generate_overlaps.lua')
+dofile(_root .. 'rock_band_instrument_helper_vkr/difficulty_generate_retime.lua')
+dofile(_root .. 'rock_band_instrument_helper_vkr/difficulty_generate_colors.lua')
+dofile(_root .. 'rock_band_instrument_helper_vkr/difficulty_generate_rhythm.lua')
+dofile(_root .. 'rock_band_instrument_helper_vkr/difficulty_generate_5lane.lua')
+dofile(_root .. 'rock_band_instrument_helper_vkr/difficulty_generate_prokeys.lua')
 
 local CORPUS = _root .. '_external_docs/all_rb3_dlc_reference_songs/'
 local OUT    = _dir .. 'generate_eval_report.txt'

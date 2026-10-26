@@ -533,7 +533,7 @@ TIPS = {
         "position every 100 ms, using YIN pitch detection.\n\n" ..
         "Scanning the same position multiple times is skipped - the display\n" ..
         "and history only update when the playhead moves.\n\n" ..
-        "Auto-stops if you navigate away from the Tuner tab, or if no new\n" ..
+        "Auto-stops if you leave the Tuner sub-tab, or if no new\n" ..
         "pitch has been detected for 60 seconds.",
 
     -- General tab

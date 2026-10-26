@@ -45,7 +45,7 @@ local N_SONGS = tonumber(arg and arg[1]) or 6
 --
 -- One track per SMF track, each holding one MIDI item with one take. PPQ is the SMF tick,
 -- so MIDI_GetProjTimeFromPPQPos is the tempo map and MIDI_GetProjQNFromPPQPos is a
--- division. Only the calls difficulty_read.lua and difficulty_suggester.lua actually make
+-- division. Only the calls lib/reaper_difficulty_read.lua and difficulty_suggester.lua actually make
 -- are implemented - a missing one should be a loud nil-call, not a plausible default.
 ----------------------------------------------------------------------
 
@@ -134,7 +134,7 @@ dofile(_root .. 'lib/reaper_difficulty_score_vocals.lua')
 dofile(_root .. 'lib/reaper_difficulty_tiers.lua')
 dofile(_root .. 'lib/reaper_difficulty_predict.lua')
 dofile(_root .. 'lib/reaper_difficulty_models.lua')
-dofile(_root .. 'rock_band_general_helper_vkr/difficulty_read.lua')
+dofile(_root .. 'lib/reaper_difficulty_read.lua')
 dofile(_root .. 'rock_band_general_helper_vkr/difficulty_explain.lua')
 dofile(_root .. 'rock_band_general_helper_vkr/difficulty_suggester.lua')
 dofile(_root .. 'dev/calibration/songs_dta.lua')

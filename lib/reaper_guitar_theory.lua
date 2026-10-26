@@ -14,7 +14,7 @@
 -- low-to-high (token 1 = the low E = string 6) and the parsers map token
 -- position to string number themselves. See _ParseFretPositions below.
 -- Matches the pre-existing convention in
--- rock_band_general_helper_vkr/actions_guitar_guide.lua's local TAB_OPEN --
+-- rock_band_instrument_helper_vkr/actions_guitar_guide.lua's local TAB_OPEN --
 -- duplicated here deliberately rather than shared, since it's a fixed
 -- physical constant (near-zero drift risk) and sharing it would require
 -- touching rock_band_general_helper_vkr/, out of scope per the TODO above.
@@ -36,7 +36,7 @@ GUITAR_TUNINGS = {
 -- Raw semitone interval (NOT mod-12 -- an octave must stay distinct from a
 -- unison) -> name + suggested RB width + specific lane-combo options.
 -- width/options use the same letter names as GEM_LETTERS in
--- rock_band_general_helper_vkr/actions_guitar.lua (G/R/Y/B/O) and line up
+-- rock_band_instrument_helper_vkr/actions_guitar.lua (G/R/Y/B/O) and line up
 -- with ChordTypeName's spread groups there: spread 1={GR,RY,YB,BO},
 -- spread 2={GY,RB,YO}, spread 3={GB,RO}, spread 4={GO}.
 GUITAR_DYAD_INTERVALS = {
@@ -254,7 +254,7 @@ end
 -- major, "3 2 0 0 0 3" is G major -- and it is what every chord chart,
 -- chord dictionary, and Guitar Pro diagram uses. (Multi-line ASCII tab is
 -- the other way up, high e on the top row; ParseTabVertical in
--- rock_band_general_helper_vkr/actions_guitar_guide.lua handles that form
+-- rock_band_instrument_helper_vkr/actions_guitar_guide.lua handles that form
 -- and is deliberately NOT reversed. The two notations genuinely run in
 -- opposite directions.)
 --
@@ -267,7 +267,7 @@ end
 --     string 7 - i -- token 1 the low E, token 6 the high e. Fret number or
 --     any non-numeric token (e.g. 'x') for muted, edge or interior, no
 --     reinterpretation. Same per-line convention as ParseTabHorizontal in
---     rock_band_general_helper_vkr/actions_guitar_guide.lua, so a line
+--     rock_band_instrument_helper_vkr/actions_guitar_guide.lua, so a line
 --     copy-pasted between the two tools behaves identically. This is the
 --     only way to reach a shape anchored above the lowest strings.
 --   Compact form (1-5 tokens): edge mutes are optional noise and are

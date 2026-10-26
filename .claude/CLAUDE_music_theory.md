@@ -97,7 +97,7 @@ its own `lib/` file (see `lib/reaper_guitar_theory.lua`,
 `lib/reaper_music_notation.lua`), not the module folder — it keeps the
 function pure (no `r`/`ctx`/`S`), testable standalone, and reusable by other
 scripts later (the Guitar tab's classifier is intentionally reusable by
-`rock_band_general_helper_vkr`'s Guitar-tab converters in a future task).
+`rock_band_instrument_helper_vkr`'s Guitar-tab converters in a future task).
 
 **And unless the tab is big enough to want its own file.** Piano got
 `ui_piano.lua` rather than a fourth render function in `ui.lua`: the tab was
@@ -204,7 +204,7 @@ No new `S` state fields for playback — every tab reuses the existing `S.previe
 
 Reads written staff notation and reports which keys to press. Set a clef per staff and a key signature, click the staff wherever a note head is printed, and the tab gives back spelled note names, MIDI numbers, a highlighted keyboard, and block-chord playback.
 
-Read-only like the rest of the script — it does not write MIDI. Project-mutating keyboard work belongs in the general helper's Keys tab (`actions_keys.lua`).
+Read-only like the rest of the script — it does not write MIDI. Project-mutating keyboard work belongs in the instrument helper's Keys tab (`actions_keys.lua`).
 
 ### The model lives in `lib/`, not `defaults.lua`
 

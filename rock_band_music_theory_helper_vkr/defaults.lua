@@ -373,7 +373,7 @@ GUITAR_CHORD_TYPES = {
 
 -- ---------------------------------------------------------------------------
 -- RB lane-combo terminology: letter names (G/R/Y/B/O, matching GEM_LETTERS in
--- rock_band_general_helper_vkr/actions_guitar.lua) for each spread width.
+-- rock_band_instrument_helper_vkr/actions_guitar.lua) for each spread width.
 -- ---------------------------------------------------------------------------
 GUITAR_LANE_TERMS = {
     { width = '1-2',    combos = 'GR, RY, YB, BO' },

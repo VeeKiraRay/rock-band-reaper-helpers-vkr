@@ -1,17 +1,22 @@
 -- @description Rock Band MIDI Pattern
 -- @author VeeKiraRay
--- @version 0.3
+-- @version 0.4
 -- @about
---   Standalone window for the MIDI > Pattern sub-tab of the Rock Band General
---   Helper. Capture a note pattern from a time selection, then find, replace,
---   tile or step through every recurrence of it on a MIDI track.
+--   Standalone window for the MIDI > Pattern sub-tab of the Rock Band
+--   Instrument Helper. Capture a note pattern from a time selection, then
+--   find, replace, tile or step through every recurrence of it on a MIDI track.
 --
---   The sub-tab remains available inside the general helper; this entry point
---   offers the same UI in its own window so it can sit beside REAPER's MIDI
---   editor without the helper's other tabs coming along.
+--   The sub-tab remains available inside the instrument helper; this entry
+--   point offers the same UI in its own window so it can sit beside REAPER's
+--   MIDI editor without the helper's other tabs coming along.
 --
 --   Built with Claude (Anthropic) - https://claude.ai
 --
+--   v0.4
+--     - No change to what this window does. The MIDI tab moved from the
+--       General Helper to the new Instrument Helper (v0.1, with General
+--       Helper v0.9.63), so this window now loads its files from there:
+--       install the Instrument Helper alongside it.
 --   v0.3
 --     - No change to this window. It loads the general helper's defaults file,
 --       which gained the new Overdrive tab's settings in general helper v0.9.60;
@@ -55,28 +60,28 @@ end
 ctx = r.ImGui_CreateContext('Rock Band MIDI Pattern')  -- global
 
 -- This entry point has no module folder of its own: it deliberately loads
--- the general helper's modules (rock_band_general_helper_vkr/) so the pattern
--- implementation is shared, not duplicated. Exception to the
+-- the instrument helper's modules (rock_band_instrument_helper_vkr/) so the
+-- pattern implementation is shared, not duplicated. Exception to the
 -- "folder named after the script" rule.
 --
--- Note the general helper's ui.lua is NOT in the list and must never be added:
--- its last line is a bare r.defer(Loop), which would spawn the full helper
--- window. Everything this window draws lives in ui_common.lua and
--- ui_midi_pattern.lua instead.
+-- Note the instrument helper's ui.lua is NOT in the list and must never be
+-- added: its last line is a bare r.defer(Loop), which would spawn the full
+-- helper window. Everything this window draws lives in lib/reaper_helper_ui.lua
+-- and ui_midi_pattern.lua instead.
 --
 -- SCRIPT_DIR / SCRIPT_MDIR are not set: nothing in this subset reads them
 -- (venue_sprites.lua is what forces the Venue Preview standalone to set them).
 local _script = ({reaper.get_action_context()})[2]
 local _dir    = _script:match('^(.+[\\/])')
-local _mdir   = _dir .. 'rock_band_general_helper_vkr/'
+local _mdir   = _dir .. 'rock_band_instrument_helper_vkr/'
 
 local _files = {
     _dir  .. 'lib/reaper_imgui_helpers.lua',
+    _dir  .. 'lib/reaper_helper_common.lua',
+    _dir  .. 'lib/reaper_helper_ui.lua',
     _dir  .. 'lib/reaper_midi_helpers.lua',
     _mdir .. 'defaults.lua',
-    _mdir .. 'helpers.lua',
     _mdir .. 'actions_midi_replace.lua',
-    _mdir .. 'ui_common.lua',
     _mdir .. 'ui_midi_pattern.lua',
 }
 
@@ -85,7 +90,7 @@ for _, _f in ipairs(_files) do
         r.ShowMessageBox(
             'A required file is missing:\n\n  ' .. _f:sub(#_dir + 1) ..
             '\n\nPlease reinstall the script (this window needs the\n' ..
-            'Rock Band General Helper files to be installed too).',
+            'Rock Band Instrument Helper files to be installed too).',
             'Missing file', 0)
         return
     end

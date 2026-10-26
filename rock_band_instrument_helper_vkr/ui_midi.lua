@@ -2,7 +2,7 @@
 --
 -- The MIDI > Pattern sub-tab's body lives in ui_midi_pattern.lua, because the
 -- standalone rock_band_midi_pattern_vkr.lua window draws it too; this file only
--- wraps it in a tab item. MidiEditorTrackWarning moved to ui_common.lua for the
+-- wraps it in a tab item. MidiEditorTrackWarning moved to lib/reaper_helper_ui.lua for the
 -- same reason (Pattern and Length both call it).
 
 -- MIDI > Length > Midi note: Difficulty dropdown options (S.mn_diff_idx).

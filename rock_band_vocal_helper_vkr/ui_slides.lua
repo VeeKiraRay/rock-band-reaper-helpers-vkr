@@ -1,4 +1,4 @@
-﻿-- Pitch slide tab rendering
+﻿-- Pitch > Slide sub-tab rendering (the Pitch slide main tab before v1.21)
 
 function DrawPitchSlideTab(ctx)
     r.ImGui_Spacing(ctx)

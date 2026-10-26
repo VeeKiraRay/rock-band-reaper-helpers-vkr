@@ -4,8 +4,9 @@ local _browse_tooltip_suppressed = false
 local _active_proj = r.EnumProjects(-1, '')
 local _active_tab  = ''
 
--- FilteredTrackCombo, YINPresetCombo and DrawStatusResultPanel now live in
--- ui_common.lua - they are shared with the standalone rock_band_pitch_tuner_vkr.lua.
+-- YINPresetCombo lives in ui_common.lua (shared with the standalone
+-- rock_band_pitch_tuner_vkr.lua); TrackCombo and DrawStatusResultPanel in
+-- lib/reaper_helper_ui.lua (shared with every helper).
 
 function Loop()
     -- Detect project switch (tabs). Reinitialize if the active project changed.
@@ -48,7 +49,6 @@ function Loop()
     if not S.all_track_list then RefreshTrackLists() end
     local midi_tracks  = S.midi_track_list
     local audio_tracks = S.audio_track_list
-    local sel_s, sel_e = GetTimeSelection()
 
     r.ImGui_SetNextWindowSize(ctx, 580, 1060, r.ImGui_Cond_FirstUseEver())
     local visible, open = r.ImGui_Begin(ctx, WINDOW_TITLE, true)
@@ -58,24 +58,19 @@ function Loop()
         ----------------------------------------------------------------
         r.ImGui_Text(ctx, 'MIDI destination track  (must already contain a MIDI item)')
         r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
-        S.midi_idx = FilteredTrackCombo('##midi', S.midi_idx, midi_tracks)
+        S.midi_idx = TrackCombo('##midi', S.midi_idx, midi_tracks)
 
         r.ImGui_Spacing(ctx)
         r.ImGui_Text(ctx, 'Audio source track')
         r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
-        S.audio_idx = FilteredTrackCombo('##audio', S.audio_idx, audio_tracks)
-
-        if sel_s then
-            r.ImGui_Spacing(ctx)
-            r.ImGui_Text(ctx, ('Time selection: %s - %s'):format(FormatTime(sel_s), FormatTime(sel_e)))
-        end
+        S.audio_idx = TrackCombo('##audio', S.audio_idx, audio_tracks)
 
         r.ImGui_Separator(ctx)
 
         ----------------------------------------------------------------
         -- Tab bar
         ----------------------------------------------------------------
-        S.tuner_tab_active = false   -- reset; set true below if Tuner tab is active
+        S.tuner_tab_active = false   -- reset; DrawPitchTab sets it while Pitch > Tuner is open
         local _new_tab = ''
         if r.ImGui_BeginTabBar(ctx, 'MainTabs') then
 
@@ -154,16 +149,6 @@ function Loop()
                     r.ImGui_EndTabBar(ctx)
                 end
 
-                r.ImGui_EndTabItem(ctx)
-            end
-
-            ------------------------------------------------------------
-            -- Tab: Tuner
-            ------------------------------------------------------------
-            if r.ImGui_BeginTabItem(ctx, 'Tuner') then
-                S.tuner_tab_active = true
-                _new_tab = 'Tuner'
-                DrawTunerTab()
                 r.ImGui_EndTabItem(ctx)
             end
 
@@ -265,15 +250,6 @@ function Loop()
                 if assign_disabled then r.ImGui_EndDisabled(ctx) end
                 Tooltip(TIPS.create_phrases)
 
-                r.ImGui_EndTabItem(ctx)
-            end
-
-            ------------------------------------------------------------
-            -- Tab: Pitch slide
-            ------------------------------------------------------------
-            if r.ImGui_BeginTabItem(ctx, 'Pitch slide') then
-                _new_tab = 'Pitch slide'
-                DrawPitchSlideTab(ctx)
                 r.ImGui_EndTabItem(ctx)
             end
 
