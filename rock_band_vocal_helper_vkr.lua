@@ -25,9 +25,24 @@
 --     - The time selection is shown in the status panel at the bottom of the
 --       window, as in the other helpers, instead of under the track
 --       dropdowns.
---     - The track dropdowns, status panel, Refresh tracks and error handling
---       now share their code with the General and Instrument helpers, so a
---       fix to one reaches all of them.
+--     - The track dropdowns, status panel and error handling now share their
+--       code with the General and Instrument helpers, so a fix to one reaches
+--       all of them.
+--     - New footer, always at the bottom of the window: the time selection,
+--       the status line, Copy result (the status and result to the clipboard)
+--       and Undo. The tabs scroll above it, so on a short window these no
+--       longer scroll out of sight. The track dropdowns now update on their
+--       own: adding, renaming or deleting a track, or adding an item to one,
+--       shows up within about a second. The Refresh tracks button is gone.
+--       General > Actions, which held only that button, is gone.
+--     - The MIDI destination / Audio source bar above the tabs is gone. Each
+--       view shows only the track it uses - Lyrics, Validation and Pitch >
+--       Snap the MIDI track, Pitch > Tuner the audio track, Pitch > Slide and
+--       Placement - Built-in both - and a track picked in one view is picked
+--       in all of them. Harmonies keeps its own track rows.
+--     - Harmonies: the Target track dropdowns list only MIDI tracks, like
+--       Source. They listed every track, so an audio track could be picked
+--       and the run then stopped with "No MIDI item on destination".
 --   v1.20
 --     - The window title now carries the script version - "Rock Band Vocal
 --       Helper v1.20". A bug report that quotes the title says which version

@@ -355,21 +355,21 @@ local function Loop()
         if r.ImGui_BeginTabBar(ctx, '##tabs') then
             if r.ImGui_BeginTabItem(ctx, 'Drums') then
                 r.ImGui_Spacing(ctx)
-                r.ImGui_BeginChild(ctx, '##drums_scroll', 0, 0, r.ImGui_ChildFlags_None(), r.ImGui_WindowFlags_None())
+                BeginScrollBody('##drums_scroll', 0)
                 DrawDrumsTab()
                 r.ImGui_EndChild(ctx)
                 r.ImGui_EndTabItem(ctx)
             end
             if r.ImGui_BeginTabItem(ctx, 'Guitar') then
                 r.ImGui_Spacing(ctx)
-                r.ImGui_BeginChild(ctx, '##guitar_scroll', 0, 0, r.ImGui_ChildFlags_None(), r.ImGui_WindowFlags_None())
+                BeginScrollBody('##guitar_scroll', 0)
                 DrawGuitarTab()
                 r.ImGui_EndChild(ctx)
                 r.ImGui_EndTabItem(ctx)
             end
             if r.ImGui_BeginTabItem(ctx, 'Piano') then
                 r.ImGui_Spacing(ctx)
-                r.ImGui_BeginChild(ctx, '##piano_scroll', 0, 0, r.ImGui_ChildFlags_None(), r.ImGui_WindowFlags_None())
+                BeginScrollBody('##piano_scroll', 0)
                 DrawPianoTab()
                 r.ImGui_EndChild(ctx)
                 r.ImGui_EndTabItem(ctx)

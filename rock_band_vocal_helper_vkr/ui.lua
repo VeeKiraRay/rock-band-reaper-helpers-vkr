@@ -4,9 +4,16 @@ local _browse_tooltip_suppressed = false
 local _active_proj = r.EnumProjects(-1, '')
 local _active_tab  = ''
 
--- YINPresetCombo lives in ui_common.lua (shared with the standalone
--- rock_band_pitch_tuner_vkr.lua); TrackCombo and DrawStatusResultPanel in
--- lib/reaper_helper_ui.lua (shared with every helper).
+-- Track lists rebuild themselves after a project edit (at most once a second,
+-- 5 s safety re-read) - lib/reaper_helper_common.lua, MakeProjectPoll.
+local _track_poll = MakeProjectPoll(1.0, 5.0)
+
+-- Footer parts this window shows (lib/reaper_helper_ui.lua, DrawHelperFooter).
+local FOOTER = {}
+
+-- YINPresetCombo and DrawVocalTrackSelectors live in ui_common.lua (shared
+-- with the standalone rock_band_pitch_tuner_vkr.lua); TrackCombo and the
+-- footer (DrawResultPanel, DrawHelperFooter) in lib/reaper_helper_ui.lua.
 
 function Loop()
     -- Detect project switch (tabs). Reinitialize if the active project changed.
@@ -46,33 +53,24 @@ function Loop()
     RunTuner()
 
     -- Build cached filtered lists on first frame if not yet populated.
-    if not S.all_track_list then RefreshTrackLists() end
-    local midi_tracks  = S.midi_track_list
-    local audio_tracks = S.audio_track_list
+    -- Poll first, so the first frame builds the lists once, not twice.
+    local tracks_due = _track_poll()
+    if tracks_due or not S.all_track_list then RefreshTrackLists() end
 
     r.ImGui_SetNextWindowSize(ctx, 580, 1060, r.ImGui_Cond_FirstUseEver())
     local visible, open = r.ImGui_Begin(ctx, WINDOW_TITLE, true)
     if visible then
-        ----------------------------------------------------------------
-        -- Global: track selectors (MIDI first, then audio source)
-        ----------------------------------------------------------------
-        r.ImGui_Text(ctx, 'MIDI destination track  (must already contain a MIDI item)')
-        r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
-        S.midi_idx = TrackCombo('##midi', S.midi_idx, midi_tracks)
-
-        r.ImGui_Spacing(ctx)
-        r.ImGui_Text(ctx, 'Audio source track')
-        r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
-        S.audio_idx = TrackCombo('##audio', S.audio_idx, audio_tracks)
-
-        r.ImGui_Separator(ctx)
+        -- Each view draws the track selector(s) it needs (DrawVocalTrackSelectors,
+        -- ui_common.lua); there is no global track bar.
 
         ----------------------------------------------------------------
         -- Tab bar
         ----------------------------------------------------------------
         S.tuner_tab_active = false   -- reset; DrawPitchTab sets it while Pitch > Tuner is open
         local _new_tab = ''
-        if r.ImGui_BeginTabBar(ctx, 'MainTabs') then
+        -- The view scrolls inside this child; the footer below it never moves.
+        local body_visible = BeginScrollBody('##body', -HelperFooterHeight(FOOTER))
+        if body_visible and r.ImGui_BeginTabBar(ctx, 'MainTabs') then
 
             ------------------------------------------------------------
             -- Tab: General
@@ -81,20 +79,6 @@ function Loop()
                 _new_tab = 'General'
 
                 if r.ImGui_BeginTabBar(ctx, '##general_subtabs') then
-
-                    ------------------------------------------------
-                    -- General > Actions sub-tab
-                    ------------------------------------------------
-                    if r.ImGui_BeginTabItem(ctx, 'Actions') then
-                        SectionHeader('Track lists')
-                        if Btn('Refresh tracks', BTN_H) then
-                            RefreshTrackLists()
-                            S.status = 'Track lists refreshed.'
-                        end
-                        Tooltip(TIPS.track_refresh)
-
-                        r.ImGui_EndTabItem(ctx)
-                    end
 
                     ------------------------------------------------
                     -- General > Settings sub-tab
@@ -166,7 +150,7 @@ function Loop()
             ------------------------------------------------------------
             if r.ImGui_BeginTabItem(ctx, 'Lyrics') then
                 _new_tab = 'Lyrics'
-                r.ImGui_Spacing(ctx)
+                DrawVocalTrackSelectors({ midi = true })
 
                 SectionHeader('File')
                 local lyric_basename = S.lyrics_path ~= ''
@@ -267,7 +251,7 @@ function Loop()
             ------------------------------------------------------------
             if r.ImGui_BeginTabItem(ctx, 'Validation') then
                 _new_tab = 'Validation'
-                r.ImGui_Spacing(ctx)
+                DrawVocalTrackSelectors({ midi = true })
                 r.ImGui_Text(ctx, 'Phrase validation')
                 r.ImGui_Spacing(ctx)
                 if Btn('Validate phrases', BTN_H) then
@@ -311,7 +295,7 @@ function Loop()
             ------------------------------------------------------------
             if S.show_wip_tabs and r.ImGui_BeginTabItem(ctx, 'Note Placement') then
                 _new_tab = 'Note Placement'
-                r.ImGui_Spacing(ctx)
+                DrawVocalTrackSelectors({ midi = true, audio = true })
                 local _
                 if r.ImGui_BeginTabBar(ctx, '##placement_subtabs') then
 
@@ -430,10 +414,13 @@ function Loop()
             _active_tab = _new_tab
         end
 
+        if body_visible then DrawResultPanel() end
+        r.ImGui_EndChild(ctx)   -- always paired with BeginScrollBody
+
         ----------------------------------------------------------------
-        -- Global: status and result panel
+        -- Footer: time selection, status, Refresh / Copy / Undo
         ----------------------------------------------------------------
-        DrawStatusResultPanel(true)
+        DrawHelperFooter(FOOTER)   -- lib/reaper_helper_ui.lua
 
         r.ImGui_End(ctx)
     end

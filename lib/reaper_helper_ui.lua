@@ -5,7 +5,7 @@
 -- r.defer(Loop) that would spawn that helper's whole window.
 --
 -- Requires globals: r, ctx, S, Btn, BtnWidth, Tooltip, BTN_H, FormatTime,
---                   GetTimeSelection (lib/reaper_imgui_helpers.lua - load first)
+--                   GetTimeSelection (lib/reaper_imgui_helpers.lua - load first).
 
 -- Track dropdown: stores and matches by REAPER track index (t.idx, from
 -- RefreshTrackLists), so a selection survives the filtered lists being rebuilt.
@@ -54,31 +54,124 @@ function MidiEditorTrackWarning(track_idx)
     end
 end
 
--- Bottom-of-window time selection readout, status line, and the wrapped
--- multi-line result panel. Always visible below whatever the caller drew.
--- show_undo: draw the right-aligned Undo button. Both current callers pass
--- true - the main helper and the standalone both make project edits - but the
--- flag is kept so a read-only window can suppress it, as the vocal helper's
--- standalone tuner does.
+------------------------------------------------------------------
+-- Result panel + window footer
 --
--- A result line containing a tab is rendered as two columns (SameLine at 190);
--- several reports in this script are written that way.
-function DrawStatusResultPanel(show_undo)
-    local sel_s, sel_e = GetTimeSelection()
+-- Layout every window uses (see CLAUDE.md, "Window footer"):
+--
+--   if BeginScrollBody('##body', -HelperFooterHeight(opts)) then
+--       ... tabs / view ...
+--       DrawResultPanel()
+--   end
+--   r.ImGui_EndChild(ctx)
+--   DrawHelperFooter(opts)
+--
+-- The view scrolls inside the child; the footer is drawn after it and never
+-- moves. opts switch each footer part on or off - a part that is off is not
+-- drawn and takes no height, so HelperFooterHeight and DrawHelperFooter must be
+-- given the same opts:
+--   status  - time selection + status line          (reads S.status)
+--   copy    - Copy result button                    (reads S.status / S.last_result)
+--   undo    - right-aligned Undo button
+-- Each part defaults to on; a window passes false for what it does not need.
+-- Tooltip strings live here, not in a script's TIPS (CLAUDE.md, Tooltips).
+------------------------------------------------------------------
 
-    r.ImGui_Separator(ctx)
-    if sel_s then
-        r.ImGui_Text(ctx, ('Time selection: %s - %s'):format(FormatTime(sel_s), FormatTime(sel_e)))
-    else
-        r.ImGui_TextDisabled(ctx, 'No time selection')
+local TIP_COPY    = 'Copy the status line and the result panel to the clipboard.'
+
+-- Pure (no r / ctx / S): the text Copy result puts on the clipboard, or nil
+-- when there is nothing beyond the status line worth copying.
+function HelperCopyText(status, result)
+    if not result or result == '' then return nil end
+    if status and status ~= '' then return status .. '\n\n' .. result end
+    return result
+end
+
+local function On(opts, name)
+    return opts == nil or opts[name] ~= false
+end
+
+local function HasButtonRow(opts)
+    return On(opts, 'copy') or On(opts, 'undo')
+end
+
+-- Height to reserve below the scroll body for DrawHelperFooter(opts).
+function HelperFooterHeight(opts)
+    local item_sp_y = select(2, r.ImGui_GetStyleVar(ctx, r.ImGui_StyleVar_ItemSpacing()))
+    local h = item_sp_y                                       -- the separator
+    if On(opts, 'status') then
+        h = h + 2 * r.ImGui_GetTextLineHeightWithSpacing(ctx)
     end
-    r.ImGui_Spacing(ctx)
-    r.ImGui_Text(ctx, S.status)
-    if show_undo then
-        r.ImGui_SameLine(ctx)
+    if HasButtonRow(opts) then
+        -- Buttons are BTN_H tall, which can exceed the style's frame height.
+        local frame_h = r.ImGui_GetFrameHeight and r.ImGui_GetFrameHeight(ctx) or BTN_H
+        h = h + math.max(BTN_H, frame_h) + item_sp_y
+    end
+    return h
+end
+
+-- The result of the last action (S.last_result), wrapped. A line containing a
+-- tab is drawn as two columns (SameLine at 190); several reports use that.
+-- Drawn at the end of the scroll body, under the view.
+function DrawResultPanel()
+    if not S.last_result then return end
+    r.ImGui_Separator(ctx)
+    r.ImGui_PushTextWrapPos(ctx, 0)
+    for line in (S.last_result .. '\n'):gmatch('([^\n]*)\n') do
+        if line ~= '' then
+            local left, right = line:match('^([^\t]*)\t(.*)$')
+            if left then
+                r.ImGui_Text(ctx, left)
+                r.ImGui_SameLine(ctx, 190)
+                r.ImGui_Text(ctx, right)
+            else
+                r.ImGui_Text(ctx, line)
+            end
+        else
+            r.ImGui_Spacing(ctx)
+        end
+    end
+    r.ImGui_PopTextWrapPos(ctx)
+end
+
+-- The always-visible footer. See the block comment above for opts.
+function DrawHelperFooter(opts)
+    r.ImGui_Separator(ctx)
+
+    if On(opts, 'status') then
+        local sel_s, sel_e = GetTimeSelection()
+        if sel_s then
+            r.ImGui_Text(ctx, ('Time selection: %s - %s'):format(FormatTime(sel_s), FormatTime(sel_e)))
+        else
+            r.ImGui_TextDisabled(ctx, 'No time selection')
+        end
+        r.ImGui_Text(ctx, S.status or '')
+    end
+
+    if not HasButtonRow(opts) then return end
+    local first = true
+    local function Next()
+        if not first then r.ImGui_SameLine(ctx) end
+        first = false
+    end
+
+    if On(opts, 'copy') then
+        Next()
+        local text = HelperCopyText(S.status, S.last_result)   -- snapshot: drives the disabled pair
+        if not text then r.ImGui_BeginDisabled(ctx) end
+        if Btn('Copy result', BTN_H) then
+            r.ImGui_SetClipboardText(ctx, text)
+            S.status = 'Result copied to the clipboard.'
+        end
+        if not text then r.ImGui_EndDisabled(ctx) end
+        Tooltip(TIP_COPY)
+    end
+
+    if On(opts, 'undo') then
+        Next()
         local bw_und   = BtnWidth('Undo')
         local undo_str = r.Undo_CanUndo2(0) or ''
-        local can_undo = undo_str ~= ''
+        local can_undo = undo_str ~= ''   -- snapshot: drives the disabled pair
         local avail_x  = r.ImGui_GetContentRegionAvail(ctx)
         if avail_x > bw_und + 4 then
             r.ImGui_SetCursorPosX(ctx, r.ImGui_GetCursorPosX(ctx) + (avail_x - bw_und))
@@ -88,23 +181,5 @@ function DrawStatusResultPanel(show_undo)
         if not can_undo then r.ImGui_EndDisabled(ctx) end
         if can_undo then Tooltip('Undo: ' .. undo_str) end
     end
-    if S.last_result then
-        r.ImGui_Separator(ctx)
-        r.ImGui_PushTextWrapPos(ctx, 0)
-        for line in (S.last_result .. '\n'):gmatch('([^\n]*)\n') do
-            if line ~= '' then
-                local left, right = line:match('^([^\t]*)\t(.*)$')
-                if left then
-                    r.ImGui_Text(ctx, left)
-                    r.ImGui_SameLine(ctx, 190)
-                    r.ImGui_Text(ctx, right)
-                else
-                    r.ImGui_Text(ctx, line)
-                end
-            else
-                r.ImGui_Spacing(ctx)
-            end
-        end
-        r.ImGui_PopTextWrapPos(ctx)
-    end
 end
+

@@ -87,7 +87,10 @@ so do not go looking for them there.
 
 1. Add content tables to `defaults.lua` following the existing naming pattern (e.g., `GUITAR_CHORDS`, `GUITAR_LANE_TERMS`).
 2. Add a `local function DrawGuitarTab()` in `ui.lua` that loops over those tables.
-3. Add a `BeginTabItem('Guitar')` block inside the `BeginTabBar` in `Loop`, calling `DrawGuitarTab()`.
+3. Add a `BeginTabItem('Guitar')` block inside the `BeginTabBar` in `Loop`, calling `DrawGuitarTab()`
+   inside `BeginScrollBody('##guitar_scroll', 0)` … `r.ImGui_EndChild(ctx)`, like the other
+   tabs. Use `BeginScrollBody`, never a bare `ImGui_BeginChild`: its 5th argument changed
+   type in ReaImGui 0.9.
 
 No other files need changing — **unless** the tab needs reusable classification
 logic rather than plain lookup data (Drums is pure lookup; Guitar's shape

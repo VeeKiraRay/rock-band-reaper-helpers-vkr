@@ -17,6 +17,11 @@
 --       General Helper to the new Instrument Helper (v0.1, with General
 --       Helper v0.9.63), so this window now loads its files from there:
 --       install the Instrument Helper alongside it.
+--     - New footer at the bottom of the window, as in the helpers: time
+--       selection, status line, Copy result and Undo. The pattern tools
+--       scroll above it. The source track dropdown updates on its own when
+--       tracks or items are added (within about a second), so the Refresh
+--       tracks button is gone.
 --   v0.3
 --     - No change to this window. It loads the general helper's defaults file,
 --       which gained the new Overdrive tab's settings in general helper v0.9.60;
@@ -105,12 +110,19 @@ end
 -- See ScriptWindowTitle.
 local _title = ScriptWindowTitle('Rock Band MIDI Pattern', _script)
 
+-- Footer parts (lib/reaper_helper_ui.lua): all of them (see DrawHelperFooter).
+local FOOTER = {}
+
 -- No LoadSettings() / SetDefault*Tracks() here, unlike the other two standalone
 -- windows: the Pattern sub-tab has never persisted anything (its S.mr_* fields
 -- are marked session-only in defaults.lua, and settings.lua has no key for
 -- them), and no SetDefault* function assigns its source track. Nothing to load.
 
 local _active_proj = r.EnumProjects(-1, '')
+
+-- Track lists rebuild themselves after a project edit (at most once a second,
+-- 5 s safety re-read) - lib/reaper_helper_common.lua, MakeProjectPoll.
+local _track_poll = MakeProjectPoll(1.0, 5.0)
 
 local function Loop()
     -- Project switch: drop the cached track lists and the captured patterns.
@@ -128,25 +140,21 @@ local function Loop()
         S.status = 'Project switched.'
     end
 
-    -- Build the cached filtered lists on first frame if not yet populated.
-    if not S.all_track_list then RefreshTrackLists() end
+    -- Poll first, so the first frame builds the lists once, not twice.
+    local tracks_due = _track_poll()
+    if tracks_due or not S.all_track_list then RefreshTrackLists() end
 
     r.ImGui_SetNextWindowSize(ctx, 560, 540, r.ImGui_Cond_FirstUseEver())
     local visible, open = r.ImGui_Begin(ctx, _title, true)
     if visible then
-        -- The general helper keeps this button in General > Actions, which this
-        -- window has no equivalent of. The source-track dropdown is not
-        -- duplicated here - it belongs to DrawMIDIPatternTab.
-        if Btn('Refresh tracks', BTN_H) then
-            RefreshTrackLists()
-            S.status = 'Track lists refreshed.'
+        -- The view scrolls inside this child; the footer below it never moves.
+        -- The source-track dropdown belongs to DrawMIDIPatternTab.
+        if BeginScrollBody('##body', -HelperFooterHeight(FOOTER)) then
+            DrawMIDIPatternTab()
+            DrawResultPanel()
         end
-        Tooltip(TIPS.track_refresh)
-
-        r.ImGui_Separator(ctx)
-
-        DrawMIDIPatternTab()
-        DrawStatusResultPanel(true)   -- true: Replace All / Fill Range write MIDI
+        r.ImGui_EndChild(ctx)   -- always paired with BeginScrollBody
+        DrawHelperFooter(FOOTER)   -- Undo on: Replace All / Fill Range write MIDI
 
         r.ImGui_End(ctx)
     end

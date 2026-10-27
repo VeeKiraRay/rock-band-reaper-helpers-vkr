@@ -21,6 +21,7 @@ function DrawPitchTab(ctx)
         if r.ImGui_BeginTabItem(ctx, 'Tuner') then
             -- RunTuner stops a running tuner on the first frame this is not set.
             S.tuner_tab_active = true
+            DrawVocalTrackSelectors({ audio = true })
             DrawTunerTab()
             r.ImGui_EndTabItem(ctx)
         end
@@ -29,7 +30,7 @@ function DrawPitchTab(ctx)
         -- Sub-tab: Snap
         ------------------------------------------------
         if r.ImGui_BeginTabItem(ctx, 'Snap') then
-            r.ImGui_Spacing(ctx)
+            DrawVocalTrackSelectors({ midi = true })
             SectionHeader('Snap to Key Scale')
 
             local lbl_col_key = LabelColWidth({ 'Key' })
@@ -84,6 +85,7 @@ function DrawPitchTab(ctx)
         -- Sub-tab: Slide (ui_slides.lua)
         ------------------------------------------------
         if r.ImGui_BeginTabItem(ctx, 'Slide') then
+            DrawVocalTrackSelectors({ midi = true, audio = true })
             DrawPitchSlideTab(ctx)
             r.ImGui_EndTabItem(ctx)
         end
@@ -93,7 +95,7 @@ function DrawPitchTab(ctx)
         ------------------------------------------------
         if r.ImGui_BeginTabItem(ctx, 'Placement - Built-in') then
             S.pitch_mode = MODE_YIN
-            r.ImGui_Spacing(ctx)
+            DrawVocalTrackSelectors({ midi = true, audio = true })
             SectionHeader('Pitch', 'Reset##pitch', ResetPitch, TIPS.reset_pitch)
 
             local lbl_col_bi = LabelColWidth({
@@ -200,10 +202,11 @@ function DrawPitchTab(ctx)
         ------------------------------------------------
         if r.ImGui_BeginTabItem(ctx, 'Placement - Reference') then
             S.pitch_mode = MODE_REFERENCE
-            r.ImGui_Spacing(ctx)
+            local lbl_col_ref = LabelColWidth({
+                'MIDI destination', 'Reference MIDI track', 'Search tolerance (ms)',
+            })
+            DrawVocalTrackSelectors({ midi = true }, lbl_col_ref)
             SectionHeader('Reference MIDI')
-
-            local lbl_col_ref = LabelColWidth({ 'Reference MIDI track', 'Search tolerance (ms)' })
 
             r.ImGui_Text(ctx, 'Reference MIDI track')
             r.ImGui_SameLine(ctx, lbl_col_ref)

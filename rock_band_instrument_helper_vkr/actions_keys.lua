@@ -110,7 +110,7 @@ function SplitHands()
 
     local src_tr = r.GetTrack(0, S.mc_keys_src_idx)
     if not src_tr then
-        S.status = 'Error: source track no longer exists - refresh tracks.'
+        S.status = 'Error: source track no longer exists - pick the track again.'
         S.last_result = nil
         return
     end
@@ -199,7 +199,7 @@ function ConvertProKeys()
 
     local src_tr = r.GetTrack(0, S.mc_keys_pk_src_idx)
     if not src_tr then
-        S.status = 'Error: source track no longer exists - refresh tracks.'
+        S.status = 'Error: source track no longer exists - pick the track again.'
         S.last_result = nil
         return
     end
@@ -286,7 +286,7 @@ function ConvertPianoToProKeys()
 
     local src_tr = r.GetTrack(0, S.mc_keys_src_idx)
     if not src_tr then
-        S.status = 'Error: source track no longer exists - refresh tracks.'
+        S.status = 'Error: source track no longer exists - pick the track again.'
         S.last_result = nil
         return
     end
@@ -462,7 +462,7 @@ function ConvertKeys5()
 
     local src_tr = r.GetTrack(0, S.mc_keys_src_idx)
     if not src_tr then
-        S.status = 'Error: source track no longer exists - refresh tracks.'
+        S.status = 'Error: source track no longer exists - pick the track again.'
         S.last_result = nil
         return
     end

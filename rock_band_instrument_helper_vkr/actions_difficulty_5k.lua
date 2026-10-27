@@ -410,7 +410,7 @@ function ValidateKeys5Diff(diff_label)
     end
     local track = r.GetTrack(0, S.diff_5k_idx)
     if not track then
-        S.status      = 'Error: PART KEYS track no longer exists - refresh tracks.'
+        S.status      = 'Error: PART KEYS track no longer exists - pick the track again.'
         S.last_result = nil
         return
     end
@@ -469,7 +469,7 @@ function ValidateAllKeys5()
     end
     local track = r.GetTrack(0, S.diff_5k_idx)
     if not track then
-        S.status      = 'Error: PART KEYS track no longer exists - refresh tracks.'
+        S.status      = 'Error: PART KEYS track no longer exists - pick the track again.'
         S.last_result = nil
         return
     end
@@ -534,7 +534,7 @@ function CopyKeys5Diff(diff_label, force)
     end
     local track = r.GetTrack(0, S.diff_5k_idx)
     if not track then
-        S.status      = 'Error: PART KEYS track no longer exists - refresh tracks.'
+        S.status      = 'Error: PART KEYS track no longer exists - pick the track again.'
         S.last_result = nil
         return
     end

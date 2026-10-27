@@ -153,7 +153,7 @@ function AdjustMidiNoteLengths()
     end
     local track = r.GetTrack(0, S.mn_midi_idx)
     if not track then
-        S.status = 'Selected track no longer exists - refresh tracks.'; return
+        S.status = 'Selected track no longer exists - pick the track again.'; return
     end
     local item, take = FindFirstMIDIItem(track)
     if not take then

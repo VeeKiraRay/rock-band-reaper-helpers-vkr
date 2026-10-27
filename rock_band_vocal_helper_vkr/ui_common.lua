@@ -3,10 +3,37 @@
 -- here rather than in ui.lua, which cannot be dofile'd by the standalone: its
 -- last line is a bare r.defer(Loop) that would spawn the full helper window.
 -- The track dropdown and the status/result panel are not vocal-specific and
--- live in lib/reaper_helper_ui.lua (TrackCombo, DrawStatusResultPanel).
+-- live in lib/reaper_helper_ui.lua (TrackCombo, the footer).
 --
--- Requires globals: r, ctx, S, TIPS, YIN_PRESETS, ApplyYINPreset,
+-- Requires globals: r, ctx, S, TIPS, YIN_PRESETS, ApplyYINPreset, TrackCombo,
+--                   LabelColWidth, WIDTH_STD,
 --                   Btn, BtnWidth, Tooltip, BTN_H, WIDTH_STD
+
+-- The track selector(s) a view needs, drawn at its top. need = { midi = bool,
+-- audio = bool }. Both write the one shared S.midi_idx / S.audio_idx, so a pick
+-- in one view carries to every view. col: label column; omit it to align with
+-- the other views' selectors, or pass the view's own LabelColWidth when rows
+-- below the selectors line up with them (Placement - Reference).
+function DrawVocalTrackSelectors(need, col)
+    col = col or LabelColWidth({ 'MIDI destination', 'Audio source' })
+    r.ImGui_Spacing(ctx)
+    if need.midi then
+        r.ImGui_Text(ctx, 'MIDI destination')
+        r.ImGui_SameLine(ctx, col)
+        r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
+        S.midi_idx = TrackCombo('##trk_midi', S.midi_idx, S.midi_track_list or {})
+        Tooltip(TIPS.vocal_midi_track)
+    end
+    if need.audio then
+        r.ImGui_Text(ctx, 'Audio source')
+        r.ImGui_SameLine(ctx, col)
+        r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
+        S.audio_idx = TrackCombo('##trk_audio', S.audio_idx, S.audio_track_list or {})
+        Tooltip(TIPS.vocal_audio_track)
+    end
+    r.ImGui_Spacing(ctx)
+    r.ImGui_Separator(ctx)
+end
 
 -- Soft sanity check for instrument presets: warn when the selected tracks
 -- still look vocal-related. Advisory only - never blocks, settings apply

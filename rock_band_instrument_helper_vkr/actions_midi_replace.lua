@@ -79,7 +79,7 @@ end
 
 local function GetTrackAndTake(idx)
     local track = r.GetTrack(0, idx)
-    if not track then return nil, nil, nil, 'Selected track no longer exists - refresh tracks.' end
+    if not track then return nil, nil, nil, 'Selected track no longer exists - pick the track again.' end
     local item, take = FindFirstMIDIItem(track)
     if not take then return nil, nil, nil, 'No MIDI item on source track.' end
     return track, item, take, nil

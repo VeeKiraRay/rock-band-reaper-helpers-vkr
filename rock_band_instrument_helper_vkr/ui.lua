@@ -2,7 +2,7 @@
 -- Requires: S, TIPS, r, ctx (globals)
 -- Requires: all action functions, RefreshTrackLists, Tooltip, SliderTooltip,
 --           SectionHeader, DrawGeneralLinksTab (globals)
--- Requires: TrackCombo, DrawStatusResultPanel (lib/reaper_helper_ui.lua) - they
+-- Requires: TrackCombo, DrawResultPanel, DrawHelperFooter (lib/reaper_helper_ui.lua) - they
 --           live there because the General Helper and the standalone
 --           rock_band_midi_pattern_vkr.lua draw them too, and neither can
 --           dofile this file (its last line is a bare r.defer(Loop)).
@@ -10,6 +10,13 @@
 
 local _active_proj = r.EnumProjects(-1, '')
 local _active_tab  = ''
+
+-- Track lists rebuild themselves after a project edit (at most once a second,
+-- 5 s safety re-read) - lib/reaper_helper_common.lua, MakeProjectPoll.
+local _track_poll = MakeProjectPoll(1.0, 5.0)
+
+-- Footer parts this window shows (lib/reaper_helper_ui.lua, DrawHelperFooter).
+local FOOTER = {}
 
 local function Loop()
     local proj = r.EnumProjects(-1, '')
@@ -55,7 +62,9 @@ local function Loop()
         SetDefaultDifficultyTracks()
     end
 
-    if not S.all_track_list then RefreshTrackLists() end
+    -- Poll first, so the first frame builds the lists once, not twice.
+    local tracks_due = _track_poll()
+    if tracks_due or not S.all_track_list then RefreshTrackLists() end
     local midi_tracks  = S.midi_track_list
 
     r.ImGui_SetNextWindowSize(ctx, 560, 660, r.ImGui_Cond_FirstUseEver())
@@ -63,7 +72,9 @@ local function Loop()
     if visible then
         local _new_tab = ''
 
-        if r.ImGui_BeginTabBar(ctx, '##tabs') then
+        -- The view scrolls inside this child; the footer below it never moves.
+        local body_visible = BeginScrollBody('##body', -HelperFooterHeight(FOOTER))
+        if body_visible and r.ImGui_BeginTabBar(ctx, '##tabs') then
 
             ------------------------------------------------------------
             -- General tab
@@ -77,14 +88,6 @@ local function Loop()
                     -- General > Actions sub-tab
                     ------------------------------------------------
                     if r.ImGui_BeginTabItem(ctx, 'Actions') then
-                        SectionHeader('General actions')
-                        if Btn('Refresh tracks', BTN_H) then
-                            RefreshTrackLists()
-                            S.status = 'Track lists refreshed.'
-                        end
-                        Tooltip(TIPS.track_refresh)
-
-                        r.ImGui_Separator(ctx)
                         SectionHeader('Drums 2x kicks')
                         -- MarkDoubleBassKicks is deliberately NOT drawn here.
                         -- It writes pitch 95, which Rock Band 3 discards, so on an
@@ -348,10 +351,13 @@ local function Loop()
             _active_tab = _new_tab
         end
 
+        if body_visible then DrawResultPanel() end
+        r.ImGui_EndChild(ctx)   -- always paired with BeginScrollBody
+
         ----------------------------------------------------------------
-        -- Time selection info + status panel (always visible below tabs)
+        -- Footer: time selection, status, Refresh / Copy / Undo
         ----------------------------------------------------------------
-        DrawStatusResultPanel(true)   -- lib/reaper_helper_ui.lua
+        DrawHelperFooter(FOOTER)   -- lib/reaper_helper_ui.lua
 
         r.ImGui_End(ctx)
     end

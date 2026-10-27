@@ -97,9 +97,9 @@ Items 1 and 2 are covered by `dev/tests/script_links.lua`, which checks the regi
 
 | File | Contents |
 |---|---|
-| `lib/reaper_imgui_helpers.lua` | `PitchName`, `Tooltip`, `SliderTooltip`, `ScriptWindowTitle`, `Btn`, `BtnWidth`, `BtnGroupWidth`, `LabelColWidth`, `RadioGroupWidth`, `SectionHeader`, `SortedByLabel`, `ComboGroupHeader`, `GetTrackList`, `FormatTime`, `GetTimeSelection` |
-| `lib/reaper_helper_common.lua` | `FindTrackByName`, `TrackAtIndex`, `GetTakePPQPerQN`, `GetTempoContextBefore`, `TrackHasAudio`, `TrackHasMIDI`, `RefreshTrackLists`, `RunAction` — track and action helpers the General, Instrument and Vocal helpers share. Writes the caller's `S` (`*_track_list`, `status`, `last_result`), so each script declares those fields. `RunAction` calls the script's optional global `RunActionErrorCleanup()` after a failed action (the vocal helper closes its open YIN context there) |
-| `lib/reaper_helper_ui.lua` | `TrackCombo`, `MidiEditorTrackWarning`, `DrawStatusResultPanel` — UI every helper and the MIDI Pattern / Pitch Tuner windows draw. `TrackCombo` matches by REAPER track index and offers `(none)` (`-1`): an optional input left unset, or a required one not picked yet — actions resolve indices through `TrackAtIndex` and ask for a track when it returns nil. `DrawStatusResultPanel(show_undo)` draws the live time selection, the status line with Undo, and the result panel (a line with a tab renders as two columns) |
+| `lib/reaper_imgui_helpers.lua` | `PitchName`, `Tooltip`, `SliderTooltip`, `ScriptWindowTitle`, `Btn`, `BtnWidth`, `BtnGroupWidth`, `LabelColWidth`, `RadioGroupWidth`, `SectionHeader`, `SortedByLabel`, `ComboGroupHeader`, `GetTrackList`, `FormatTime`, `GetTimeSelection`, `BeginScrollBody` (BeginChild for both the 0.9 and the 0.7/0.8 signature) |
+| `lib/reaper_helper_common.lua` | `FindTrackByName`, `TrackAtIndex`, `GetTakePPQPerQN`, `GetTempoContextBefore`, `TrackHasAudio`, `TrackHasMIDI`, `RefreshTrackLists`, `RunAction`, `MakeProjectPoll` — track and action helpers the General, Instrument and Vocal helpers share. Writes the caller's `S` (`*_track_list`, `status`, `last_result`), so each script declares those fields. `RunAction` calls the script's optional global `RunActionErrorCleanup()` after a failed action (the vocal helper closes its open YIN context there) |
+| `lib/reaper_helper_ui.lua` | `TrackCombo`, `MidiEditorTrackWarning`, `DrawResultPanel`, `HelperFooterHeight`, `DrawHelperFooter`, `HelperCopyText` — UI every window draws (see "Window footer" below). `TrackCombo` matches by REAPER track index and offers `(none)` (`-1`): an optional input left unset, or a required one not picked yet — actions resolve indices through `TrackAtIndex` and ask for a track when it returns nil. `DrawResultPanel()` draws the last result (a line with a tab renders as two columns) |
 | `lib/reaper_dsp.lua` | `ComputeRMSContour`, `OpenYINContext`, `YINWindowSize`, `ReadMonoWindow`, `QuickRMS`, `ComputeCMND`, `SearchYINTau`, `MedianVote`, `DetectPitchYIN`, `SampleYINAt`, `GateAndSplit`, `ApplyMinOffset` |
 | `lib/reaper_midi_helpers.lua` | `FindMIDIItem`, `FindFirstMIDIItem`, `ReadAllMIDINotesOnTrack`, `ClearNotesAtPitchesInRange`, `InsertNotes`, … |
 | `lib/reaper_guitar_theory.lua` | `GuitarShapeToPitches`, `GuitarNormalizeIntervals`, `GuitarClassifyChordType`, `GuitarSuggestRBMapping`, `GuitarAnalyzeShape`, `GuitarParseFretInput`, `GuitarAnalyzeShapeAllTunings` — pure, no `r`/`ctx`/`S` |
@@ -328,11 +328,63 @@ Before closing work on a UI change, ask:
 - Does it apply to all tabs within a script, or only the one currently being edited?
 
 **Examples of changes that must be kept in sync across all helpers:**
-- Bottom-panel undo button (added to vocal helper → must also appear in general helper, and any future helper).
-- Track-selector pre-filtering (audio-only / MIDI-only lists, `RefreshTrackLists`, "Refresh tracks" button).
+- The window footer (below) — every window draws the one implementation; never a per-script copy.
+- Track-selector pre-filtering (audio-only / MIDI-only lists, `RefreshTrackLists`) and the automatic refresh below.
 - Any new status-bar widget, keyboard shortcut, or window-level affordance.
 
 If a sync to another script is out of scope for the current task, leave a TODO comment in the code and note it in the PR description — do not silently skip it.
+
+### Window footer
+
+Every window with actions (the three helpers, MIDI Pattern, Pitch Tuner) ends the
+same way, from `lib/reaper_helper_ui.lua`:
+
+```lua
+local FOOTER = {}   -- file-level; switch parts off per window, e.g. { undo = false }
+local visible, open = r.ImGui_Begin(ctx, title, true)
+if visible then
+    local body_visible = BeginScrollBody('##body', -HelperFooterHeight(FOOTER))
+    if body_visible then
+        -- tabs / view ...
+        DrawResultPanel()
+    end
+    r.ImGui_EndChild(ctx)          -- always, whatever BeginScrollBody returned
+    DrawHelperFooter(FOOTER)
+    r.ImGui_End(ctx)
+end
+```
+
+- The view scrolls inside the child; the footer is drawn after it and never moves.
+- `FOOTER` parts: `status`, `copy`, `undo` (all on unless set `false`).
+  `HelperFooterHeight` and `DrawHelperFooter` must get the **same** table, so the
+  reserved height matches what is drawn.
+- Scroll regions use `BeginScrollBody` (`lib/reaper_imgui_helpers.lua`), never a bare
+  `ImGui_BeginChild`: its 5th argument changed type in ReaImGui 0.9.
+- **No Always on top.** It was built and removed again: ReaImGui's TopMost flag
+  keeps a window above other REAPER windows only, by design on Windows (and per its
+  source, macOS), and the fix that worked around it was Windows-specific. It waits
+  until it can be verified on macOS and Linux.
+- New actions that belong to every window go in the footer, not a General tab.
+
+### Track lists refresh themselves
+
+Every window with track dropdowns rebuilds its lists through the shared project-change
+poll — no Refresh button:
+
+```lua
+local _track_poll = MakeProjectPoll(1.0, 5.0)   -- file level, lib/reaper_helper_common.lua
+-- in Loop, after the project-switch check:
+local tracks_due = _track_poll()                -- poll first: one build on the first frame
+if tracks_due or not S.all_track_list then RefreshTrackLists() end
+```
+
+`MakeProjectPoll(min_secs, fallback_secs)` fires when `GetProjectStateChangeCount` moved
+and `min_secs` passed (so note drags, which bump the count every frame, cost at most one
+rebuild a second), or every `fallback_secs`. The count only moves when an **undo point**
+is created — user edits always make one, and so must any helper action that adds tracks
+or items (wrap it in an undo block). A project switch still clears `S.all_track_list`
+for an immediate rebuild. Use the same poll for any other cached project read in draw
+code (the Venue views and the Venue Preview do); never re-scan the project every frame.
 
 ### Time selection as scope
 Actions respect time selection when active; fall back to whole-item or whole-track defaults otherwise. This is the primary iteration mechanism — work one section at a time.
@@ -448,7 +500,7 @@ Before that isolation, two runners went unnoticed missing a library for months.
   lib/                                       ← shared by the scripts
     reaper_imgui_helpers.lua
     reaper_helper_common.lua                 ← track/action helpers: general, instrument, vocal
-    reaper_helper_ui.lua                     ← TrackCombo, status panel: every helper
+    reaper_helper_ui.lua                     ← TrackCombo, result panel, window footer: every window
     reaper_dsp.lua
     reaper_midi_helpers.lua
     reaper_guitar_theory.lua

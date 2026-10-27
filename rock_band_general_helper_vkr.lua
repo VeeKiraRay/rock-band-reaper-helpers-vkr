@@ -42,6 +42,12 @@
 --     - New Events tab for the EVENTS track tools, with two sub-tabs.
 --       General holds "List event sections" (moved from Venue > Actions);
 --       Manual gen is the former Venue > Events sub-tab, unchanged.
+--     - New footer, always at the bottom of the window: the time selection,
+--       the status line, Copy result (the status and result to the clipboard)
+--       and Undo. The tabs scroll above it, so on a short window these no
+--       longer scroll out of sight. The track dropdowns now update on their
+--       own: adding, renaming or deleting a track, or adding an item to one,
+--       shows up within about a second. The Refresh tracks button is gone.
 --
 --   v0.9.62
 --     - Difficulty > Keys and Guitar/Bass: Validate now agrees with official

@@ -449,7 +449,7 @@ function ValidateGtrBassDiff(instrument, diff_label)
     end
     local track = r.GetTrack(0, idx)
     if not track then
-        S.status      = ('Error: %s track no longer exists - refresh tracks.'):format(inst.track_name)
+        S.status      = ('Error: %s track no longer exists - pick the track again.'):format(inst.track_name)
         S.last_result = nil
         return
     end
@@ -511,7 +511,7 @@ function ValidateAllGtrBass(instrument)
     end
     local track = r.GetTrack(0, idx)
     if not track then
-        S.status      = ('Error: %s track no longer exists - refresh tracks.'):format(inst.track_name)
+        S.status      = ('Error: %s track no longer exists - pick the track again.'):format(inst.track_name)
         S.last_result = nil
         return
     end
@@ -578,7 +578,7 @@ function CopyGtrBassDiff(instrument, diff_label, force)
     end
     local track = r.GetTrack(0, idx)
     if not track then
-        S.status      = ('Error: %s track no longer exists - refresh tracks.'):format(inst.track_name)
+        S.status      = ('Error: %s track no longer exists - pick the track again.'):format(inst.track_name)
         S.last_result = nil
         return
     end

@@ -16,10 +16,11 @@ Note the two Difficulty features are different things and are deliberately kept 
 
 One WIP tab appears only when **Show WIPs? = Yes** in the General tab (persisted setting, default No): **Tempo Map**. It functions at a basic level but has known issues and is not ready for general users.
 
+**Window footer** (every tab) — time selection, status, Copy result, Undo; the tabs scroll above it. Track lists refresh on their own (`CLAUDE.md` → "Track lists refresh themselves"). Shared implementation: `CLAUDE.md` → "Window footer".
+
 **General tab** — audio alignment and settings persistence. Contains three sub-tabs:
 
 *Actions sub-tab*
-- **Refresh tracks** — re-scans the project's track list.
 - **Align all audio** — aligns every audio item on every track to a common reference position.
 - **Align count-in** — positions the COUNT IN clip relative to the first measure.
 - **Song fade out** — creates a fade-out automation envelope on the master track at the end of the project.
@@ -159,7 +160,7 @@ The section's **keyframes are emitted either way** — only the lighting event i
 | `rock_band_general_helper_vkr.lua` | Entry point: ReaImGui check, path derivation, dofile calls, startup |
 | `rock_band_general_helper_vkr/defaults.lua` | `VENUE_VALID`, `DIRECTED_GAP_MIN`, `MIDI_META_NAMES`, `S`, `TIPS` |
 | `rock_band_general_helper_vkr/settings.lua` | `SaveSettings`, `LoadSettings` (project key: `RBHelperVKR/settings_v1`) |
-| `rock_band_general_helper_vkr/helpers.lua` | `FindNamedTrackMIDI` (track + first MIDI item/take; self-contained for the standalone preview), `SetDefaultTempoTracks`, `GetMeasureStartTime`, `GetAudioItems`, `MakeProjectPoll` |
+| `rock_band_general_helper_vkr/helpers.lua` | `FindNamedTrackMIDI` (track + first MIDI item/take; self-contained for the standalone preview), `SetDefaultTempoTracks`, `GetMeasureStartTime`, `GetAudioItems` |
 | `rock_band_general_helper_vkr/venue.lua` | `ListVenueEvents`, `GetVenueEventsForPreview`, `IsBlendAnchor`, `AnnotateVenueBlends` (global); `ReadVenueTextEvents`, `BuildCameraGaps`, `GapStats` (local). Holds the **read** side of the blend rule (`IsBlendAnchor`) because this module is in the standalone Preview's subset and `venue_lighting.lua`, which owns the write side, deliberately is not. |
 | `rock_band_general_helper_vkr/venue_awareness.lua` | `GetMutedInstruments`, `GetCoopRequiredInstruments`, `GetDirectedRequiredInstruments`, `FilterPool`, `ReadEventSections`, `ListEventSections`, `FindEventTime` (generic EVENTS-track text-event lookup), `FindMusicStartTime` (thin wrapper over `FindEventTime`), `INST_LETTER_NAMES` (global); `INST_TRACK_NAMES`, `ParsePrcEvent` (local) |
 | `rock_band_general_helper_vkr/venue_camera_priority.lua` | `CAM_PRIORITY_TIERS`, `CAM_PRIORITY`, `CAM_GENERIC_FALLBACK`, `CameraShotPriority`, `CameraShotFitsBand`, `PickPriorityCameraEvent` (global); `KEYS_EXCEPTION`, `BareName` (local). Which of several shots stacked on one tick the game plays, transcribed from `_external_docs/RBN2 Camera And Lights - RBN_C3 Documentation.htm`. Pure — no `r`/`ctx`/`S`; its `GetCoopRequiredInstruments`/`GetDirectedRequiredInstruments` use is at call time, so it may load before or after `venue_awareness.lua`. Full write-up in `.claude/CLAUDE_venue_theme_generation.md` ("Camera shot priority"). |
@@ -230,7 +231,7 @@ lib/reaper_imgui_helpers.lua   → Tooltip, SliderTooltip, SectionHeader, GetTra
 lib/reaper_helper_common.lua   → FindTrackByName, TrackAtIndex, GetTakePPQPerQN, GetTempoContextBefore,
                                   RefreshTrackLists, RunAction
 lib/reaper_helper_ui.lua       → TrackCombo (REAPER index, (none) = -1), MidiEditorTrackWarning,
-                                  DrawStatusResultPanel
+                                  DrawResultPanel, DrawHelperFooter
 lib/reaper_dsp.lua             → (loaded; not currently used by general helper)
 lib/reaper_midi_helpers.lua    → FindFirstMIDIItem, InsertNotes, ClearNotesAtPitchesInRange, …
 lib/reaper_script_links.lua    → SCRIPT_LINK_GROUPS, ScriptLinkBasename, IsRunningScriptLink,
@@ -240,7 +241,7 @@ lib/reaper_difficulty_*.lua    → score, tiers, predict, models, read (Metadata
 defaults.lua                   → S, VENUE_VALID, TIPS, constants
 settings.lua                   → SaveSettings, LoadSettings
 helpers.lua                    → FindNamedTrackMIDI, SetDefaultTempoTracks,
-                                  GetMeasureStartTime, GetAudioItems, MakeProjectPoll
+                                  GetMeasureStartTime, GetAudioItems
 venue.lua                      → ListVenueEvents, GetVenueEventsForPreview,
                                   IsBlendAnchor, AnnotateVenueBlends
 venue_awareness.lua            → GetMutedInstruments, GetCoopRequiredInstruments,
@@ -316,7 +317,7 @@ ui.lua                         → Loop (also calls r.defer(Loop))
 
 **`SCRIPT_MDIR` global.** The entry point sets `SCRIPT_MDIR = _mdir` (global) so dofile'd modules can access the module folder path for filesystem operations. The `local _mdir` variable is not accessible from dofile'd modules. **`SCRIPT_DIR` global.** The entry point also sets `SCRIPT_DIR = _dir` (repo root) for accessing shared resources under `resources/` (e.g. `resources/themes/`, `resources/img/spritesheets/`).
 
-**Polling convention for continuous MIDI reads.** UI draw code that reads project MIDI every frame is forbidden — gate the read behind `MakeProjectPoll(min_secs, fallback_secs)` (helpers.lua): it fires when `GetProjectStateChangeCount` changed (subject to `min_secs`) or `fallback_secs` elapsed (safety net for count collisions across project switches). Heavy multi-track scans use `min_secs = 1.0` (protects against per-frame count churn while dragging notes in a MIDI editor). Only pure-Lua lookups over the cached data may run per frame; lookups that follow the *play* position during playback should recompute at a ~0.5 s cadence, while stopped-cursor moves recompute immediately (the lookup is cheap; a debounce would only add lag). Cached take pointers must be `ValidatePtr2`-checked before use. Note: `GetProjectStateChangeCount` only increments when an **undo point** is registered — bare API edits without an undo block are invisible to the count gate (they are still caught by the `fallback_secs` rescan). All helper edit paths create undo points (the mandatory undo-block pattern), as do user edits in REAPER, so in practice only undo-less test/script edits need care. Current adopters: `ui_venue_players.lua`, `ui_venue_events.lua`; `ui_venue_preview.lua` keeps its own immediate-on-change + self-pause variant; the vocal helper's tuner (audio, 100 ms + playhead gate) is intentionally separate.
+**Polling convention for continuous MIDI reads.** UI draw code that reads project MIDI every frame is forbidden — gate the read behind `MakeProjectPoll(min_secs, fallback_secs)` (`lib/reaper_helper_common.lua`): it fires when `GetProjectStateChangeCount` changed (subject to `min_secs`) or `fallback_secs` elapsed (safety net for count collisions across project switches). Heavy multi-track scans use `min_secs = 1.0` (protects against per-frame count churn while dragging notes in a MIDI editor). Only pure-Lua lookups over the cached data may run per frame; lookups that follow the *play* position during playback should recompute at a ~0.5 s cadence, while stopped-cursor moves recompute immediately (the lookup is cheap; a debounce would only add lag). Cached take pointers must be `ValidatePtr2`-checked before use. Note: `GetProjectStateChangeCount` only increments when an **undo point** is registered — bare API edits without an undo block are invisible to the count gate (they are still caught by the `fallback_secs` rescan). All helper edit paths create undo points (the mandatory undo-block pattern), as do user edits in REAPER, so in practice only undo-less test/script edits need care. Current adopters: `ui_venue_players.lua`, `ui_venue_events.lua`; `ui_venue_preview.lua` keeps its own immediate-on-change + self-pause variant; the vocal helper's tuner (audio, 100 ms + playhead gate) is intentionally separate.
 
 **Second entry point: `rock_band_preview_vkr.lua` (repo root).** Standalone Venue Preview window. It has no module folder of its own — it dofiles a subset of this helper's modules: `lib/reaper_imgui_helpers.lua`, `lib/reaper_helper_common.lua`, then `defaults.lua`, `settings.lua`, `helpers.lua`, `venue.lua`, `venue_awareness.lua`, `venue_camera_priority.lua`, `venue_sprites.lua`, `ui_venue_preview.lua`, `ui_venue_players.lua`, and runs its own minimal `Loop` calling `DrawVenuePreviewTab()` + `DrawActivePlayersRow()`. Consequences when editing those files:
 - They must keep working without the rest of the general helper loaded — do not add load-time or call-time dependencies (from the preview code path) on modules outside this subset. `settings.lua` guards its `SaveSectionConfigs`/`LoadSectionConfigs` calls (`if X then X() end`) for this reason.

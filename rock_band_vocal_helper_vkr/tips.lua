@@ -422,14 +422,15 @@ TIPS = {
         "enabled destination.\n\n" ..
         "Existing overdrive-marker notes in the destination are cleared before copying.",
 
-    track_refresh =
-        "Re-scan all tracks and rebuild the filtered track dropdowns.\n\n" ..
-        "Audio source shows only tracks with audio items.\n" ..
-        "MIDI destination, Reference MIDI, and Harmony source show only\n" ..
-        "tracks with MIDI items.\n\n" ..
-        "Click after adding audio or MIDI items to a track that wasn't\n" ..
-        "previously visible in a dropdown. Refresh also runs automatically\n" ..
-        "on startup and project switch.",
+    vocal_midi_track =
+        "The MIDI track this view reads and writes notes on (usually\n" ..
+        "PART VOCALS). It must already contain a MIDI item.\n\n" ..
+        "One setting for every view: picking it here picks it everywhere.",
+
+    vocal_audio_track =
+        "The audio track pitch detection reads from (usually VOCALS AUDIO\n" ..
+        "or DRYVOX1).\n\n" ..
+        "One setting for every view: picking it here picks it everywhere.",
 
     harm_lyric_unpitched =
         "Add '#' to the end of each copied lyric on this destination.\n\n" ..

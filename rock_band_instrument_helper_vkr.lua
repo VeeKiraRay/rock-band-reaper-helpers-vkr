@@ -6,7 +6,7 @@
 --   Keys and Pro Keys.
 --
 --   Tabs:
---     General    - refresh tracks, remove 2x kicks, settings, buttons that
+--     General    - remove 2x kicks, settings, buttons that
 --                  open the other tools in this set
 --     Difficulty - copy and validate Pro Keys + Keys + Guitar/Bass + Drums difficulty tiers;
 --                  generate Hard/Medium/Easy automatically
@@ -33,6 +33,12 @@
 --     - Settings are saved separately from the General Helper's. Settings
 --       saved in a project before this version are not carried over: these
 --       tabs start from their defaults until you save them here.
+--     - New footer, always at the bottom of the window: the time selection,
+--       the status line, Copy result (the status and result to the clipboard)
+--       and Undo. The tabs scroll above it, so on a short window these no
+--       longer scroll out of sight. The track dropdowns now update on their
+--       own: adding, renaming or deleting a track, or adding an item to one,
+--       shows up within about a second. The Refresh tracks button is gone.
 --     - The rest of this entry is what changed in these tabs after General
 --       Helper v0.9.62.
 --     - New Difficulty > Generate sub-tab. Builds Hard, Medium and Easy for

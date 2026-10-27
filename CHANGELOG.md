@@ -1382,6 +1382,11 @@ harness in `dev/tests/dsp_algorithms.lua`.
 
 `rock_band_music_theory_helper_vkr.lua`
 
+**v0.3**
+- Guitar tab can now play chords back (synthesized preview tone,
+  no extra assets required) from both the reference table and
+  Shape Search.
+
 **v0.2**
 - Added Guitar tab (chord-shape reference table, RB lane-combo
   terminology, live fret-shape search/classifier).

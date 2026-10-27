@@ -2,7 +2,8 @@
 
 function DrawHarmoniesTab(ctx)
     local sel_s, _ = GetTimeSelection()
-    local tracks       = S.all_track_list
+    -- Source and every Target track list MIDI tracks only: Harmonies reads and
+    -- writes notes, and refuses a destination without a MIDI item.
     local midi_tracks  = S.midi_track_list
 
     r.ImGui_Spacing(ctx)
@@ -60,7 +61,7 @@ function DrawHarmoniesTab(ctx)
         Tooltip(TIPS[d.tip])
         r.ImGui_SameLine(ctx, lbl_col)
         r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
-        S[d.idx] = TrackCombo(d.trk_id, S[d.idx], tracks)
+        S[d.idx] = TrackCombo(d.trk_id, S[d.idx], midi_tracks)
         Tooltip(TIPS[d.tip])
         r.ImGui_Text(ctx, 'Copy style')
         Tooltip(TIPS.harm_dst_mode)

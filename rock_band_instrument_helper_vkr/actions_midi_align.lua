@@ -9,7 +9,7 @@ function AlignMIDI()
     end
     local src_tr = r.GetTrack(0, S.ma_midi_src_idx)
     if not src_tr then
-        S.status = 'Error: selected track no longer exists - refresh tracks.'
+        S.status = 'Error: selected track no longer exists - pick the track again.'
         S.last_result = nil
         return
     end
@@ -108,7 +108,7 @@ function ResizeAllMIDI()
     end
     local ref_tr = r.GetTrack(0, S.ms_ref_idx)
     if not ref_tr then
-        S.status = 'Error: reference track no longer exists - refresh tracks.'
+        S.status = 'Error: reference track no longer exists - pick the track again.'
         S.last_result = nil
         return
     end

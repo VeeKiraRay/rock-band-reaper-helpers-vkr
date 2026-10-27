@@ -1,16 +1,16 @@
 -- Venue > Preview sub-tab
 -- Shows previous / current / next venue events relative to the playhead
 -- for each category (Camera, Lighting, Post-Process) with sprite animations.
--- Requires globals: r, ctx, S, GetVenueEventsForPreview, DrawVenueInlineSprite,
+-- Requires globals: r, ctx, S, GetVenueEventsForPreview, DrawVenueInlineSprite, MakeProjectPoll,
 --                   VenueSpriteFoldersFound, SectionHeader, PickPriorityCameraEvent
 
 local _preview_cache       = nil   -- { camera, lighting, postproc } or nil
 local _preview_error       = nil   -- error string or nil
 local _preview_animate     = true  -- false = show middle frame only (no animation)
-local _last_state_count    = -1    -- r.GetProjectStateChangeCount() at last refresh
-local _last_refresh_time   = 0     -- r.time_precise() at last refresh
+-- Re-read as soon as the project state count changes (min_secs 0), plus a
+-- 5 s safety-net re-read - MakeProjectPoll, lib/reaper_helper_common.lua.
+local _poll                = MakeProjectPoll(0, 5.0)
 local _auto_refresh_paused = false -- true if a read exceeded _SLOW_READ_THRESHOLD
-local _AUTO_REFRESH_SECS   = 5.0   -- safety-net re-read interval when state count unchanged
 local _SLOW_READ_THRESHOLD = 0.15  -- 150 ms - pause auto-refresh if exceeded
 
 -- Matches SPRITE_DISPLAY_W / SPRITE_DISPLAY_H in venue_sprites.lua
@@ -54,8 +54,6 @@ local function _refresh_preview()
     _preview_cache, _preview_error = GetVenueEventsForPreview()
     _muted_cache = GetMutedInstruments()
     local elapsed = r.time_precise() - t0
-    _last_refresh_time = r.time_precise()
-    _last_state_count  = r.GetProjectStateChangeCount()
     if _preview_cache then _preview_error = nil end
     if elapsed >= _SLOW_READ_THRESHOLD then
         _auto_refresh_paused = true
@@ -233,12 +231,8 @@ local function _draw_category_row(label, prev_grp, curr_grp, next_grp, category,
 end
 
 function DrawVenuePreviewTab()
-    if not _auto_refresh_paused then
-        local state = r.GetProjectStateChangeCount()
-        local now   = r.time_precise()
-        if state ~= _last_state_count or now - _last_refresh_time >= _AUTO_REFRESH_SECS then
-            _refresh_preview()
-        end
+    if not _auto_refresh_paused and _poll() then
+        _refresh_preview()
     end
 
     local lbl_col = LabelColWidth({ 'Players', 'Preview size', 'Sprites', 'Show' })
@@ -323,6 +317,7 @@ function DrawVenuePreviewTab()
     if _auto_refresh_paused then
         if r.ImGui_Button(ctx, 'Resume auto-refresh##vpr') then
             _auto_refresh_paused = false
+            _poll(true)   -- restart the poll's clock from this read
             _refresh_preview()
         end
         Tooltip(TIPS.venue_preview_refresh_resume)

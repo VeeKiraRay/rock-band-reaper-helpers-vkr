@@ -14,10 +14,11 @@ Five stable tabs are always visible: **General | Difficulty | Overdrive | Tab In
 
 Three WIP tabs appear only when **Show WIPs? = Yes** in the General tab (persisted setting, default No): **Drums | Keys | Guitar**. These tabs function at a basic level but have known issues and are not ready for general users.
 
+**Window footer** (every tab) — time selection, status, Copy result, Undo; the tabs scroll above it. Track lists refresh on their own (`CLAUDE.md` → "Track lists refresh themselves"). Shared implementation: `CLAUDE.md` → "Window footer".
+
 **General tab** — three sub-tabs:
 
 *Actions sub-tab*
-- **Refresh tracks** — re-scans the project's track list.
 - **Remove 2x kicks** — works out which kicks on `PART DRUMS_2X` are the drummer's second foot and deletes those from `PART DRUMS`. `PART DRUMS_2X` is the complete chart (every kick at 96) and is never thinned; the only thing that can change there is a leftover pitch-95 note being put back to 96. Matching between the tracks is by musical position, so a tempo change does not affect it. Whole track: a time selection does not narrow it. Safe to re-run — the second run finds nothing to remove and creates no undo point. See "Feature: double-bass detection" below.
 
 *Settings sub-tab*
@@ -249,7 +250,7 @@ lib/reaper_imgui_helpers.lua   → Tooltip, SliderTooltip, SectionHeader, Btn*, 
 lib/reaper_helper_common.lua   → FindTrackByName, GetTakePPQPerQN, GetTempoContextBefore,
                                   RefreshTrackLists, RunAction
 lib/reaper_helper_ui.lua       → TrackCombo (REAPER index, (none) = -1), MidiEditorTrackWarning,
-                                  DrawStatusResultPanel
+                                  DrawResultPanel, DrawHelperFooter
 lib/reaper_midi_helpers.lua    → FindFirstMIDIItem, InsertNotes, ClearNotesAtPitchesInRange, …
 lib/reaper_guitar_theory.lua   → GuitarClassifyChordType, GuitarSuggestRBMapping (consulted by
                                   actions_guitar.lua's BuildShapeGemMap); GUITAR_TAB_OPEN (also used by
@@ -331,7 +332,7 @@ The entry point sets `WINDOW_TITLE` right after `lib/reaper_imgui_helpers.lua` l
 
 **`SCRIPT_MDIR` global.** The entry point sets `SCRIPT_MDIR = _mdir` (global) so dofile'd modules can access the module folder path for filesystem operations. The `local _mdir` variable is not accessible from dofile'd modules. **`SCRIPT_DIR` global.** The entry point also sets `SCRIPT_DIR = _dir` (repo root) for accessing shared resources under `resources/` (e.g. `resources/themes/`, `resources/img/spritesheets/`).
 
-**Second entry point: `rock_band_midi_pattern_vkr.lua` (repo root).** Standalone MIDI Pattern window. No module folder of its own either — it dofiles `lib/reaper_imgui_helpers.lua`, `lib/reaper_helper_common.lua`, `lib/reaper_helper_ui.lua`, `lib/reaper_midi_helpers.lua`, then this helper's `defaults.lua`, `actions_midi_replace.lua`, `ui_midi_pattern.lua`, and runs its own minimal `Loop`: a **Refresh tracks** button (the instrument helper keeps that button in General > Actions, which this window has no equivalent of), then `DrawMIDIPatternTab()` + `DrawStatusResultPanel(true)`. Consequences when editing those files:
+**Second entry point: `rock_band_midi_pattern_vkr.lua` (repo root).** Standalone MIDI Pattern window. No module folder of its own either — it dofiles `lib/reaper_imgui_helpers.lua`, `lib/reaper_helper_common.lua`, `lib/reaper_helper_ui.lua`, `lib/reaper_midi_helpers.lua`, then this helper's `defaults.lua`, `actions_midi_replace.lua`, `ui_midi_pattern.lua`, and runs its own minimal `Loop`: `DrawMIDIPatternTab()` + `DrawResultPanel()` in a scroll body, then the shared footer (`DrawHelperFooter({})` - Copy result, Undo; its track list refreshes through `MakeProjectPoll` like the helpers'). Consequences when editing those files:
 - The subset must keep working without the rest of the instrument helper loaded. In particular `ui_midi_pattern.lua` may not grow a dependency on `ui_midi.lua`, `settings.lua` or any venue/difficulty module.
 - **`ui.lua` is deliberately not in the list and must never be added**: its last line is a bare `r.defer(Loop)`, which would spawn the full helper window. That is the whole reason `TrackCombo` and the status/result panel were moved out into `lib/reaper_helper_ui.lua` (first `lib/reaper_helper_ui.lua`) — the same split the vocal helper made for its standalone tuner.
 - It sets neither `SCRIPT_DIR` nor `SCRIPT_MDIR` — nothing in this subset reads them .

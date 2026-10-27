@@ -1,4 +1,4 @@
--- ImGui display helpers and track combo (shared library)
+-- ImGui display helpers (shared library)
 -- Requires globals: r (reaper), ctx (ImGui context)
 
 local CTRL_CLICK_HINT = "\n\nTip: Ctrl+click the slider to type an exact value."
@@ -195,6 +195,20 @@ function GetTimeSelection()
     local s, e = r.GetSet_LoopTimeRange(false, false, 0, 0, false)
     if e > s then return s, e end
     return nil, nil
+end
+
+-- Begin a borderless scrolling child region, full width, h tall (h <= 0 means
+-- "all the remaining height minus |h|", the ImGui convention). Always pair with
+-- r.ImGui_EndChild(ctx), whatever this returns.
+-- Two signatures exist: ReaImGui 0.9+ takes child_flags (an int) as the 5th
+-- argument, 0.7/0.8 take a border boolean there. Feature-detected so the
+-- declared 0.7 floor keeps working (see CLAUDE.md, Runtime requirements).
+local HAS_CHILD_FLAGS = r.ImGui_ChildFlags_None ~= nil
+function BeginScrollBody(id, h)
+    if HAS_CHILD_FLAGS then
+        return r.ImGui_BeginChild(ctx, id, 0, h, r.ImGui_ChildFlags_None())
+    end
+    return r.ImGui_BeginChild(ctx, id, 0, h, false)
 end
 
 function SectionHeader(title, reset_label, reset_fn, reset_tip)

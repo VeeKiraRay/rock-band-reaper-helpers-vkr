@@ -188,7 +188,6 @@ S = {
 TIPS = {
     save          = "Save current settings to this project.",
     load          = "Load previously saved settings from this project.",
-    track_refresh = "Refresh the track lists to include any newly added or renamed tracks.",
 
     -- Metadata > Genre
     genre_family =

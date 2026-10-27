@@ -678,7 +678,7 @@ function CopyProKeysDiff(diff_label, force)
     end
     local src_tr, tgt_tr = r.GetTrack(0, src_idx), r.GetTrack(0, tgt_idx)
     if not src_tr or not tgt_tr then
-        S.status      = 'Error: a selected track no longer exists - refresh tracks.'
+        S.status      = 'Error: a selected track no longer exists - pick the track again.'
         S.last_result = nil
         return
     end
@@ -748,7 +748,7 @@ function ValidateProKeysDiff(diff_label)
     end
     local tgt_tr = r.GetTrack(0, tgt_idx)
     if not tgt_tr then
-        S.status      = ('Error: %s track no longer exists - refresh tracks.'):format(DIFF_NAMES[diff_label])
+        S.status      = ('Error: %s track no longer exists - pick the track again.'):format(DIFF_NAMES[diff_label])
         S.last_result = nil
         return
     end

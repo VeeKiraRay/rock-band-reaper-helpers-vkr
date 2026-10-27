@@ -1,6 +1,6 @@
 -- @description Rock Band Music Theory Helper
 -- @author VeeKiraRay
--- @version 0.6
+-- @version 0.7
 -- @about
 --   In-DAW reference guide for Rock Band custom charters.
 --   Covers drum notation, RB lane mappings, common patterns, a Guitar
@@ -19,6 +19,8 @@
 --   This @about block keeps only the 5 most recent versions.
 --   Full history: CHANGELOG.md in the repo.
 --
+--   v0.7: Fixed: the tabs' scroll areas used a call only ReaImGui 0.9 has,
+--         so on ReaImGui 0.7 and 0.8 the window stopped with an error.
 --   v0.6: The window title now carries the script version -- "RB Music Theory
 --         Helper v0.6". A bug report that quotes the title says which version
 --         it came from, with nothing to look up. The version is read from this
@@ -75,9 +77,6 @@
 --   v0.3.1: Drums tab now says why playback is unavailable, distinguishing
 --         a missing SWS extension from a missing drum sample pack (it
 --         previously showed the same silent fallback text for both).
---   v0.3: Guitar tab can now play chords back (synthesized preview tone,
---         no extra assets required) from both the reference table and
---         Shape Search.
 
 r = reaper
 

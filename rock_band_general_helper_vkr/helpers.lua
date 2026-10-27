@@ -44,29 +44,6 @@ function GetMeasureStartTime(measure_num, num, denom)
     return r.TimeMap2_beatsToTime(0, qn_pos)
 end
 
--- Poll gate for cached project reads in per-frame draw code. Returns a
--- check(force) function -> true when the caller should re-read its project
--- data: on first call, when forced, when fallback_secs elapsed (safety net -
--- covers state-count collisions across project switches), or when min_secs
--- elapsed AND GetProjectStateChangeCount changed (MIDI edits, mute toggles,
--- undo). min_secs > 0 protects heavy scans from per-frame state-count churn
--- (e.g. dragging notes in a MIDI editor bumps the count every frame).
-function MakeProjectPoll(min_secs, fallback_secs)
-    local last_count, last_time
-    return function(force)
-        local now = r.time_precise()
-        if force or not last_count
-            or now - last_time >= fallback_secs
-            or (now - last_time >= min_secs
-                and r.GetProjectStateChangeCount() ~= last_count) then
-            last_count = r.GetProjectStateChangeCount()
-            last_time  = now
-            return true
-        end
-        return false
-    end
-end
-
 -- Return a list of audio (non-MIDI) items on a track.
 function GetAudioItems(track)
     local result = {}

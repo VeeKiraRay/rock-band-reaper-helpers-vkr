@@ -133,7 +133,8 @@ actions_snap_key.lua:
 
 ui_common.lua:
   23. Shared widgets              YINPresetCombo (global); KeysPresetTrackWarnings (local).
-                                  TrackCombo and DrawStatusResultPanel: lib/reaper_helper_ui.lua
+                                  DrawVocalTrackSelectors (global): a view's MIDI / audio selectors.
+                                  TrackCombo and the window footer: lib/reaper_helper_ui.lua
 
 ui_tuner.lua:
   24. Pitch > Tuner sub-tab       DrawTunerTab()
@@ -203,7 +204,7 @@ lib/reaper_dsp.lua             → audio analysis, YIN
 lib/reaper_midi_helpers.lua    → MIDI read/write helpers
 lib/reaper_helper_common.lua   → TrackAtIndex, GetTakePPQPerQN, TrackHasAudio, TrackHasMIDI,
                                   RefreshTrackLists, RunAction (shared with every helper)
-lib/reaper_helper_ui.lua       → TrackCombo, DrawStatusResultPanel (shared with every helper)
+lib/reaper_helper_ui.lua       → TrackCombo, DrawResultPanel, DrawHelperFooter (shared with every window)
 lib/reaper_script_links.lua    → SCRIPT_LINK_GROUPS, ScriptLinkBasename, IsRunningScriptLink,
                                   FilterScriptLinkGroups, LaunchReaScript, DrawGeneralLinksTab
                                   (General > Other tools sub-tab; shared with the general
@@ -238,8 +239,8 @@ Tuner window. It has no module folder of its own — it dofiles a subset of this
 helper's modules: `lib/reaper_imgui_helpers.lua`, `lib/reaper_dsp.lua`, `lib/reaper_helper_common.lua`, `lib/reaper_helper_ui.lua`, then
 `defaults.lua`, `tips.lua`, `settings.lua`, `helpers.lua`, `tuner.lua`,
 `ui_common.lua`, `ui_tuner.lua`, and runs its own minimal `Loop` calling
-`DrawTunerTab()` + `DrawStatusResultPanel(false)` under its own audio-source
-track combo. Consequences when editing those files:
+`DrawVocalTrackSelectors({ audio = true })` + `DrawTunerTab()` + `DrawResultPanel()`
+in a scroll body, then `DrawHelperFooter({ undo = false })`. Consequences when editing those files:
 
 - They must keep working without the rest of the vocal helper loaded — do not add
   load-time or call-time dependencies (from the tuner code path) on modules
@@ -293,7 +294,7 @@ Read-only — never modifies the project. Polls `SampleYINAt` at the current pla
 
 **Window-close stop:** closing either window ends its defer chain, so both call `StopTuner()` when `ImGui_Begin`'s `open` is false. Without it the `CreateTakeAudioAccessor` handle in `S.tuner_yctx` is never destroyed and holds the source audio file open until REAPER exits.
 
-**Standalone window:** the Tuner sub-tab body lives in `ui_tuner.lua` as `DrawTunerTab()` and is drawn by both the sub-tab and `rock_band_pitch_tuner_vkr.lua`. The standalone adds its own audio-source combo + "Refresh tracks" button above it (the main window's live above the tab bar) and a status/result panel below it without the Undo button — it makes no project edits.
+**Standalone window:** the Tuner sub-tab body lives in `ui_tuner.lua` as `DrawTunerTab()` and is drawn by both the sub-tab and `rock_band_pitch_tuner_vkr.lua`. The standalone draws the same Audio source selector above it (`DrawVocalTrackSelectors({ audio = true })`, as the sub-tab does) and the shared footer without Undo — it makes no project edits.
 
 **YIN and pitch range settings** — shared with the other Pitch sub-tabs (`S.yin_*`, `S.min_pitch`, `S.max_pitch`). Changes on the Tuner sub-tab are immediately reflected elsewhere and vice versa.
 

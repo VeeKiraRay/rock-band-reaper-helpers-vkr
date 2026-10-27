@@ -43,7 +43,7 @@ local results = { vocal = nil, general = nil, instrument = nil,
                   venue_labels = nil, workflow = nil,
                   guitar_theory = nil, music_notation = nil,
                   karplus_strong = nil, wav_writer = nil,
-                  script_links = nil, window_title = nil,
+                  script_links = nil, window_title = nil, helper_ui = nil,
                   difficulty_score = nil,
                   difficulty_bpm = nil, difficulty_suggester = nil,
                   metadata_genres = nil }
@@ -297,6 +297,14 @@ function Loop()
         end
         r.ImGui_SameLine(ctx)
         draw_status(results.window_title)
+
+        r.ImGui_Spacing(ctx)
+
+        if r.ImGui_Button(ctx, 'Helper UI Tests', 155, 24) then
+            run('run_helper_ui.lua', 'helper_ui')
+        end
+        r.ImGui_SameLine(ctx)
+        draw_status(results.helper_ui)
 
         r.ImGui_Spacing(ctx)
 

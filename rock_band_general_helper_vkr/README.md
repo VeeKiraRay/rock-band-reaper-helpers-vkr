@@ -19,7 +19,7 @@ The instrument tools — Difficulty, Overdrive, Tab Input and MIDI — are in th
 
 ## UI overview
 
-The window is organized into tabs plus a status panel at the bottom. Five tabs are always visible; one more (Tempo Map) is work-in-progress and hidden until enabled.
+The window is organized into tabs plus a [footer](#window-footer) that is always visible at the bottom. Five tabs are always visible; one more (Tempo Map) is work-in-progress and hidden until enabled.
 
 | Tab            | Purpose                                                                              |
 | -------------- | ------------------------------------------------------------------------------------ |
@@ -41,6 +41,19 @@ The bottom of the window always shows the active time selection (or "No time sel
 
 ---
 
+## Window footer
+
+The bottom of the window is always visible; the tabs scroll above it, so on a short window nothing here scrolls out of sight.
+
+- **Time selection** and the **status line** of the last action.
+- **Track lists update on their own** — adding, renaming or deleting a track, or adding an item to one, shows up in the track dropdowns within about a second (audio dropdowns list only tracks with audio items, MIDI dropdowns only tracks with MIDI items). There is no Refresh button to press.
+- **Copy result** — copies the status line and the result panel to the clipboard, e.g. for a bug report.
+- **Undo** — undoes the last REAPER action; its tooltip names it.
+
+The result panel of the last action is shown under the tab content, scrolling with it.
+
+---
+
 ## General tab
 
 Contains three sub-tabs: **Actions**, **Settings**, and **Other tools**.
@@ -48,10 +61,6 @@ Contains three sub-tabs: **Actions**, **Settings**, and **Other tools**.
 ### Actions sub-tab
 
 ![General - Actions tab](../assets/g_general_actions.jpg)
-
-#### Refresh tracks
-
-Re-scans the project's track list to pick up any tracks added or renamed after the script opened.
 
 #### Audio alignment
 

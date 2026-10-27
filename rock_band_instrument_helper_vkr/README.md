@@ -19,11 +19,11 @@ These tabs used to be part of the [General Helper](../rock_band_general_helper_v
 
 ## UI overview
 
-The window is organized into tabs plus a status panel at the bottom. Five tabs are always visible; three more (Drums, Keys, Guitar) are work-in-progress and hidden until enabled.
+The window is organized into tabs plus a [footer](#window-footer) that is always visible at the bottom. Five tabs are always visible; three more (Drums, Keys, Guitar) are work-in-progress and hidden until enabled.
 
 | Tab            | Purpose                                                                              |
 | -------------- | ------------------------------------------------------------------------------------ |
-| **General**    | Refresh tracks, remove 2x kicks, settings save/load, and buttons that open the other tools |
+| **General**    | Remove 2x kicks, settings save/load, and buttons that open the other tools |
 | **Difficulty** | Generate, copy and validate Pro Keys / Keys / Guitar-Bass / Drums tracks at each difficulty level |
 | **Overdrive**  | Generate overdrive phrases, unisons, drum fills and vocal overdrive, and validate what is already authored |
 | **Tab Input**  | Reference guide: parse ASCII tab notation for Guitar/Bass, Keys/Pro Keys, or Vocal  |
@@ -43,15 +43,24 @@ The bottom of the window always shows the active time selection (or "No time sel
 
 ---
 
+## Window footer
+
+The bottom of the window is always visible; the tabs scroll above it, so on a short window nothing here scrolls out of sight.
+
+- **Time selection** and the **status line** of the last action.
+- **Track lists update on their own** — adding, renaming or deleting a track, or adding an item to one, shows up in the track dropdowns within about a second (audio dropdowns list only tracks with audio items, MIDI dropdowns only tracks with MIDI items). There is no Refresh button to press.
+- **Copy result** — copies the status line and the result panel to the clipboard, e.g. for a bug report.
+- **Undo** — undoes the last REAPER action; its tooltip names it.
+
+The result panel of the last action is shown under the tab content, scrolling with it.
+
+---
+
 ## General tab
 
 Contains three sub-tabs: **Actions**, **Settings**, and **Other tools**.
 
 ### Actions sub-tab
-
-#### Refresh tracks
-
-Re-scans the project's track list to pick up any tracks added or renamed after the script opened.
 
 #### Drums 2x kicks
 
@@ -208,6 +217,6 @@ A live readout under the buttons shows what's currently captured (e.g. "M4–M6 
 
 #### Standalone MIDI Pattern window
 
-`rock_band_midi_pattern_vkr.lua` (repo root) is a separate script that opens just this sub-tab in its own window — load it the same way as the main scripts (**Actions → Show action list → Load ReaScript**), or click **MIDI Pattern** in [General → Other tools](#other-tools-sub-tab). Handy for keeping it beside REAPER's MIDI editor without the helper's other tabs coming along. Same underlying behavior as above, plus its own **Refresh tracks** button (the main window keeps that in General → Actions) and its own status line with an Undo button.
+`rock_band_midi_pattern_vkr.lua` (repo root) is a separate script that opens just this sub-tab in its own window — load it the same way as the main scripts (**Actions → Show action list → Load ReaScript**), or click **MIDI Pattern** in [General → Other tools](#other-tools-sub-tab). Handy for keeping it beside REAPER's MIDI editor without the helper's other tabs coming along. Same underlying behavior as above, plus the same [footer](#window-footer) as the main window: status line, Copy result and Undo. Its source track dropdown updates on its own like the main window's.
 
 It has no settings of its own to save — this sub-tab has never had any — and switching REAPER projects clears the captured Search and Replace patterns rather than leaving them pointing at the previous project's MIDI item.

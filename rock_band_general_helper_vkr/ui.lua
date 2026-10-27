@@ -2,12 +2,19 @@
 -- Requires: S, TIPS, r, ctx (globals)
 -- Requires: all action functions, RefreshTrackLists, Tooltip, SliderTooltip,
 --           SectionHeader, DrawGeneralLinksTab (globals)
--- Requires: TrackCombo, DrawStatusResultPanel (lib/reaper_helper_ui.lua, shared
+-- Requires: TrackCombo, DrawResultPanel, DrawHelperFooter (lib/reaper_helper_ui.lua, shared
 --           with the Instrument Helper).
 -- Note: r.defer(Loop) is called at the end of this file.
 
 local _active_proj = r.EnumProjects(-1, '')
 local _active_tab  = ''
+
+-- Track lists rebuild themselves after a project edit (at most once a second,
+-- 5 s safety re-read) - lib/reaper_helper_common.lua, MakeProjectPoll.
+local _track_poll = MakeProjectPoll(1.0, 5.0)
+
+-- Footer parts this window shows (lib/reaper_helper_ui.lua, DrawHelperFooter).
+local FOOTER = {}
 
 local function Loop()
     local proj = r.EnumProjects(-1, '')
@@ -45,7 +52,9 @@ local function Loop()
         SetDefaultTempoTracks()
     end
 
-    if not S.all_track_list then RefreshTrackLists() end
+    -- Poll first, so the first frame builds the lists once, not twice.
+    local tracks_due = _track_poll()
+    if tracks_due or not S.all_track_list then RefreshTrackLists() end
     local audio_tracks = S.audio_track_list
 
     r.ImGui_SetNextWindowSize(ctx, 560, 660, r.ImGui_Cond_FirstUseEver())
@@ -53,7 +62,9 @@ local function Loop()
     if visible then
         local _new_tab = ''
 
-        if r.ImGui_BeginTabBar(ctx, '##tabs') then
+        -- The view scrolls inside this child; the footer below it never moves.
+        local body_visible = BeginScrollBody('##body', -HelperFooterHeight(FOOTER))
+        if body_visible and r.ImGui_BeginTabBar(ctx, '##tabs') then
 
             ------------------------------------------------------------
             -- General tab
@@ -67,14 +78,6 @@ local function Loop()
                     -- General > Actions sub-tab
                     ------------------------------------------------
                     if r.ImGui_BeginTabItem(ctx, 'Actions') then
-                        SectionHeader('General actions')
-                        if Btn('Refresh tracks', BTN_H) then
-                            RefreshTrackLists()
-                            S.status = 'Track lists refreshed.'
-                        end
-                        Tooltip(TIPS.track_refresh)
-
-                        r.ImGui_Separator(ctx)
                         SectionHeader('Audio alignment')
 
                         local bw_align = BtnGroupWidth({ 'Import stems', 'Align all audio', 'Align count-in' })
@@ -363,10 +366,13 @@ local function Loop()
             _active_tab = _new_tab
         end
 
+        if body_visible then DrawResultPanel() end
+        r.ImGui_EndChild(ctx)   -- always paired with BeginScrollBody
+
         ----------------------------------------------------------------
-        -- Time selection info + status panel (always visible below tabs)
+        -- Footer: time selection, status, Refresh / Copy / Undo
         ----------------------------------------------------------------
-        DrawStatusResultPanel(true)   -- lib/reaper_helper_ui.lua
+        DrawHelperFooter(FOOTER)   -- lib/reaper_helper_ui.lua
 
         r.ImGui_End(ctx)
     end

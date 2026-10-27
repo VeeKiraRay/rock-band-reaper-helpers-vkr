@@ -23,17 +23,17 @@ Designed for authoring Rock Band-style vocal charts — it defaults to the RB3 v
 
 ![General tab](../assets/v_general.jpg)
 
-The script window has a persistent track-selector row at the top and a status/result panel at the bottom. Everything in between is organised into tabs:
+Each view shows the track selector(s) it uses at its top, and a [footer](#window-footer) is always visible at the bottom. Everything in between is organised into tabs:
 
 | Area                   | Description                                                                                         |
 | ---------------------- | ----------------------------------------------------------------------------------------------------- |
-| Track selectors        | Above the tab bar — Audio source, MIDI destination; always visible                                  |
-| **General** tab        | Save / Load project settings; Refresh tracks; Show WIPs toggle; buttons that open the other tools   |
+| Track selectors        | At the top of each view, only the ones it uses — MIDI destination, Audio source; one setting shared by every view |
+| **General** tab        | Save / Load project settings; Show WIPs toggle; buttons that open the other tools                   |
 | **Pitch** tab          | Tuner (live pitch detector), Snap to Key Scale, Slide scan, and the pitch source for Apply pitch changes: Built-in detection (YIN) or Reference MIDI |
 | **Lyrics** tab         | Select a lyrics file, assign or clear lyric events                                                  |
 | **Harmonies** tab      | Copy lead vocal notes to up to three harmony tracks, transposed or keeping the target's own pitches |
 | **Validation** tab     | Validate phrase markers; check phrase similarity to catch copy errors                               |
-| Status / Undo          | Below the tab bar — the active time selection, the result of the last action, and the Undo button |
+| Footer                 | Always visible — time selection, status, Copy result, Undo                                         |
 
 <a id="wip-tabs"></a>
 
@@ -64,15 +64,22 @@ Without a time selection, the full audio item is analysed.
 
 ---
 
+## Window footer
+
+The bottom of the window is always visible; the tabs scroll above it, so on a short window nothing here scrolls out of sight.
+
+- **Time selection** and the **status line** of the last action.
+- **Track lists update on their own** — adding, renaming or deleting a track, or adding an item to one, shows up in the track dropdowns within about a second (audio dropdowns list only tracks with audio items, MIDI dropdowns only tracks with MIDI items). There is no Refresh button to press.
+- **Copy result** — copies the status line and the result panel to the clipboard, e.g. for a bug report.
+- **Undo** — undoes the last REAPER action; its tooltip names it.
+
+The result panel of the last action is shown under the tab content, scrolling with it.
+
+---
+
 ## General tab
 
-Contains three sub-tabs: **Actions**, **Settings**, and **Other tools**.
-
-### Actions sub-tab
-
-![Actions sub-tab](../assets/v_general_actions.jpg)
-
-**Refresh tracks** re-scans the project's track list to pick up any tracks added or renamed after the script opened.
+Contains two sub-tabs: **Settings** and **Other tools**. (The Actions sub-tab held only Refresh tracks; track lists now [update on their own](#window-footer).)
 
 ### Settings sub-tab
 
@@ -177,7 +184,7 @@ The same Min pitch / Max pitch checkbox+slider pairs as Placement - Built-in. Wh
 
 `rock_band_pitch_tuner_vkr.lua` (repo root) is a separate script that opens just this sub-tab in its own window — load it the same way as the main scripts (**Actions → Show action list → Load ReaScript**). Handy for keeping the live readout visible while you work in another tab (Pitch, Lyrics) or in the MIDI editor, instead of the tuner stopping the moment you navigate away. Same underlying behaviour as the Tuner tab above, with two differences:
 
-- It has its own **Audio source track** selector and **Refresh tracks** button at the top, since it isn't sharing the main window's track selectors.
+- It shows the **Audio source** selector at the top, and the same [footer](#window-footer) as the main window without Undo — it makes no project edits.
 - It never stops on tab navigation — there are no tabs. The 60-second idle auto-stop still applies, and closing the window stops the tuner.
 
 It reads the same per-project settings the vocal helper saves, so YIN thresholds, confidence, Min RMS level and pitch range carry over. Saving stays in the vocal helper's General tab — this window never writes settings, so changes made here apply for the session only.

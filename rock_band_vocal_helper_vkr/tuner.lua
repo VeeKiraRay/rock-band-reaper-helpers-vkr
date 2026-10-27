@@ -40,7 +40,7 @@ function StartTuner()
     end
     local tr = r.GetTrack(0, S.audio_idx)
     if not tr then
-        S.status = 'Error: source track not found - refresh tracks.'
+        S.status = 'Error: source track not found - pick it again.'
         return
     end
     local play_pos = r.GetPlayPosition2()

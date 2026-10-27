@@ -142,7 +142,7 @@ function ConvertDrums()
     local src_tr = r.GetTrack(0, S.mc_drum_src_idx)
     local tgt_tr = r.GetTrack(0, S.mc_drum_tgt_idx)
     if not src_tr or not tgt_tr then
-        S.status = 'Error: a selected track no longer exists - refresh tracks.'
+        S.status = 'Error: a selected track no longer exists - pick the track again.'
         S.last_result = nil
         return
     end

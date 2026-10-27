@@ -18,6 +18,9 @@
 --       to the new Instrument Helper (General Helper v0.9.63), and the track
 --       lookup this window uses moved into the shared lib folder with them;
 --       this window now loads it from there.
+--     - No change to what this window does: it notices project edits with the
+--       same shared check the helpers now use to keep their track lists
+--       current, instead of its own copy of it.
 --   v0.6
 --     - No change to this window. It loads the general helper's settings files,
 --       which gained the new Overdrive tab's options in general helper v0.9.60;

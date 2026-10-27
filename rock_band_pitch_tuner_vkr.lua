@@ -19,6 +19,10 @@
 --     - The audio source dropdown has a "(none)" entry, and the status panel
 --       at the bottom shows the active time selection, as in the helpers -
 --       both now share their code with every helper.
+--     - New footer at the bottom of the window, as in the helpers: time
+--       selection, status line and Copy result. The audio source dropdown
+--       updates on its own when tracks or items are added (within about a
+--       second), so the Refresh tracks button is gone.
 --   v0.2
 --     - The window title now carries the script version - "Rock Band Pitch
 --       Tuner v0.2". A bug report that quotes the title says which version
@@ -102,6 +106,10 @@ end
 -- See ScriptWindowTitle.
 local _title = ScriptWindowTitle('Rock Band Pitch Tuner', _script)
 
+-- Footer parts (lib/reaper_helper_ui.lua). No Undo: this window makes no
+-- project edits, so there is never anything of its own to undo.
+local FOOTER = { undo = false }
+
 -- Startup initialisation: pick up saved detection settings (YIN threshold,
 -- frequency range, window, confidence, RMS gate, pitch range). Saving stays
 -- in the vocal helper's General tab; this window never writes settings.
@@ -109,6 +117,10 @@ LoadSettings()
 SetDefaultTracks()
 
 local _active_proj = r.EnumProjects(-1, '')
+
+-- Track lists rebuild themselves after a project edit (at most once a second,
+-- 5 s safety re-read) - lib/reaper_helper_common.lua, MakeProjectPoll.
+local _track_poll = MakeProjectPoll(1.0, 5.0)
 
 local function Loop()
     -- Project switch: reset the track selection and reload that project's
@@ -147,26 +159,21 @@ local function Loop()
     -- reads S.tuner_quiet_since that RunTuner has just written.
     RunTuner()
 
-    -- Build the cached filtered lists on first frame if not yet populated.
-    if not S.all_track_list then RefreshTrackLists() end
+    -- Poll first, so the first frame builds the lists once, not twice.
+    local tracks_due = _track_poll()
+    if tracks_due or not S.all_track_list then RefreshTrackLists() end
 
     r.ImGui_SetNextWindowSize(ctx, 560, 640, r.ImGui_Cond_FirstUseEver())
     local visible, open = r.ImGui_Begin(ctx, _title, true)
     if visible then
-        r.ImGui_Text(ctx, 'Audio source track')
-        r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
-        S.audio_idx = TrackCombo('##audio_tur', S.audio_idx, S.audio_track_list)
-        r.ImGui_SameLine(ctx)
-        if Btn('Refresh tracks', BTN_H) then
-            RefreshTrackLists()
-            S.status = 'Track lists refreshed.'
+        -- The view scrolls inside this child; the footer below it never moves.
+        if BeginScrollBody('##body', -HelperFooterHeight(FOOTER)) then
+            DrawVocalTrackSelectors({ audio = true })
+            DrawTunerTab()
+            DrawResultPanel()
         end
-        Tooltip(TIPS.track_refresh)
-
-        r.ImGui_Separator(ctx)
-
-        DrawTunerTab()
-        DrawStatusResultPanel(false)
+        r.ImGui_EndChild(ctx)   -- always paired with BeginScrollBody
+        DrawHelperFooter(FOOTER)
 
         r.ImGui_End(ctx)
     end
