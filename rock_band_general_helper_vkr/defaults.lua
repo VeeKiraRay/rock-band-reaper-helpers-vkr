@@ -344,7 +344,7 @@ TIPS = {
                       "  piano, else keys, else accordion -> KEYS AUDIO\n" ..
                       "  bass (not drum)         -> BASS AUDIO\n" ..
                       "  guitar                  -> GUITAR AUDIO\n" ..
-                      "  vocal (lead preferred)  -> VOCAL AUDIO\n" ..
+                      "  vocal (lead preferred)  -> VOCALS AUDIO\n" ..
                       "  drum                    -> KIT AUDIO\n" ..
                       "KIT AUDIO ignores single-piece files that also name crash, cymbal, hh,\n" ..
                       "kick, ride, snare, toms or bass. When several files fit, the shortest\n" ..

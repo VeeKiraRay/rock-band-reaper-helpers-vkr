@@ -30,7 +30,7 @@ local STEM_RULES = {
     { track = 'KEYS AUDIO',   priority = { 'piano', 'keys', 'accordion' } },
     { track = 'BASS AUDIO',   all = { 'bass' }, none = { 'drum' } },
     { track = 'GUITAR AUDIO', all = { 'guitar' } },
-    { track = 'VOCAL AUDIO',  all = { 'vocal' }, none = { 'back' }, prefer = 'lead' },
+    { track = 'VOCALS AUDIO', all = { 'vocal' }, none = { 'back' }, prefer = 'lead' },
     { track = 'KIT AUDIO',    all = { 'drum' }, none = KIT_EXCLUDE },
 }
 

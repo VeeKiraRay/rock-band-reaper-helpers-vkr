@@ -48,6 +48,10 @@
 --       longer scroll out of sight. The track dropdowns now update on their
 --       own: adding, renaming or deleting a track, or adding an item to one,
 --       shows up within about a second. The Refresh tracks button is gone.
+--     - General > Actions "Import stems": the lead vocal stem now goes to the
+--       VOCALS AUDIO track. It looked for VOCAL AUDIO, which the template does
+--       not have, so the vocal stem was always listed as skipped (track not
+--       found) instead of imported.
 --     - New Metadata > Song key sub-tab (Beta). Suggests the vocal tonic note
 --       and whether the song is major or minor - the vocal_tonic_note and
 --       song_tonality values in songs.dta - from the charted notes. Four
