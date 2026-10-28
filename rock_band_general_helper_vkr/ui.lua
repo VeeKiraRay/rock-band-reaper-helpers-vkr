@@ -28,9 +28,16 @@ local function Loop()
         S.tm_snare_idx       = -1
         S.tm_kit_idx         = -1
         S.tm_fallback_idx    = -1
+        S.key_audio_idx      = -1   -- Metadata > Song key audio tracks; re-defaulted below
+        S.key_bass_idx       = -1
         -- Metadata > Difficulty results describe the PREVIOUS project's charts. Leaving
         -- them on screen after a switch would attribute one song's ranks to another.
         S.diff_suggestions   = nil
+        S.key_suggestion     = nil   -- Metadata > Song key, same reason
+        S.key_audio          = nil
+        SongKeyAudioCancel()          -- a running audio read belongs to the old project
+        S.key_check_tonic    = nil
+        S.key_check_minor    = false
         local loaded = LoadSettings()
         S.status = loaded and 'Project switched: loaded saved settings.'
                            or 'Project switched.'
@@ -49,12 +56,15 @@ local function Loop()
         -- persisted name (workflow_state itself is repopulated by LoadSettings above)
         S.workflow_files    = nil
         S.workflow_file_idx = 0
-        SetDefaultTempoTracks()
+        SetDefaultTracks()
     end
 
     -- Poll first, so the first frame builds the lists once, not twice.
     local tracks_due = _track_poll()
     if tracks_due or not S.all_track_list then RefreshTrackLists() end
+
+    -- Metadata > Song key's audio job: a ~20 ms slice per frame, whichever tab is showing.
+    SongKeyTick()
     local audio_tracks = S.audio_track_list
 
     r.ImGui_SetNextWindowSize(ctx, 560, 660, r.ImGui_Cond_FirstUseEver())

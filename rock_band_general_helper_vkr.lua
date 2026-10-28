@@ -12,9 +12,9 @@
 --                  playhead
 --     Venue      - list, validate, and generate VENUE track events
 --     Metadata   - genre converter (real-world genre to the supported major genre
---                  and subgenre), and suggested difficulty rank and tier per
+--                  and subgenre), suggested difficulty rank and tier per
 --                  instrument (Beta) from measurements of the finished Expert
---                  charts. Read-only.
+--                  charts, and suggested song key (Beta). Read-only.
 --   Work-in-progress tab (General > Settings > Show WIPs?):
 --     Tempo Map  - audio-driven tempo map generation from drum stems
 --
@@ -48,6 +48,27 @@
 --       longer scroll out of sight. The track dropdowns now update on their
 --       own: adding, renaming or deleting a track, or adding an item to one,
 --       shows up within about a second. The Refresh tracks button is gone.
+--     - New Metadata > Song key sub-tab (Beta). Suggests the vocal tonic note
+--       and whether the song is major or minor - the vocal_tonic_note and
+--       song_tonality values in songs.dta - from the charted notes. Four
+--       results side by side: PART VOCALS alone, with the harmonies, with Pro
+--       Keys, and Pro Keys alone as a second opinion, so you can see what each
+--       part says. Each shows the runner-up key and how clear the lead is;
+--       hover a key to see its notes. Notes marked unpitched (#) are left out.
+--     - Read from: Charted MIDI (default) or Audio stems (experimental), one at
+--       a time. Audio stems reads a vocal track and a bass track - each that
+--       part on its own (a stem or an AI-separated part, not the full mix) -
+--       and gives one result, from both when both have enough notes. Useful
+--       before the vocals are charted, and as a second opinion after. Tracks
+--       named VOCALS AUDIO and BASS AUDIO are picked automatically. It
+--       runs in the background with a progress bar and Cancel, so the window
+--       stays usable on slower computers.
+--     - Check a key, below the suggestions: pick any key (a suggestion, or one
+--       from Tunebat or a chord chart) and see, for PART VOCALS, HARM1-3 and
+--       Pro Keys separately, how many notes fall outside it and in which bars -
+--       where to look for a note charted a semitone off.
+--       A suggestion to verify by ear, not an answer: it is only as accurate as
+--       the chart. Read-only.
 --
 --   v0.9.62
 --     - Difficulty > Keys and Guitar/Bass: Validate now agrees with official
@@ -193,6 +214,9 @@ for _, _f in ipairs({
     _dir  .. 'lib/reaper_difficulty_predict.lua',
     _dir  .. 'lib/reaper_difficulty_models.lua',
     _dir  .. 'lib/reaper_difficulty_read.lua',
+    _dir  .. 'lib/reaper_key_detect.lua',
+    _dir  .. 'lib/reaper_key_profiles.lua',
+    _dir  .. 'lib/reaper_key_audio.lua',
     _mdir .. 'defaults.lua',
     _mdir .. 'settings.lua',
     _mdir .. 'helpers.lua',
@@ -225,6 +249,8 @@ for _, _f in ipairs({
     _mdir .. 'metadata_genres.lua',
     _mdir .. 'metadata_genres_ext.lua',
     _mdir .. 'metadata_genres_lookup.lua',
+    _mdir .. 'song_key.lua',
+    _mdir .. 'song_key_audio.lua',
     _mdir .. 'ui_venue.lua',
     _mdir .. 'ui_venue_section_gen.lua',
     _mdir .. 'ui_venue_manual.lua',
@@ -234,6 +260,7 @@ for _, _f in ipairs({
     _mdir .. 'ui_venue_players.lua',
     _mdir .. 'ui_workflow.lua',
     _mdir .. 'ui_metadata_genre.lua',
+    _mdir .. 'ui_metadata_key.lua',
     _mdir .. 'ui_metadata.lua',
     _mdir .. 'ui.lua',
 }) do
@@ -258,6 +285,9 @@ dofile(_dir  .. 'lib/reaper_difficulty_tiers.lua')
 dofile(_dir  .. 'lib/reaper_difficulty_predict.lua')
 dofile(_dir  .. 'lib/reaper_difficulty_models.lua')
 dofile(_dir  .. 'lib/reaper_difficulty_read.lua')
+dofile(_dir  .. 'lib/reaper_key_detect.lua')
+dofile(_dir  .. 'lib/reaper_key_profiles.lua')   -- generated; read by song_key.lua
+dofile(_dir  .. 'lib/reaper_key_audio.lua')      -- uses reaper_dsp.lua's YIN core
 
 -- Window title with this script's own @version, read from the header above.
 -- ui.lua passes it to ImGui_Begin; the "###" id inside keeps saved window
@@ -299,6 +329,8 @@ dofile(_mdir .. 'difficulty_suggester.lua')
 dofile(_mdir .. 'metadata_genres.lua')
 dofile(_mdir .. 'metadata_genres_ext.lua')
 dofile(_mdir .. 'metadata_genres_lookup.lua')
+dofile(_mdir .. 'song_key.lua')
+dofile(_mdir .. 'song_key_audio.lua')
 dofile(_mdir .. 'ui_venue.lua')
 dofile(_mdir .. 'ui_venue_section_gen.lua')
 dofile(_mdir .. 'ui_venue_manual.lua')
@@ -308,10 +340,11 @@ dofile(_mdir .. 'ui_venue_keyframes.lua')
 dofile(_mdir .. 'ui_venue_players.lua')
 dofile(_mdir .. 'ui_workflow.lua')
 dofile(_mdir .. 'ui_metadata_genre.lua')
+dofile(_mdir .. 'ui_metadata_key.lua')
 dofile(_mdir .. 'ui_metadata.lua')
 dofile(_mdir .. 'ui.lua')  -- also calls r.defer(Loop) at end
 
 -- Startup initialisation (runs after all modules are loaded)
 local _autoloaded = LoadSettings()
 if _autoloaded then S.status = 'Loaded saved settings.' end
-SetDefaultTempoTracks()
+SetDefaultTracks()

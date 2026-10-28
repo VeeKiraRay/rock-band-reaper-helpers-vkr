@@ -19,13 +19,16 @@ function FindNamedTrackMIDI(name)
     return track, nil, nil
 end
 
--- Scan track names and pre-select the drum audio tracks.
+-- Scan track names and pre-select the audio tracks the tabs read by name: the drum
+-- stems for Tempo Map, the vocal and bass stems for Metadata > Song key.
 -- Only sets a field when it is still -1 (not yet assigned).
-function SetDefaultTempoTracks()
+function SetDefaultTracks()
     local name_to_field = {
         ['KICK AUDIO']   = 'tm_kick_idx',
         ['SNARE AUDIO']  = 'tm_snare_idx',
         ['KIT AUDIO']    = 'tm_kit_idx',
+        ['VOCALS AUDIO'] = 'key_audio_idx',
+        ['BASS AUDIO']   = 'key_bass_idx',
     }
     for i = 0, r.CountTracks(0) - 1 do
         local tr = r.GetTrack(0, i)

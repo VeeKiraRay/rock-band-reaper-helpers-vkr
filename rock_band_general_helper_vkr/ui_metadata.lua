@@ -1,7 +1,8 @@
 -- Metadata tab rendering.
 --
 -- Song-level properties, as opposed to every other tab in this script, which operates on
--- tracks, notes or events. Two sub-tabs: Genre and Difficulty.
+-- tracks, notes or events. Three sub-tabs: Genre, Difficulty and Song key (the last drawn
+-- by ui_metadata_key.lua).
 --
 -- Genre is drawn by ui_metadata_genre.lua; this file only wraps it in a tab item. It is
 -- first because it is a pure lookup that needs no project at all, so it works in an
@@ -13,7 +14,7 @@
 --
 -- Requires globals: r, ctx, S, TIPS, Btn, BTN_H, Tooltip, SectionHeader, LabelColWidth,
 --                   RunAction, SuggestProjectDifficulties, HasAnyChartTrack
---                   (difficulty_suggester.lua)
+--                   (difficulty_suggester.lua), DrawMetadataKeyTab (ui_metadata_key.lua)
 
 -- Amber for advisory notes, matching the inline warnings elsewhere in this script.
 local COL_WARN = 0xFFAA00FF
@@ -394,6 +395,14 @@ function DrawMetadataTab(ctx)
                 end
             end
 
+            r.ImGui_EndTabItem(ctx)
+        end
+
+        ------------------------------------------------
+        -- Metadata > Song key sub-tab (ui_metadata_key.lua)
+        ------------------------------------------------
+        if r.ImGui_BeginTabItem(ctx, 'Song key') then
+            DrawMetadataKeyTab(ctx)
             r.ImGui_EndTabItem(ctx)
         end
 

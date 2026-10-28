@@ -96,7 +96,7 @@ S = {
     tm_timesig_text       = '',   -- UI buffer; '' = inherit
     tm_override_failsafe  = false,
     tm_autotune_density   = 0,    -- expected onsets/measure for auto-tune density guard (0 = disabled)
-    -- Tempo map track indices (not persisted - set by SetDefaultTempoTracks; -1 = none)
+    -- Tempo map track indices (not persisted - set by SetDefaultTracks; -1 = none)
     tm_kick_idx           = -1,
     tm_snare_idx          = -1,
     tm_kit_idx            = -1,
@@ -118,6 +118,21 @@ S = {
     -- and no way to tell which of the two flags put it there. Starting from off every
     -- session means the panel's visibility always has exactly one explanation.
     diff_show_factors     = false,
+    -- Metadata > Song key: the last SuggestProjectSongKey() result. Session-only and
+    -- cleared on project switch, like diff_suggestions above and for the same reason.
+    key_suggestion        = nil,
+    -- Metadata > Song key > Check a key: the key being checked (tonic 0-11, minor).
+    -- Session-only; set to the best suggestion on each run, cleared on project switch.
+    key_check_tonic       = nil,
+    key_check_minor       = false,
+    -- Metadata > Song key, audio mode: the vocal and bass tracks (REAPER indices, -1 =
+    -- none). Not persisted, like every track index; SetDefaultTracks picks VOCALS
+    -- AUDIO and BASS AUDIO. key_audio is the last SuggestAudioSongKey() result.
+    key_audio_idx         = -1,
+    key_bass_idx          = -1,
+    key_audio             = nil,
+    -- Which source the tab reads: 1 = charted MIDI (default), 2 = audio stems. Session-only.
+    key_mode              = 1,
     -- Metadata > Genre: the two combo positions. SESSION ONLY, DELIBERATELY NOT
     -- PERSISTED - this sub-tab is a lookup over two static tables and says nothing about
     -- the project, so a saved position would restore one project's answer into another
@@ -242,6 +257,68 @@ TIPS = {
         "be called either tier - the marker shows how much room there was.\n\n" ..
         "An amber marker pinned to one end means the score ran past the end of\n" ..
         "the scale, so its real position is further out than the ruler can show.",
+    -- Metadata > Song key
+    key_analyze =
+        "Read the charted vocals, harmonies and Pro Keys and suggest the\n" ..
+        "vocal tonic note and whether the song is major or minor.\n\n" ..
+        "Notes whose lyric is marked unpitched (#) are left out.\n\n" ..
+        "Read-only: nothing is written to the project, and no undo point\n" ..
+        "is created. Results are not saved - re-run after editing a chart.\n\n" ..
+        "The whole song is read. A time selection does not change the result.",
+    key_suggested =
+        "The key whose scale and home note fit the charted notes best.\n\n" ..
+        "A suggestion, not a measurement: verify it by ear or against a\n" ..
+        "chord chart before entering it.",
+    key_keys_only =
+        "Pro Keys on its own, as a second opinion beside the vocals.",
+    key_mode_midi =
+        "Suggest the key from the charted notes: PART VOCALS, HARM1-3 and Pro Keys.",
+    key_mode_audio =
+        "Suggest the key from vocal and bass audio stems instead of the chart.\n\n" ..
+        "Useful before the vocals are charted, and as a second\n" ..
+        "opinion after.",
+    key_audio_track =
+        "A track with the lead vocal on its own. Avoid using the full mix - the\n" ..
+        "pitch detected there would be whatever is loudest, which usually is not\n" ..
+        "the vocals. Choose (none) to try what the bass stem alone produces.\n\n" ..
+        "A track named VOCALS AUDIO is picked automatically.",
+    key_bass_track =
+        "A track with the bass guitar on its own. The bass keeps returning to the\n" ..
+        "home note, so with the vocal it gives the best audio result. Leave it at\n" ..
+        "(none) to use the vocal alone.\n\n" ..
+        "A track named BASS AUDIO is picked automatically.",
+    key_analyze_audio =
+        "Read the picked vocal and bass tracks and suggest the vocal tonic note\n" ..
+        "and whether the song is major or minor. Uses both when both give\n" ..
+        "enough notes, otherwise whichever does.\n\n" ..
+        "Read-only: nothing is written to the project, and no undo point\n" ..
+        "is created. Takes a few seconds for a whole song.",
+    key_check_button_audio =
+        "Switch to Charted MIDI and show this key in Check a key, track by\n" ..
+        "track - which charted notes fall outside it.",
+    key_check_button =
+        "Show this key in Check a key below, track by track.",
+    key_check_pick =
+        "The key to check. Starts on the best suggestion; set it to any\n" ..
+        "key you want to compare, such as one from Tunebat or a chord chart.",
+    key_scale =
+        "The seven notes of the checked key, starting from its home note.\n\n" ..
+        "Minor keys are listed as the natural minor scale.",
+    key_share_out =
+        "How many of this track's notes are not in the checked key. The\n" ..
+        "notes are listed below with the bars they are in.\n\n" ..
+        "Songs use such notes on purpose all the time - a blue note, or the\n" ..
+        "raised 7th of a minor key (G# in A minor) - so they are not mistakes\n" ..
+        "in themselves, and a chart should keep the pitch actually sung. They\n" ..
+        "are where to look if a note may be charted a semitone off: a note\n" ..
+        "that appears once or twice is worth a listen, one that repeats in\n" ..
+        "the same places is almost always meant.\n\n" ..
+        "In the official vocal charts, half the songs have under 3% of their\n" ..
+        "notes outside the key their songs.dta lists, and about 1 in 5 has 15%\n" ..
+        "or more - so the amber from 15% means worth a look, not wrong. Such\n" ..
+        "songs often sit between major and minor; try the other one.",
+
+    -- Metadata > Difficulty (continued)
     diff_show_factors =
         "Show the raw measurements behind each suggestion.\n\n" ..
         "This is a development view - useful for comparing a chart\n" ..

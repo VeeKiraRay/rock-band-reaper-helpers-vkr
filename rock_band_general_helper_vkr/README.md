@@ -27,7 +27,7 @@ The window is organized into tabs plus a [footer](#window-footer) that is always
 | **Workflow**   | A per-project authoring checklist from a template you can edit                      |
 | **Events**     | List the song sections and insert EVENTS-track markers at the playhead               |
 | **Venue**      | Validate and generate text events on the VENUE track                                |
-| **Metadata**   | Convert a real-world genre to the closest supported Rock Band genre, and suggest a difficulty rank and tier for each finished Expert chart |
+| **Metadata**   | Convert a real-world genre to the closest supported Rock Band genre, suggest a difficulty rank and tier for each finished Expert chart, and suggest the song key from the charted vocals |
 
 <a id="wip-tabs"></a>
 
@@ -364,7 +364,7 @@ The VENUE spec includes three categories of events:
 
 ## Metadata tab
 
-Contains two sub-tabs: **Genre** and **Difficulty**. Both answer questions about the song as a whole rather than editing anything — neither writes to the project or creates an undo point.
+Contains three sub-tabs: **Genre**, **Difficulty** and **Song key**. All three answer questions about the song as a whole rather than editing anything — none of them writes to the project or creates an undo point.
 
 ### Genre sub-tab
 
@@ -414,6 +414,80 @@ More useful than ranking the instruments, though, is where on the scale you are.
 It's advisory. Official ranks and player judgment can differ from each other too, so treat a suggestion as a starting point rather than a verdict.
 
 The models are still evolving. **If a chart of yours scores clearly wrong, that's the most useful thing you can report** — see [A note on validation rules](../README.md#a-note-on-validation-rules) in the main README for where to send it.
+
+### Song key sub-tab
+
+Suggests the **vocal tonic note** and whether the song is **major or minor** — the `vocal_tonic_note` and `song_tonality` values in `songs.dta`.
+
+**Read from** picks the source, one at a time so the screen shows one set of answers:
+
+- **Charted MIDI** (the default) — the notes you've charted. Described below.
+- **Audio stems (experimental)** — the recordings, for before the vocals are charted or as a second opinion after. See [Audio stems](#audio-stems-experimental).
+
+Each mode has its own **Suggest song key** button and keeps its own results.
+
+#### Charted MIDI
+
+Press **Suggest song key** to read the chart. You get four results side by side:
+
+- **PART VOCALS** — the lead vocal alone.
+- **PART VOCALS + harmonies** — adds HARM1–3 (whichever of them you've charted).
+- **PART VOCALS + harmonies + Pro Keys** — adds PART REAL_KEYS_X. Pro Keys charts whole chords, so this one usually has the most to go on.
+- **Pro Keys only (check)** — Pro Keys on its own, as a second opinion beside the vocals. A piano transcription and a live vocal take often point different ways; when they agree, that's reassuring, and when they don't, it's worth a listen. It also still works when every vocal note is unpitched.
+
+They're kept apart so you can weigh each input yourself. Not every chart has Pro Keys, and a simple harmony that follows the melody a third above can pull the answer toward the wrong key. A result whose part isn't charted says so instead of guessing, and each title names only the parts it actually read. Only the Expert Pro Keys track (PART REAL_KEYS_X) is read, since the easier tiers may have notes shifted.
+
+Each result shows the **suggested** key and the **runner-up** (and how it relates — the relative key, the parallel key, or a fifth away), and whether the lead over the runner-up is clear or a close call. Hover over a key to see its notes.
+
+#### Check a key
+
+Below the suggestions, pick any key — press **Check** next to a suggestion, or set the key you found on Tunebat, a chord chart or by ear — and see, track by track (PART VOCALS, HARM1, HARM2, HARM3, Pro Keys):
+
+- what share of the track's notes fall **outside the key** (shown in amber from 15%), and
+- those notes, with how many and in which bars.
+
+Songs use notes outside the key on purpose all the time (a blue note, or G# in A minor), so these aren't mistakes in themselves — they're where to look if a note might be charted a semitone off. A large share can also mean the key itself is wrong: comparing two candidate keys here is often the quickest way to choose between them.
+
+Notes whose lyric is marked **unpitched** (`#` or `#$` — screams, growls, spoken lines) are left out. If every vocal note is unpitched, the tab says so: there's no sung pitch to suggest a key from, and the part may not need one.
+
+**Treat the result as a starting point and always check it by ear or against a chord chart.** It is only as accurate as the chart it reads — a few stray or mis-pitched notes can pull it off — and the common mix-ups are exactly the ones the runner-up line names: the relative key (C major and A minor share every note) and the parallel key (C major and C minor share the home note).
+
+Where the numbers come from: the suggestion compares your notes against patterns averaged from the official Rock Band 3 DLC charts and the keys their own `songs.dta` files list. Those values are the charters' judgement from the time and some disagree with published keys, so even a perfect match with them wouldn't guarantee the right answer. The whole song is read; a time selection makes no difference.
+
+#### Audio stems (experimental)
+
+Pick a **Vocal track** and a **Bass track** — each holding that part on its own: a stem, or a part separated from the song with a stem-splitting tool. Tracks named VOCALS AUDIO and BASS AUDIO are picked automatically. A picked track with no audio on it is skipped, as if left at (none). **Don't pick the full mix of the song**: with every instrument in it, the pitch the tool hears is whatever is loudest, and the result means nothing.
+
+Press **Suggest song key** for **one** result. It uses the vocal and the bass together when both are picked and have enough pitched notes, otherwise whichever one does. The two together work best: the vocal gives the scale and the bass keeps returning to the home note. Tried on official Rock Band songs with their studio stems, vocal + bass found the listed key about as often as the charted vocals did, and more often than the vocal alone. Treat it as a starting point all the same.
+
+It shows the suggested key and the runner-up, with how clear the lead is, and which tracks were read. There's no "outside the key" list here: pitch tracking a real recording (slides, vibrato, breaths) puts many notes outside even the right key. Instead, **Check** next to a key switches to Charted MIDI and loads that key into Check a key, so you can see how the charted notes fit it.
+
+Rapped or spoken parts can pull the audio result off — they have no steady pitch, and unlike the chart, the recording has no `#` to mark them. Reading a whole song takes a few seconds — longer on a slower computer. The window stays usable meanwhile: a progress bar shows how far it has got, **Cancel** stops it, and you can switch to other tabs while it finishes.
+
+#### How many notes outside the key is normal?
+
+Some, and it's not something to fix. Chart the pitch the singer actually sings — vocals are scored against the charted notes, and the song key is only metadata, so moving a correct note into the key makes the chart worse, not better.
+
+For reference, this is how the official Rock Band 3 DLC charts compare with the key their own `songs.dta` lists (about 480 songs; pitched notes only, unpitched `#` notes left out):
+
+| Notes outside the listed key | PART VOCALS | HARM2 + HARM3 | Pro Keys |
+|---|---|---|---|
+| None at all | 17% of songs | 32% | 19% |
+| Under 1% | 33% | 42% | 26% |
+| Under 3% | 49% | 52% | 36% |
+| Under 5% | 55% | 58% | 45% |
+| Under 10% | 70% | 70% | 61% |
+| 15% or more | 19% | 22% | 28% |
+| Median song | 3.2% | 2.3% | 6.6% |
+
+The notes outside the key are mostly ordinary pop and rock writing rather than slips:
+
+- **In major keys:** the flat 3rd (a blue note) and the flat 7th (the "Mixolydian" rock sound) make up most of them — about three quarters in PART VOCALS.
+- **In minor keys:** the flat 5th, the major 6th (the "Dorian" sound) and the major 3rd lead; on Pro Keys, so does the raised 7th (G# in A minor).
+
+So a song with 1% or so outside the key is entirely typical. What's worth a listen is a note a semitone off a key note that appears **once or twice** in a long song — a note that repeats in the same places is almost always meant.
+
+**When the share gets high, the suggestion gets shakier too.** On the official charts, the suggestions held up about equally well for songs with anything up to roughly 15% of their notes outside the listed key, and dropped off sharply above that. Those songs — about one in five — accounted for a third to a half of all the misses, and the typical miss there was the **right home note with the other of major and minor**: these songs sit between the two, and even the official value is a judgement call. If Check a key shows a large share, try the same note as the other mode before anything else.
 
 ---
 

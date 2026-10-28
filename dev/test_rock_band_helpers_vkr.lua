@@ -46,7 +46,7 @@ local results = { vocal = nil, general = nil, instrument = nil,
                   script_links = nil, window_title = nil, helper_ui = nil,
                   difficulty_score = nil,
                   difficulty_bpm = nil, difficulty_suggester = nil,
-                  metadata_genres = nil }
+                  metadata_genres = nil, key_detect = nil }
 
 local COL_OK  = 0x55DD55FF
 local COL_ERR = 0xFF5555FF
@@ -313,6 +313,14 @@ function Loop()
         end
         r.ImGui_SameLine(ctx)
         draw_status(results.metadata_genres)
+
+        r.ImGui_Spacing(ctx)
+
+        if r.ImGui_Button(ctx, 'Song Key Tests', 155, 24) then
+            run('run_key_detect.lua', 'key_detect')
+        end
+        r.ImGui_SameLine(ctx)
+        draw_status(results.key_detect)
 
         r.ImGui_Spacing(ctx)
         r.ImGui_Separator(ctx)
