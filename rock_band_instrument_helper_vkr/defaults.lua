@@ -330,7 +330,12 @@ TIPS = {
                      "Only looks up to a half note (16x32nd notes) ahead for a next note -\n" ..
                      "sustains with nothing that close are left unchanged. A note starting\n" ..
                      "INSIDE the sustain always counts as the next note, however far the\n" ..
-                     "following one is, so an overlap is never left behind.",
+                     "following one is, so an overlap is never left behind.\n\n" ..
+                     "Intentional rests are kept: the track's most common gap is measured\n" ..
+                     "(whole track, this difficulty), and a sustain is only lengthened when\n" ..
+                     "its gap is at most 1.5x that (usual 3 -> up to 4). Longer gaps are left\n" ..
+                     "alone and listed in the result to check by hand. A gap tighter than\n" ..
+                     "the target is always fixed.",
     mn_adjust      = "Apply the note-length/sustain-gap adjustment to the selected track\n" ..
                      "and difficulty range.\n\n" ..
                      "With a time selection: only adjusts notes starting inside it.\n" ..

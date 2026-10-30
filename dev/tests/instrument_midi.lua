@@ -911,7 +911,7 @@ Test.it('Only sustains: a chord sustain (same start tick) is counted once, not p
     S.mn_sustain_32nds   = 4
     AdjustMidiNoteLengths()
 
-    Test.expect(S.last_result ~= nil and S.last_result:find('^1 sustain'),
+    Test.expect(S.last_result ~= nil and S.last_result:find('\n1 sustain adjusted'),
         'expected the 3-pitch chord to be reported as 1 sustain, got: ' .. tostring(S.last_result))
     local _, n = r.MIDI_CountEvts(take)
     for i = 0, n - 1 do
@@ -1064,6 +1064,109 @@ Test.it('Only sustains: a next note starting exactly at the sustain end is seen'
     local ok, _, _, _, new_eppq = r.MIDI_GetNote(take, 0)
     Test.expect(ok and new_eppq == next_sppq - 2 * len32,
         ('expected end at %d, got %d'):format(next_sppq - 2 * len32, new_eppq))
+    CleanupFixture(idx)
+end)
+
+-- Sustains of 1 QN, each followed by a short note `gaps[k]` 32nds after its
+-- end, laid out back to back. Returns the take, idx, len32 and every
+-- sustain's { sppq, eppq, next_sppq }.
+local function MakeGapFixture(gaps)
+    local take, item, idx = MakeMidiTrack('PART GUITAR', 20)
+    local ppq_per_qn = GetTakePPQPerQN(take)
+    local len32      = math.floor(ppq_per_qn * 4 / 32 + 0.5)
+    local pos, list = 0, {}
+    for _, g in ipairs(gaps) do
+        local s, e = pos, pos + ppq_per_qn
+        local nx   = e + g * len32
+        r.MIDI_InsertNote(take, false, false, s, e, 0, 96, 100, false)
+        r.MIDI_InsertNote(take, false, false, nx, nx + len32, 0, 97, 100, false)
+        list[#list + 1] = { sppq = s, eppq = e, next_sppq = nx }
+        pos = nx + 2 * ppq_per_qn
+    end
+    return take, idx, len32, list
+end
+
+local function SustainEnd(take, sppq)
+    local _, n = r.MIDI_CountEvts(take)
+    for i = 0, n - 1 do
+        local ok, _, _, s, e, _, p = r.MIDI_GetNote(take, i)
+        if ok and s == sppq and p == 96 then return e end
+    end
+end
+
+Test.it('Only sustains: a gap much longer than the usual one is left alone and listed', function()
+    reset()
+    local take, idx, len32, list = MakeGapFixture({ 3, 3, 3, 3, 16 })
+    S.mn_midi_idx      = idx
+    S.mn_diff_idx      = 1
+    S.mn_note_type     = 1
+    S.mn_sustain_32nds = 2
+    AdjustMidiNoteLengths()
+
+    for k = 1, 4 do
+        local e = SustainEnd(take, list[k].sppq)
+        Test.expect(e == list[k].next_sppq - 2 * len32,
+            ('sustain %d: expected end %d, got %s'):format(k, list[k].next_sppq - 2 * len32, tostring(e)))
+    end
+    local e5 = SustainEnd(take, list[5].sppq)
+    Test.expect(e5 == list[5].eppq, 'the sustain before the long rest must not be lengthened')
+    local res = S.last_result or ''
+    Test.expect(res:find('Most common gap: 3/32', 1, true), 'expected the usual gap in the result: ' .. res)
+    Test.expect(res:find('4/32 or less', 1, true), 'expected the limit in the result: ' .. res)
+    Test.expect(res:find('1 left alone', 1, true) and res:find('gap 16/32', 1, true),
+        'expected the long gap listed: ' .. res)
+    CleanupFixture(idx)
+end)
+
+Test.it('Only sustains: a gap tighter than the target is always fixed, even past the limit', function()
+    reset()
+    -- Expert-range notes with a Medium-like 8/32 target.
+    local take, idx, len32, list = MakeGapFixture({ 3, 3, 3, 6 })
+    S.mn_midi_idx      = idx
+    S.mn_diff_idx      = 1
+    S.mn_note_type     = 1
+    S.mn_sustain_32nds = 8
+    AdjustMidiNoteLengths()
+
+    for k = 1, 4 do
+        local e = SustainEnd(take, list[k].sppq)
+        Test.expect(e == list[k].next_sppq - 8 * len32,
+            ('sustain %d: expected end %d, got %s'):format(k, list[k].next_sppq - 8 * len32, tostring(e)))
+    end
+    Test.expect(not (S.last_result or ''):find('left alone', 1, true),
+        'nothing should be left alone: ' .. tostring(S.last_result))
+    CleanupFixture(idx)
+end)
+
+Test.it('Only sustains: usual 3/32 - a 4/32 gap is closed up, a 5/32 gap is left alone', function()
+    reset()
+    local take, idx, len32, list = MakeGapFixture({ 3, 3, 3, 4, 5 })
+    S.mn_midi_idx      = idx
+    S.mn_diff_idx      = 1
+    S.mn_note_type     = 1
+    S.mn_sustain_32nds = 2
+    AdjustMidiNoteLengths()
+
+    local e4 = SustainEnd(take, list[4].sppq)
+    Test.expect(e4 == list[4].next_sppq - 2 * len32, 'the 4/32 gap should be closed to 2/32')
+    local e5 = SustainEnd(take, list[5].sppq)
+    Test.expect(e5 == list[5].eppq, 'the 5/32 gap should be left alone')
+    CleanupFixture(idx)
+end)
+
+Test.it('Only sustains: the usual gap ties go to the smaller gap', function()
+    reset()
+    -- Two 3/32 and two 6/32 gaps: usual 3, limit 4, so the 6/32 ones stay.
+    local take, idx, len32, list = MakeGapFixture({ 6, 3, 6, 3 })
+    S.mn_midi_idx      = idx
+    S.mn_diff_idx      = 1
+    S.mn_note_type     = 1
+    S.mn_sustain_32nds = 2
+    AdjustMidiNoteLengths()
+
+    Test.expect((S.last_result or ''):find('Most common gap: 3/32', 1, true),
+        'expected the tie to pick 3/32: ' .. tostring(S.last_result))
+    Test.expect(SustainEnd(take, list[1].sppq) == list[1].eppq, 'the 6/32 gap should be left alone')
     CleanupFixture(idx)
 end)
 

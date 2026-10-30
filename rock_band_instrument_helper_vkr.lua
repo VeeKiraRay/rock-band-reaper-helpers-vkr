@@ -279,6 +279,13 @@
 --     - Auto fill pacing: fast songs now get one measure every 4, as official
 --       charts do at every tempo, instead of 2 measures every 8 from 170 BPM.
 --       "2 bars every 8 bars" is still there to pick by hand.
+--     - MIDI > Length, Only sustains: a sustain ended early on purpose (a
+--       break, a muted guitar) is no longer stretched up to the next note.
+--       The track's most common gap is measured first, and a sustain is only
+--       lengthened when its gap is at most 1.5x that (usual 3/32 -> up to
+--       4/32). Longer gaps are left alone and listed in the result by
+--       position, to check by hand. A gap tighter than the target is still
+--       always fixed. The result shows the usual gap and the limit used.
 --
 r = reaper  -- global so all dofile'd modules can use it
 
