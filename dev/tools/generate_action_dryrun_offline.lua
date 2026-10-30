@@ -112,6 +112,14 @@ local api = {
         return true
     end,
     MIDI_DeleteNote = function(take, i) table.remove(take.notes, i + 1); return true end,
+    -- Generate's "make Expert's too-short sustains plain" answer changes note ends only.
+    MIDI_SetNote = function(take, i, _, _, sp, ep)
+        local n = take.notes[i + 1]
+        if not n then return false end
+        if sp then n.tick = sp end
+        if ep then n.len = ep - n.tick end
+        return true
+    end,
     -- The whole take as REAPER's packed event buffer (int32 tick offset, flag byte, int32
     -- length, message), notes only plus an end-of-take CC 123, and back. Pairs note-ons
     -- with note-offs first on, first off, like REAPER. Lets the action's bulk write
@@ -324,12 +332,17 @@ local function Run(path, key)
     if S[part.field] < 0 and not (key == 'drums' and S.diff_drums2x_idx >= 0) then return nil end
     S.diff_copy_pending = nil
     local ok, err = pcall(GenerateDifficulties, key == 'all' and GEN_ALL_KEY or key, { 'H', 'M', 'E' }, true)
-    -- A question after the overwrite one (Pro Keys Hard equal to Expert): take the
-    -- second answer, "Keep as Expert", so the run writes what the planner made.
-    local pending = S.diff_copy_pending
-    if ok and pending and pending.on_alt then
+    -- Questions after the overwrite one (Expert's too-short sustains, then Pro Keys Hard
+    -- equal to Expert): take each one's second answer ("Keep them", "Keep as Expert"), so
+    -- the run writes what the planner made from Expert as it is. DRYRUN_FIRST_ANSWER=1
+    -- takes the first answer instead ("Make them plain notes", "Shorten sustains").
+    local first = os.getenv('DRYRUN_FIRST_ANSWER') == '1'
+    for _ = 1, 3 do
+        local pending = S.diff_copy_pending
+        local answer = pending and (first and pending.on_confirm or pending.on_alt)
+        if not (ok and answer) then break end
         S.diff_copy_pending = nil
-        ok, err = pcall(pending.on_alt)
+        ok, err = pcall(answer)
     end
     if not ok then S.status, S.last_result = 'ERROR ' .. tostring(err), nil end
     return reaper.GetTrack(0, S[part.field] >= 0 and S[part.field] or S.diff_drums2x_idx)

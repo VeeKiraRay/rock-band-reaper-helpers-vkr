@@ -137,10 +137,30 @@ function SmfTierEvents(trk, lo, tpqn, timing, opts)
     return events
 end
 
+-- A 5-lane part's trill (127) and tremolo (126) lanes, with their marker velocity, as the
+-- planner's opts.lanes takes them (GenKeepHardLanes).
+function SmfLaneSpans(trk, tpqn)
+    local out = {}
+    for _, n in ipairs(SmfNotesInRange(trk, 126, 127)) do
+        out[#out + 1] = { qn = n.tick / tpqn, qn_e = (n.tick + n.len) / tpqn, vel = n.vel }
+    end
+    return out
+end
+
+-- A Pro Keys Hard track's trill markers (127) as Hard lanes (`hard`, any velocity): the
+-- action reads them the same way from PART REAL_KEYS_H.
+function SmfProKeysHardTrills(trk, tpqn)
+    local out = {}
+    for _, n in ipairs(SmfNotesInRange(trk, 127, 127)) do
+        out[#out + 1] = { qn = n.tick / tpqn, qn_e = (n.tick + n.len) / tpqn, vel = n.vel, hard = true }
+    end
+    return out
+end
+
 -- The marker context the Drums planner (difficulty_generate_drums.lua, opts.ctx) takes,
 -- from a song's PART DRUMS track and its EVENTS track, in quarter notes:
 --   fills    { { qn, qn_e }... }  drum fill lanes (120 - all five lanes span the same)
---   rolls    roll (126) and special roll (127) lanes
+--   rolls    roll (126) and special roll (127, flagged `two`) lanes
 --   toms     { [2|3|4] = spans }  Pro Drums tom markers 110 / 111 / 112 (Y / B / G)
 --   disco    Expert's disco-flip spans: [mix 3 drumsNd] up to the next [mix 3 drumsN]
 --            ("dnoflip" is not a flip for the lower tiers)
@@ -151,13 +171,14 @@ function SmfDrumsContext(song, trk)
     local function Spans(lo, hi)
         local out = {}
         for _, n in ipairs(SmfNotesInRange(trk, lo, hi)) do
-            out[#out + 1] = { qn = n.tick / tpqn, qn_e = (n.tick + n.len) / tpqn }
+            out[#out + 1] = { qn = n.tick / tpqn, qn_e = (n.tick + n.len) / tpqn, vel = n.vel }
         end
         return out
     end
-    local ctx = { fills = Spans(120, 120), rolls = Spans(126, 127),
+    local ctx = { fills = Spans(120, 120), rolls = Spans(126, 126),
                   toms = { [2] = Spans(110, 110), [3] = Spans(111, 111), [4] = Spans(112, 112) },
                   disco = {}, sections = {}, song_bpm = SmfSongTiming(song).Bpm(0) }
+    for _, sp in ipairs(Spans(127, 127)) do sp.two = true; ctx.rolls[#ctx.rolls + 1] = sp end
     local open
     for _, t in ipairs(SmfTexts(trk)) do
         local suffix = t.text:match('^%[mix 3 drums%d(%a*)%]')

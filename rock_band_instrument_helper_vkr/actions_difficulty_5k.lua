@@ -241,25 +241,11 @@ local function CheckK5SustainGaps(events, diff_label)
     return issues
 end
 
--- Expert/Hard: notes in the gray zone [1/8, 3/16) at >= 100 BPM are too long to be a hit
--- but too short for a valid sustain display. Flag them to extend or shorten.
+-- Expert/Hard: sustains in [1/8, 3/16) at >= 100 BPM - too long to be a hit, too short to
+-- read as a sustain (DiffCheckSustainLength, shared with Guitar/Bass and Pro Keys).
 local function CheckK5SustainLength(events)
-    local issues = {}
-    for _, ev in ipairs(events) do
-        local bpm = 60.0 / GetK5BeatDur(ev.s)
-        if bpm < 100 then goto k5sl_next end
-        local qn_s   = QNAt(ev.s)
-        local dur_qn = QNAt(ev.e) - qn_s
-        -- Gray zone: >= 1/8 note (too long for a hit) but < 3/16 note (too short to sustain)
-        if dur_qn >= 0.5 - EPS_QN and dur_qn < 0.75 * (1 - GRACE) then
-            local dur   = ev.e - ev.s
-            local min_s = r.TimeMap2_QNToTime(0, qn_s + 0.75) - ev.s
-            issues[#issues + 1] = DiffIssue(ev.s, ev.pitches, ('%s: %s is %.0f ms (need >= 3/16 note = %.0f ms at %.0f BPM, or shorten to hit)'):format(
-                FormatTime(ev.s), K5Label(ev.pitches), dur * 1000, min_s * 1000, bpm))
-        end
-        ::k5sl_next::
-    end
-    return issues
+    return DiffCheckSustainLength(events, { label = K5Label, qn_at = QNAt,
+                                            bpm_at = function(t) return 60.0 / GetK5BeatDur(t) end })
 end
 
 -- Pro Keys' own constants (self-contained duplicate of the equivalent locals
@@ -378,7 +364,7 @@ function CollectK5Checks(diff_label, events)
     cats[#cats + 1] = { name = 'Note length (min 1/64)', rule = 'note_length', issues = CheckK5NoteLength(events) }
 
     if diff_label == 'X' or diff_label == 'H' then
-        cats[#cats + 1] = { name = 'Sustain length (min 3/16 at >=100 BPM)', rule = 'sustain_length',
+        cats[#cats + 1] = { name = DIFF_SUSTAIN_LENGTH_NAME, rule = 'sustain_length',
                             issues = CheckK5SustainLength(events) }
     end
 

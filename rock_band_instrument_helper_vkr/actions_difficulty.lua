@@ -620,6 +620,11 @@ function CollectPKChecks(diff_label, events, lane_shifts, exp_events, sel_s)
 
     cats[#cats + 1] = { name = 'Overlapping gems', rule = 'overlap',
                         issues = DiffCheckOverlaps(events, diff_label, PK_OVERLAP) }
+    if diff_label == 'X' or diff_label == 'H' then
+        cats[#cats + 1] = { name = DIFF_SUSTAIN_LENGTH_NAME, rule = 'sustain_length',
+                            issues = DiffCheckSustainLength(events, { label = EventLabel, qn_at = QNAt,
+                                bpm_at = function(t) return 60.0 / GetBeatDurAt(t) end }) }
+    end
     cats[#cats + 1] = { name = 'Sustain gaps', rule = 'sustain_gap',
                         issues = Records(CheckSustainGaps(events, diff_label)) }
 

@@ -411,11 +411,11 @@ local function MarkerSpans(take, pitch, sel_s, sel_e)
     local spans = {}
     local _, n = r.MIDI_CountEvts(take)
     for i = 0, n - 1 do
-        local ok, _, _, sppq, eppq, _, p = r.MIDI_GetNote(take, i)
+        local ok, _, _, sppq, eppq, _, p, vel = r.MIDI_GetNote(take, i)
         if ok and p == pitch then
             local s = r.MIDI_GetProjTimeFromPPQPos(take, sppq)
             if not sel_s or (s >= sel_s - 0.001 and s < sel_e) then
-                spans[#spans + 1] = { qn = SnapQN(r.TimeMap2_timeToQN(0, s)),
+                spans[#spans + 1] = { qn = SnapQN(r.TimeMap2_timeToQN(0, s)), vel = vel,
                                       qn_e = SnapQN(r.TimeMap2_timeToQN(0, r.MIDI_GetProjTimeFromPPQPos(take, eppq))) }
             end
         end
@@ -432,7 +432,7 @@ local function DrumsContext(take)
     local ctx = { fills = MarkerSpans(take, 120), rolls = MarkerSpans(take, 126),
                   toms = { [2] = MarkerSpans(take, 110), [3] = MarkerSpans(take, 111), [4] = MarkerSpans(take, 112) },
                   disco = {}, sections = {} }
-    for _, sp in ipairs(MarkerSpans(take, 127)) do ctx.rolls[#ctx.rolls + 1] = sp end
+    for _, sp in ipairs(MarkerSpans(take, 127)) do sp.two = true; ctx.rolls[#ctx.rolls + 1] = sp end
     local function QN(ppq, tk) return SnapQN(r.TimeMap2_timeToQN(0, r.MIDI_GetProjTimeFromPPQPos(tk, ppq))) end
     local texts = {}
     local _, _, _, n_txt = r.MIDI_CountEvts(take)
@@ -633,6 +633,11 @@ local function DrumsLines(dl, log, opts)
     if (log.cym_changes or 0) > 0 then
         lines[#lines + 1] = ('    %d hi-hat/ride hit%s removed where the hand would jump to another cymbal an 8th later'
             .. ' or earlier'):format(log.cym_changes, log.cym_changes == 1 and '' or 's')
+    end
+    if (log.cym_changes_quarter or 0) > 0 then
+        lines[#lines + 1] = ('    %d hi-hat/ride hit%s removed between two hits on other cymbals a quarter apart (%d+ BPM)'):format(
+            log.cym_changes_quarter, log.cym_changes_quarter == 1 and '' or 's',
+            GEN_DRUMS_PARAMS.easy_cymbal_change_quarter_bpm)
     end
     if (log.lone_ands or 0) > 0 then
         lines[#lines + 1] = ('    %d lone drum "and"%s between two beat hits removed (%d+ BPM: too quick for Easy)'):format(
@@ -875,13 +880,92 @@ local function ToPlannerShifts(shifts)
     return out
 end
 
+-- Expert sustains too short to read as one: under 3/16 at 100+ BPM (DiffSustainTooShort,
+-- the rule Validate checks on Expert and Hard). A run from Expert asks once, for every
+-- instrument in it, whether to make them plain notes on Expert first.
+local SHORT_FIX_KINDS = { gb = true, k5 = true, pk = true }
+local EXPERT_PLAIN_QN = 0.25   -- the plain note they become: a 1/16, official charts' commonest
+local POPUP_MAX_RANGES = 10    -- bar ranges listed per instrument in the question
+
+-- The job's Expert events (planner events) that are such sustains.
+local function ShortExpertSustains(job)
+    local found = {}
+    for _, ev in ipairs(job.src) do
+        if DiffSustainTooShort(ev.qn_e - ev.qn, ev.bpm) then found[#found + 1] = ev end
+    end
+    return found
+end
+
+-- "m5-8, m40" for planner events; max_ranges cuts a long list short with ", ...".
+local function BarsOf(evs, max_ranges)
+    local bars = {}
+    for _, ev in ipairs(evs) do
+        local m = MeasureAt(ev.qn)
+        if m then bars[#bars + 1] = m end
+    end
+    local text = MeasureRanges(bars)
+    if max_ranges then
+        local parts = {}
+        for part in text:gmatch('[^,]+') do parts[#parts + 1] = part:match('^%s*(.-)%s*$') end
+        if #parts > max_ranges then text = table.concat(parts, ', ', 1, max_ranges) .. ', ...' end
+    end
+    return text
+end
+
+-- Make the Expert notes at those onsets plain: every Expert-range note starting there and
+-- held 1/8 or longer ends a 1/16 after its start (a chord's notes alike). Runs inside the
+-- run's undo block. Returns the number of notes changed.
+local function MakeExpertNotesPlain(inst, track, evs)
+    local at = {}
+    for _, ev in ipairs(evs) do at[math.floor(ev.qn * 96 + 0.5)] = true end
+    local lo, hi
+    if inst.kind == 'pk' then lo, hi = 48, 72 else lo = RangeLo(inst, 'X'); hi = lo + 4 end
+    local n = 0
+    for i = 0, r.CountTrackMediaItems(track) - 1 do
+        local item = r.GetTrackMediaItem(track, i)
+        local take = r.GetActiveTake(item)
+        if take and r.TakeIsMIDI(take) then
+            local changed = false
+            local _, notecnt = r.MIDI_CountEvts(take)
+            for j = 0, notecnt - 1 do
+                local ok, sel, muted, sppq, eppq, chan, pitch, vel = r.MIDI_GetNote(take, j)
+                if ok and not muted and pitch >= lo and pitch <= hi then
+                    local qs = r.TimeMap2_timeToQN(0, r.MIDI_GetProjTimeFromPPQPos(take, sppq))
+                    local qe = r.TimeMap2_timeToQN(0, r.MIDI_GetProjTimeFromPPQPos(take, eppq))
+                    if at[math.floor(qs * 96 + 0.5)] and qe - qs >= GEN5_SUSTAIN_QN - 0.01 then
+                        if not changed then
+                            r.MarkTrackItemsDirty(track, item)
+                            changed = true
+                        end
+                        local new_e = r.MIDI_GetPPQPosFromProjTime(take, r.TimeMap2_QNToTime(0, qs + EXPERT_PLAIN_QN))
+                        r.MIDI_SetNote(take, j, sel, muted, sppq, new_e, chan, pitch, vel, true)
+                        n = n + 1
+                    end
+                end
+            end
+            if changed then r.MIDI_Sort(take) end
+        end
+    end
+    return n
+end
+
+-- A copy of answers with one more answer, for the run a popup starts.
+local function WithAnswer(answers, key, value)
+    local out = {}
+    for k, v in pairs(answers) do out[k] = v end
+    out[key] = value
+    return out
+end
+
 -- Generate tiers (an ordered list such as { 'H' } or { 'H', 'M', 'E' }) for one
 -- instrument key, or GEN_ALL_KEY for every supported instrument. Each tier is built from
 -- the tier above it - the one just generated, when the run made it.
 -- force: skip the overwrite confirmation (set when called again from the popup).
 -- answers: the user's answers to questions this run asked, so the run that follows the
---   popup does not ask again. pk_pull_back: true / false once asked whether to shorten
---   Pro Keys Hard's sustains because Hard would equal Expert; nil = not asked yet.
+--   popup does not ask again (nil = not asked yet). expert_short: true / false once asked
+--   whether to make Expert's too-short sustains plain notes first. pk_pull_back: true /
+--   false once asked whether to shorten Pro Keys Hard's sustains because Hard would equal
+--   Expert.
 function GenerateDifficulties(inst_key, tiers, force, answers)
     answers = answers or {}
     local targets, skipped, err = ResolveTargets(inst_key)
@@ -1026,6 +1110,48 @@ function GenerateDifficulties(inst_key, tiers, force, answers)
     end
     Lap('ref')
 
+    -- Expert sustains too short to read as one (ShortExpertSustains). Hard plays them as
+    -- plain notes either way; the question is whether Expert itself is fixed. Asked once for
+    -- every instrument, before anything is written, so the fix and the tiers stay one undo
+    -- step - and before the Pro Keys question below, which plans from the fixed Expert.
+    if tiers[1] == 'H' then
+        local listed = {}
+        for _, job in ipairs(jobs) do
+            if SHORT_FIX_KINDS[job.inst.kind] then
+                job.short_x = ShortExpertSustains(job)
+                if #job.short_x > 0 then
+                    listed[#listed + 1] = ('  %s: %d (%s)'):format(job.inst.label, #job.short_x,
+                        BarsOf(job.short_x, POPUP_MAX_RANGES))
+                end
+            end
+        end
+        if #listed > 0 and answers.expert_short == nil then
+            S.diff_copy_pending = {
+                message = 'Expert has sustains shorter than a dotted 8th (3/16 note) at 100+ BPM:\n'
+                          .. table.concat(listed, '\n') .. '\n\n'
+                          .. 'RBN: "Durations should only be authored for notes longer than a dotted\n'
+                          .. '8th note for songs over 100bpm." Validate lists them as errors, and\n'
+                          .. 'Hard plays them as plain notes either way.\n\n'
+                          .. 'Make them plain 1/16 notes on Expert before generating?',
+                confirm_label = 'Make them plain notes',
+                on_confirm = function()
+                    GenerateDifficulties(inst_key, tiers, true, WithAnswer(answers, 'expert_short', true))
+                end,
+                alt_label = 'Keep them',
+                on_alt = function()
+                    GenerateDifficulties(inst_key, tiers, true, WithAnswer(answers, 'expert_short', false))
+                end,
+            }
+            return
+        end
+        -- The planners build from the fixed Expert; the notes are written in the undo block.
+        if answers.expert_short then
+            for _, job in ipairs(jobs) do
+                for _, ev in ipairs(job.short_x or {}) do ev.qn_e = ev.qn + EXPERT_PLAIN_QN end
+            end
+        end
+    end
+
     -- Pro Keys Hard that would come out as Expert exactly (a simple Expert: the RBN doc has
     -- no rule that Hard must differ, and official Hard sometimes is Expert as it is). Ask
     -- BEFORE writing anything, so Medium and Easy are built from the Hard the user picks
@@ -1042,9 +1168,13 @@ function GenerateDifficulties(inst_key, tiers, force, answers)
                                   .. 'Shorten the sustains on Hard so it differs slightly?\n'
                                   .. '(Some official charters reduce a simple Hard this way.)',
                         confirm_label = 'Shorten sustains',
-                        on_confirm = function() GenerateDifficulties(inst_key, tiers, true, { pk_pull_back = true }) end,
+                        on_confirm = function()
+                            GenerateDifficulties(inst_key, tiers, true, WithAnswer(answers, 'pk_pull_back', true))
+                        end,
                         alt_label = 'Keep as Expert',
-                        on_alt = function() GenerateDifficulties(inst_key, tiers, true, { pk_pull_back = false }) end,
+                        on_alt = function()
+                            GenerateDifficulties(inst_key, tiers, true, WithAnswer(answers, 'pk_pull_back', false))
+                        end,
                     }
                     return
                 end
@@ -1074,6 +1204,22 @@ function GenerateDifficulties(inst_key, tiers, force, answers)
         -- Each tier's planner events as this run has them (Easy's "and" phrases look at Hard).
         local tier_events = { [UPPER[tiers[1]]] = job.src }
         lines[#lines + 1] = ('%s  (%s)%s'):format(inst.label, inst.track_name, scope)
+        -- Expert's too-short sustains: made plain (the user's answer), or kept.
+        local short_x = job.short_x or {}
+        if #short_x > 0 then
+            local n, bars = #short_x, BarsOf(short_x)
+            if answers.expert_short then
+                local xtrack = inst.kind == 'pk' and job.tracks.X or job.track
+                local notes = MakeExpertNotesPlain(inst, xtrack, short_x)
+                -- Pro Keys' cross-difficulty checks compare the written tiers with Expert.
+                if inst.kind == 'pk' then job.exp_events = select(1, ReadTier(inst, xtrack, 'X', sel_s, read_e)) end
+                lines[#lines + 1] = ('  Expert: %d sustain%s shorter than a dotted 8th at 100+ BPM made plain 1/16 notes'
+                    .. ' (%d note%s): %s'):format(n, n == 1 and '' or 's', notes, notes == 1 and '' or 's', bars)
+            else
+                lines[#lines + 1] = ('  Expert: %d sustain%s shorter than a dotted 8th at 100+ BPM kept, as you chose'
+                    .. ' (Validate lists them; Hard plays them as plain notes): %s'):format(n, n == 1 and '' or 's', bars)
+            end
+        end
         for _, dl in ipairs(tiers) do
             local d = job.dest[dl]
             -- No time selection: the whole take, not 0 .. the item's end. An imported item
@@ -1090,6 +1236,13 @@ function GenerateDifficulties(inst_key, tiers, force, answers)
             local opts = { guide = guide, busy_drop = busy_drop, fast_runs = fast_runs,
                            busy_ref   = inst.key ~= 'gtr' and dl == 'H' and refs.H or nil,
                            rhythm_ref = inst.key ~= 'gtr' and dl == 'M' and refs.M or nil }
+            -- Guitar/Bass/Keys Hard: trill (127) and tremolo (126) lanes, whose marker
+            -- velocity says whether Hard plays them as lanes (GenKeepHardLanes).
+            if dl == 'H' and (inst.kind == 'gb' or inst.kind == 'k5') then
+                local take = d.take
+                opts.lanes = MarkerSpans(take, 126)
+                for _, sp in ipairs(MarkerSpans(take, 127)) do opts.lanes[#opts.lanes + 1] = sp end
+            end
             -- Pro Keys in a time selection. A tier with no notes outside the selection is
             -- generated as a new one: its lane shifts are cleared over the whole item, as a
             -- template's default C2-E3 marker must be (it was kept as "the window this tier
@@ -1098,6 +1251,12 @@ function GenerateDifficulties(inst_key, tiers, force, answers)
             -- keep the window set before the selection.
             if inst.kind == 'pk' then
                 opts.shifts = upper_shifts
+                -- Trill markers the author put on the Hard track (Generate never writes or
+                -- clears them): Hard keeps Expert's notes there, at any marker velocity.
+                if dl == 'H' then
+                    opts.lanes = MarkerSpans(d.take, 127)
+                    for _, sp in ipairs(opts.lanes) do sp.hard = true end
+                end
                 if sel_s then
                     local tier_shifts, tier_notes = ReadPKTierEvents(d.track)
                     local outside = false
@@ -1281,6 +1440,14 @@ function GenerateDifficulties(inst_key, tiers, force, answers)
                 n_out, n_up, KeptPercent(n_out, n_up), DIFF_NAMES[UPPER[dl]],
                 log.guided and (', following PART REAL_KEYS_' .. dl) or '')
             if #parts > 0 then lines[#lines + 1] = '    ' .. table.concat(parts, ', ') end
+            if (log.hard_lanes or 0) > 0 and inst.kind == 'pk' then
+                lines[#lines + 1] = ('    %d trill marker%s on PART REAL_KEYS_H: Expert\'s notes kept there as they are'):format(
+                    log.hard_lanes, log.hard_lanes == 1 and '' or 's')
+            elseif (log.hard_lanes or 0) > 0 then
+                lines[#lines + 1] = ('    %d %s lane%s marked for Hard (marker velocity 41-50): Expert\'s notes kept'
+                    .. ' there as they are'):format(log.hard_lanes, inst.kind == 'drums' and 'roll' or 'trill/tremolo',
+                    log.hard_lanes == 1 and '' or 's')
+            end
             if inst.kind == 'drums' then
                 for _, l in ipairs(DrumsLines(dl, log, opts)) do lines[#lines + 1] = l end
             end

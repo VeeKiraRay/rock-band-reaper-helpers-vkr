@@ -389,6 +389,10 @@ function CollectGBChecks(diff_label, events, track, sel_s, sel_e)
 
     cats[#cats + 1] = { name = 'Note length (min 1/64)', rule = 'note_length', issues = CheckGBNoteLength(events) }
     cats[#cats + 1] = { name = 'Overlapping notes', rule = 'overlap', issues = CheckGBOverlap(events) }
+    if diff_label == 'X' or diff_label == 'H' then
+        cats[#cats + 1] = { name = DIFF_SUSTAIN_LENGTH_NAME, rule = 'sustain_length',
+                            issues = DiffCheckSustainLength(events, { label = GBLabel, qn_at = QNAt, bpm_at = GetBPMAt }) }
+    end
 
     local sg_name = (diff_label == 'M' or diff_label == 'E')
         and DiffReleaseGapName(diff_label)

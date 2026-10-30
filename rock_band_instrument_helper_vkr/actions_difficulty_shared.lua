@@ -126,6 +126,44 @@ function DiffReleaseGapName(diff_label)
     return name .. ')'
 end
 
+-- Expert/Hard sustains too short to read as one, on Guitar, Bass, Keys and Pro Keys. RBN
+-- doc: "Durations should only be authored for notes longer than a dotted 8th note for songs
+-- over 100bpm, and a regular 8th note for songs under 100bpm." A note 1/8 long or longer
+-- shows a tail, so only 100 BPM and faster has a range to flag: [1/8, 3/16), with 5%
+-- forgiven at the top for hand-placed ends. Validate (DiffCheckSustainLength) and Generate
+-- (the Hard planners, and its question about Expert) share this one test.
+DIFF_SUSTAIN_MIN_QN  = 0.75   -- a dotted 8th
+DIFF_SUSTAIN_MIN_BPM = 100
+local SUSTAIN_TAIL_QN = 0.5   -- a 1/8 note or longer has a tail
+local SUSTAIN_GRACE   = 0.05
+
+-- True when a note len_qn quarter notes long at tempo bpm is such a sustain.
+function DiffSustainTooShort(len_qn, bpm)
+    return (bpm or 120) >= DIFF_SUSTAIN_MIN_BPM and len_qn >= SUSTAIN_TAIL_QN - 0.01
+       and len_qn < DIFF_SUSTAIN_MIN_QN * (1 - SUSTAIN_GRACE)
+end
+
+DIFF_SUSTAIN_LENGTH_NAME = ('Sustain length (min 3/16 at >=%d BPM)'):format(DIFF_SUSTAIN_MIN_BPM)
+
+-- The check itself, for Expert and Hard.
+--   events - { s, e, pitches } (project time)
+--   opts   - { label = fn(pitches) -> text, qn_at = fn(time) -> quarter notes,
+--              bpm_at = fn(time) -> tempo }
+-- Returns DiffIssue records.
+function DiffCheckSustainLength(events, opts)
+    local issues = {}
+    for _, ev in ipairs(events) do
+        local bpm  = opts.bpm_at(ev.s)
+        local qn_s = opts.qn_at(ev.s)
+        if DiffSustainTooShort(opts.qn_at(ev.e) - qn_s, bpm) then
+            local min_s = r.TimeMap2_QNToTime(0, qn_s + DIFF_SUSTAIN_MIN_QN) - ev.s
+            issues[#issues + 1] = DiffIssue(ev.s, ev.pitches, ('%s: %s is %.0f ms (need >= 3/16 note = %.0f ms at %.0f BPM, or shorten to a plain note)'):format(
+                FormatTime(ev.s), opts.label(ev.pitches), (ev.e - ev.s) * 1000, min_s * 1000, bpm))
+        end
+    end
+    return issues
+end
+
 -- One issue found by a difficulty check. Checks return arrays of these rather
 -- than bare strings, so the same rule can be counted per rule (the corpus
 -- probe) or acted on (the Generate planners) without parsing report text.

@@ -5,7 +5,8 @@
 -- and difficulty_generate_5lane.lua bind Gen5MinGapQN, Gen5MinSustainQN,
 -- Gen5ReleaseGapQN and the GEN5_* constants at load time.
 --
--- Requires (globals, read at call time): DiffReleaseGapQN (actions_difficulty_shared.lua).
+-- Requires (globals, read at call time): DiffReleaseGapQN, DiffSustainTooShort
+--   (actions_difficulty_shared.lua).
 --
 -- What each rule does and why - its source and the measured numbers - is in
 -- docs/difficulty_reduction.md, "Guitar, Bass and Keys" and "Pro Keys". Keep the two in step.
@@ -41,6 +42,16 @@ GEN5_PARAMS = {
     -- Shortest sustain each tier keeps (above fast_bpm: _fast); shorter ones become plain notes.
     min_sustain      = { H = 0.5, M = 0.75, E = 1.0 },
     min_sustain_fast = { M = 1.0, E = 1.0 },
+    -- Hard keeps Expert's sustain lengths, but a Guitar/Bass sustain shorter than qn (at
+    -- any tempo) or ms becomes a plain note: Hard's slower highway draws the same tail
+    -- shorter. Official Hard drops most of those; Keys keeps them. nil = none for that kind.
+    -- Every kind also drops a sustain under 3/16 at 100+ BPM (DiffSustainTooShort).
+    -- The ms floor applies only when Hard's next note starts less than ms_room QN after the
+    -- tail: with nothing close behind, the tail has time to read (user rule; official Hard
+    -- keeps about half of those, against a fifth to two fifths with a note close behind).
+    -- ms_grace: a length within this many ms under the floor still passes, so a note on the
+    -- line is not judged by which side of a tempo marker its tempo was read on.
+    hard_min_sustain = { gb = { qn = 0.75, ms = 300, ms_room = 1.0, ms_grace = 3 } },
     -- A chord next to a single note is worth this much more on Medium: an "and" chord
     -- (3 + 2.5) outweighs a beat single (5) but not a downbeat (8). Bass and Keys follow
     -- Guitar's Medium in bars of the same rhythm (opts.rhythm_ref).
@@ -100,11 +111,12 @@ GEN5_PARAMS = {
     -- (isolated_qn), and only if it still keeps too much is eased by color.
     offbeat_fallback_keep = { M = 0.95 },
     -- Gap left between a sustain's end and the next note - what each tier aims for.
-    -- Hard 1/8, Medium a dotted 8th, Easy a quarter; above fast_bpm, Medium a quarter and
-    -- Easy a half note. Medium and Easy never go below DiffReleaseGapQN, the floor Validate
-    -- enforces. A sustain that cannot leave this gap and stay 1/8 or longer becomes a 1/32
-    -- note, so it clearly reads as a plain note.
-    release      = { H = 0.5, M = 0.75, E = 1.0 },
+    -- Hard 1/16 (the RBN standard gap), so it keeps Expert's length; Medium a dotted 8th,
+    -- Easy a quarter; above fast_bpm, Medium a quarter and Easy a half note. Medium and Easy
+    -- never go below DiffReleaseGapQN, the floor Validate enforces. A sustain that cannot
+    -- leave this gap and stay long enough (min_sustain) becomes a 1/32 note, so it clearly
+    -- reads as a plain note.
+    release      = { H = 0.25, M = 0.75, E = 1.0 },
     release_fast = { M = 1.0, E = 2.0 },
     fast_bpm     = 160,
     -- A rest longer than this (quarter notes) ends a color-shift segment, and a segment is
@@ -182,6 +194,20 @@ function Gen5MinSustainQN(dl, bpm)
     return p.min_sustain[dl] or SUSTAIN_QN
 end
 
+-- Hard: true when a sustain len_qn long at tempo bpm is played as a plain note - under 3/16
+-- at 100+ BPM (DiffSustainTooShort, Validate's Expert/Hard rule), or under the kind's
+-- hard_min_sustain (the same 5% grace on qn as Validate, ms_grace on ms). room_qn: from the
+-- tail's end to Hard's next onset (nil = none follows); the ms floor needs a note close behind.
+function Gen5HardSustainTooShort(kind, len_qn, bpm, room_qn)
+    if len_qn < SUSTAIN_QN - EPS then return false end
+    if DiffSustainTooShort(len_qn, bpm) then return true end
+    local min = GEN5_PARAMS.hard_min_sustain[kind]
+    if not min then return false end
+    if min.qn and len_qn < min.qn * 0.95 then return true end
+    local close = room_qn and (not min.ms_room or room_qn < min.ms_room - EPS)
+    return (min.ms and close and len_qn * 60000 / (bpm or 120) < min.ms - (min.ms_grace or 1)) or false
+end
+
 -- Gap a sustain must leave before the next note on this tier.
 function Gen5ReleaseGapQN(kind, dl, ev)
     local p = GEN5_PARAMS
@@ -193,4 +219,66 @@ function Gen5ReleaseGapQN(kind, dl, ev)
         need = math.max(need, 0.5)   -- Keys X/H: 1/8 after a sustained chord
     end
     return need
+end
+
+-- Roll, trill and tremolo lanes (126/127) count on Hard too when the lane marker's velocity
+-- is 41-50 (RBN doc: "If you want to use trills and tremolos on Hard difficulty, author your
+-- markers with a velocity between 50 and 41"; the drums page says the same of rolls). Hard
+-- then plays Expert's notes under such a lane as they are: the game plays them as a lane,
+-- and the lane's first note must stay where the marker starts.
+-- Pro Keys has a track per tier, so a trill marker on the Hard track is a Hard lane at any
+-- velocity (span.hard): the author put it there by hand.
+GEN_HARD_LANE_VEL = { lo = 41, hi = 50 }
+-- Lane membership: from the lane's start to its end, both included (a roll or trill lane
+-- ends at, or just past, the start of its last note). 0.004 QN is 1 ms at 240 BPM.
+local LANE_TOL = 0.004
+
+function GenHardLane(span)
+    if span.hard then return true end
+    return span.vel ~= nil and span.vel >= GEN_HARD_LANE_VEL.lo and span.vel <= GEN_HARD_LANE_VEL.hi
+end
+
+-- Hard (out) with every note under a Hard lane replaced by a copy of the upper tier's notes
+-- there. A note next to a lane is shortened so it does not run into the lane's notes, nor
+-- a lane's last note into the next note. Returns out, and the number of lanes copied.
+function GenKeepHardLanes(out, upper, lanes)
+    local hard = {}
+    for _, sp in ipairs(lanes or {}) do if GenHardLane(sp) then hard[#hard + 1] = sp end end
+    if #hard == 0 then return out, 0 end
+    local function InLane(qn)
+        for _, sp in ipairs(hard) do
+            if qn >= sp.qn - LANE_TOL and qn <= sp.qn_e + LANE_TOL then return sp end
+        end
+        return nil
+    end
+    local res, copy, used = {}, {}, {}
+    for _, ev in ipairs(out) do
+        if not InLane(ev.qn) then res[#res + 1] = ev end
+    end
+    for _, ev in ipairs(upper) do
+        local sp = InLane(ev.qn)
+        if sp then
+            local c = {}
+            for k, v in pairs(ev) do c[k] = v end
+            c.offs = {}
+            for i, o in ipairs(ev.offs) do c.offs[i] = o end
+            res[#res + 1] = c
+            copy[c], used[sp] = true, true
+        end
+    end
+    table.sort(res, function(a, b) return a.qn < b.qn end)
+    for i = 1, #res - 1 do
+        local a, b = res[i], res[i + 1]
+        if copy[a] ~= copy[b] and a.qn_e > b.qn - EPS / 2 then
+            local gap = b.qn - a.qn
+            if a.qn_e - a.qn >= SUSTAIN_QN - EPS and gap - 0.25 >= SUSTAIN_QN - EPS then
+                a.qn_e = b.qn - 0.25          -- still a sustain, a 1/16 before the lane
+            else
+                a.qn_e = a.qn + math.min(0.125, gap - EPS / 2)
+            end
+        end
+    end
+    local n = 0
+    for _ in pairs(used) do n = n + 1 end
+    return res, n
 end

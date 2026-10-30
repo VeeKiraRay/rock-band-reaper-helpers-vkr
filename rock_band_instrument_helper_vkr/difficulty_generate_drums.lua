@@ -23,7 +23,9 @@
 --              grid (ExpertForRewrittenRuns). nil = plan from the tier above only.
 --   keep_kicks the kicks are already this tier's (Drums 2X): skip the kick-choosing rules
 --   ctx        { fills, rolls, disco = { { qn, qn_e }... }, toms = { [2|3|4] = spans },
---                sections = { { qn, name }... }, song_bpm } - all optional, in quarter notes
+--                sections = { { qn, name }... }, song_bpm } - all optional, in quarter notes;
+--                a roll span from a special roll lane (127) carries two = true, and every
+--                roll span its marker's vel (GenKeepHardLanes: 41-50 = Hard plays Expert's)
 
 local EPS = GEN5_EPS
 -- Roll lane membership: Validate takes the notes from 1 ms before the lane's start to 1 ms
@@ -87,6 +89,9 @@ GEN_DRUMS_PARAMS = {
     medium_tom_pair_sparse_keep = true,
     -- Medium/Easy: a cymbal change an 8th apart loses a hi-hat/ride (CymbalChanges).
     lower_cymbal_change = true,
+    -- Easy: the same at a quarter note, from this tempo, for a hi-hat/ride between two hits
+    -- on other cymbals (CymbalChangesQuarter). nil = off.
+    easy_cymbal_change_quarter_bpm = 170,
     -- Easy: a verse plays kick + snare when its kick/snare hits come at least this often per
     -- quarter note (EasyBeats).
     easy_ks_min_density = 0.5,
@@ -340,6 +345,22 @@ local function Rolls(evs, dl, log)
             keep, last = {}, nil
             for _, i in ipairs(idx) do
                 if not last or evs[i].qn - evs[last].qn >= grid - EPS then keep[#keep + 1] = i; last = i end
+            end
+        end
+        -- A special roll (127: a swell split between two pads) is one pad below Expert: the
+        -- higher of the lane's pads (Green over Blue over Yellow), on every kept grid step,
+        -- whichever pad the upper tier had there. The lane marks the sound, not exact hits.
+        if span.two then
+            local top = 0
+            for _, i in ipairs(idx) do
+                for _, o in ipairs(evs[i].offs) do if o ~= KICK and o > top then top = o end end
+            end
+            if top > 0 then
+                for _, i in ipairs(keep) do
+                    local ev = evs[i]
+                    local kick = Has(ev, KICK)
+                    ev.offs = kick and { KICK, top } or { top }
+                end
             end
         end
         local gems = 0
@@ -1402,6 +1423,68 @@ local function CymbalChanges(evs)
     return n
 end
 
+-- Easy from easy_cymbal_change_quarter_bpm: CymbalChanges at a quarter note. A hi-hat/ride
+-- on neither of the hits a quarter before and after it, both on other cymbals and each
+-- needing 3+ hand pads with it, goes (`G RB G RG` -> `G R G RG`, `RG Y RG` -> `RG . RG`):
+-- the hand stops jumping between cymbals on every beat. A hat with the same cymbal on one
+-- side stays, so a crash on 1 into a hat beat (`G RY Y RY`) is left alone. A hit left
+-- empty plays the kick the tier above has there, when its bar has no kick yet: the beat
+-- is not silent, and one kick a bar keeps Easy's kick limits. upper_kick: positions (1/24
+-- QN) of the incoming tier's kicks. Returns the number of hats removed.
+local function CymbalChangesQuarter(evs, upper_kick)
+    local from = GEN_DRUMS_PARAMS.easy_cymbal_change_quarter_bpm
+    if not from then return 0 end
+    local function Cyms(ev)
+        local c = {}
+        for _, o in ipairs(ev.offs) do if o >= YEL and IsCymbal(ev, o) then c[o] = true end end
+        return c
+    end
+    local function Pads(a, b)
+        local pads, n = {}, 0
+        for _, ev in ipairs({ a, b }) do
+            for _, o in ipairs(ev.offs) do
+                if o ~= KICK then
+                    local key = o .. (IsTom(ev, o) and 't' or '')
+                    if not pads[key] then pads[key] = true; n = n + 1 end
+                end
+            end
+        end
+        return n
+    end
+    local list = {}
+    for _, ev in ipairs(evs) do
+        if not ev.rolled then
+            for _, o in ipairs(ev.offs) do if o ~= KICK then list[#list + 1] = ev; break end end
+        end
+    end
+    -- Decided on the tier as it came in, then applied, so one removal cannot hide the next.
+    local drop = {}
+    for i = 2, #list - 1 do
+        local p, ev, nx = list[i - 1], list[i], list[i + 1]
+        if (ev.bpm or 120) >= from and math.abs(ev.qn - p.qn - 1) <= EPS and math.abs(nx.qn - ev.qn - 1) <= EPS
+           and Pads(p, ev) >= 3 and Pads(ev, nx) >= 3 then
+            local cp, cn = Cyms(p), Cyms(nx)
+            if next(cp) and next(cn) then
+                for _, o in ipairs({ YEL, BLU }) do
+                    if IsCymbal(ev, o) and Has(ev, o) and not cp[o] and not cn[o] then drop[#drop + 1] = { ev, o } end
+                end
+            end
+        end
+    end
+    local function BarKey(ev) return ('%.3f'):format(ev.qn - (ev.bar_qn or 0)) end
+    local bar_kick = {}
+    for _, ev in ipairs(evs) do if Has(ev, KICK) then bar_kick[BarKey(ev)] = true end end
+    for _, d in ipairs(drop) do
+        local ev = d[1]
+        Drop(ev, d[2])
+        if #ev.offs == 0 and upper_kick[math.floor(ev.qn * 24 + 0.5)] and not bar_kick[BarKey(ev)] then
+            Add(ev, KICK)
+            bar_kick[BarKey(ev)] = true
+        end
+    end
+    return #drop
+end
+
 -- Medium/Easy: a snare + tom hit (both hands on drums, no cymbal) a quarter note or less
 -- before a crash loses its tom, so the hand gets to the crash.
 local function TomBeforeCrash(evs)
@@ -1950,6 +2033,9 @@ PlanTier = function(dl, events, opts)
         for _, o in ipairs(ev.offs) do if IsTom(ev, o) then drum = true end end
         if HasCymbal(ev) and not drum then upper_cym_only[math.floor(ev.qn * 24 + 0.5)] = true end
     end
+    -- ... and of its kicks (CymbalChangesQuarter).
+    local upper_kick = {}
+    for _, ev in ipairs(evs) do if Has(ev, KICK) then upper_kick[math.floor(ev.qn * 24 + 0.5)] = true end end
 
     if (opts.unflip or 'H') == dl then evs = Unflip(evs, log) end
     evs = Rolls(evs, dl, log)
@@ -2055,8 +2141,11 @@ PlanTier = function(dl, events, opts)
     -- one before it then needs the treatment.
     if dl ~= 'H' then log.tom_before_crash = TomBeforeCrash(evs) end
     if dl ~= 'H' then log.cym_changes = CymbalChanges(evs) end
+    if dl == 'E' then log.cym_changes_quarter = CymbalChangesQuarter(evs, upper_kick) end
     EvenRolls(evs, ctx.rolls)
     evs = Compact(evs)
+    -- A roll lane whose marker allows Hard (velocity 41-50) plays Expert's notes as they are.
+    if dl == 'H' then evs, log.hard_lanes = GenKeepHardLanes(evs, events, ctx.rolls) end
 
     for _, ev in ipairs(evs) do
         ev.fill, ev.roll, ev.disco, ev.tom, ev.rolled, ev.kick_dropped, ev.and_beat = nil, nil, nil, nil, nil, nil, nil

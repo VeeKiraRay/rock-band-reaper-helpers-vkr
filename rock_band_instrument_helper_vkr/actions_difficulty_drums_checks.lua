@@ -564,20 +564,39 @@ function CollectDrumsChecks(diff_label, events, track, sel_s, sel_e, upper_event
         cats[#cats + 1] = { name = 'No gems paired with kick (Easy)', rule = 'kick_pairing', issues = CheckDrumsKickPairing(events, rng) }
     end
 
+    -- Hard: a roll lane whose marker velocity is 41-50 is a lane on Hard too, played as
+    -- Expert's notes (RBN doc) - its notes are not held to Hard's roll and density limits.
+    local all_rolls = (diff_label ~= 'X') and ReadDrumsNotes(track, 126, 127, sel_s, sel_e) or {}
+    local rolls, hard_lanes = {}, {}
+    for _, n in ipairs(all_rolls) do
+        if diff_label == 'H' and n.vel >= 41 and n.vel <= 50 then hard_lanes[#hard_lanes + 1] = n
+        else rolls[#rolls + 1] = n end
+    end
+    local timed = events
+    if #hard_lanes > 0 then
+        timed = {}
+        for _, ev in ipairs(events) do
+            local under = false
+            for _, l in ipairs(hard_lanes) do
+                if ev.s >= l.s - 0.001 and ev.s < l.e + 0.001 then under = true; break end
+            end
+            if not under then timed[#timed + 1] = ev end
+        end
+    end
+
     if diff_label ~= 'X' then
-        cats[#cats + 1] = { name = 'Timekeeping density', rule = 'density', issues = CheckDrumsGeneralDensity(events, diff_label,
+        cats[#cats + 1] = { name = 'Timekeeping density', rule = 'density', issues = CheckDrumsGeneralDensity(timed, diff_label,
             diff_label == 'H' and (ReadDrumsTierEvents(track, 'X', sel_s, sel_e)) or nil) }
         cats[#cats + 1] = { name = 'Double crash prep space', rule = 'double_crash', issues = CheckDrumsDoubleCrash(events, rng, toms) }
 
         local fills = ReadDrumsNotes(track, 120, 120, sel_s, sel_e)
-        local rolls = ReadDrumsNotes(track, 126, 127, sel_s, sel_e)
         local up_dl = ({ H = 'X', M = 'H', E = 'M' })[diff_label]
         cats[#cats + 1] = { name = 'Kicks in drum fills (advisory: thin them)', rule = 'fill_kicks', advisory = true,
                             issues = CheckDrumsFillKicks(events, fills, rng, upper_events, DRUMS_RANGE[up_dl]) }
         -- marker = true: the check is about the roll lane marker (shared by every tier), not
         -- the tier's notes - Generate does not count it against the tier it wrote.
         cats[#cats + 1] = { name = 'Roll starts on grid',     rule = 'roll_grid',    marker = true,
-                            issues = CheckDrumsRollGrid(rolls) }
+                            issues = CheckDrumsRollGrid(all_rolls) }
         cats[#cats + 1] = { name = 'Even roll hit count',     rule = 'roll_even',    issues = CheckDrumsRollEvenCount(rolls, events) }
         cats[#cats + 1] = { name = 'Roll/fill density',       rule = 'roll_density', issues = CheckDrumsRollDensity(rolls, events, diff_label) }
     end

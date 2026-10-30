@@ -221,11 +221,15 @@ for _, path in ipairs(files) do
                             if not t then ok = false; break end
                             tiers[dl], shifts[dl] = SmfProKeysEvents(t, song.tpqn, timing)
                         end
-                        if ok then DATA[#DATA + 1] = { inst = inst, tiers = tiers, shifts = shifts, song = n_songs } end
+                        if ok then
+                            DATA[#DATA + 1] = { inst = inst, tiers = tiers, shifts = shifts, song = n_songs,
+                                lanes = SmfProKeysHardTrills(SmfFindTrack(song, inst.track .. 'H'), song.tpqn) }
+                        end
                     elseif trk then
                         local tiers = {}
                         for dl in pairs(LO) do tiers[dl] = SmfTierEvents(trk, LO[dl], song.tpqn, timing) end
-                        DATA[#DATA + 1] = { inst = inst, tiers = tiers, song = n_songs }
+                        DATA[#DATA + 1] = { inst = inst, tiers = tiers, song = n_songs,
+                                            lanes = SmfLaneSpans(trk, song.tpqn) }
                         if inst.key == 'guitar' then GTR_X[n_songs], GTR_H[n_songs] = tiers.X, tiers.H end
                     end
                 end
@@ -260,7 +264,8 @@ local function Evaluate(with_chain, only_kind, only_dl)
         local function Opts(dl, chain, shifts, hard)
             return { busy_ref = dl == 'H' and ref.H or nil,
                      rhythm_ref = dl == 'M' and (chain and ref.M_chain or ref.M) or nil,
-                     shifts = shifts, and_source = dl == 'E' and hard or nil }
+                     shifts = shifts, and_source = dl == 'E' and hard or nil,
+                     lanes = dl == 'H' and d.lanes or nil }
         end
         -- Pro Keys has its own planner; its upper tier's lane-shift markers go with it.
         local function Plan(dl, upper, opts)

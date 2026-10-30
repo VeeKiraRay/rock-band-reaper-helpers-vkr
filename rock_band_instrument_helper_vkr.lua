@@ -110,10 +110,22 @@
 --       If Hard still keeps almost all of Expert, as on a sparse beginner part,
 --       it is made easier by color instead: each bar moves down until its top
 --       note is Blue (Orange-Blue-Yellow becomes Blue-Yellow-Red).
---     - Sustains leave room before the next note: Hard an 8th, Medium a
---       dotted 8th, Easy a quarter (above 160 BPM: Medium a quarter, Easy a
---       half). A sustain too short to keep that gap becomes a short 1/32 note,
---       so it clearly reads as a plain note.
+--     - Sustains: Hard keeps Expert's lengths (a 1/16 before the next note),
+--       as official Hard does. A sustain too short for Hard becomes a plain
+--       note: under a dotted 8th at 100+ BPM on every instrument, and on
+--       Guitar/Bass also under a dotted 8th at any tempo, or under 300 ms
+--       when the next note follows within a quarter note (the slower Hard
+--       highway draws it shorter; with nothing close behind it still reads).
+--       Medium leaves a dotted 8th
+--       before the next note, Easy a quarter (above 160 BPM: Medium a
+--       quarter, Easy a half). A sustain too short to keep that gap becomes a
+--       short 1/32 note, so it clearly reads as a plain note.
+--     - Expert sustains shorter than a dotted 8th at 100+ BPM (RBN: only
+--       author durations longer than that): Generate asks once, for every
+--       instrument in the run, whether to make them plain notes on Expert
+--       first. The result lists them per instrument, by bar.
+--     - Validate: Guitar, Bass and Pro Keys now flag Expert/Hard sustains
+--       shorter than a dotted 8th at 100+ BPM as errors, as Keys already did.
 --     - Pro Keys gets the same rhythm as the other instruments, with its own
 --       pitch rules, measured on the official charts: chords lose notes from
 --       the bottom, so the top (melody) note stays; Hard keeps Expert's notes
@@ -191,9 +203,13 @@
 --       150 BPM, Easy from 140) no three hand hits come an 8th apart - a
 --       pair stays; "Drums fast 8ths" picks which hit goes: Beats (the
 --       "and", as official charts do) or Hands (the hit with the least
---       important hands, so two snares can stay together). Every difficulty
+--       important hands, so two snares can stay together). From 170 BPM Easy
+--       also drops a hi-hat/ride between two hits on other cymbals a quarter
+--       apart (G RB G RG -> G R G RG), so the hand stops jumping cymbals on
+--       every beat; a beat left empty plays Medium's kick. Every difficulty
 --       thins the kicks in fills, plays rolls on its own grid with an even
---       number of hits, and turns a double crash with no room before it into
+--       number of hits (a two-pad cymbal swell, roll marker 127, on the
+--       higher of its two pads at every grid step), and turns a double crash with no room before it into
 --       one crash. With "Hard fast runs" on Rewrite or Auto, tom and snare
 --       fills are played one grid slower instead of thinned to 8ths;
 --       Medium and Easy then reduce such a fill from Expert's notes, so
@@ -208,6 +224,14 @@
 --       made in memory the way "Remove 2x kicks" makes one. The result lists
 --       both tracks. "Only 2x bass pedal authored on PART DRUMS" treats
 --       PART DRUMS itself as the 2x chart, for a song charted only that way.
+--     - Roll, trill and tremolo lanes whose marker velocity is 41-50 count on
+--       Hard too (RBN docs), so Hard keeps Expert's notes under them as they
+--       are, on Drums, Guitar, Bass and Keys; Medium and Easy still reduce
+--       them. Validate no longer holds such a Hard roll to Hard's roll and
+--       density limits.
+--       Pro Keys has a track per tier: a trill marker you put on
+--       PART REAL_KEYS_H (any velocity) keeps Expert's notes there on Hard.
+--       Generate never removes trill markers from the tier tracks.
 --     - General > Actions "Remove 2x kicks": in a 16th double-bass figure the
 --       kicks that stay are now chosen by beat position - downbeat, beat,
 --       "and", then the 16ths - instead of every second kick counted from the

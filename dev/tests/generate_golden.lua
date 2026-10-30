@@ -252,7 +252,8 @@ for _, name in ipairs(files) do
                     local opts = { shifts = shifts,
                                    busy_ref   = dl == 'H' and refs.H or nil,
                                    rhythm_ref = dl == 'M' and refs.M or nil,
-                                   and_source = dl == 'E' and hard or nil }
+                                   and_source = dl == 'E' and hard or nil,
+                                   lanes = dl == 'H' and SmfProKeysHardTrills(tier_trk, song.tpqn) or nil }
                     local gen, log = GenPKPlanTier(dl, upper, opts)
                     -- Hard equal to Expert asks the user (Shorten sustains / Keep); the verified
                     -- chart holds the answer: shortened sustains unless it IS Expert as it is.
@@ -297,7 +298,8 @@ for _, name in ipairs(files) do
                         local gen = Gen5PlanTier(part.kind, dl, upper, { guide = guide,
                             busy_ref   = follower and dl == 'H' and refs.H or nil,
                             rhythm_ref = follower and dl == 'M' and refs.M or nil,
-                            and_source = dl == 'E' and hard or nil })
+                            and_source = dl == 'E' and hard or nil,
+                            lanes = dl == 'H' and SmfLaneSpans(trk, song.tpqn) or nil })
                         if dl == 'H' then hard = gen end
                         local want = SmfTierEvents(trk, LO[dl], song.tpqn, timing)
                         Test.it(('%s %s'):format(part.label, ({ H = 'Hard', M = 'Medium', E = 'Easy' })[dl]), function()

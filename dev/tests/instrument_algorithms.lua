@@ -450,23 +450,23 @@ Test.it('the same rhythm reduces to the same onsets on guitar, bass and keys', f
 end)
 
 Test.it('identical repeats keep identical sustains despite tempo-map rounding', function()
-    -- The 160 BPM test song intro: a Green held 5/32 then Orange on beat 2, four times.
-    -- The Hard gap leaves the Green exactly 1/8 long, on the cut-back boundary. Converting
-    -- through a tempo map leaves float noise; a few 1e-9 either side used to decide
-    -- whether a bar kept its sustain.
+    -- A Green held 3/16 then Orange on beat 2, four times, at 120 BPM: the Green ends exactly
+    -- Hard's 1/16 release gap before the Orange, on the shorten boundary. Converting through
+    -- a tempo map leaves float noise; a few 1e-9 either side used to decide whether a bar
+    -- kept its sustain.
     local events, noise = {}, { -1e-9, 1e-9, -1e-9, 1e-9 }
     for b = 0, 3 do
         local base = b * 4
-        events[#events + 1] = Ev(base, 0.625 + noise[b + 1], { 0 }, 157, base)
-        events[#events + 1] = Ev(base + 1 + noise[4 - b], 0.125, { 4 }, 157, base)
-        events[#events + 1] = Ev(base + 2, 0.125, { 2 }, 157, base)
+        events[#events + 1] = Ev(base, 0.75 + noise[b + 1], { 0 }, 120, base)
+        events[#events + 1] = Ev(base + 1 + noise[4 - b], 0.125, { 4 }, 120, base)
+        events[#events + 1] = Ev(base + 2, 0.125, { 2 }, 120, base)
     end
     local out = Gen5PlanTier('gb', 'H', events)
     local lens = {}
     for _, ev in ipairs(out) do
         if ev.down then lens[#lens + 1] = ('%.3f'):format(ev.qn_e - ev.qn) end
     end
-    Test.expect(table.concat(lens, ' ') == '0.500 0.500 0.500 0.500',
+    Test.expect(table.concat(lens, ' ') == '0.750 0.750 0.750 0.750',
         'the four repeats differ: ' .. table.concat(lens, ' '))
 end)
 
@@ -1044,11 +1044,11 @@ Test.it('fast song (210 BPM): Medium keeps quarters, Easy beats 1 and 3', functi
     ExpectEveryBar(Gen5PlanTier('gb', 'E', med), 8, '0.00 2.00', 'Easy at 210 BPM')
 end)
 
-Test.it('sustain release gaps: Hard 1/8, Medium dotted 8th / 1/4 fast, Easy 1/4 / 1/2 fast', function()
+Test.it('sustain release gaps: Hard 1/16, Medium dotted 8th / 1/4 fast, Easy 1/4 / 1/2 fast', function()
     -- A sustain at 0 held for 3 quarter notes, the next note at 2. Expected sustain end
     -- (quarter notes) per tier and tempo; above 160 BPM is "fast".
     local expect = {
-        { 'H', 120, 1.5 },  { 'H', 170, 1.5 },
+        { 'H', 120, 1.75 }, { 'H', 170, 1.75 },
         { 'M', 120, 1.25 }, { 'M', 170, 1.0 },
         { 'E', 120, 1.0 },  { 'E', 170, 0.125 },  -- a 1/2 gap leaves no sustain: cut to 1/32
     }
@@ -1060,6 +1060,68 @@ Test.it('sustain release gaps: Hard 1/8, Medium dotted 8th / 1/4 fast, Easy 1/4 
         local got = out[1].qn_e
         Test.expect(math.abs(got - want) < 1e-6,
             ('%s at %d BPM: sustain ends at %.3f, expected %.3f'):format(dl, bpm, got, want))
+    end
+end)
+
+Test.it("Hard keeps Expert's sustain length, or plays a too-short one as a plain note", function()
+    -- One sustain, then a note at QN 4 (or at c[5]), so only the length rules act.
+    -- Every kind: under 3/16 at 100+ BPM (Validate's rule). Guitar/Bass also: under 3/16 at
+    -- any tempo, or under 300 ms when the next note starts under a quarter note after the
+    -- tail. Keys keeps the rest. Plain = a 1/32 note (0.125).
+    local cases = {
+        { 'gb', 120, 1.0,   1.0 },    -- 500 ms: kept as Expert has it
+        { 'gb', 120, 0.625, 0.125 },  -- 5/32 at 100+ BPM
+        { 'gb', 90,  0.5,   0.125 },  -- 1/8 under 100 BPM: Guitar/Bass only
+        { 'gb', 193, 0.75,  0.75 },   -- 3/16 at 193 BPM = 233 ms, but nothing close behind
+        { 'gb', 193, 0.75,  0.125, 1.5 },   -- ... a note an 8th after the tail: plain
+        { 'gb', 193, 0.75,  0.75,  1.75 },  -- ... a quarter note after the tail: kept
+        { 'gb', 193, 1.0,   1.0,   1.5 },   -- 1/4 at 193 BPM = 311 ms
+        { 'k5', 90,  0.5,   0.5 },    -- Keys keeps a 1/8 under 100 BPM
+        { 'k5', 193, 0.75,  0.75, 1.5 },    -- ... and has no time floor
+        { 'k5', 120, 0.625, 0.125 },  -- but 5/32 at 100+ BPM is plain
+    }
+    for _, c in ipairs(cases) do
+        local kind, bpm, len, want = c[1], c[2], c[3], c[4]
+        local nq = c[5] or 4
+        local out = Gen5PlanTier(kind, 'H', { Ev(0, len, { 0 }, bpm, 0), Ev(nq, 0.2, { 1 }, bpm, nq) })
+        local got = out[1] and out[1].qn_e - out[1].qn
+        Test.expect(got and math.abs(got - want) < 1e-6,
+            ('%s %d BPM, Expert %.3f QN: Hard %s, expected %.3f'):format(kind, bpm, len, tostring(got), want))
+    end
+end)
+
+Test.it('Hard keeps Expert\'s trill / tremolo under a lane whose marker velocity is 41-50', function()
+    -- A 16th trill (G-R) over beats 1-2 at 150 BPM, then a sustain on beat 3 held into it
+    -- by nothing; the note before the lane (a sustain) must end before the lane's first note.
+    local x = { Ev(0, 1.0, { 2 }, 150, 0) }
+    for k = 0, 7 do x[#x + 1] = Ev(1 + k * 0.25, 0.125, { k % 2 == 0 and 0 or 1 }, 150, 1 + k * 0.25) end
+    x[#x + 1] = Ev(4, 0.125, { 2 }, 150, 0)
+    for _, kind in ipairs({ 'gb', 'k5' }) do
+        local function Under(out)
+            local n = 0
+            for _, ev in ipairs(out) do if ev.qn >= 1 - 1e-6 and ev.qn <= 2.75 + 1e-6 then n = n + 1 end end
+            return n
+        end
+        local hard = Gen5PlanTier(kind, 'H', x, { lanes = { { qn = 1, qn_e = 2.76, vel = 45 } } })
+        Test.expect(Under(hard) == 8, ('%s, velocity 45: %d notes under the lane, Expert has 8'):format(kind, Under(hard)))
+        for _, ev in ipairs(hard) do
+            if ev.qn < 1 then Test.expect(ev.qn_e <= 1 + 1e-6, kind .. ': the note before the lane runs into it') end
+        end
+        local plain = Gen5PlanTier(kind, 'H', x, { lanes = { { qn = 1, qn_e = 2.76, vel = 100 } } })
+        Test.expect(Under(plain) < 8, kind .. ', velocity 100: the trill is reduced as before')
+    end
+end)
+
+Test.it('DiffSustainTooShort: 1/8 up to just under 3/16, at 100 BPM and faster', function()
+    local cases = {
+        { 0.625, 193, true }, { 0.5, 100, true }, { 0.7, 120, true },
+        { 0.75, 120, false }, { 0.72, 120, false },  -- 3/16, and inside its 5% grace
+        { 0.5, 99, false },                          -- under 100 BPM a 1/8 is fine
+        { 0.25, 193, false },                        -- a 1/16 has no tail
+    }
+    for _, c in ipairs(cases) do
+        Test.expect(DiffSustainTooShort(c[1], c[2]) == c[3],
+            ('%.3f QN at %d BPM: expected %s'):format(c[1], c[2], tostring(c[3])))
     end
 end)
 
@@ -1165,6 +1227,32 @@ Test.it('Hard keeps the lane shifts it needs and drops the rest', function()
     Test.expect(log.shifts_dropped == 1, 'dropped ' .. log.shifts_dropped .. ', expected 1')
 end)
 
+Test.it('Hard keeps Expert\'s trill under a trill marker on the Hard track, at any velocity', function()
+    -- A 16th trill G3-A3 (67-69) over beats 1-2 at 150 BPM, in a G2-B3 window from beat 1;
+    -- a sustain before it must end before the lane's first note.
+    local x = { Ev(0, 1.0, { 60 }, 150, 0) }
+    for k = 0, 7 do x[#x + 1] = Ev(1 + k * 0.25, 0.125, { k % 2 == 0 and 67 or 69 }, 150, 1 + k * 0.25) end
+    x[#x + 1] = Ev(4, 0.125, { 60 }, 150, 4)
+    local shifts = { { qn = 0, qn_e = 0.25, pitch = 0 }, { qn = 1, qn_e = 1.25, pitch = 7 } }
+    local function Under(out)
+        local n = 0
+        for _, ev in ipairs(out) do if ev.qn >= 1 - 1e-6 and ev.qn <= 2.75 + 1e-6 then n = n + 1 end end
+        return n
+    end
+    local hard, log = GenPKPlanTier('H', x, { shifts = shifts,
+                                             lanes = { { qn = 1, qn_e = 2.76, vel = 100, hard = true } } })
+    Test.expect(Under(hard) == 8, ('%d notes under the marker, Expert has 8'):format(Under(hard)))
+    Test.expect(log.hard_lanes == 1, 'hard_lanes ' .. tostring(log.hard_lanes))
+    for _, ev in ipairs(hard) do
+        if ev.qn < 1 then Test.expect(ev.qn_e <= 1 + 1e-6, 'the note before the trill runs into it') end
+    end
+    local g_shift = false
+    for _, sh in ipairs(log.shifts) do if sh.qn == 1 and sh.pitch == 7 then g_shift = true end end
+    Test.expect(g_shift, 'the G2-B3 shift the trill needs is kept')
+    local plain = GenPKPlanTier('H', x, { shifts = shifts })
+    Test.expect(Under(plain) < 8, 'without the marker the trill is reduced as before')
+end)
+
 Test.it('sustains: Medium leaves a quarter, a stub under 3/16 becomes a 1/16 note', function()
     -- Held from 0 for 3 QN, next note at 2: Medium ends it at 1.0. Held from 4, next at 5.5:
     -- the quarter gap leaves 0.5 QN, under 3/16 (0.75), so it becomes 0.25. (The note at
@@ -1175,6 +1263,16 @@ Test.it('sustains: Medium leaves a quarter, a stub under 3/16 becomes a 1/16 not
     Test.expect(#out == 5, 'kept ' .. #out .. ' of 5')
     Test.expect(math.abs(out[1].qn_e - 1.0) < 1e-6, ('first sustain ends at %.3f, expected 1.000'):format(out[1].qn_e))
     Test.expect(math.abs(out[3].qn_e - 4.25) < 1e-6, ('stub ends at %.3f, expected 4.250'):format(out[3].qn_e))
+end)
+
+Test.it('Hard plays an Expert sustain under 3/16 at 100+ BPM as a 1/16 note', function()
+    local function HardLen(len, bpm)
+        local out = GenPKPlanTier('H', { Ev(0, len, { 60 }, bpm, 0), Ev(4, 0.2, { 62 }, bpm, 4) })
+        return out[1].qn_e - out[1].qn
+    end
+    Test.expect(math.abs(HardLen(0.625, 120) - 0.25) < 1e-6, ('5/32 at 120: %.3f, expected 0.250'):format(HardLen(0.625, 120)))
+    Test.expect(math.abs(HardLen(0.5, 90) - 0.5) < 1e-6, ('1/8 at 90: %.3f, expected 0.500 (kept)'):format(HardLen(0.5, 90)))
+    Test.expect(math.abs(HardLen(0.75, 193) - 0.75) < 1e-6, ('3/16 at 193: %.3f, expected 0.750 (kept)'):format(HardLen(0.75, 193)))
 end)
 
 Test.it('Keys following Pro Keys keeps one onset per Pro Keys onset', function()
@@ -1998,6 +2096,40 @@ Test.it('Drums Medium: a cymbal change an 8th apart drops the hi-hat/ride; after
     Test.expect(DHas(DAt(c, 2.5), 1) and not DHas(DAt(c, 2.5), 2), 'the hit after keeps only its snare')
 end)
 
+Test.it('Drums Easy: a hi-hat/ride between two other cymbals a quarter apart goes from 170 BPM', function()
+    local function Bar(at, bpm, hits)
+        local out = {}
+        for k, offs in ipairs(hits) do out[k] = DH(at + k - 1, offs, bpm) end
+        return out
+    end
+    local function Cat(...)
+        local out = {}
+        for _, t in ipairs({ ... }) do for _, ev in ipairs(t) do out[#out + 1] = ev end end
+        return out
+    end
+    -- KG RB G RG, twice: the Blue between two crashes goes, the snare stays.
+    local crash = { { 0, 4 }, { 1, 3 }, { 4 }, { 1, 4 } }
+    local a = GenDrumsPlanTier('E', Cat(Bar(0, 193, crash), Bar(4, 193, crash)), {})
+    Test.expect(DHas(DAt(a, 1), 1) and not DHas(DAt(a, 1), 3), 'G RB G -> G R G')
+    Test.expect(DHas(DAt(a, 3), 4) and DHas(DAt(a, 7), 4), 'the crashes stay')
+    -- Below 170 BPM: left as Medium has it.
+    local b = GenDrumsPlanTier('E', Cat(Bar(0, 160, crash), Bar(4, 160, crash)), {})
+    Test.expect(DHas(DAt(b, 1), 3), '160 BPM: RB stays')
+    -- A crash on 1 into a hat beat: each hat shares Yellow with a neighbour - untouched.
+    local c = GenDrumsPlanTier('E', Cat(Bar(0, 193, { { 0, 4 }, { 1, 2 }, { 2 }, { 1, 2 } }),
+                                        Bar(4, 193, { { 2 }, { 1, 2 }, { 2 }, { 1, 2 } })), {})
+    Test.expect(DHas(DAt(c, 1), 2) and DHas(DAt(c, 2), 2), 'G RY Y RY stays')
+    -- RY Y RG Y | RG Y RY RG | KB RY: the Yellow between two RGs goes; the downbeat Blue
+    -- between RG and RY goes and plays the tier above's kick instead of falling silent.
+    local d = GenDrumsPlanTier('E', Cat(Bar(0, 247, { { 1, 2 }, { 2 }, { 1, 4 }, { 2 } }),
+                                        Bar(4, 247, { { 1, 4 }, { 2 }, { 1, 2 }, { 1, 4 } }),
+                                        Bar(8, 247, { { 0, 3 }, { 1, 2 }, { 2 }, { 1, 2 } })), {})
+    Test.expect(DAt(d, 1) ~= nil and DHas(DAt(d, 1), 2), 'a hat after a hat stays')
+    Test.expect(DAt(d, 3) == nil or not DHas(DAt(d, 3), 2), 'RG Y RG: the Yellow goes')
+    local down = DAt(d, 8)
+    Test.expect(down ~= nil and DHas(down, 0) and not DHas(down, 3), 'the emptied downbeat plays its kick')
+end)
+
 Test.it('Drums Medium: a snare between a hi-hat and a crash is not "between hi-hats"', function()
     -- a 128 BPM test song: ... RY | R on the "and" of 4 | crash on the downbeat.
     local up = { DH(2, { 0, 2 }), DH(3, { 1, 2 }), DH(3.5, { 1 }), DH(4, { 0, 4 }), DH(5, { 1, 2 }) }
@@ -2423,6 +2555,44 @@ Test.it('Drums: a roll lane keeps an even number of hits on the tier\'s grid', f
         local grid = dl == 'H' and 0.25 or dl == 'M' and 0.5 or 1.0
         Test.expect(hits % 2 == 0, ('%s: %d hits in the roll'):format(dl, hits))
         Test.expect(hits == 0 or min_gap >= grid - 1e-6, ('%s: hits %g apart, grid %g'):format(dl, min_gap, grid))
+    end
+end)
+
+Test.it('Drums: a roll lane whose marker velocity is 41-50 keeps Expert\'s notes on Hard only', function()
+    local x = {}
+    for k = 0, 8 do x[#x + 1] = DH(k * 0.125, { 1 }, 150) end   -- 9 32nds, 0 .. 1 under the lane
+    x[#x + 1] = DH(2, { 0, 4 }, 150)
+    local function Hits(out)
+        local n = 0
+        for _, ev in ipairs(out) do if ev.qn <= 1 + 1e-6 then n = n + #ev.offs end end
+        return n
+    end
+    local hard = GenDrumsPlanTier('H', x, { fast_runs = 'thin', ctx = { rolls = { { qn = 0, qn_e = 1, vel = 45 } } } })
+    Test.expect(Hits(hard) == 9, ('Hard, velocity 45: %d hits, Expert has 9'):format(Hits(hard)))
+    local plain = GenDrumsPlanTier('H', x, { fast_runs = 'thin', ctx = { rolls = { { qn = 0, qn_e = 1, vel = 100 } } } })
+    Test.expect(Hits(plain) < 9, 'Hard, velocity 100: the roll is reduced as before')
+    local med = GenDrumsPlanTier('M', hard, { fast_runs = 'thin', ctx = { rolls = { { qn = 0, qn_e = 1, vel = 45 } } } })
+    Test.expect(Hits(med) < 9 and Hits(med) % 2 == 0, 'Medium still reduces the roll')
+end)
+
+Test.it('Drums: a special roll (127) is the higher pad on the tier\'s grid, even where Expert has the other', function()
+    -- Yellow on the beats and 8ths, Green on the 16ths between, at 174 BPM: Hard's grid (8ths)
+    -- lands on Yellow, yet every kept hit is Green.
+    local x = {}
+    for k = 0, 15 do x[#x + 1] = DH(k * 0.25, { k % 2 == 0 and 2 or 4 }, 174) end
+    x[#x + 1] = DH(5, { 0, 4 }, 174)
+    local ctx = { rolls = { { qn = 0, qn_e = 3.75, two = true } } }
+    for _, dl in ipairs({ 'H', 'M', 'E' }) do
+        local out = GenDrumsPlanTier(dl, x, { fast_runs = 'thin', ctx = ctx })
+        local hits, other = 0, 0
+        for _, ev in ipairs(out) do
+            if ev.qn <= 3.75 + 1e-6 then
+                for _, o in ipairs(ev.offs) do
+                    if o == 4 then hits = hits + 1 elseif o ~= 0 then other = other + 1 end
+                end
+            end
+        end
+        Test.expect(hits >= 2 and other == 0, ('%s: %d Green, %d other hits in the roll'):format(dl, hits, other))
     end
 end)
 

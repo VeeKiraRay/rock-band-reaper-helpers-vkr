@@ -32,9 +32,7 @@
 local SUSTAIN_QN   = GEN5_SUSTAIN_QN
 local SHORT_QN     = 0.125   -- length a sustain becomes when cut back (1/32 note)
 local MIN_LEN_QN   = GEN5_MIN_LEN_QN
-local KEYS_GRAY_LO = 0.5     -- Keys X/H gray zone [1/8, 3/16) at >= 100 BPM, see
-local KEYS_GRAY_HI = 0.75    --   CheckK5SustainLength
-local EPS          = GEN5_EPS
+local EPS         = GEN5_EPS
 local MinSustainQN, ReleaseGapQN = Gen5MinSustainQN, Gen5ReleaseGapQN
 
 local function Copy(offs)
@@ -87,10 +85,12 @@ local function FixLengths(kind, dl, out)
             end
         end
         len = ev.qn_e - ev.qn
-        -- Keys Expert/Hard gray zone: too long for a hit, too short for a tail.
-        -- Same bounds as CheckK5SustainLength, so a length on either edge is judged alike.
-        if kind == 'k5' and (dl == 'H' or dl == 'X') and (ev.bpm or 120) >= 100
-           and len >= KEYS_GRAY_LO - EPS and len < KEYS_GRAY_HI * 0.95 then
+        -- Hard keeps Expert's length, or plays a sustain too short for it as a plain note:
+        -- under 3/16 at 100+ BPM (the test Validate's Expert/Hard check uses, so a length on
+        -- either edge is judged alike), or, on Guitar/Bass, too short in time for Hard's
+        -- slower highway when a note follows close behind (Gen5HardSustainTooShort).
+        local behind = (ev.hold and len >= SUSTAIN_QN - EPS) and nx or first
+        if dl == 'H' and Gen5HardSustainTooShort(kind, len, ev.bpm, behind and (behind.qn - ev.qn_e)) then
             ev.qn_e = ev.qn + SHORT_QN
             cut = cut + 1
         end
@@ -123,6 +123,8 @@ end
 --            leads Bass and Keys), so a bar with the same rhythm loses the same notes.
 --            rhythm_ref: the leader's log.rhythm_bars from its own Medium, so a bar with
 --            the same Hard rhythm keeps the same Medium onsets.
+--            lanes: the take's trill (127) / tremolo (126) lanes { qn, qn_e, vel }; Hard
+--            plays Expert's notes under one whose marker allows Hard (GenKeepHardLanes).
 -- kind affects chords, colors and sustain rules only - which onsets are kept depends on it
 -- only through Medium's chord bonus, where Bass and Keys follow Guitar (rhythm_ref).
 -- Returns (out_events, log) where log counts what was done:
@@ -139,6 +141,7 @@ function Gen5PlanTier(kind, dl, events, opts)
     opts = opts or {}
     local log = { upper = #events, kept = 0, removed = 0, chords_reduced = 0,
                   recolored = 0, shortened = 0, cut = 0, guided = false, color_fallback = false }
+    local upper = events
 
 
     local keep, guide_len
@@ -211,5 +214,6 @@ function Gen5PlanTier(kind, dl, events, opts)
             function(h) return ReleaseGapQN(kind, dl, h) end)
     end
     log.shortened, log.cut = FixLengths(kind, dl, out)
+    if dl == 'H' then out, log.hard_lanes = GenKeepHardLanes(out, upper, opts.lanes) end
     return out, log
 end

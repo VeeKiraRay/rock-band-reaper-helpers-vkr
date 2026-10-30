@@ -350,6 +350,20 @@ Two hits an 8th apart on different cymbals that need 3+ hand pads between them l
 hi-hat/ride that is not on both (Yellow before Blue): `RY | RG` -> `R | RG`. Crashes, snares and
 toms stay. *User rule.*
 
+*Easy at a quarter note* - `CymbalChangesQuarter`, `easy_cymbal_change_quarter_bpm` 170. The same
+hand jump a quarter apart: a hi-hat/ride on neither of the hits a quarter before and after it
+(both on other cymbals, each pair needing 3+ hand pads) goes - `G RB G RG` -> `G R G RG`,
+`RY | Y RG Y RG` -> `RY | Y RG . RG`. A hat sharing its cymbal with one neighbour stays, so a
+crash on 1 into a hat beat (`G RY Y RY`) is untouched. A hit left empty plays the kick the tier
+above has there, if its bar has no kick yet (one kick a bar keeps Easy's kick limits).
+It acts only on hits a quarter apart on both sides and the 8th rule only on hits an 8th apart, so
+the two never act on the same pair.
+*Official charts* (Easy at 170+ BPM): Medium's `Y | RG` change is kept 69%, the cymbal dropped and
+the snare kept 14%, a hit dropped 17%, with a wide spread per song (0/12 to 84/89 kept). Where
+official Easy thins a cymbal change on every beat, it drops the cymbal-only beats (`. R . R`) or
+the cymbal off the snare (`G R G R`); it almost never drops the snare (0 of about 2,900 such snare
+hits at 170+). *User rule* to apply it.
+
 **A tom before a crash** - `TomBeforeCrash`
 A snare + tom hit within a quarter note before a crash loses its tom.
 *RBN doc:* "if crash happens right after a snare flam, turn the snare flam into a one-hand hit so
@@ -382,6 +396,23 @@ from 120; Easy quarters), trimmed from the start to an even number of hits.
 quarter note grid line. 16th note rolls with an uneven number of hits require an extra bit of
 advanced reading to nail, so even them out." *Official charts:* roll lanes are Expert-only; Hard
 plays rolls as 16ths 38% / 8ths 46%.
+A special roll lane (127, a swell split between two pads) is one pad below Expert: the higher of
+the lane's pads (Green over Blue over Yellow) on every kept grid step, whichever pad the tier above
+had there - the lane marks the sound, not exact hits.
+*RBN doc:* "Special Drum Rolls are authored on note 127 (G8). They are used for cymbal swells and
+allow the player to do a roll that is divided between two pads." *Official charts:* Hard, Medium
+and Easy play every 127 lane on one pad (20 of 20 lanes, 15 songs), the higher one (Green in 19;
+a Yellow-Blue swell keeps Blue on Hard, Green on Medium and Easy).
+**A lane marked for Hard keeps Expert's notes on Hard** - `GenKeepHardLanes`, `GEN_HARD_LANE_VEL`
+A roll lane whose *marker* (126/127) has velocity 41-50 counts on Hard as well as Expert, so Hard
+plays Expert's notes under it as they are (the lane's first note stays where the marker starts).
+Medium and Easy reduce it as any roll. Validate does not hold those notes to Hard's roll and
+density limits. The same rule covers Guitar/Bass/Keys trills and tremolos (5-lane section).
+*RBN doc (Drums):* "Markers can be used in different difficulties depending on velocity. If you
+want to use rolls on Hard difficulty, author your markers with a velocity between 50 and 41.
+Anything below that, and Magma will report a note spacing error upon building." *Official
+charts:* the velocity is the marker's - Expert's gems under lanes carry ordinary velocities. No
+official drum lane uses 41-50 (0 of 300); the rule is taken from the docs.
 
 **Medium and Easy: no constant 8ths from 140 BPM** - `BreakEighthRuns`
 A run of four hits an 8th apart loses its least valuable hit. *RBN doc* (Medium 140 BPM, as above).
@@ -482,6 +513,17 @@ Keys songs; Medium keeps 99% of isolated off-beats.
 
 ### Hard
 
+**A trill or tremolo lane marked for Hard keeps Expert's notes** - `GenKeepHardLanes`, `GEN_HARD_LANE_VEL`
+Under a trill (127) or tremolo (126) lane whose marker has velocity 41-50, Hard plays Expert's
+notes as they are; a note before the lane is shortened so it does not run into it.
+*RBN doc (Guitar/Bass):* "If you want to use trills and tremolos on Hard difficulty, author your
+markers with a velocity between 50 and 41. If they are authored on 40 or lower, Magma will report
+a note spacing error upon building." *(Keys):* "Make sure your markers are authored with a high
+velocity, or MagmaCompiler may report note spacing errors when authoring on lower difficulties."
+*Official charts:* 5 Guitar and 1 Keys trill lanes at 41-50 (of about 800); Hard keeps the trill
+whole under some of them. Pro Keys has a track per tier: its Hard track carries its own trill
+markers in 9 of the 32 songs with Expert trills - see Pro Keys for those.
+
 **Fast runs are rewritten one grid slower** - `Gen5RetimeDenseRuns`, "Hard fast runs" (`fast_runs_default`), `fast_8ths_bpm` 160, `retime_min_run`, `retime_color_penalty`
 Notes closer than Hard's gap are not thinned in place but played again on the next slower grid -
 16ths as 8th triplets, 8th triplets as 8ths - keeping the order of the colors. Above 160 BPM any
@@ -529,9 +571,32 @@ If Hard still keeps more than 95%, each bar moves down as a whole until its top 
 *RBN doc:* "All chords in Expert should be retained in Hard unless special circumstances prevent
 that making sense"; "Three note chords and Green/Orange chords are not permitted in Hard."
 
-**Sustains: Expert's length, a 1/8 gap before the next note** - `release`
+**Sustains: Expert's length, or a plain note when too short** - `release`, `hard_min_sustain`
+Hard keeps Expert's sustain lengths, pulled back only to leave a 1/16 before the next note (Keys:
+a 1/8 after a chord). A sustain too short for Hard becomes a 1/32 note: under 3/16 at 100 BPM or
+faster on every instrument (Validate's Expert/Hard check, `DiffSustainTooShort`), and on
+Guitar/Bass also under 3/16 at any tempo, or under 300 ms when Hard's next note starts less than
+a quarter note after the tail (`ms_room`; user rule - with nothing close behind, the tail has time
+to read). A length up to 3 ms short still passes (`ms_grace`): a note on the line otherwise came
+out differently depending on which side of a tempo marker its tempo was read.
 *RBN doc:* "Sustain durations in Hard should be the same as Expert unless the slower scroll rate
-of the highway creates sustains that are too short visually."
+of the highway creates sustains that are too short visually"; "Durations should only be authored
+for notes longer than a dotted 8th note for songs over 100bpm". *Official charts:* Hard keeps an
+Expert sustain at its exact length or makes it plain - it shortens a short one 0-0.3% of the time;
+the commonest gap after a Hard sustain is 1/16 (55-78%). Under 300 ms official Guitar/Bass Hard
+makes 56-92% of Expert's sustains plain, over it 4-49%; Keys keeps them (5% plain at 250-275 ms,
+none of its 3/16 sustains above 160 BPM). Under 100 BPM Guitar/Bass Hard makes 77-83% of Expert's
+1/8 sustains plain, Keys 67%. Of Guitar/Bass sustains of 3/16+ under 300 ms, official Hard makes
+56-80% plain when its next note starts within a quarter note of the tail, 40-50% with more room
+(rare: 83 notes in 73 songs). Against official Hard (dev songs, matched onsets where Expert holds
+a sustain): sustain-or-plain agreement 81.4% -> 86.1%, exact length 30.9% -> 91.6%, compared with
+the earlier 1/8 gap.
+
+**Expert's own too-short sustains: asked first.** A run from Expert that finds Expert sustains
+under 3/16 at 100+ BPM (Guitar, Bass, Keys, Pro Keys) asks once, before writing anything, whether
+to make them plain 1/16 notes on Expert; the result lists them per instrument, by bar. Hard plays
+them as plain notes either way. *Official charts:* Expert has a few in 152 of 480 Guitar charts
+(4.4% of sustains at 100+ BPM), 67 of 483 Bass, 58 of 352 Keys and 71 of 352 Pro Keys (13.1%).
 
 **Hammer-on markers (Guitar/Bass)** - `difficulty_generate_hopo.lua`
 Notes Expert forces to hammer on keep their marker on Hard where they survive; a hammer-on lost
@@ -694,7 +759,8 @@ of Medium"; "Try to primarily use the ranges of C-2 (C2-E3 range), F-2 (F2-A3 ra
 Generate's Easy matches the official window in 96% of songs, Medium in 63%.
 
 **Sustains leave room to move** - Hard 1/16 (simple transition) or 1/8, Medium and Easy a quarter
-A sustain cut under 3/16 becomes a 1/16 note.
+A sustain cut under 3/16 becomes a 1/16 note, and so does a Hard sustain Expert holds under 3/16 at
+100+ BPM (Validate's Expert/Hard check; official Hard makes half of those plain).
 *RBN doc:* Expert/Hard "leave a 1/16th note space ... between two chords or between a chord and a
 non-complementary note, leave an 1/8th note space"; Medium "All sustains should be pulled back to
 leave a 1/4th note space ... (shorter than 3/16ths in duration ...) it may need to be pulled back
@@ -705,6 +771,17 @@ If Hard would equal Expert exactly, Generate asks before writing: shorten the su
 a simple transition or a phrase end, 1/8 otherwise) or keep Hard as Expert.
 *Official charts:* charters decide per song, nearly all or nothing (41 of 275 songs pull back 75%+
 of Hard's sustains, 185 under 5%).
+
+**A trill marker on the Hard track keeps Expert's notes** - `GenKeepHardLanes` (`hard` spans)
+Under a trill marker (127) on PART REAL_KEYS_H, at any velocity, Hard plays Expert's notes as they
+are, with the lane shifts they need. Generate never writes or clears trill or glissando markers on
+the tier tracks: the author decides where Hard keeps a trill, by putting the marker there (copied
+from Expert, say).
+*User rule:* each Pro Keys tier is its own track, so a marker on the Hard track can only mean Hard.
+*Official charts:* the Hard track carries its own trill markers in 9 of the 32 songs with Expert
+trills (46 markers; velocity 40 or lower 37, 41-50 7, above 50 2 - velocity does not decide it
+there). Under them Hard is Expert's trill unchanged in some songs, at half rate in others. Medium
+and Easy tracks never have one.
 
 **Interval jumps are not changed.** *RBN doc* asks to avoid jumps over a 7th (Hard), 6th (Medium),
 5th (Easy), or leave extra space; Generate leaves them for the author (Validate lists them).

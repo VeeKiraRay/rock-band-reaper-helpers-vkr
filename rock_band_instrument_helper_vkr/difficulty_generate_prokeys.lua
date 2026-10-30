@@ -194,7 +194,8 @@ local function ReleaseGap(dl, ev, nx)
     return SimpleTransition(ev.offs, nx.offs) and 0.25 or 0.5
 end
 
--- Sustains leave the tier's gap; one cut shorter than 3/16 becomes a 1/16 note. No note
+-- Sustains leave the tier's gap; one cut shorter than 3/16 becomes a 1/16 note, and so does
+-- a Hard sustain under 3/16 at 100+ BPM. No note
 -- runs into the next onset, except a sustain GenPlanOverlaps holds over later onsets
 -- (hold): its gap is measured from the first onset after it ends. Returns (shortened, cut).
 local function FixLengths(dl, out)
@@ -220,6 +221,12 @@ local function FixLengths(dl, out)
             local again = GenNextAfterHold(out, i)
             if again == nx then break end
             nx = again
+        end
+        -- Hard: an Expert sustain under 3/16 at 100+ BPM is a plain note (DiffSustainTooShort,
+        -- Validate's Expert/Hard sustain length check).
+        if dl == 'H' and DiffSustainTooShort(ev.qn_e - ev.qn, ev.bpm) then
+            ev.qn_e = ev.qn + PLAIN_QN
+            cut = cut + 1
         end
         if ev.qn_e - ev.qn < MIN_LEN_QN then ev.qn_e = ev.qn + MIN_LEN_QN end
         -- A held sustain stops only for the first onset after its end (nil: none follows).
@@ -274,16 +281,20 @@ end
 --              target's existing window); unset = the upper tier's single window
 --              (GenPKUpperWindow), else the best fit;
 --            pull_back: Hard only, pull every sustain back (PullBackSustains) - the
---              user's answer when Hard would otherwise equal Expert.
+--              user's answer when Hard would otherwise equal Expert;
+--            lanes: Hard only, the trill markers on the Hard track { { qn, qn_e, hard = true }... }:
+--              Hard keeps Expert's notes under them (GenKeepHardLanes).
 -- Returns (out_events, log): Gen5SelectOnsets' rhythm fields plus upper, kept, removed,
 --   chords_reduced, shortened, cut, window (M/E), folded (M/E: events moved by octaves),
---   shifts (the tier's lane-shift markers to write), shifts_dropped (H).
+--   shifts (the tier's lane-shift markers to write), shifts_dropped (H), hard_lanes (H:
+--   trill markers whose notes were kept).
 function GenPKPlanTier(dl, events, opts)
     opts = opts or {}
     local log = { upper = #events, kept = 0, removed = 0, chords_reduced = 0,
                   recolored = 0, shortened = 0, cut = 0, guided = false, color_fallback = false,
                   folded = 0, shifts_dropped = 0 }
 
+    local upper = events
     local keep
     events, keep = Gen5SelectOnsets('pk', dl, events, opts, log)
 
@@ -337,5 +348,21 @@ function GenPKPlanTier(dl, events, opts)
         function(h, ev) return ReleaseGap(dl, h, ev) end)
     log.shortened, log.cut = FixLengths(dl, out)
     if dl == 'H' and opts.pull_back then log.pulled, log.pull_cut = PullBackSustains(out) end
+    -- Trill markers on the Hard track: Expert's notes there as they are (GenKeepHardLanes),
+    -- last, so nothing above shortens or thins them; then the lane shifts again, for the
+    -- copied pitches.
+    if dl == 'H' and opts.lanes then
+        local n
+        out, n = GenKeepHardLanes(out, upper, opts.lanes)
+        if n > 0 then
+            log.hard_lanes = n
+            log.kept, log.removed = #out, log.upper - #out
+            if #shifts > 0 then
+                log.shifts, log.shifts_dropped = KeepNeededShifts(shifts, out)
+            elseif #out > 0 then
+                log.shifts = { { qn = out[1].qn, qn_e = out[1].qn + 0.25, pitch = GenPKBestWindow(out) } }
+            end
+        end
+    end
     return out, log
 end
