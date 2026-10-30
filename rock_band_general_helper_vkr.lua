@@ -49,6 +49,11 @@
 --       work on the subtracks too. If a subtrack is missing, you are told to
 --       create them first. Run Copy all to main track when done - the game reads
 --       only VENUE.
+--     - Venue > Manual gen: new Insert choice, Add (as before) or Replace.
+--       Replace first removes the events of the same kind at the playhead, then
+--       adds the new one: a new lighting preset replaces the old one but leaves a
+--       post-process effect on the same spot alone. Cameras count as one kind, so
+--       a new shot replaces a whole camera stack there. Works with both targets.
 --     - New footer, always at the bottom of the window: the time selection,
 --       the status line, Copy result (the status and result to the clipboard)
 --       and Undo. The tabs scroll above it, so on a short window these no

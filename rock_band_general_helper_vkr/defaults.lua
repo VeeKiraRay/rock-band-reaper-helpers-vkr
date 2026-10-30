@@ -175,6 +175,7 @@ S = {
     venue_mg_kf_rate     = 2,    -- keyframe rate in beats (1-8)
     venue_mg_remove_type = 0,    -- 0=Camera 1=Lighting 2=PostProc 3=Special 4=All
     venue_mg_target      = 0,    -- 0=VENUE 1=Sub VENUE tracks (persisted: 'vmgt')
+    venue_mg_replace     = 0,    -- 0=Add 1=Replace same family at the playhead (persisted: 'vmgr')
     -- Keyframes tab (not persisted - session state only)
     venue_kf_rate        = 2,    -- keyframe rate in beats (1-8), independent of venue_mg_kf_rate
     -- Events tab (not persisted - session state only)
@@ -517,6 +518,14 @@ TIPS = {
                       "Blend and the [first] check read VENUE lighting / VENUE post proc.\n\n" ..
                       "The game, the Venue validators and Preview read only VENUE: run\n" ..
                       "Copy all to main track when you are done.",
+    venue_mg_replace = "What the Add buttons do with events already at the playhead.\n\n" ..
+                       "Add: insert next to them (stacks build up).\n" ..
+                       "Replace: first remove the events of the same family on that spot,\n" ..
+                       "then insert. Other families there stay.\n\n" ..
+                       "Families: cameras (normal and directed together, so a camera stack\n" ..
+                       "becomes the one new shot), lighting, post proc, bonus FX, and\n" ..
+                       "keyframes ([first] / [next] / [previous]).\n\n" ..
+                       "Blend and keyframe generation are not affected. One undo step.",
 
     venue_kf_inst_subdiv = "Subdivision grid for instrument-aware keyframe alignment.\n\n" ..
                            "Every beat:         check each beat boundary (max 4 [next] per measure in 4/4).\n" ..

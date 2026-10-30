@@ -92,10 +92,38 @@ function FindManualLightingAtPpq(take, ppq_pos, tol)
     return nil
 end
 
+-- Replace mode (S.venue_mg_replace 1): the categories an Add clears at the playhead
+-- first. Cameras are one family, so a new shot replaces a whole stack on that tick.
+local REPLACE_FAMILIES = {
+    coop     = { 'coop', 'directed' },
+    directed = { 'coop', 'directed' },
+    lighting = { 'lighting' },
+    postproc = { 'postproc' },
+    special  = { 'special' },
+    keyframe = { 'keyframe' },
+}
+
+-- Deletes the type-1 events within tol of ppq whose CategorizeVenueEvent category is in
+-- cats (a set). Returns the removed messages. No UI state, so tests can drive it.
+function DeleteVenueEventsAtPpq(take, ppq, tol, cats)
+    local removed = {}
+    local _, _, _, text_count = r.MIDI_CountEvts(take)
+    for i = text_count - 1, 0, -1 do
+        local ok, _, _, evt_ppq, evt_type, msg = r.MIDI_GetTextSysexEvt(take, i)
+        if ok and evt_type == 1 and math.abs(evt_ppq - ppq) <= tol
+                and cats[CategorizeVenueEvent(msg)] then
+            r.MIDI_DeleteTextSysexEvt(take, i)
+            table.insert(removed, 1, msg)
+        end
+    end
+    return removed
+end
+
 function InsertVenueEventAtPlayhead(text)
     local kind = CategorizeVenueEvent(text)
     local track, item, take = _find_target(kind)
     if not track then return end
+    local replace = S.venue_mg_replace == 1
 
     local cursor  = r.GetCursorPosition()
     local abs_ppq = r.MIDI_GetPPQPosFromProjTime(take, cursor)
@@ -113,16 +141,55 @@ function InsertVenueEventAtPlayhead(text)
         end
     end
 
+    -- Replace: the takes holding the family, grouped so one take is cleared once (in
+    -- VENUE mode every category is the VENUE take). A missing subtrack on the clearing
+    -- side has nothing to clear and is skipped.
+    local clears = {}
+    if replace then
+        local by_take = {}
+        for _, cat in ipairs(REPLACE_FAMILIES[kind] or { kind }) do
+            local c_track, c_item, c_take
+            if cat == kind then
+                c_track, c_item, c_take = track, item, take
+            else
+                c_track, c_item, c_take = FindNamedTrackMIDI(ManualGenTargetName(cat))
+            end
+            if c_item then
+                local entry = by_take[c_take]
+                if not entry then
+                    entry = { track = c_track, item = c_item, take = c_take, cats = {} }
+                    by_take[c_take] = entry
+                    clears[#clears + 1] = entry
+                end
+                entry.cats[cat] = true
+            end
+        end
+    end
+
     local name = ManualGenTargetName(kind)
     r.PreventUIRefresh(1)
     r.Undo_BeginBlock2(0)
+    local removed = {}
+    for _, c in ipairs(clears) do
+        r.MarkTrackItemsDirty(c.track, c.item)
+        local c_ppq = r.MIDI_GetPPQPosFromProjTime(c.take, cursor)
+        for _, msg in ipairs(DeleteVenueEventsAtPpq(c.take, c_ppq, _spot_tol(c.take), c.cats)) do
+            removed[#removed + 1] = msg
+        end
+    end
     r.MarkTrackItemsDirty(track, item)
     r.MIDI_InsertTextSysexEvt(take, false, false, abs_ppq, 1, text)
-    r.Undo_EndBlock2(0, 'RB Insert VENUE event: ' .. text, -1)
+    local verb = #removed > 0 and 'Replace' or 'Insert'
+    r.Undo_EndBlock2(0, 'RB ' .. verb .. ' VENUE event: ' .. text, -1)
     r.PreventUIRefresh(-1)
     r.UpdateArrange()
 
-    S.status = ('Inserted %s at playhead (%s).'):format(text, name)
+    if #removed > 0 then
+        S.status = ('Replaced %s with %s at playhead (%s).'):format(
+            table.concat(removed, ' + '), text, name)
+    else
+        S.status = ('Inserted %s at playhead (%s).'):format(text, name)
+    end
 end
 
 -- ---------------------------------------------------------------------------

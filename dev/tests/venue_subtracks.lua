@@ -916,4 +916,129 @@ else
         end, 10)
     end)
 
+    ------------------------------------------------------------------
+    Test.section('Manual gen Insert = Replace (actions_venue_manual.lua)')
+    ------------------------------------------------------------------
+
+    -- Runs fn with Insert = Replace and the given Target (0 VENUE, 1 Subtracks),
+    -- restoring both modes and the cursor afterwards.
+    local function InReplaceMode(target, fn)
+        local rep0, tgt0, cur0 = S.venue_mg_replace, S.venue_mg_target, r.GetCursorPosition()
+        S.venue_mg_replace, S.venue_mg_target = 1, target
+        local ok, err = pcall(fn)
+        S.venue_mg_replace, S.venue_mg_target = rep0, tgt0
+        r.SetEditCurPos(cur0, false, false)
+        if not ok then error(err, 2) end
+    end
+
+    local function Has(take, msg)
+        for _, m in ipairs(ReadMsgs(take)) do if m == msg then return true end end
+        return false
+    end
+
+    Test.it('DeleteVenueEventsAtPpq removes only the given categories on the spot', function()
+        WithVenueFixture(function(_, _, take)
+            InsertEvt(take, 1, '[lighting (stomp)]')
+            InsertEvt(take, 1, '[ProFilm_a.pp]')
+            InsertEvt(take, 1, '[first]')
+            InsertEvt(take, 2, '[lighting (verse)]')
+            local p = r.MIDI_GetPPQPosFromProjTime(take, 1)
+            local removed = DeleteVenueEventsAtPpq(take, p, 2, { lighting = true })
+            Test.expect(#removed == 1 and removed[1] == '[lighting (stomp)]',
+                'removed: ' .. table.concat(removed, ','))
+            Test.expect(#ReadMsgs(take) == 3, 'post proc, [first] and the 2 s lighting stay')
+        end, 10)
+    end)
+
+    Test.it('Replace lighting leaves post proc and [first] on the same tick', function()
+        WithVenueFixture(function(_, _, take)
+            InsertEvt(take, 1, '[lighting (stomp)]')
+            InsertEvt(take, 1, '[ProFilm_a.pp]')
+            InsertEvt(take, 1, '[first]')
+            InReplaceMode(0, function()
+                r.SetEditCurPos(1, false, false)
+                InsertVenueEventAtPlayhead('[lighting (verse)]')
+                Test.expect(not Has(take, '[lighting (stomp)]'), 'old lighting removed')
+                Test.expect(Has(take, '[lighting (verse)]'), 'new lighting added')
+                Test.expect(Has(take, '[ProFilm_a.pp]') and Has(take, '[first]'),
+                    'other families stay')
+                Test.expect(#ReadMsgs(take) == 3, 'count')
+                Test.expect(S.status:find('^Replaced'), 'status: ' .. tostring(S.status))
+            end)
+        end, 10)
+    end)
+
+    Test.it('Replace camera turns a coop + directed stack into the one new shot', function()
+        WithVenueFixture(function(_, _, take)
+            InsertEvt(take, 1, '[coop_all_far]')
+            InsertEvt(take, 1, '[directed_all]')
+            InsertEvt(take, 2, '[coop_all_near]')   -- another spot: stays
+            InReplaceMode(0, function()
+                r.SetEditCurPos(1, false, false)
+                InsertVenueEventAtPlayhead('[coop_g_behind]')
+                local msgs = ReadMsgs(take)
+                Test.expect(#msgs == 2, 'got ' .. table.concat(msgs, ','))
+                Test.expect(Has(take, '[coop_g_behind]') and Has(take, '[coop_all_near]'),
+                    'new shot + the shot 1 s away')
+            end)
+        end, 10)
+    end)
+
+    Test.it('Replace with nothing on the spot acts like Add', function()
+        WithVenueFixture(function(_, _, take)
+            InsertEvt(take, 2, '[lighting (stomp)]')
+            InReplaceMode(0, function()
+                r.SetEditCurPos(1, false, false)
+                InsertVenueEventAtPlayhead('[lighting (verse)]')
+                Test.expect(#ReadMsgs(take) == 2, 'nothing removed')
+                Test.expect(S.status:find('^Inserted'), 'status: ' .. tostring(S.status))
+            end)
+        end, 10)
+    end)
+
+    Test.it('Add mode still stacks', function()
+        WithVenueFixture(function(_, _, take)
+            InsertEvt(take, 1, '[coop_all_far]')
+            local rep0, cur0 = S.venue_mg_replace, r.GetCursorPosition()
+            S.venue_mg_replace = 0
+            r.SetEditCurPos(1, false, false)
+            local ok, err = pcall(InsertVenueEventAtPlayhead, '[coop_all_near]')
+            S.venue_mg_replace = rep0
+            r.SetEditCurPos(cur0, false, false)
+            if not ok then error(err, 2) end
+            Test.expect(#ReadMsgs(take) == 2, 'both shots on the tick')
+        end, 10)
+    end)
+
+    Test.it('Subtracks + Replace: a directed cut clears the coop shot on its own track', function()
+        WithVenueFixture(function(_, _, venue_take)
+            InsertEvt(venue_take, 1, '[coop_all_far]')
+            InsertEvt(venue_take, 1, '[lighting (stomp)]')
+            CopyVenueToSubtracks()
+            InReplaceMode(1, function()
+                r.SetEditCurPos(1, false, false)
+                InsertVenueEventAtPlayhead('[directed_all]')
+                Test.expect(#ReadMsgs(SubTake('coop')) == 0, 'coop shot cleared')
+                Test.expect(Has(SubTake('directed'), '[directed_all]'), 'directed cut added')
+                Test.expect(#ReadMsgs(SubTake('lighting')) == 1, 'lighting subtrack untouched')
+                Test.expect(#ReadMsgs(venue_take) == 2, 'VENUE untouched')
+            end)
+        end, 10)
+    end)
+
+    Test.it('Replace is one undo step', function()
+        WithVenueFixture(function(_, _, take)
+            InsertEvt(take, 1, '[lighting (stomp)]')
+            InReplaceMode(0, function()
+                r.SetEditCurPos(1, false, false)
+                InsertVenueEventAtPlayhead('[lighting (verse)]')
+                r.Undo_DoUndo2(0)
+                -- The take pointer can change across undo; read it again.
+                local _, _, tk = FindNamedTrackMIDI('VENUE')
+                Test.expect(tk and Has(tk, '[lighting (stomp)]'), 'old lighting back')
+                Test.expect(tk and not Has(tk, '[lighting (verse)]'), 'new lighting gone')
+            end)
+        end, 10)
+    end)
+
 end

@@ -81,12 +81,12 @@ function DrawVenueManualTab()
     r.ImGui_Spacing(ctx)
 
     local _lbl_col = LabelColWidth({
-        'Target', 'Normal camera', 'Directed camera', 'Lighting', 'Keyframe align',
+        'Target', 'Insert', 'Normal camera', 'Directed camera', 'Lighting', 'Keyframe align',
         'Keyframe rate', 'Post proc', 'Special', 'Camera pacing', 'Remove',
     })
 
     -- ---- Target: VENUE or the Sub VENUE tracks ----
-    local _radio_w = RadioGroupWidth({ 'VENUE', 'Subtracks' })
+    local _radio_w = RadioGroupWidth({ 'VENUE', 'Subtracks', 'Add', 'Replace' })
     r.ImGui_Text(ctx, 'Target')
     r.ImGui_SameLine(ctx, _lbl_col)
     if r.ImGui_RadioButton(ctx, 'VENUE##mg_tgt', S.venue_mg_target == 0) then
@@ -104,6 +104,19 @@ function DrawVenueManualTab()
         r.ImGui_TextWrapped(ctx, 'No Sub VENUE tracks in this project. Create them first with ' ..
                                  'Venue > Actions > Copy all to subtracks.')
     end
+
+    -- ---- Insert: add next to existing events, or replace the same family ----
+    r.ImGui_Text(ctx, 'Insert')
+    r.ImGui_SameLine(ctx, _lbl_col)
+    if r.ImGui_RadioButton(ctx, 'Add##mg_rep', S.venue_mg_replace == 0) then
+        S.venue_mg_replace = 0
+    end
+    Tooltip(TIPS.venue_mg_replace)
+    r.ImGui_SameLine(ctx, _lbl_col + _radio_w)
+    if r.ImGui_RadioButton(ctx, 'Replace##mg_rep', S.venue_mg_replace == 1) then
+        S.venue_mg_replace = 1
+    end
+    Tooltip(TIPS.venue_mg_replace)
     r.ImGui_Spacing(ctx)
 
     -- Special events list
