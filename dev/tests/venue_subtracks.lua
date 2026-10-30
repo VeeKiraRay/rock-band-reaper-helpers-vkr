@@ -746,4 +746,174 @@ else
         end, 10)
     end)
 
+    ------------------------------------------------------------------
+    Test.section('Manual gen Target = Subtracks (actions_venue_manual.lua)')
+    ------------------------------------------------------------------
+
+    -- Runs fn with Manual gen in Subtracks mode, no time selection, and restores the
+    -- mode, the cursor and the time selection afterwards whatever fn does.
+    local function InSubtracksMode(fn)
+        local mode0, cur0 = S.venue_mg_target, r.GetCursorPosition()
+        local sel_s0, sel_e0 = r.GetSet_LoopTimeRange(false, false, 0, 0, false)
+        r.GetSet_LoopTimeRange(true, false, 0, 0, false)
+        S.venue_mg_target = 1
+        local ok, err = pcall(fn)
+        S.venue_mg_target = mode0
+        r.SetEditCurPos(cur0, false, false)
+        r.GetSet_LoopTimeRange(true, false, sel_s0, sel_e0, false)
+        if not ok then error(err, 2) end
+    end
+
+    local function SubTake(key)
+        for _, cat in ipairs(VENUE_SUBTRACKS) do
+            if cat.key == key then
+                local _, _, take = FindNamedTrackMIDI(cat.track_name)
+                return take
+            end
+        end
+    end
+
+    Test.it('Add puts each event on its own subtrack and leaves VENUE alone', function()
+        WithVenueFixture(function(_, _, venue_take)
+            CopyVenueToSubtracks()
+            InSubtracksMode(function()
+                r.SetEditCurPos(1, false, false)
+                InsertVenueEventAtPlayhead('[coop_all_far]')
+                InsertVenueEventAtPlayhead('[directed_all]')
+                InsertVenueEventAtPlayhead('[lighting (stomp)]')
+                InsertVenueEventAtPlayhead('[ProFilm_a.pp]')
+                InsertVenueEventAtPlayhead('[bonusfx]')
+                -- [first] is checked against VENUE lighting, which now has stomp here.
+                InsertVenueEventAtPlayhead('[first]')
+                r.SetEditCurPos(2, false, false)
+                InsertVenueEventAtPlayhead('[next]')
+
+                local expect = {
+                    coop = 1, directed = 1, lighting = 1, postproc = 1, special = 1, keyframe = 2,
+                }
+                for key, n in pairs(expect) do
+                    local got = #ReadMsgs(SubTake(key))
+                    Test.expect(got == n, ('%s: expected %d, got %d'):format(key, n, got))
+                end
+                Test.expect(#ReadMsgs(venue_take) == 0, 'VENUE must stay empty')
+                Test.expect(S.status:find('VENUE keyevents', 1, true),
+                    'status should name the subtrack: ' .. tostring(S.status))
+            end)
+        end, 10)
+    end)
+
+    Test.it('a missing subtrack is reported and nothing is written', function()
+        WithVenueFixture(function(_, _, venue_take)
+            InSubtracksMode(function()
+                r.SetEditCurPos(1, false, false)
+                local before = r.GetProjectStateChangeCount(0)
+                InsertVenueEventAtPlayhead('[coop_all_far]')
+                Test.expect(S.status:find('Copy all to subtracks', 1, true),
+                    'expected the create-them-first hint, got: ' .. tostring(S.status))
+                Test.expect(#ReadMsgs(venue_take) == 0, 'VENUE must not get the event')
+                Test.expect(r.GetProjectStateChangeCount(0) == before, 'no undo point')
+
+                RemoveVenueEventsByType(4)
+                Test.expect(S.status:find('Copy all to subtracks', 1, true),
+                    'Remove with no subtracks: ' .. tostring(S.status))
+            end)
+        end, 10)
+    end)
+
+    Test.it('[first] gate reads VENUE lighting, not VENUE', function()
+        WithVenueFixture(function(_, _, venue_take)
+            InsertEvt(venue_take, 1, '[lighting (stomp)]')   -- on VENUE only
+            CopyVenueToSubtracks()
+            -- Empty VENUE lighting again: the gate must not fall back to VENUE.
+            local lt_take = SubTake('lighting')
+            DeleteTextEventsInRange(lt_take, -1, math.huge, nil)
+            InSubtracksMode(function()
+                r.SetEditCurPos(1, false, false)
+                InsertVenueEventAtPlayhead('[first]')
+                Test.expect(S.status == NO_LIGHTING_AT_PLAYHEAD_MSG,
+                    'expected the gate refusal, got: ' .. tostring(S.status))
+                Test.expect(#ReadMsgs(SubTake('keyframe')) == 0, 'no [first] written')
+            end)
+        end, 10)
+    end)
+
+    Test.it('keyframe Add reads VENUE lighting and writes VENUE keyevents at the same time', function()
+        WithVenueFixture(function(_, _, venue_take)
+            CopyVenueToSubtracks()
+            -- Move the keyevents item so its ticks differ from the lighting item's.
+            local _, kf_item = FindNamedTrackMIDI('VENUE keyevents')
+            r.SetMediaItemInfo_Value(kf_item, 'D_POSITION', 0)
+            r.SetMediaItemInfo_Value(kf_item, 'D_LENGTH', 32)
+            local kf_take = r.GetActiveTake(kf_item)
+            local lt_take = SubTake('lighting')
+            InsertEvt(lt_take, 4, '[lighting (stomp)]')
+            InsertEvt(lt_take, 12, '[lighting (verse)]')
+
+            local align0, rate0 = S.venue_keyframe_align, S.venue_mg_kf_rate
+            local ok, err = pcall(InSubtracksMode, function()
+                S.venue_keyframe_align = 0
+                S.venue_mg_kf_rate     = 1
+                r.SetEditCurPos(4, false, false)
+                GenerateManualKeyframes()
+                Test.expect(S.status:find('Generated'), 'got: ' .. tostring(S.status))
+
+                local first_t
+                local _, _, _, n = r.MIDI_CountEvts(kf_take)
+                for i = 0, n - 1 do
+                    local o, _, _, p, ty, msg = r.MIDI_GetTextSysexEvt(kf_take, i)
+                    if o and ty == 1 and msg == '[first]' then
+                        first_t = r.MIDI_GetProjTimeFromPPQPos(kf_take, p)
+                    end
+                end
+                Test.expect(first_t and math.abs(first_t - 4) < 0.01,
+                    '[first] should sit at 4 s, got ' .. tostring(first_t))
+                Test.expect(#ReadMsgs(lt_take) == 2, 'VENUE lighting gains nothing')
+                Test.expect(#ReadMsgs(venue_take) == 0, 'VENUE stays empty')
+            end)
+            S.venue_keyframe_align, S.venue_mg_kf_rate = align0, rate0
+            if not ok then error(err, 2) end
+        end, 30, false, 2)
+    end)
+
+    Test.it('Blend reads and writes its own subtrack', function()
+        WithVenueFixture(function(_, _, venue_take)
+            CopyVenueToSubtracks()
+            local lt_take = SubTake('lighting')
+            InsertEvt(lt_take, 1, '[lighting (stomp)]')
+            InsertEvt(lt_take, 3, '[lighting (verse)]')
+            InSubtracksMode(function()
+                r.SetEditCurPos(6, false, false)
+                BlendVenuePresetAtPlayhead('lighting')
+                Test.expect(#ReadMsgs(lt_take) == 3, 'blend anchor on VENUE lighting')
+                Test.expect(#ReadMsgs(venue_take) == 0, 'VENUE untouched')
+            end)
+        end, 10)
+    end)
+
+    Test.it('Remove clears only the covered subtracks; All clears all six', function()
+        WithVenueFixture(function(_, _, venue_take)
+            InsertEvt(venue_take, 1, '[coop_all_far]')
+            InsertEvt(venue_take, 2, '[directed_all]')
+            InsertEvt(venue_take, 3, '[lighting (loop_warm)]')
+            InsertEvt(venue_take, 4, '[ProFilm_a.pp]')
+            InsertEvt(venue_take, 5, '[bonusfx]')
+            InsertEvt(venue_take, 6, '[first]')
+            CopyVenueToSubtracks()
+            InSubtracksMode(function()
+                RemoveVenueEventsByType(3)  -- Special: special + keyevents
+                for _, cat in ipairs(VENUE_SUBTRACKS) do
+                    local want = (cat.key == 'special' or cat.key == 'keyframe') and 0 or 1
+                    local got  = #ReadMsgs(SubTake(cat.key))
+                    Test.expect(got == want, ('%s after Special: %d'):format(cat.key, got))
+                end
+
+                RemoveVenueEventsByType(4)  -- All
+                for _, cat in ipairs(VENUE_SUBTRACKS) do
+                    Test.expect(#ReadMsgs(SubTake(cat.key)) == 0, cat.key .. ' after All')
+                end
+                Test.expect(#ReadMsgs(venue_take) == 6, 'VENUE untouched')
+            end)
+        end, 10)
+    end)
+
 end

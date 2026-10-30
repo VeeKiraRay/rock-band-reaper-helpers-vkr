@@ -42,6 +42,13 @@
 --     - New Events tab for the EVENTS track tools, with two sub-tabs.
 --       General holds "List event sections" (moved from Venue > Actions);
 --       Manual gen is the former Venue > Events sub-tab, unchanged.
+--     - Venue > Manual gen: new Target choice, VENUE (as before) or Subtracks.
+--       Subtracks writes each event to its own Sub VENUE track (made by Venue >
+--       Actions > Copy all to subtracks): cameras, lighting, post proc, special
+--       and keyframes each to their track. Blend, keyframe generation and Remove
+--       work on the subtracks too. If a subtrack is missing, you are told to
+--       create them first. Run Copy all to main track when done - the game reads
+--       only VENUE.
 --     - New footer, always at the bottom of the window: the time selection,
 --       the status line, Copy result (the status and result to the clipboard)
 --       and Undo. The tabs scroll above it, so on a short window these no

@@ -33,6 +33,7 @@ local function SerializeSettings()
         'vcpacc=' .. S.venue_cam_pacing_custom,
         'vcpacj=' .. (S.venue_cam_pacing_jitter and '1' or '0'),
         'vsecm='  .. S.venue_sec_mode,
+        'vmgt='   .. S.venue_mg_target,
         'vsectm=' .. S.venue_sec_tmpl_name,
         'vpscl='   .. S.venue_preview_scale,
         'vpan='    .. (S.venue_preview_animate and '1' or '0'),
@@ -69,6 +70,7 @@ local function DeserializeSettings(str)
         elseif k == 'vcpacc' then S.venue_cam_pacing_custom = tonumber(v) or 16
         elseif k == 'vcpacj' then S.venue_cam_pacing_jitter = (v == '1')
         elseif k == 'vsecm'  then S.venue_sec_mode          = tonumber(v) or 0
+        elseif k == 'vmgt'   then S.venue_mg_target         = (v == '1') and 1 or 0
         elseif k == 'vsectm' then S.venue_sec_tmpl_name     = v
         elseif k == 'vpscl'   then S.venue_preview_scale   = tonumber(v) or 1
         elseif k == 'vpan'    then S.venue_preview_animate = (v == '1')

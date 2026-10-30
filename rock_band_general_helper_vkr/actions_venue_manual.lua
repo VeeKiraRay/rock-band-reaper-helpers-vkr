@@ -4,7 +4,7 @@
 --           GenerateKeyframesForSpan, ResolveUserCamInterval,
 --           JitteredInterval, CAM_INTERVAL_16THS, CAM_JITTER,
 --           DeleteTextEventsInRange, ClearVenueKeyframesInRange, CategorizeVenueEvent,
---           IsBlendAnchor,
+--           IsBlendAnchor, VENUE_SUBTRACKS (read at call time; loaded later),
 --           FindTrackByName, FindFirstMIDIItem, FormatTime, RB3_PHRASE_PITCH,
 --           r, S (globals)
 
@@ -15,17 +15,57 @@ NO_LIGHTING_AT_PLAYHEAD_MSG =
     'no manual lighting event ([lighting (verse|chorus|manual_cool|manual_warm|' ..
     'dischord|stomp)]) found at the playhead.'
 
-local function _find_venue_track_and_take()
-    local track, item, take = FindNamedTrackMIDI('VENUE')
+-- Manual gen writes to VENUE (S.venue_mg_target 0) or to the Sub VENUE tracks made by
+-- Venue > Actions "Copy all to subtracks" (1). In Subtracks mode each event goes to the
+-- subtrack of its CategorizeVenueEvent category, the same split those tracks hold.
+
+function ManualGenUsesSubtracks()
+    return S.venue_mg_target == 1
+end
+
+-- Track name Manual gen reads/writes for one category (a VENUE_SUBTRACKS key).
+function ManualGenTargetName(kind)
+    if not ManualGenUsesSubtracks() then return 'VENUE' end
+    for _, cat in ipairs(VENUE_SUBTRACKS) do
+        if cat.key == kind then return cat.track_name end
+    end
+    return 'VENUE'
+end
+
+local SUBTRACKS_FIRST_HINT =
+    'create the subtracks first with Venue > Actions > Copy all to subtracks.'
+
+-- Returns track, item, take for a category, or nil with S.status set.
+local function _find_target(kind)
+    local name = ManualGenTargetName(kind)
+    local track, item, take = FindNamedTrackMIDI(name)
+    if not ManualGenUsesSubtracks() then
+        if not track then
+            S.status = 'No VENUE track found.'
+            return nil, nil, nil
+        end
+        if not item then
+            S.status = 'No MIDI item on VENUE track.'
+            return nil, nil, nil
+        end
+        return track, item, take
+    end
     if not track then
-        S.status = 'No VENUE track found.'
+        S.status = ('No "%s" track - %s'):format(name, SUBTRACKS_FIRST_HINT)
         return nil, nil, nil
     end
     if not item then
-        S.status = 'No MIDI item on VENUE track.'
+        S.status = ('No MIDI item on "%s" - %s'):format(name, SUBTRACKS_FIRST_HINT)
         return nil, nil, nil
     end
     return track, item, take
+end
+
+-- Same project time, expressed in another take's ticks. Subtrack items normally match
+-- VENUE's position, but a moved item must not shift the events.
+local function _ppq_between(src_take, ppq, dst_take)
+    if src_take == dst_take then return ppq end
+    return r.MIDI_GetPPQPosFromProjTime(dst_take, r.MIDI_GetProjTimeFromPPQPos(src_take, ppq))
 end
 
 -- ---------------------------------------------------------------------------
@@ -53,18 +93,27 @@ function FindManualLightingAtPpq(take, ppq_pos, tol)
 end
 
 function InsertVenueEventAtPlayhead(text)
-    local track, item, take = _find_venue_track_and_take()
+    local kind = CategorizeVenueEvent(text)
+    local track, item, take = _find_target(kind)
     if not track then return end
 
-    local abs_ppq = r.MIDI_GetPPQPosFromProjTime(take, r.GetCursorPosition())
+    local cursor  = r.GetCursorPosition()
+    local abs_ppq = r.MIDI_GetPPQPosFromProjTime(take, cursor)
 
     -- Re-validate here, never trusting the UI frame's cached check (same discipline as
     -- InsertEventsEvent). Returns before any Undo_* call, so a refusal leaves no undo point.
-    if text == '[first]' and not FindManualLightingAtPpq(take, abs_ppq) then
-        S.status = NO_LIGHTING_AT_PLAYHEAD_MSG
-        return
+    -- In Subtracks mode the lighting event lives on another track than the [first].
+    if text == '[first]' then
+        local _, _, lt_take = _find_target('lighting')
+        if not lt_take then return end
+        local lt_ppq = r.MIDI_GetPPQPosFromProjTime(lt_take, cursor)
+        if not FindManualLightingAtPpq(lt_take, lt_ppq) then
+            S.status = NO_LIGHTING_AT_PLAYHEAD_MSG
+            return
+        end
     end
 
+    local name = ManualGenTargetName(kind)
     r.PreventUIRefresh(1)
     r.Undo_BeginBlock2(0)
     r.MarkTrackItemsDirty(track, item)
@@ -73,7 +122,7 @@ function InsertVenueEventAtPlayhead(text)
     r.PreventUIRefresh(-1)
     r.UpdateArrange()
 
-    S.status = 'Inserted ' .. text .. ' at playhead (VENUE).'
+    S.status = ('Inserted %s at playhead (%s).'):format(text, name)
 end
 
 -- ---------------------------------------------------------------------------
@@ -113,7 +162,7 @@ end
 
 -- kind: 'lighting' or 'postproc' (CategorizeVenueEvent's own names).
 function BlendVenuePresetAtPlayhead(kind)
-    local track, item, take = _find_venue_track_and_take()
+    local track, item, take = _find_target(kind)
     if not track then return end
 
     local cur_ppq = r.MIDI_GetPPQPosFromProjTime(take, r.GetCursorPosition())
@@ -181,7 +230,8 @@ function BlendVenuePresetAtPlayhead(kind)
 
     local placed_t = FormatTime(r.MIDI_GetProjTimeFromPPQPos(take, cur_ppq))
     local lines = {
-        ('Copied the active %s preset to the playhead as a blend anchor.'):format(label),
+        ('Copied the active %s preset to the playhead as a blend anchor (%s).'):format(
+            label, ManualGenTargetName(kind)),
         '',
         ('  Source:  %s   %s'):format(src.msg, at(src)),
         ('  Placed:  %s   %s'):format(src.msg, placed_t),
@@ -257,8 +307,13 @@ end
 -- ---------------------------------------------------------------------------
 
 function GenerateManualKeyframes()
-    local track, item, take = _find_venue_track_and_take()
+    -- Lighting is read from one take and the keyframes written to another; in VENUE mode
+    -- both are the VENUE take. Every position below is in the lighting take's ticks
+    -- until the write, which converts through project time.
+    local track, item, take = _find_target('lighting')
     if not track then return end
+    local kf_track, kf_item, kf_take = _find_target('keyframe')
+    if not kf_track then return end
 
     local ppq       = GetTakePPQPerQN(take)
     local half_beat = math.floor(ppq / 2 + 0.5)
@@ -318,63 +373,90 @@ function GenerateManualKeyframes()
 
     r.PreventUIRefresh(1)
     r.Undo_BeginBlock2(0)
-    r.MarkTrackItemsDirty(track, item)
+    r.MarkTrackItemsDirty(kf_track, kf_item)
 
     -- Clear existing keyframe events in range
-    ClearVenueKeyframesInRange(take, start_ppq, end_ppq)
+    ClearVenueKeyframesInRange(kf_take,
+        _ppq_between(take, start_ppq, kf_take), _ppq_between(take, end_ppq, kf_take))
 
     -- Insert new keyframe events at their already-computed alignment grid position (beat,
     -- half-beat, quarter-beat, etc. per S.venue_kf_inst_subdiv for instrument-aware modes) -
     -- no further snapping, or a coarser half-beat re-snap would collapse finer positions.
     for _, ev in ipairs(ctrl_events) do
-        r.MIDI_InsertTextSysexEvt(take, false, false, ev.ppq, 1, ev.text)
+        r.MIDI_InsertTextSysexEvt(kf_take, false, false,
+            _ppq_between(take, ev.ppq, kf_take), 1, ev.text)
     end
 
     r.Undo_EndBlock2(0, 'RB Generate Manual Keyframes (' .. #ctrl_events .. ' events)', -1)
     r.PreventUIRefresh(-1)
     r.UpdateArrange()
 
-    S.status = ('Generated %d keyframe events.'):format(#ctrl_events)
+    if ManualGenUsesSubtracks() then
+        S.status = ('Generated %d keyframe events (%s).'):format(
+            #ctrl_events, ManualGenTargetName('keyframe'))
+    else
+        S.status = ('Generated %d keyframe events.'):format(#ctrl_events)
+    end
 end
 
 -- ---------------------------------------------------------------------------
 
+-- Categories (CategorizeVenueEvent keys) each Remove type covers. "Camera" = coop or
+-- directed; "Special" = special (bonusfx + anything unrecognized) or keyframe. "All"
+-- lists every category, since the classifier's categories are exhaustive.
+local REMOVE_CATEGORIES = {
+    [0] = { coop = true, directed = true },
+    [1] = { lighting = true },
+    [2] = { postproc = true },
+    [3] = { special = true, keyframe = true },
+    [4] = { coop = true, directed = true, lighting = true, keyframe = true,
+            postproc = true, special = true },
+}
+
 function RemoveVenueEventsByType(remove_type)
-    local track, item, take = _find_venue_track_and_take()
-    if not track then return end
+    local cats = REMOVE_CATEGORIES[remove_type] or REMOVE_CATEGORIES[4]
+
+    -- The takes to clear: VENUE alone, or each existing subtrack of a covered category.
+    local targets, missing = {}, {}
+    if ManualGenUsesSubtracks() then
+        for _, cat in ipairs(VENUE_SUBTRACKS) do
+            if cats[cat.key] then
+                local track, item, take = FindNamedTrackMIDI(cat.track_name)
+                if item then
+                    targets[#targets + 1] = { track = track, item = item, take = take }
+                else
+                    missing[#missing + 1] = cat.track_name
+                end
+            end
+        end
+        if #targets == 0 then
+            S.status = ('No subtrack found (%s) - %s'):format(
+                        table.concat(missing, ', '), SUBTRACKS_FIRST_HINT)
+            return
+        end
+    else
+        local track, item, take = _find_target('special')
+        if not track then return end
+        targets[1] = { track = track, item = item, take = take }
+    end
 
     local sel_s, sel_e = r.GetSet_LoopTimeRange(false, false, 0, 0, false)
     local has_sel      = sel_e > sel_s
 
-    local item_start_sec  = r.GetMediaItemInfo_Value(item, 'D_POSITION')
-    local item_end_sec    = item_start_sec + r.GetMediaItemInfo_Value(item, 'D_LENGTH')
-    local range_start_ppq = r.MIDI_GetPPQPosFromProjTime(take, has_sel and sel_s or item_start_sec)
-    local range_end_ppq   = r.MIDI_GetPPQPosFromProjTime(take, has_sel and sel_e or item_end_sec)
-
-    -- Category membership per remove_type, in terms of CategorizeVenueEvent's output
-    -- (actions_venue_subtracks.lua) - the single shared classifier also used by the Sub VENUE
-    -- tracks split. "Camera" = coop or directed; "Special" = special (bonusfx + anything
-    -- unrecognized) or keyframe, matching the previous pattern-based groupings exactly.
-    -- "All" is unconditionally true since the classifier's categories are exhaustive.
-    local match
-    if remove_type == 0 then
-        match = function(msg) local c = CategorizeVenueEvent(msg); return c == 'coop' or c == 'directed' end
-    elseif remove_type == 1 then
-        match = function(msg) return CategorizeVenueEvent(msg) == 'lighting' end
-    elseif remove_type == 2 then
-        match = function(msg) return CategorizeVenueEvent(msg) == 'postproc' end
-    elseif remove_type == 3 then
-        match = function(msg) local c = CategorizeVenueEvent(msg); return c == 'special' or c == 'keyframe' end
-    else  -- 4 = All
-        match = function(msg) return true end
-    end
+    local function keep(msg) return not cats[CategorizeVenueEvent(msg)] end
 
     r.PreventUIRefresh(1)
     r.Undo_BeginBlock2(0)
-    r.MarkTrackItemsDirty(track, item)
 
-    local count = DeleteTextEventsInRange(take, range_start_ppq, range_end_ppq,
-                                          function(msg) return not match(msg) end)
+    local count = 0
+    for _, t in ipairs(targets) do
+        r.MarkTrackItemsDirty(t.track, t.item)
+        local item_start_sec  = r.GetMediaItemInfo_Value(t.item, 'D_POSITION')
+        local item_end_sec    = item_start_sec + r.GetMediaItemInfo_Value(t.item, 'D_LENGTH')
+        local range_start_ppq = r.MIDI_GetPPQPosFromProjTime(t.take, has_sel and sel_s or item_start_sec)
+        local range_end_ppq   = r.MIDI_GetPPQPosFromProjTime(t.take, has_sel and sel_e or item_end_sec)
+        count = count + DeleteTextEventsInRange(t.take, range_start_ppq, range_end_ppq, keep)
+    end
 
     local type_names = { 'Camera', 'Lighting', 'Post proc', 'Special', 'All' }
     local tname      = type_names[remove_type + 1] or ''
@@ -383,5 +465,12 @@ function RemoveVenueEventsByType(remove_type)
     r.UpdateArrange()
 
     local scope = has_sel and 'time selection' or 'full song'
-    S.status = ('Removed %d %s events (%s).'):format(count, tname, scope)
+    if ManualGenUsesSubtracks() then
+        S.status = ('Removed %d %s events (%s, subtracks).'):format(count, tname, scope)
+        if #missing > 0 then
+            S.last_result = 'Not found, skipped: ' .. table.concat(missing, ', ')
+        end
+    else
+        S.status = ('Removed %d %s events (%s).'):format(count, tname, scope)
+    end
 end

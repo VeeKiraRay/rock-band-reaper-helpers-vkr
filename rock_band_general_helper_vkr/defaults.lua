@@ -174,6 +174,7 @@ S = {
     venue_mg_special     = '',   -- full event e.g. '[bonusfx]'
     venue_mg_kf_rate     = 2,    -- keyframe rate in beats (1-8)
     venue_mg_remove_type = 0,    -- 0=Camera 1=Lighting 2=PostProc 3=Special 4=All
+    venue_mg_target      = 0,    -- 0=VENUE 1=Sub VENUE tracks (persisted: 'vmgt')
     -- Keyframes tab (not persisted - session state only)
     venue_kf_rate        = 2,    -- keyframe rate in beats (1-8), independent of venue_mg_kf_rate
     -- Events tab (not persisted - session state only)
@@ -507,6 +508,15 @@ TIPS = {
                       "the whole row is blocked anywhere else.\n\n" ..
                       "Clears any existing [first]/[next]/[previous] events in that range first.\n" ..
                       "Fully undoable.",
+    venue_mg_target = "Where this tab reads and writes events.\n\n" ..
+                      "VENUE: the VENUE track.\n" ..
+                      "Subtracks: the Sub VENUE tracks made by Venue > Actions > Copy all to\n" ..
+                      "subtracks. Each event goes to its own track - cameras to VENUE normal\n" ..
+                      "camera / VENUE directed camera, lighting to VENUE lighting, [first] /\n" ..
+                      "[next] / [previous] and generated keyframes to VENUE keyevents, and so on.\n" ..
+                      "Blend and the [first] check read VENUE lighting / VENUE post proc.\n\n" ..
+                      "The game, the Venue validators and Preview read only VENUE: run\n" ..
+                      "Copy all to main track when you are done.",
 
     venue_kf_inst_subdiv = "Subdivision grid for instrument-aware keyframe alignment.\n\n" ..
                            "Every beat:         check each beat boundary (max 4 [next] per measure in 4/4).\n" ..

@@ -14,7 +14,9 @@
 --                   LIGHTING_DISPLAY_GROUPS, LIGHTING_LABELS, LIGHTING_TIPS,
 --                   POSTPROC_DISPLAY, POSTPROC_LABELS, POSTPROC_TIPS,
 --                   KF_ALIGN_LABELS, VenueEventTooltip, RawVenueEventText,
---                   ComboGroupHeader
+--                   ComboGroupHeader, RadioGroupWidth, LabelColWidth,
+--                   ManualGenTargetName, ManualGenUsesSubtracks, VENUE_SUBTRACKS,
+--                   FindTrackByName
 
 -- Cached VENUE take and the PPQ of every manual lighting event on it, refreshed via
 -- MakeProjectPoll (at most every 1 s and only when the project changed; 5 s fallback) -
@@ -26,11 +28,14 @@
 -- switch invalidates the pointer between polls), and this tab's own Add buttons force a
 -- rescan so the gate reopens the frame after a lighting event is added. Correctness never
 -- depends on this cache - both actions re-check the take for themselves.
+-- In Subtracks mode the cached take is "VENUE lighting" instead (ManualGenTargetName), and
+-- the poll also caches whether any subtrack exists, for the inline hint.
 local _poll         = MakeProjectPoll(1.0, 5.0)
 local _venue_take
 local _manual_lt    = nil   -- array of manual lighting PPQ positions
 local _lt_tol       = 0     -- match tolerance in ticks (see FindManualLightingAtPpq)
 local _force_rescan = false
+local _subtracks_missing = false
 
 local function _ScanManualLighting(take)
     local out = {}
@@ -48,11 +53,18 @@ function DrawVenueManualTab()
     local _take_valid = _venue_take and r.ValidatePtr2(0, _venue_take, 'MediaItem_Take*')
     if _poll(_force_rescan) or (_venue_take and not _take_valid) then
         _force_rescan = false
-        local _, _, _tk = FindNamedTrackMIDI('VENUE')
+        local _, _, _tk = FindNamedTrackMIDI(ManualGenTargetName('lighting'))
         _venue_take = _tk
         _take_valid = _venue_take ~= nil
         _manual_lt  = nil
         if _take_valid then _manual_lt, _lt_tol = _ScanManualLighting(_venue_take) end
+        _subtracks_missing = false
+        if ManualGenUsesSubtracks() then
+            _subtracks_missing = true
+            for _, _cat in ipairs(VENUE_SUBTRACKS) do
+                if FindTrackByName(_cat.track_name) then _subtracks_missing = false; break end
+            end
+        end
     end
     -- No VENUE take at all: leave the keyframe controls enabled rather than locking the
     -- tab on a stale/missing cache - the actions report the missing track themselves.
@@ -68,6 +80,32 @@ function DrawVenueManualTab()
     r.ImGui_TextWrapped(ctx, 'Insert individual venue events at the playhead position')
     r.ImGui_Spacing(ctx)
 
+    local _lbl_col = LabelColWidth({
+        'Target', 'Normal camera', 'Directed camera', 'Lighting', 'Keyframe align',
+        'Keyframe rate', 'Post proc', 'Special', 'Camera pacing', 'Remove',
+    })
+
+    -- ---- Target: VENUE or the Sub VENUE tracks ----
+    local _radio_w = RadioGroupWidth({ 'VENUE', 'Subtracks' })
+    r.ImGui_Text(ctx, 'Target')
+    r.ImGui_SameLine(ctx, _lbl_col)
+    if r.ImGui_RadioButton(ctx, 'VENUE##mg_tgt', S.venue_mg_target == 0) then
+        if S.venue_mg_target ~= 0 then _force_rescan = true end
+        S.venue_mg_target = 0
+    end
+    Tooltip(TIPS.venue_mg_target)
+    r.ImGui_SameLine(ctx, _lbl_col + _radio_w)
+    if r.ImGui_RadioButton(ctx, 'Subtracks##mg_tgt', S.venue_mg_target == 1) then
+        if S.venue_mg_target ~= 1 then _force_rescan = true end
+        S.venue_mg_target = 1
+    end
+    Tooltip(TIPS.venue_mg_target)
+    if S.venue_mg_target == 1 and _subtracks_missing then
+        r.ImGui_TextWrapped(ctx, 'No Sub VENUE tracks in this project. Create them first with ' ..
+                                 'Venue > Actions > Copy all to subtracks.')
+    end
+    r.ImGui_Spacing(ctx)
+
     -- Special events list
     local _special_events = {
         '[bonusfx]', '[bonusfx_optional]', '[first]', '[next]', '[previous]',
@@ -80,10 +118,6 @@ function DrawVenueManualTab()
         ['[previous]']         = '[previous] keyframe',
     }
 
-    local _lbl_col = LabelColWidth({
-        'Normal camera', 'Directed camera', 'Lighting', 'Keyframe align',
-        'Keyframe rate', 'Post proc', 'Special', 'Camera pacing', 'Remove',
-    })
     -- Every row's button starts at the same x (all combos are 230 wide), so size
     -- them all to the widest label in the group - otherwise the two rows that also
     -- carry Blend would leave the Add column ragged.
