@@ -53,9 +53,10 @@ S = {
     mn_diff_idx           = 1,     -- 1=Expert, 2=Hard, 3=Medium, 4=Easy (no "All")
     mn_note_type          = 0,     -- 0 = All notes, 1 = Only sustains
     mn_note_denom         = 32,    -- All notes: note size denominator (16/32/64/128)
-    mn_sustain_32nds      = 3,     -- Only sustains: gap size in 32nd notes (0-32);
-                                   -- matches SustainGapDefaultForDiff(1) (Expert),
-                                   -- which prefills it when the tier is changed
+    mn_gap_mode           = 0,     -- Only sustains: 0 = Default (Generate's rules), 1 = Custom
+    mn_sustain_32nds      = 2,     -- Only sustains, Custom: gap size in 32nd notes (0-32);
+                                   -- prefilled with MidiLengthDefaultGap32 when the track
+                                   -- or tier changes (2 = Expert's 1/16)
     -- Pattern Replace (session-only - not persisted)
     mr_midi_src_idx       = -1,
     mr_diff_idx           = 0,     -- 0=All, 1=Expert, 2=Hard, 3=Medium, 4=Easy
@@ -314,9 +315,8 @@ TIPS = {
                      "PART VOCALS/HARM1-3 and PART REAL_KEYS*/PART KEYS_ANIM* always use\n" ..
                      "their own fixed range regardless of this selector.\n\n" ..
                      "No notes outside the selected range are touched.\n\n" ..
-                     "Changing the tier prefills the 32nd note amount with that tier's\n" ..
-                     "standard gap (Expert 3, Hard 4, Medium 8, Easy 16). Adjust it\n" ..
-                     "afterwards and your value sticks.",
+                     "Only sustains: picks the tier's gap and shortest-sustain rules.\n" ..
+                     "PART REAL_KEYS_X/H/M/E take the tier from the track name instead.",
     mn_note_type   = "Non-sustains: unify every note SHORTER than 1/8 note to the selected\n" ..
                      "Note size. Existing sustains (>= 1/8 note) are left untouched.\n\n" ..
                      "Only sustains: leave note starts and short notes untouched; instead\n" ..
@@ -324,20 +324,30 @@ TIPS = {
     mn_note_denom  = "Standard note length every non-sustain note in range is set to (start\n" ..
                      "position unchanged, only the end position moves). Default: 1/32.\n\n" ..
                      "1/8 is not offered: that is the sustain threshold.",
+    mn_gap_mode    = "Default: the gap Difficulty > Generate leaves after a sustain, worked out\n" ..
+                     "per sustain for this instrument and tier (Keys: a 1/8 after a chord on\n" ..
+                     "Expert/Hard; Pro Keys Hard: a 1/16 before a simple change, else a 1/8).\n" ..
+                     "Fast songs (over 160 BPM) are told by the song's first tempo. Expert\n" ..
+                     "uses Hard's gaps. The rules are shown below.\n\n" ..
+                     "Custom: one gap, in 32nd notes, for every sustain.\n\n" ..
+                     "Both: a sustain too short for the tier becomes a plain note, as\n" ..
+                     "Generate makes it, and is listed in the result.",
     mn_sustain_32nds = "Target gap, in 32nd notes, between a sustain's end and the next note.\n\n" ..
                      "Widens or shortens the sustain as needed to hit this gap exactly.\n" ..
-                     "Prefilled per difficulty tier (Expert 3, Hard 4, Medium 8, Easy 16).\n\n" ..
-                     "Only looks up to a half note (16x32nd notes) ahead for a next note -\n" ..
-                     "sustains with nothing that close are left unchanged. A note starting\n" ..
-                     "INSIDE the sustain always counts as the next note, however far the\n" ..
-                     "following one is, so an overlap is never left behind.\n\n" ..
+                     "Prefilled with the Default gap (single note to single note) when the\n" ..
+                     "track or difficulty changes.",
+    mn_adjust      = "Apply the note-length/sustain-gap adjustment to the selected track\n" ..
+                     "and difficulty range.\n\n" ..
+                     "Only sustains: looks up to a half note (16x32nd notes) ahead for a\n" ..
+                     "next note - sustains with nothing that close keep their gap. A note\n" ..
+                     "starting INSIDE the sustain always counts as the next note, so an\n" ..
+                     "overlap is never left behind.\n\n" ..
                      "Intentional rests are kept: the track's most common gap is measured\n" ..
                      "(whole track, this difficulty), and a sustain is only lengthened when\n" ..
                      "its gap is at most 1.5x that (usual 3 -> up to 4). Longer gaps are left\n" ..
                      "alone and listed in the result to check by hand. A gap tighter than\n" ..
-                     "the target is always fixed.",
-    mn_adjust      = "Apply the note-length/sustain-gap adjustment to the selected track\n" ..
-                     "and difficulty range.\n\n" ..
+                     "the target is always fixed. Then a sustain too short for the tier\n" ..
+                     "becomes a plain note (listed too).\n\n" ..
                      "With a time selection: only adjusts notes starting inside it.\n" ..
                      "Without: adjusts the whole MIDI item.\n\n" ..
                      "Fully undoable.",

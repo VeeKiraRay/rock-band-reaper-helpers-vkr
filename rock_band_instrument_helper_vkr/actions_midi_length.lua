@@ -1,10 +1,11 @@
 -- Midi note: bulk non-sustain note-length unification and sustain-gap normalization.
 -- Requires: S, r, GetTimeSelection, FindFirstMIDIItem, GetTakePPQPerQN,
--- GetPatternPitchRange (globals)
+-- GetPatternPitchRange, GetBPMAt, and midi_length_rules.lua's MidiLength* (globals)
 --
 -- All length/gap math works in raw take-relative PPQ ticks (never seconds or
 -- QN floats) so results always land exactly on REAPER's own note-length grid
 -- - standard note values divide evenly into GetTakePPQPerQN's tick count.
+-- Rule values (quarter notes) are converted to ticks once, per note.
 
 local SUSTAIN_MIN_DENOM = 8    -- 1/8 note: minimum length to be treated as a sustain
 local FLOOR_DENOM        = 32   -- 1/32 note: minimum length any note can be shortened to
@@ -14,13 +15,19 @@ local USUAL_GAP_TOLERANCE = 1.5 -- a sustain is lengthened only when its gap is 
                                 -- many times the track's most common gap; a longer gap is
                                 -- taken as an intentional rest (muted guitar, a break)
 
--- Standard sustain gap per difficulty tier, in 32nd notes (S.mn_diff_idx:
--- 1=Expert, 2=Hard, 3=Medium, 4=Easy). The UI prefills the gap slider with
--- this when the tier is chosen; the user is free to override it afterwards.
-local SUSTAIN_GAP_BY_DIFF = { [1] = 3, [2] = 4, [3] = 8, [4] = 16 }
+local TIER_LETTERS = { 'X', 'H', 'M', 'E' }   -- S.mn_diff_idx 1-4
 
-function SustainGapDefaultForDiff(diff_idx)
-    return SUSTAIN_GAP_BY_DIFF[diff_idx]
+-- The song's tempo for the Length rules: the tempo at bar 1, as Generate reads it.
+function MidiLengthSongBPM()
+    return GetBPMAt(r.TimeMap2_QNToTime(0, 0))
+end
+
+-- The rules' kind and tier for a track and the Difficulty selector: Pro Keys takes its tier
+-- from the track name (a track per tier), the others from diff_idx. kind nil = no rules.
+function MidiLengthTarget(track_name, diff_idx)
+    local kind, pk_tier = MidiLengthKind(track_name)
+    if not kind then return nil end
+    return kind, pk_tier or TIER_LETTERS[diff_idx]
 end
 
 -- Standard note length in take-relative PPQ ticks, rounded to the nearest tick.
@@ -67,13 +74,14 @@ end
 -- next clean note is: it's buried under the sustain and must be uncovered.
 -- Measuring only from the sustain's tail would step over such a note and
 -- stretch the sustain toward a later one, leaving the overlap in place.
--- `notes` must be start-sorted.
-local function NextNoteStart(notes, i, search_win)
+-- `notes` must be start-sorted. end_ppq: measure the window from this end
+-- instead of the note's own (the plain-note pass, after the gap pass moved it).
+local function NextNoteStart(notes, i, search_win, end_ppq)
     local note = notes[i]
+    local e = end_ppq or note.eppq
     for j = i + 1, #notes do
         if notes[j].sppq > note.sppq then
-            if notes[j].sppq < note.eppq
-               or notes[j].sppq - note.eppq <= search_win then
+            if notes[j].sppq < e or notes[j].sppq - e <= search_win then
                 return notes[j].sppq
             end
             return nil
@@ -117,12 +125,16 @@ local function LengthenLimit32nds(usual)
 end
 
 -- For every sustain (length >= 1/8 note) in [lo,hi] pitch range inside the
--- scope, set its end position so the gap to the next in-range note is
--- exactly `gap_32nds` x 1/32 note - widening or narrowing the sustain as
--- needed. A sustain with no next note within SEARCH_WINDOW_32NDS x 1/32 notes
--- of its own end is left unchanged (skipped). If honoring the requested gap
--- would shrink the sustain below the 1/32-note floor, it's clamped to that
--- floor instead (becomes a non-sustain). See NextNoteStart for "next note".
+-- scope, set its end position so the gap to the next in-range note is the
+-- target gap - widening or narrowing the sustain as needed. A sustain with no
+-- next note within SEARCH_WINDOW_32NDS x 1/32 notes of its own end is left
+-- unchanged (skipped). If honoring the gap would shrink the sustain below the
+-- 1/32-note floor, it's clamped to that floor instead (becomes a non-sustain).
+-- See NextNoteStart for "next note".
+--
+-- rule: { gap32 = n } - one gap for every sustain (Custom); otherwise the gap
+-- is MidiLengthGapQN(kind, dl, bpm, chord, next chord) per sustain (Default).
+-- kind / dl / bpm, when kind is set, also drive the plain-note pass below.
 --
 -- Lengthening is limited: the track's most common gap is measured over the
 -- WHOLE take in the pitch range (not just the scope, so a section-by-section
@@ -131,27 +143,34 @@ end
 -- earlier than usual means a rest. A gap tighter than the target is always
 -- fixed, whatever its size: shortening a sustain never fills a rest.
 --
+-- Then the plain-note pass: every sustain in scope (adjusted, left alone or
+-- skipped) that MidiLengthTooShort finds too short for the tier - or that the
+-- gap cut under 1/8 - becomes a plain note MidiLengthPlainQN long, as Generate
+-- makes it.
+--
 -- Every matching pitch still gets its own MIDI_SetNote call, but a chord
 -- sustain (multiple notes sharing one start tick, e.g. a Green+Red+Blue
--- chord) is only counted once toward adjusted/skipped/clamped/left, so the
--- report reads as "N sustains", not "N pitches" - the first note processed at
--- a given start tick decides which bucket the whole chord is counted in.
+-- chord) is only counted once toward adjusted/skipped/clamped/left/plain, so
+-- the report reads as "N sustains", not "N pitches" - the first note processed
+-- at a given start tick decides which bucket the whole chord is counted in.
 --
 -- Returns adjusted, skipped, clamped, left (list of { sppq, gap_32nds }),
--- usual ({ gap_32nds, count, total, limit_32nds } or nil).
-local function AdjustSustainGaps(take, lo, hi, sel_s, sel_e, gap_32nds)
+-- usual ({ gap_32nds, count, total, limit_32nds } or nil), plain (list of
+-- { sppq, len_32nds } - the length before it became plain).
+local function AdjustSustainGaps(take, lo, hi, sel_s, sel_e, rule)
     local ppq_per_qn  = GetTakePPQPerQN(take)
     local thirty2_ppq = NoteLenPPQ(ppq_per_qn, FLOOR_DENOM)
     local sustain_min = NoteLenPPQ(ppq_per_qn, SUSTAIN_MIN_DENOM)
     local search_win  = SEARCH_WINDOW_32NDS * thirty2_ppq
-    local gap_target  = gap_32nds * thirty2_ppq
     local scope_s = sel_s and r.MIDI_GetPPQPosFromProjTime(take, sel_s) or nil
     local scope_e = sel_e and r.MIDI_GetPPQPosFromProjTime(take, sel_e) or nil
+    local function Ticks(qn) return math.floor(qn * ppq_per_qn + 0.5) end
 
     -- Pass 1: collect every in-range note's original start/end, sorted by
     -- start - "next note" lookups must see original, unmodified positions.
     -- `all` ignores the scope (for the usual gap); `notes` is the scope.
     local all = {}
+    local chord_at = {}   -- start tick -> ascending pitches (the rules' chord tests)
     local _, n = r.MIDI_CountEvts(take)
     for i = 0, n - 1 do
         local ok, sel, mute, sppq, eppq, chan, p, vel = r.MIDI_GetNote(take, i)
@@ -160,14 +179,23 @@ local function AdjustSustainGaps(take, lo, hi, sel_s, sel_e, gap_32nds)
                 idx = i, sppq = sppq, eppq = eppq, chan = chan, pitch = p, vel = vel,
                 sel = sel, mute = mute,
             }
+            chord_at[sppq] = chord_at[sppq] or {}
+            table.insert(chord_at[sppq], p)
         end
     end
     table.sort(all, function(a, b) return a.sppq < b.sppq end)
+    for _, c in pairs(chord_at) do table.sort(c) end
     local notes = {}
     for _, note in ipairs(all) do
         if (not scope_s or note.sppq >= scope_s) and (not scope_e or note.sppq < scope_e) then
             notes[#notes + 1] = note
         end
+    end
+
+    local function TargetGap(note, next_sppq)
+        if rule.gap32 then return rule.gap32 * thirty2_ppq end
+        return Ticks(MidiLengthGapQN(rule.kind, rule.dl, rule.bpm,
+            chord_at[note.sppq], chord_at[next_sppq]))
     end
 
     local usual_g, usual_n, usual_total = UsualSustainGap(all, thirty2_ppq, sustain_min, search_win)
@@ -184,10 +212,12 @@ local function AdjustSustainGaps(take, lo, hi, sel_s, sel_e, gap_32nds)
     local counted_starts = {}
     for i, note in ipairs(notes) do
         local len = note.eppq - note.sppq
+        note.new_e = note.eppq
         if len >= sustain_min then
             local next_sppq = NextNoteStart(notes, i, search_win)
             local first_at_start = not counted_starts[note.sppq]
             counted_starts[note.sppq] = true
+            local gap_target = next_sppq and TargetGap(note, next_sppq)
             local leave_gap = nil   -- set (in 32nds) when this is a rest to leave alone
             if next_sppq and next_sppq >= note.eppq then
                 local gap = next_sppq - note.eppq
@@ -206,6 +236,7 @@ local function AdjustSustainGaps(take, lo, hi, sel_s, sel_e, gap_32nds)
                 end
                 r.MIDI_SetNote(take, note.idx, note.sel, note.mute, note.sppq, new_eppq,
                     note.chan, note.pitch, note.vel, true)
+                note.new_e = new_eppq
                 if first_at_start then
                     adjusted = adjusted + 1
                     if was_clamped then clamped = clamped + 1 end
@@ -219,8 +250,37 @@ local function AdjustSustainGaps(take, lo, hi, sel_s, sel_e, gap_32nds)
             end
         end
     end
-    return adjusted, skipped, clamped, left, usual
+
+    -- Pass 3: sustains too short for the tier become plain notes - including one the
+    -- gap pass cut under 1/8 (a stub that is neither sustain nor plain), as Generate
+    -- does. Only ever shortens: a note already at or under the plain length stays.
+    local plain = {}
+    if rule.kind then
+        local plain_ppq = Ticks(MidiLengthPlainQN(rule.kind, rule.dl))
+        local listed = {}
+        for i, note in ipairs(notes) do
+            local len = note.new_e - note.sppq
+            if note.eppq - note.sppq >= sustain_min and len > plain_ppq then
+                local next_sppq = NextNoteStart(notes, i, search_win, note.new_e)
+                local room_qn = next_sppq and (next_sppq - note.new_e) / ppq_per_qn
+                if len < sustain_min
+                   or MidiLengthTooShort(rule.kind, rule.dl, len / ppq_per_qn, rule.bpm, room_qn) then
+                    r.MIDI_SetNote(take, note.idx, note.sel, note.mute, note.sppq,
+                        note.sppq + plain_ppq, note.chan, note.pitch, note.vel, true)
+                    note.new_e = note.sppq + plain_ppq
+                    if not listed[note.sppq] then
+                        listed[note.sppq] = true
+                        plain[#plain + 1] = { sppq = note.sppq,
+                            len_32nds = math.floor(len / thirty2_ppq + 0.5) }
+                    end
+                end
+            end
+        end
+    end
+    return adjusted, skipped, clamped, left, usual, plain
 end
+
+local TIER_NAMES = { X = 'Expert', H = 'Hard', M = 'Medium', E = 'Easy' }
 
 function AdjustMidiNoteLengths()
     if S.mn_midi_idx < 0 then
@@ -242,6 +302,13 @@ function AdjustMidiNoteLengths()
     local lo, hi = GetPatternPitchRange(track_name, S.mn_diff_idx)
     local sel_s, sel_e = GetTimeSelection()
 
+    -- Sustain rules: kind nil = a track without them (Custom only, no plain-note pass).
+    local kind, dl = MidiLengthTarget(track_name, S.mn_diff_idx)
+    local bpm = MidiLengthSongBPM()
+    if S.mn_note_type == 1 and S.mn_gap_mode == 0 and not kind then
+        S.status = ('No sustain rules for %s - pick Custom.'):format(track_name); return
+    end
+
     r.PreventUIRefresh(1)
     r.Undo_BeginBlock2(0)
     r.MarkTrackItemsDirty(track, item)
@@ -253,10 +320,20 @@ function AdjustMidiNoteLengths()
         S.status = ('Adjusted %d non-sustain note%s.'):format(count, count ~= 1 and 's' or '')
         S.last_result = nil
     else
-        local adjusted, skipped, clamped, left, usual =
-            AdjustSustainGaps(take, lo, hi, sel_s, sel_e, S.mn_sustain_32nds)
+        local rule = { kind = kind, dl = dl, bpm = bpm }
+        if S.mn_gap_mode == 1 then rule.gap32 = S.mn_sustain_32nds end
+        local adjusted, skipped, clamped, left, usual, plain =
+            AdjustSustainGaps(take, lo, hi, sel_s, sel_e, rule)
         r.Undo_EndBlock2(0, ('Adjust notes: sustain gaps (%d adjusted)'):format(adjusted), -1)
         local lines = {}
+        if rule.gap32 then
+            lines[#lines + 1] = ('Custom gap: %d/32.'):format(rule.gap32)
+            if kind then
+                lines[#lines + 1] = 'Plain notes: ' .. MidiLengthRuleText(kind, dl, bpm)
+            end
+        else
+            lines[#lines + 1] = MidiLengthRuleText(kind, dl, bpm)
+        end
         if usual then
             lines[#lines + 1] = ('Most common gap: %d/32 (%d of %d sustains). Lengthened only where the gap was %d/32 or less.'):format(
                 usual.gap_32nds, usual.count, usual.total, usual.limit_32nds)
@@ -268,19 +345,32 @@ function AdjustMidiNoteLengths()
         if clamped > 0 then
             lines[#lines + 1] = ('%d clamped to the 1/32-note floor (became non-sustain).'):format(clamped)
         end
+        local function Pos(sppq)
+            return r.format_timestr_pos(r.MIDI_GetProjTimeFromPPQPos(take, sppq), '', 1)
+        end
+        if #plain > 0 then
+            lines[#lines + 1] = ''
+            lines[#lines + 1] = ('%d became plain notes (too short for %s):'):format(#plain, TIER_NAMES[dl])
+            for _, p in ipairs(plain) do
+                lines[#lines + 1] = ('%s\twas %d/32'):format(Pos(p.sppq), p.len_32nds)
+            end
+        end
         if #left > 0 then
             lines[#lines + 1] = ''
             lines[#lines + 1] = ('%d left alone - gap longer than %d/32 (check by hand):'):format(
                 #left, usual.limit_32nds)
             for _, l in ipairs(left) do
-                local t = r.MIDI_GetProjTimeFromPPQPos(take, l.sppq)
-                lines[#lines + 1] = ('%s\tgap %d/32'):format(r.format_timestr_pos(t, '', 1), l.gap_32nds)
+                lines[#lines + 1] = ('%s\tgap %d/32'):format(Pos(l.sppq), l.gap_32nds)
             end
-            S.status = ('Adjust notes done - %d long gap%s left alone.'):format(
-                #left, #left ~= 1 and 's' or '')
-        else
-            S.status = 'Adjust notes done.'
         end
+        local extra = {}
+        if #plain > 0 then
+            extra[#extra + 1] = ('%d became plain'):format(#plain)
+        end
+        if #left > 0 then
+            extra[#extra + 1] = ('%d long gap%s left alone'):format(#left, #left ~= 1 and 's' or '')
+        end
+        S.status = 'Adjust notes done' .. (#extra > 0 and (' - ' .. table.concat(extra, ', ')) or '') .. '.'
         S.last_result = table.concat(lines, '\n')
     end
 

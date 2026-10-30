@@ -37,7 +37,7 @@ local results = { vocal = nil, general = nil, instrument = nil,
                   instrument_drums_2x = nil, instrument_overdrive = nil,
                   general_stem_import = nil,
                   dsp_algo = nil, vocal_algo = nil, general_algo = nil,
-                  instrument_algo = nil,
+                  instrument_algo = nil, midi_length_rules = nil,
                   quick_actions = nil, spritesheet = nil, venue_events = nil,
                   venue_subtracks = nil, venue_phrase_pacing = nil,
                   venue_labels = nil, workflow = nil,
@@ -217,6 +217,12 @@ function Loop()
         end
         r.ImGui_SameLine(ctx)
         draw_status(results.instrument_algo)
+
+        if r.ImGui_Button(ctx, 'MIDI Length Rules', 155, 24) then
+            run('run_midi_length_rules.lua', 'midi_length_rules')
+        end
+        r.ImGui_SameLine(ctx)
+        draw_status(results.midi_length_rules)
 
         r.ImGui_Spacing(ctx)
 

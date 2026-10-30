@@ -46,6 +46,9 @@ local MIN_LEN_QN = GEN5_MIN_LEN_QN
 local EPS        = GEN5_EPS
 local STUB_QN    = 0.75    -- a sustain cut shorter than 3/16 note is "stubby" (RBN doc)
 local PLAIN_QN   = 0.25    -- ... and becomes a 1/16 note
+-- Global for MIDI > Length (midi_length_rules.lua), which applies the same rules.
+GEN_PK_STUB_QN  = STUB_QN
+GEN_PK_PLAIN_QN = PLAIN_QN
 
 local function Copy(t)
     local out = {}
@@ -175,8 +178,9 @@ local function KeepNeededShifts(shifts, out)
 end
 
 -- Simple transition (RBN doc, as CheckSustainGaps reads it): single to single, a single
--- into a chord holding it or out of one, or a chord repeated exactly.
-local function SimpleTransition(a, b)
+-- into a chord holding it or out of one, or a chord repeated exactly. Global: MIDI >
+-- Length (midi_length_rules.lua) uses it too.
+function GenPKSimpleTransition(a, b)
     if #a == 1 and #b == 1 then return true end
     if #a == 1 or #b == 1 then
         local one, many = (#a == 1) and a[1] or b[1], (#a == 1) and b or a
@@ -187,11 +191,18 @@ local function SimpleTransition(a, b)
     for i = 1, #a do if a[i] ~= b[i] then return false end end
     return true
 end
+local SimpleTransition = GenPKSimpleTransition
 
--- Gap a sustain leaves before the next onset on tier dl.
-local function ReleaseGap(dl, ev, nx)
+-- Gap a sustain leaves before the next onset on tier dl: Medium and Easy a quarter, Hard a
+-- 1/16 before a simple transition and a 1/8 otherwise. offs / next_offs: ascending pitches
+-- (or offsets) of the sustain and the next onset. Global: MIDI > Length uses it too.
+function GenPKReleaseGapQN(dl, offs, next_offs)
     if dl == 'M' or dl == 'E' then return 1.0 end
-    return SimpleTransition(ev.offs, nx.offs) and 0.25 or 0.5
+    return SimpleTransition(offs, next_offs) and 0.25 or 0.5
+end
+
+local function ReleaseGap(dl, ev, nx)
+    return GenPKReleaseGapQN(dl, ev.offs, nx.offs)
 end
 
 -- Sustains leave the tier's gap; one cut shorter than 3/16 becomes a 1/16 note, and so does

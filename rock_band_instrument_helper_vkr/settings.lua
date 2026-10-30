@@ -42,6 +42,7 @@ local function SerializeSettings()
         'mnnt='  .. S.mn_note_type,
         'mnnd='  .. S.mn_note_denom,
         'mns32=' .. S.mn_sustain_32nds,
+        'mngm='  .. S.mn_gap_mode,
         'swip='   .. (S.show_wip_tabs and '1' or '0'),
         -- Overdrive tab
         'odgrp=' .. S.od_group,
@@ -100,6 +101,7 @@ local function DeserializeSettings(str)
             local d = tonumber(v)
             if d == 16 or d == 32 or d == 64 or d == 128 then S.mn_note_denom = d end
         elseif k == 'mns32' then S.mn_sustain_32nds    = tonumber(v) or S.mn_sustain_32nds
+        elseif k == 'mngm'  then S.mn_gap_mode         = (v == '1') and 1 or 0
         elseif k == 'swip'   then S.show_wip_tabs      = (v == '1')
         -- Overdrive tab
         elseif k == 'odgrp' then

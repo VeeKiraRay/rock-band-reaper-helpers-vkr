@@ -64,6 +64,7 @@ dofile(_mdir .. 'difficulty_generate_5lane.lua')
 dofile(_mdir .. 'difficulty_generate_prokeys.lua')
 dofile(_mdir .. 'difficulty_generate_hopo.lua')
 dofile(_mdir .. 'actions_difficulty_generate.lua')
+dofile(_mdir .. 'midi_length_rules.lua')
 dofile(_root .. 'lib/reaper_difficulty_read.lua')   -- FindTrackExact, used by Generate
 -- ui*.lua intentionally omitted: it calls r.defer(Loop) which starts the ImGui loop
 

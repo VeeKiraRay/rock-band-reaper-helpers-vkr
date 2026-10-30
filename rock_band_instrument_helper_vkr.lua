@@ -279,13 +279,29 @@
 --     - Auto fill pacing: fast songs now get one measure every 4, as official
 --       charts do at every tempo, instead of 2 measures every 8 from 170 BPM.
 --       "2 bars every 8 bars" is still there to pick by hand.
---     - MIDI > Length, Only sustains: a sustain ended early on purpose (a
---       break, a muted guitar) is no longer stretched up to the next note.
---       The track's most common gap is measured first, and a sustain is only
---       lengthened when its gap is at most 1.5x that (usual 3/32 -> up to
---       4/32). Longer gaps are left alone and listed in the result by
---       position, to check by hand. A gap tighter than the target is still
---       always fixed. The result shows the usual gap and the limit used.
+--     - MIDI > Length, Only sustains: new Gap choice, Default or Custom.
+--       Default leaves the gap Difficulty > Generate leaves, per sustain:
+--       Guitar/Bass and Keys a 1/16 on Expert and Hard (Keys a 1/8 after a
+--       chord), a dotted 1/8 on Medium and a quarter on Easy (a quarter and a
+--       half above 160 BPM); Pro Keys Hard a 1/16 before a simple change and
+--       a 1/8 otherwise, Medium and Easy a quarter. A fast song is told by
+--       its first tempo. The rules are shown under the choice. Custom is the
+--       old 32nd-note slider; changing the track or difficulty now fills it
+--       with the Default gap (the old fixed 3/4/8/16 no longer matched
+--       Generate).
+--     - Both: a sustain too short for the difficulty now becomes a plain
+--       note, as Generate makes it (Expert and Hard under a dotted 1/8 at
+--       100+ BPM, Guitar/Bass Hard also under 300 ms with a note close
+--       behind, Medium under a dotted 1/8 or a quarter when fast, Easy under
+--       a quarter, Pro Keys under a dotted 1/8), and so does one the gap
+--       left shorter than a 1/8. The result lists each one with its old
+--       length.
+--     - A sustain ended early on purpose (a break, a muted guitar) is no
+--       longer stretched up to the next note. The track's most common gap is
+--       measured first, and a sustain is only lengthened when its gap is at
+--       most 1.5x that (usual 3/32 -> up to 4/32). Longer gaps are left
+--       alone and listed in the result by position, to check by hand. A gap
+--       tighter than the target is still always fixed.
 --
 r = reaper  -- global so all dofile'd modules can use it
 
@@ -365,6 +381,8 @@ local _files = {
     _mdir .. 'difficulty_generate_hopo.lua',
     _mdir .. 'difficulty_generate_drums.lua',
     _mdir .. 'actions_difficulty_generate.lua',
+    -- MIDI > Length's sustain rules: Generate's and Validate's, called at call time.
+    _mdir .. 'midi_length_rules.lua',
     -- Overdrive tab: the song model first (it reads through lib/reaper_difficulty_read.lua's
     -- FindTrackExact / ReadGemEvents), then the per-bar interest score, the fill and vocal
     -- planners, the instrument planner and Generate action that calls them, and the

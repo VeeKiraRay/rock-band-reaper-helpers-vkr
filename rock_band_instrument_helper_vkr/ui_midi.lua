@@ -14,6 +14,11 @@ local MN_DIFF_OPTIONS = {
     { idx = 4, label = 'Easy' },
 }
 
+-- MIDI > Length > Midi note: the song's first tempo for the sustain rules, re-read through
+-- the shared project poll (a tempo edit makes an undo point), never every frame.
+local _mn_bpm_poll = MakeProjectPoll(1.0, 5.0)
+local _mn_song_bpm = nil
+
 -- MIDI > Length > Midi note: Note size dropdown options (S.mn_note_denom).
 -- No 1/8 entry: 1/8 is the sustain threshold, so a "non-sustain" target can
 -- never land on it.
@@ -161,29 +166,37 @@ function DrawMIDITab(ctx)
         if r.ImGui_BeginTabItem(ctx, 'Length') then
             SectionHeader('Midi note')
 
-            local lbl_col_mn = LabelColWidth({ 'Source track', 'Difficulty', 'Note type', 'Note size' })
+            local lbl_col_mn = LabelColWidth({ 'Source track', 'Difficulty', 'Note type', 'Note size', 'Gap' })
 
             r.ImGui_Text(ctx, 'Source track')
             r.ImGui_SameLine(ctx, lbl_col_mn)
             r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
+            local prev_track_mn = S.mn_midi_idx
             S.mn_midi_idx = TrackCombo('##mn_track', S.mn_midi_idx, midi_tracks)
             Tooltip(TIPS.mn_midi_track)
             MidiEditorTrackWarning(S.mn_midi_idx)
 
-            -- Picking a tier prefills the standard gap for it; a manual slider
-            -- tweak afterwards sticks (only a CHANGE of tier overwrites it).
             r.ImGui_Text(ctx, 'Difficulty')
             r.ImGui_SameLine(ctx, lbl_col_mn)
             r.ImGui_SetNextItemWidth(ctx, WIDTH_SHORT)
             local prev_diff_mn = S.mn_diff_idx
             S.mn_diff_idx = TrackCombo('##mn_diff', S.mn_diff_idx, MN_DIFF_OPTIONS)
             Tooltip(TIPS.mn_diff)
-            if S.mn_diff_idx ~= prev_diff_mn then
-                S.mn_sustain_32nds = SustainGapDefaultForDiff(S.mn_diff_idx) or S.mn_sustain_32nds
+
+            -- The sustain rules for this track and tier, at the song's first tempo
+            -- (cached through the project poll, never read every frame).
+            local mn_tr = S.mn_midi_idx >= 0 and r.GetTrack(0, S.mn_midi_idx)
+            local mn_name = mn_tr and select(2, r.GetTrackName(mn_tr)) or ''
+            local mn_kind, mn_dl = MidiLengthTarget(mn_name, S.mn_diff_idx)
+            if _mn_bpm_poll() or not _mn_song_bpm then _mn_song_bpm = MidiLengthSongBPM() end
+            -- A CHANGE of track or tier prefills the Custom gap with the Default one;
+            -- a manual slider tweak afterwards sticks until the next change.
+            if (S.mn_diff_idx ~= prev_diff_mn or S.mn_midi_idx ~= prev_track_mn) and mn_kind then
+                S.mn_sustain_32nds = MidiLengthDefaultGap32(mn_kind, mn_dl, _mn_song_bpm)
             end
 
             r.ImGui_Spacing(ctx)
-            local radio_w_mn = RadioGroupWidth({ 'Non-sustains', 'Only sustains' })
+            local radio_w_mn = RadioGroupWidth({ 'Non-sustains', 'Only sustains', 'Default', 'Custom' })
             r.ImGui_Text(ctx, 'Note type')
             r.ImGui_SameLine(ctx, lbl_col_mn)
             if r.ImGui_RadioButton(ctx, 'Non-sustains##mn_type', S.mn_note_type == 0) then
@@ -203,11 +216,35 @@ function DrawMIDITab(ctx)
                 S.mn_note_denom = TrackCombo('##mn_denom', S.mn_note_denom, MN_NOTE_SIZE_OPTIONS)
                 Tooltip(TIPS.mn_note_denom)
             else
-                r.ImGui_Text(ctx, '32nd note amount')
-                r.ImGui_SameLine(ctx)
-                r.ImGui_SetNextItemWidth(ctx, WIDTH_SHORT)
-                _, S.mn_sustain_32nds = r.ImGui_SliderInt(ctx, '##mn_gap32', S.mn_sustain_32nds, 0, 32)
-                Tooltip(TIPS.mn_sustain_32nds)
+                r.ImGui_Text(ctx, 'Gap')
+                r.ImGui_SameLine(ctx, lbl_col_mn)
+                if r.ImGui_RadioButton(ctx, 'Default##mn_gapm', S.mn_gap_mode == 0) then
+                    S.mn_gap_mode = 0
+                end
+                Tooltip(TIPS.mn_gap_mode)
+                r.ImGui_SameLine(ctx, lbl_col_mn + radio_w_mn)
+                if r.ImGui_RadioButton(ctx, 'Custom##mn_gapm', S.mn_gap_mode == 1) then
+                    S.mn_gap_mode = 1
+                end
+                Tooltip(TIPS.mn_gap_mode)
+
+                if S.mn_gap_mode == 1 then
+                    r.ImGui_Text(ctx, '32nd note amount')
+                    r.ImGui_SameLine(ctx)
+                    r.ImGui_SetNextItemWidth(ctx, WIDTH_SHORT)
+                    _, S.mn_sustain_32nds = r.ImGui_SliderInt(ctx, '##mn_gap32', S.mn_sustain_32nds, 0, 32)
+                    Tooltip(TIPS.mn_sustain_32nds)
+                end
+                -- The rules, read-only: the gap in Default, the plain-note step in both.
+                r.ImGui_BeginDisabled(ctx)
+                if mn_kind then
+                    local txt = MidiLengthRuleText(mn_kind, mn_dl, _mn_song_bpm)
+                    if S.mn_gap_mode == 1 then txt = 'Plain notes: ' .. txt end
+                    r.ImGui_TextWrapped(ctx, txt)
+                elseif S.mn_gap_mode == 0 then
+                    r.ImGui_TextWrapped(ctx, 'No sustain rules for this track (Guitar, Bass, Keys and Pro Keys only) - use Custom.')
+                end
+                r.ImGui_EndDisabled(ctx)
             end
 
             r.ImGui_Spacing(ctx)

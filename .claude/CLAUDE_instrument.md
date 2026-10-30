@@ -146,7 +146,9 @@ Every Validate action (all four sub-tabs, H/M/E only — never Expert) also runs
 - **Midi note** — bulk note-length/sustain-gap adjustment on one track's difficulty tier. Source track selector (warns when that track isn't the one open in the MIDI editor — shared `MidiEditorTrackWarning`, `ui_midi.lua`, also used by the Pattern sub-tab) + Difficulty selector (Expert/Hard/Medium/Easy — no "All": sustain rules differ per tier so there's no real use case for adjusting all four at once) + Note type radio:
   - A **sustain is any note >= 1/8 note** (`SUSTAIN_MIN_DENOM`, `actions_midi_length.lua`) — the single threshold both modes split on.
   - **Non-sustains** — a Note size combo (1/16, 1/32 default, 1/64, 1/128 — no 1/8: that's the sustain threshold itself); **Adjust notes** sets every note SHORTER than 1/8 note in the selected track/difficulty range to that standard length (start position never moves). Existing sustains are left completely untouched.
-  - **Only sustains** — a "32nd note amount" slider (0-32), prefilled with the tier's standard gap whenever Difficulty changes (Expert 3, Hard 4, Medium 8, Easy 16 — `SustainGapDefaultForDiff`; a manual tweak afterwards sticks until the tier changes again). **Adjust notes** finds every sustain and widens or narrows it so the gap to the next note in range is exactly that many 32nd notes. Honoring the requested gap would shrink the sustain below a 1/32-note floor: it's clamped to that floor instead (becomes a non-sustain) rather than skipped.
+  - **Only sustains** — a **Gap** radio (`S.mn_gap_mode`, saved): **Default** (0) applies Difficulty > Generate's gap rules per sustain; **Custom** (1) is a "32nd note amount" slider (0-32) used for every sustain. **Adjust notes** finds every sustain and widens or narrows it so the gap to the next note in range is the target. Honoring the gap would shrink the sustain below a 1/32-note floor: it's clamped to that floor instead (becomes a non-sustain) rather than skipped.
+  - **The rules are Generate's and Validate's, never copied.** `midi_length_rules.lua` (pure) dispatches to `Gen5ReleaseGapQN` / `Gen5MinSustainQN` / `Gen5HardSustainTooShort` (`difficulty_generate_params.lua`), `DiffSustainTooShort` (`actions_difficulty_shared.lua`) and `GenPKReleaseGapQN` / `GEN_PK_STUB_QN` / `GEN_PK_PLAIN_QN` (`difficulty_generate_prokeys.lua`, exported for this). Kind comes from the track name (`MidiLengthKind`: PART GUITAR/BASS `gb`, PART KEYS `k5`, PART REAL_KEYS_X/H/M/E `pk` with the tier from the suffix; anything else has no rules — Default refuses, Custom skips the plain-note pass). Expert uses Hard's gap rules (Generate never writes Expert). Tempo is the **song's first tempo** (`MidiLengthSongBPM`, bar 1, as Generate's `ctx.song_bpm`) for every note, so "fast" (> `GEN5_PARAMS.fast_bpm`) is one decision per song. The UI shows `MidiLengthRuleText` read-only; the bar-1 tempo is cached through `MakeProjectPoll`. A track or tier change prefills the Custom slider with `MidiLengthDefaultGap32` (single-note case); a manual tweak sticks until the next change.
+  - **Plain-note pass** (both modes, after the gap pass): a sustain in scope that `MidiLengthTooShort` rejects for the tier — or that the gap cut under 1/8 — becomes a plain note `MidiLengthPlainQN` long (1/32 on 5-lane Hard/Medium/Easy, 1/16 on Pro Keys and Expert, as Generate writes them). Only ever shortens. Listed in the result with the old length. The Guitar/Bass Hard 300 ms floor gets the room to the next note, measured from the new end.
   - "Next note" is the **earliest** note starting after the sustain's own start tick — notes sharing that tick are chord-mates, not "next". A note starting *inside* the sustain (an existing overlap) counts and always wins, however far the next clean note is; measuring only from the sustain's tail (the pre-v0.9.41 rule) stepped over such a note and sized the sustain against a later one, leaving it overlapped. Only a next note at or past the sustain's end is subject to the search window — more than `SEARCH_WINDOW_32NDS` (16x32nd notes = half a measure in 4/4) past the end and the sustain is left unchanged (skipped).
   - **Intentional rests are kept.** `UsualSustainGap` finds the most common sustain-to-next-note gap (rounded to 32nds, chords once, ties to the smaller gap) over the **whole take** in the tier's pitch range — not just the time selection, so a section-by-section run sees the song's value. A sustain is lengthened only when its gap is at most `LengthenLimit32nds(usual)` = `max(floor(usual x USUAL_GAP_TOLERANCE), usual + 1)` (tolerance 1.5: usual 3 -> 4). Longer gaps are left alone and listed by position in the result (an author ending a sustain early on purpose: a break, a muted guitar). A gap tighter than the target is always fixed — shortening never fills a rest. Buried notes always win, as above.
   - All math works in raw take-PPQ ticks (via `GetTakePPQPerQN`, never seconds or QN floats) so results land exactly on REAPER's own note-length grid. Reuses `GetPatternPitchRange` (below) for the difficulty pitch range, so notes outside the tier (e.g. overdrive) are never touched. Respects time selection (falls back to the whole MIDI item). Fully undoable.
@@ -182,7 +184,8 @@ Every Validate action (all four sub-tabs, H/M/E only — never Expert) also runs
 | `rock_band_instrument_helper_vkr/actions_guitar_validate.lua` | `SustainThresholds`, `ReadRBGuitarNotes`, `RunValidation` (global) — validation helpers called by `ValidateGuitar` |
 | `rock_band_instrument_helper_vkr/actions_midi_align.lua` | `AlignMIDI`, `ResizeAllMIDI` (global) |
 | `rock_band_instrument_helper_vkr/actions_midi_replace.lua` | `GetPatternPitchRange`, `SetSearchPattern`, `SetReplacePattern`, `FillRange`, `DoMIDIPatternReplace`, `GoPrevPatternMatch`, `GoNextPatternMatch`, `ListPatternMatches` (global); `BuildPatternLabel`, `PatternsMatch`, `ClearPatternWindow`, `GetTrackAndTake`, `ResolvePatternScope`, `ScanPatternMatches`, `GoToPatternMatch` (local) |
-| `rock_band_instrument_helper_vkr/actions_midi_length.lua` | `AdjustMidiNoteLengths` (global) — Midi note length/sustain-gap adjustment; `NoteLenPPQ`, `AdjustAllNoteLengths`, `UsualSustainGap`, `AdjustSustainGaps` (local) |
+| `rock_band_instrument_helper_vkr/actions_midi_length.lua` | `AdjustMidiNoteLengths`, `MidiLengthSongBPM`, `MidiLengthTarget` (global) — Midi note length/sustain-gap adjustment and the plain-note pass; `NoteLenPPQ`, `AdjustNonSustainLengths`, `UsualSustainGap`, `AdjustSustainGaps` (local) |
+| `rock_band_instrument_helper_vkr/midi_length_rules.lua` | `MidiLengthKind`, `MidiLengthGapQN`, `MidiLengthTooShort`, `MidiLengthPlainQN`, `MidiLengthDefaultGap32`, `MidiLengthRuleText` (global) — MIDI > Length's sustain rules, dispatched to Generate's and Validate's own functions. Pure; tested offline by `dev/tests/run_midi_length_rules.lua` |
 | `rock_band_instrument_helper_vkr/actions_difficulty_shared.lua` | `CheckDifficultyProgression`, `CompressChordOffsets`, `DiffIssue`, `DiffCheckOverlaps`, `BuildDiffCheckReport`, `DiffReleaseGapQN`, `DiffReleaseGapName`, `DiffQNLabel`, `DiffSustainTooShort`, `DiffCheckSustainLength`, `DIFF_RELEASE_GAP_QN` / `DIFF_RELEASE_GAP_SLOW_QN` / `DIFF_SLOW_BPM` / `DIFF_SUSTAIN_MIN_QN` / `DIFF_SUSTAIN_MIN_BPM` / `DIFF_SUSTAIN_LENGTH_NAME` (global) — cross-difficulty identical-chart + note-count reduction checks, the color-compression helper used by Keys/Guitar-Bass's Copy functions, the issue record + report builder the Keys and Guitar/Bass checks share, their shared Medium/Easy sustain-release gap, and the Expert/Hard sustain length rule Validate and Generate share |
 | `rock_band_instrument_helper_vkr/actions_difficulty.lua` | `CopyProKeysDiff`, `ValidateProKeysDiff`, `ValidateAllProKeys`, `CollectPKChecks`, `ReadPKTierEvents`, `PK_MAX_CHORD`, `PK_MAX_SPAN` (global) — Pro Keys difficulty rules |
 | `rock_band_instrument_helper_vkr/actions_difficulty_5k.lua` | `ValidateKeys5Diff`, `ValidateAllKeys5`, `CopyKeys5Diff`, `ReadK5TierEvents`, `CollectK5Checks`, rule tables `K5_RANGE` / `K5_MAX_CHORD` / `K5_MIN_SP` / `K5_ADV_SP` (global) — Keys (formerly "5-Lane Keys") difficulty rules |
@@ -242,7 +245,8 @@ thresholds (is-sustained, sustain gray zone) use a small `EPS_QN` epsilon instea
 `actions_guitar_validate.lua`, loaded earlier) for its Expert/Hard note-length
 and sustain-gap thresholds instead of re-deriving them.
 - `actions_midi_replace.lua`: `BuildPatternLabel`, `PatternsMatch`, `ClearPatternWindow`, `GetTrackAndTake`, `ResolvePatternScope`, `ScanPatternMatches`, `GoToPatternMatch`
-- `actions_midi_length.lua`: `NoteLenPPQ`, `AdjustAllNoteLengths`, `NextNoteStart`, `UsualSustainGap`, `LengthenLimit32nds`, `AdjustSustainGaps`; `SUSTAIN_MIN_DENOM`, `FLOOR_DENOM`, `SEARCH_WINDOW_32NDS`, `USUAL_GAP_TOLERANCE` (module-level locals)
+- `actions_midi_length.lua`: `NoteLenPPQ`, `AdjustNonSustainLengths`, `NextNoteStart`, `UsualSustainGap`, `LengthenLimit32nds`, `AdjustSustainGaps`; `SUSTAIN_MIN_DENOM`, `FLOOR_DENOM`, `SEARCH_WINDOW_32NDS`, `USUAL_GAP_TOLERANCE`, `TIER_LETTERS`, `TIER_NAMES` (module-level locals)
+- `midi_length_rules.lua`: `EPS`, `PK_TIER`, `NOTE_NAMES`, `KIND_NAMES`, `TIER_NAMES`, `NoteName`
 - `ui.lua`: `Loop`
 
 **Load order:**
@@ -277,7 +281,7 @@ actions_midi_align.lua         → AlignMIDI, ResizeAllMIDI
 actions_midi_replace.lua       → GetPatternPitchRange, SetSearchPattern, SetReplacePattern,
                                   FillRange, DoMIDIPatternReplace, GoPrevPatternMatch,
                                   GoNextPatternMatch, ListPatternMatches
-actions_midi_length.lua        → AdjustMidiNoteLengths
+actions_midi_length.lua        → AdjustMidiNoteLengths, MidiLengthSongBPM, MidiLengthTarget
 actions_difficulty_shared.lua  → CheckDifficultyProgression, CompressChordOffsets,
                                   DiffIssue, DiffCheckOverlaps, BuildDiffCheckReport, DiffReleaseGapQN,
                                   DiffReleaseGapName, DiffQNLabel, DIFF_RELEASE_GAP_* tables
@@ -300,7 +304,8 @@ difficulty_generate_colors.lua → Gen5ReduceChordSize(Keys), Gen5KeysEasyMotion
 difficulty_generate_rhythm.lua → Gen5SelectOnsets, Gen5AndPhrases (pure; which onsets every planner keeps)
 difficulty_generate_5lane.lua  → Gen5PlanTier (pure; Guitar/Bass/Keys)
 difficulty_generate_prokeys.lua → GenPKPlanTier, GenPKReduceChord, GenPKBestWindow,
-                                  GEN_PK_WINDOWS (pure; Pro Keys)
+                                  GEN_PK_WINDOWS, GenPKSimpleTransition, GenPKReleaseGapQN,
+                                  GEN_PK_STUB_QN, GEN_PK_PLAIN_QN (pure; Pro Keys)
 difficulty_generate_hopo.lua   → Gen5IsAutoHopo, Gen5MarkHopos, Gen5ForceHopoSpans,
                                   GEN5_HOPO_THRESHOLD_TICKS (pure; Hard force-HOPO markers)
 difficulty_generate_drums.lua  → GenDrumsPlanTier, GenDrums2xInput, GenDrumsSinglePedal, GEN_DRUMS_PARAMS (pure; Drums - needs DRUMS_RULES,
@@ -308,6 +313,10 @@ difficulty_generate_drums.lua  → GenDrumsPlanTier, GenDrums2xInput, GenDrumsSi
                                   and Gen5RetimeDenseRuns at call time)
 actions_difficulty_generate.lua → GenerateDifficulties, GenInstrumentByKey,
                                   GenToPlannerEvents, GEN_INSTRUMENTS, GEN_ALL_KEY
+midi_length_rules.lua          → MidiLengthKind, MidiLengthGapQN, MidiLengthTooShort,
+                                  MidiLengthPlainQN, MidiLengthDefaultGap32, MidiLengthRuleText
+                                  (pure; MIDI > Length's sustain rules - calls the Generate /
+                                  Validate rule functions at call time)
 overdrive_read.lua             → OD_* constants, OdBuildModel, Od* span/bar helpers
                                   (needs difficulty_read.lua's FindTrackExact/ReadGemEvents
                                   at call time)
