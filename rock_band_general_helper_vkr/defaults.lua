@@ -416,7 +416,9 @@ TIPS = {
     venue_sing_along = "Derive VENUE sing-along notes from the HARM2/HARM3 harmony tracks:\n" ..
                       "pitch 87 (guitarist) from HARM2, pitch 85 (bassist) from HARM3.\n\n" ..
                       "For each vocal phrase (bounded by a pitch-105 marker) where the harmony\n" ..
-                      "track actually sings a note, draws a note spanning that phrase. Phrases\n" ..
+                      "track actually sings a note, draws a note spanning that phrase. HARM3\n" ..
+                      "uses HARM2's phrase markers, as the game does - its own are ignored.\n" ..
+                      "Phrases\n" ..
                       "back to back (gap of one measure or less) are merged into one continuous\n" ..
                       "note instead of one per phrase.\n\n" ..
                       "If only one of HARM2/HARM3 is muted or missing, that instrument is\n" ..

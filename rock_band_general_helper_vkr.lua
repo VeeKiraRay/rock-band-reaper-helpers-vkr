@@ -54,6 +54,10 @@
 --       adds the new one: a new lighting preset replaces the old one but leaves a
 --       post-process effect on the same spot alone. Cameras count as one kind, so
 --       a new shot replaces a whole camera stack there. Works with both targets.
+--     - Venue > Actions "Generate sing along": the bassist's notes (from HARM3)
+--       now follow HARM2's phrase markers, as the game does. HARM3's own phrase
+--       markers are ignored. Before, a HARM3 without phrase markers - the usual
+--       way to chart it - gave the bassist no sing-along notes at all.
 --     - New footer, always at the bottom of the window: the time selection,
 --       the status line, Copy result (the status and result to the clipboard)
 --       and Undo. The tabs scroll above it, so on a short window these no

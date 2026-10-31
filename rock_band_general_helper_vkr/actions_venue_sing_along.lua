@@ -17,6 +17,15 @@ local function AvailableHarmTake(track_name)
     return take
 end
 
+-- Returns the take holding a track's phrase markers, muted track or not: HARM3 reads
+-- HARM2's phrases even when HARM2 itself is muted (muting only skips the guitarist).
+local function PhraseSourceTake(track_name)
+    local track = FindTrackByName(track_name)
+    if not track then return nil end
+    local _, take = FindFirstMIDIItem(track)
+    return take
+end
+
 -- Returns phrase_markers ({s, e} in project time, sorted by s) and vocal_starts (sorted
 -- project-time start positions of notes in the vocal range).
 local function ReadPhrasesAndVocalNotes(take)
@@ -100,9 +109,11 @@ function GenerateSingAlong()
     local item_start_sec = r.GetMediaItemInfo_Value(venue_item, 'D_POSITION')
     local item_end_sec   = item_start_sec + r.GetMediaItemInfo_Value(venue_item, 'D_LENGTH')
 
+    -- HARM3 takes its phrases from HARM2: the game ignores HARM3's own phrase markers,
+    -- so they are not read even when present (they may differ from HARM2's).
     local SOURCES = {
         { track_name = 'HARM2', pitch = 87, label = 'Guitarist (HARM2)' },
-        { track_name = 'HARM3', pitch = 85, label = 'Bassist (HARM3)' },
+        { track_name = 'HARM3', pitch = 85, label = 'Bassist (HARM3)', phrases_from = 'HARM2' },
     }
 
     local all_spans        = {}
@@ -114,12 +125,23 @@ function GenerateSingAlong()
         local take = AvailableHarmTake(src.track_name)
         if take then
             any_available = true
-            processed_pitches[src.pitch] = true
             local phrase_markers, vocal_starts = ReadPhrasesAndVocalNotes(take)
-            local spans, qual_count = BuildSpans(phrase_markers, vocal_starts, src.pitch)
-            for _, sp in ipairs(spans) do all_spans[#all_spans + 1] = sp end
-            report_lines[#report_lines + 1] = ('%s: %d qualifying phrase(s) -> %d note(s)')
-                :format(src.label, qual_count, #spans)
+            local phrase_take = src.phrases_from and PhraseSourceTake(src.phrases_from)
+            if src.phrases_from then
+                phrase_markers = phrase_take and ReadPhrasesAndVocalNotes(phrase_take) or {}
+            end
+            if src.phrases_from and #phrase_markers == 0 then
+                report_lines[#report_lines + 1] = ('%s: skipped (no phrase markers on %s, '
+                    .. 'which %s uses) - existing notes untouched')
+                    :format(src.label, src.phrases_from, src.track_name)
+            else
+                processed_pitches[src.pitch] = true
+                local spans, qual_count = BuildSpans(phrase_markers, vocal_starts, src.pitch)
+                for _, sp in ipairs(spans) do all_spans[#all_spans + 1] = sp end
+                report_lines[#report_lines + 1] = ('%s: %d qualifying phrase(s)%s -> %d note(s)')
+                    :format(src.label, qual_count,
+                        src.phrases_from and (' of ' .. src.phrases_from) or '', #spans)
+            end
         else
             report_lines[#report_lines + 1] =
                 src.label .. ': skipped (muted or not found) - existing notes untouched'
