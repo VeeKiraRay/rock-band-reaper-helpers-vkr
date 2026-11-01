@@ -154,9 +154,10 @@ end
 -- the report reads as "N sustains", not "N pitches" - the first note processed
 -- at a given start tick decides which bucket the whole chord is counted in.
 --
--- Returns adjusted, skipped, clamped, left (list of { sppq, gap_32nds }),
--- usual ({ gap_32nds, count, total, limit_32nds } or nil), plain (list of
--- { sppq, len_32nds } - the length before it became plain).
+-- Returns adjusted (end moved), skipped (no next note in the window), clamped,
+-- left (list of { sppq, gap_32nds }), usual ({ gap_32nds, count, total,
+-- limit_32nds } or nil), plain (list of { sppq, len_32nds } - the length
+-- before it became plain), already (gap already the target - not rewritten).
 local function AdjustSustainGaps(take, lo, hi, sel_s, sel_e, rule)
     local ppq_per_qn  = GetTakePPQPerQN(take)
     local thirty2_ppq = NoteLenPPQ(ppq_per_qn, FLOOR_DENOM)
@@ -207,7 +208,7 @@ local function AdjustSustainGaps(take, lo, hi, sel_s, sel_e, rule)
     end
 
     -- Pass 2: adjust sustains against the (unmodified) start positions above.
-    local adjusted, skipped, clamped = 0, 0, 0
+    local adjusted, skipped, clamped, already = 0, 0, 0, 0
     local left = {}
     local counted_starts = {}
     for i, note in ipairs(notes) do
@@ -234,12 +235,18 @@ local function AdjustSustainGaps(take, lo, hi, sel_s, sel_e, rule)
                     new_eppq = floor_eppq
                     was_clamped = true
                 end
-                r.MIDI_SetNote(take, note.idx, note.sel, note.mute, note.sppq, new_eppq,
-                    note.chan, note.pitch, note.vel, true)
-                note.new_e = new_eppq
+                if new_eppq ~= note.eppq then
+                    r.MIDI_SetNote(take, note.idx, note.sel, note.mute, note.sppq, new_eppq,
+                        note.chan, note.pitch, note.vel, true)
+                    note.new_e = new_eppq
+                end
                 if first_at_start then
-                    adjusted = adjusted + 1
-                    if was_clamped then clamped = clamped + 1 end
+                    if new_eppq == note.eppq then
+                        already = already + 1   -- the gap was already the target
+                    else
+                        adjusted = adjusted + 1
+                        if was_clamped then clamped = clamped + 1 end
+                    end
                 end
             elseif first_at_start then
                 if leave_gap then
@@ -277,7 +284,7 @@ local function AdjustSustainGaps(take, lo, hi, sel_s, sel_e, rule)
             end
         end
     end
-    return adjusted, skipped, clamped, left, usual, plain
+    return adjusted, skipped, clamped, left, usual, plain, already
 end
 
 local TIER_NAMES = { X = 'Expert', H = 'Hard', M = 'Medium', E = 'Easy' }
@@ -322,7 +329,7 @@ function AdjustMidiNoteLengths()
     else
         local rule = { kind = kind, dl = dl, bpm = bpm }
         if S.mn_gap_mode == 1 then rule.gap32 = S.mn_sustain_32nds end
-        local adjusted, skipped, clamped, left, usual, plain =
+        local adjusted, skipped, clamped, left, usual, plain, already =
             AdjustSustainGaps(take, lo, hi, sel_s, sel_e, rule)
         r.Undo_EndBlock2(0, ('Adjust notes: sustain gaps (%d adjusted)'):format(adjusted), -1)
         local lines = {}
@@ -340,8 +347,19 @@ function AdjustMidiNoteLengths()
         else
             lines[#lines + 1] = 'No gaps to measure a most common gap from.'
         end
-        lines[#lines + 1] = ('%d sustain%s adjusted, %d skipped (no next note within a half note).'):format(
-            adjusted, adjusted ~= 1 and 's' or '', skipped)
+        local function Sus(n) return ('%d sustain%s'):format(n, n ~= 1 and 's' or '') end
+        lines[#lines + 1] = ''
+        lines[#lines + 1] = Sus(adjusted) .. ' adjusted.'
+        if already > 0 then
+            lines[#lines + 1] = ('%d skipped - gap already correct.'):format(already)
+        end
+        if #left > 0 then
+            lines[#lines + 1] = ('%d skipped - gap longer than %d/32 (listed below).'):format(
+                #left, usual.limit_32nds)
+        end
+        if skipped > 0 then
+            lines[#lines + 1] = ('%d skipped - no next note within a half note.'):format(skipped)
+        end
         if clamped > 0 then
             lines[#lines + 1] = ('%d clamped to the 1/32-note floor (became non-sustain).'):format(clamped)
         end

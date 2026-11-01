@@ -1190,6 +1190,25 @@ Test.it('Only sustains: usual 3/32 - a 4/32 gap is closed up, a 5/32 gap is left
     CleanupFixture(idx)
 end)
 
+Test.it('Only sustains: gaps already at the target are reported apart from the adjusted ones', function()
+    reset()
+    -- Two gaps already 2/32 (the target), one at 3/32 to close, one 16/32 rest.
+    local take, idx, len32, list = MakeGapFixture({ 2, 2, 3, 16 })
+    S.mn_midi_idx      = idx
+    S.mn_diff_idx      = 1
+    S.mn_note_type     = 1
+    S.mn_sustain_32nds = 2
+    S.mn_gap_mode      = 1  -- Custom
+    AdjustMidiNoteLengths()
+
+    local res = S.last_result or ''
+    Test.expect(res:find('\n1 sustain adjusted.', 1, true), 'expected 1 adjusted: ' .. res)
+    Test.expect(res:find('2 skipped - gap already correct.', 1, true), 'expected 2 already correct: ' .. res)
+    Test.expect(res:find('1 skipped - gap longer than', 1, true), 'expected 1 over the limit: ' .. res)
+    Test.expect(SustainEnd(take, list[3].sppq) == list[3].next_sppq - 2 * len32, 'the 3/32 gap closes to 2/32')
+    CleanupFixture(idx)
+end)
+
 Test.it('Only sustains: the usual gap ties go to the smaller gap', function()
     reset()
     -- Two 3/32 and two 6/32 gaps: usual 3, limit 4, so the 6/32 ones stay.
