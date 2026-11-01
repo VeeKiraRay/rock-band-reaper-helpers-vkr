@@ -88,3 +88,7 @@ dev/tests/golden/*
 !dev/tests/golden/README.md
 
 *.zip
+
+# Venue research probes: they read a locally built corpus (RB3 DLC MIDIs with each
+# song's venue merged back in) that needs a tool not shared here, so they stay local.
+dev/tools/venue_*_probe_offline.lua
