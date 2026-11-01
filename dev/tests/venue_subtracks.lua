@@ -1041,4 +1041,67 @@ else
         end, 10)
     end)
 
+    ------------------------------------------------------------------
+    Test.section('Keyframes tab Target = Subtracks (actions_venue_keyframes.lua)')
+    ------------------------------------------------------------------
+
+    -- [first] times (seconds) on a take, sorted.
+    local function FirstTimes(take)
+        local out = {}
+        local _, _, _, n = r.MIDI_CountEvts(take)
+        for i = 0, n - 1 do
+            local o, _, _, p, ty, msg = r.MIDI_GetTextSysexEvt(take, i)
+            if o and ty == 1 and msg == '[first]' then
+                out[#out + 1] = r.MIDI_GetProjTimeFromPPQPos(take, p)
+            end
+        end
+        table.sort(out)
+        return out
+    end
+
+    Test.it('reads VENUE lighting and writes VENUE keyevents at the same times', function()
+        WithVenueFixture(function(_, _, venue_take)
+            CopyVenueToSubtracks()
+            -- Move the keyevents item so its ticks differ from the lighting item's.
+            local _, kf_item = FindNamedTrackMIDI('VENUE keyevents')
+            r.SetMediaItemInfo_Value(kf_item, 'D_POSITION', 0)
+            r.SetMediaItemInfo_Value(kf_item, 'D_LENGTH', 32)
+            local kf_take = r.GetActiveTake(kf_item)
+            local lt_take = SubTake('lighting')
+            InsertEvt(lt_take, 4, '[lighting (stomp)]')
+            InsertEvt(lt_take, 12, '[lighting (verse)]')
+            InsertEvt(kf_take, 6, '[next]')                 -- stale keyframe: replaced
+
+            local align0, rate0 = S.venue_keyframe_align, S.venue_kf_rate
+            local ok, err = pcall(InSubtracksMode, function()
+                S.venue_keyframe_align = 0
+                S.venue_kf_rate        = 1
+                RegenerateVenueKeyframes()
+                Test.expect(S.status:find('Regenerated') and S.status:find('VENUE keyevents', 1, true),
+                    'status: ' .. tostring(S.status))
+
+                local firsts = FirstTimes(kf_take)
+                Test.expect(#firsts == 2 and math.abs(firsts[1] - 4) < 0.01
+                            and math.abs(firsts[2] - 12) < 0.01,
+                    '[first] at 4 s and 12 s, got ' .. table.concat(firsts, ','))
+                Test.expect(#ReadMsgs(lt_take) == 2, 'VENUE lighting gains nothing')
+                Test.expect(#ReadMsgs(venue_take) == 0, 'VENUE stays empty')
+            end)
+            S.venue_keyframe_align, S.venue_kf_rate = align0, rate0
+            if not ok then error(err, 2) end
+        end, 30, false, 2)
+    end)
+
+    Test.it('a missing VENUE keyevents subtrack is reported and nothing is written', function()
+        WithVenueFixture(function(_, _, venue_take)
+            InsertEvt(venue_take, 4, '[lighting (stomp)]')
+            InSubtracksMode(function()
+                RegenerateVenueKeyframes()
+                Test.expect(S.status:find('Copy all to subtracks', 1, true),
+                    'expected the create-them-first hint, got: ' .. tostring(S.status))
+                Test.expect(#ReadMsgs(venue_take) == 1, 'VENUE must not get keyframes')
+            end)
+        end, 10)
+    end)
+
 end

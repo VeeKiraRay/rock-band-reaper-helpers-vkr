@@ -519,7 +519,15 @@ TIPS = {
                       "[next] / [previous] and generated keyframes to VENUE keyevents, and so on.\n" ..
                       "Blend and the [first] check read VENUE lighting / VENUE post proc.\n\n" ..
                       "The game, the Venue validators and Preview read only VENUE: run\n" ..
-                      "Copy all to main track when you are done.",
+                      "Copy all to main track when you are done.\n\n" ..
+                      "The Keyframes tab shares this setting.",
+    venue_kf_target = "Where Regenerate keyframes reads lighting and writes keyframes.\n\n" ..
+                      "VENUE: both on the VENUE track.\n" ..
+                      "Subtracks: reads the manual lighting events on VENUE lighting and\n" ..
+                      "writes [first] / [next] to VENUE keyevents (Sub VENUE tracks, made by\n" ..
+                      "Venue > Actions > Copy all to subtracks).\n\n" ..
+                      "Shared with Manual gen's Target. The game, the Venue validators and\n" ..
+                      "Preview read only VENUE: run Copy all to main track when you are done.",
     venue_mg_replace = "What the Add buttons do with events already at the playhead.\n\n" ..
                        "Add: insert next to them (stacks build up).\n" ..
                        "Replace: first remove the events of the same family on that spot,\n" ..
@@ -618,7 +626,8 @@ TIPS = {
     -- Keyframes tab
     venue_kf_regenerate = "Find every manual lighting event ([lighting (verse)], (chorus),\n" ..
                           "(manual_cool), (manual_warm), (dischord), (stomp)) already on the\n" ..
-                          "VENUE track and regenerate its [first]/[next] keyframes, running from\n" ..
+                          "VENUE track (Target = Subtracks: on VENUE lighting, keyframes go to\n" ..
+                          "VENUE keyevents) and regenerate its [first]/[next] keyframes, running from\n" ..
                           "that lighting event to the next lighting event of any kind.\n\n" ..
                           "[first] is placed on the lighting event's own tick; Keyframe align\n" ..
                           "decides where the first [next] lands.\n\n" ..

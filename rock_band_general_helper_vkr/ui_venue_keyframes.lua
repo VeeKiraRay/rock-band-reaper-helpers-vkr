@@ -1,11 +1,14 @@
 ﻿-- Venue > Keyframes sub-tab
 -- Bulk-regenerates [first]/[next] keyframes for every manual lighting event already on the
 -- VENUE track, respecting time selection.
--- Requires globals: r, ctx, S, TIPS, Tooltip, SliderTooltip, RunAction, RegenerateVenueKeyframes
+-- Target (VENUE / Subtracks) is the same S.venue_mg_target setting Manual gen shows.
+-- Requires globals: r, ctx, S, TIPS, Tooltip, SliderTooltip, RunAction, RegenerateVenueKeyframes,
+--                   LabelColWidth, RadioGroupWidth, Btn, BTN_H
 
 function DrawVenueKeyframesTab()
     r.ImGui_TextWrapped(ctx,
-        'Regenerate [first]/[next] keyframes for every manual lighting event already on the VENUE track')
+        'Regenerate [first]/[next] keyframes for every manual lighting event already on the ' ..
+        'VENUE track (or, with Target = Subtracks, on VENUE lighting)')
     r.ImGui_Spacing(ctx)
 
     local _kfa_labels = {
@@ -13,7 +16,22 @@ function DrawVenueKeyframesTab()
         'Guitar notes', 'Bass notes', 'Keys notes',
         'Drum kicks', 'Drum snare',
     }
-    local _lbl_col = LabelColWidth({ 'Keyframe align', 'Keyframe rate' })
+    local _lbl_col = LabelColWidth({ 'Target', 'Keyframe align', 'Keyframe rate' })
+
+    -- ---- Target: VENUE or the Sub VENUE tracks (shared with Manual gen) ----
+    local _radio_w = RadioGroupWidth({ 'VENUE', 'Subtracks' })
+    r.ImGui_Text(ctx, 'Target')
+    r.ImGui_SameLine(ctx, _lbl_col)
+    if r.ImGui_RadioButton(ctx, 'VENUE##vkf_tgt', S.venue_mg_target == 0) then
+        S.venue_mg_target = 0
+    end
+    Tooltip(TIPS.venue_kf_target)
+    r.ImGui_SameLine(ctx, _lbl_col + _radio_w)
+    if r.ImGui_RadioButton(ctx, 'Subtracks##vkf_tgt', S.venue_mg_target == 1) then
+        S.venue_mg_target = 1
+    end
+    Tooltip(TIPS.venue_kf_target)
+    r.ImGui_Spacing(ctx)
 
     r.ImGui_Text(ctx, 'Keyframe align')
     r.ImGui_SameLine(ctx, _lbl_col)

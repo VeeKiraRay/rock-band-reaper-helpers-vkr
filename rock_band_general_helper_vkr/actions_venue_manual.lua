@@ -15,17 +15,18 @@ NO_LIGHTING_AT_PLAYHEAD_MSG =
     'no manual lighting event ([lighting (verse|chorus|manual_cool|manual_warm|' ..
     'dischord|stomp)]) found at the playhead.'
 
--- Manual gen writes to VENUE (S.venue_mg_target 0) or to the Sub VENUE tracks made by
--- Venue > Actions "Copy all to subtracks" (1). In Subtracks mode each event goes to the
--- subtrack of its CategorizeVenueEvent category, the same split those tracks hold.
+-- Manual gen and the Keyframes tab write to VENUE (S.venue_mg_target 0) or to the Sub
+-- VENUE tracks made by Venue > Actions "Copy all to subtracks" (1). In Subtracks mode each
+-- event goes to the subtrack of its CategorizeVenueEvent category, the same split those
+-- tracks hold. One setting for both views: the subtrack workflow is per project.
 
-function ManualGenUsesSubtracks()
+function VenueTargetUsesSubtracks()
     return S.venue_mg_target == 1
 end
 
 -- Track name Manual gen reads/writes for one category (a VENUE_SUBTRACKS key).
-function ManualGenTargetName(kind)
-    if not ManualGenUsesSubtracks() then return 'VENUE' end
+function VenueTargetName(kind)
+    if not VenueTargetUsesSubtracks() then return 'VENUE' end
     for _, cat in ipairs(VENUE_SUBTRACKS) do
         if cat.key == kind then return cat.track_name end
     end
@@ -36,10 +37,10 @@ local SUBTRACKS_FIRST_HINT =
     'create the subtracks first with Venue > Actions > Copy all to subtracks.'
 
 -- Returns track, item, take for a category, or nil with S.status set.
-local function _find_target(kind)
-    local name = ManualGenTargetName(kind)
+function FindVenueTarget(kind)
+    local name = VenueTargetName(kind)
     local track, item, take = FindNamedTrackMIDI(name)
-    if not ManualGenUsesSubtracks() then
+    if not VenueTargetUsesSubtracks() then
         if not track then
             S.status = 'No VENUE track found.'
             return nil, nil, nil
@@ -63,7 +64,7 @@ end
 
 -- Same project time, expressed in another take's ticks. Subtrack items normally match
 -- VENUE's position, but a moved item must not shift the events.
-local function _ppq_between(src_take, ppq, dst_take)
+function VenuePpqBetween(src_take, ppq, dst_take)
     if src_take == dst_take then return ppq end
     return r.MIDI_GetPPQPosFromProjTime(dst_take, r.MIDI_GetProjTimeFromPPQPos(src_take, ppq))
 end
@@ -121,7 +122,7 @@ end
 
 function InsertVenueEventAtPlayhead(text)
     local kind = CategorizeVenueEvent(text)
-    local track, item, take = _find_target(kind)
+    local track, item, take = FindVenueTarget(kind)
     if not track then return end
     local replace = S.venue_mg_replace == 1
 
@@ -132,7 +133,7 @@ function InsertVenueEventAtPlayhead(text)
     -- InsertEventsEvent). Returns before any Undo_* call, so a refusal leaves no undo point.
     -- In Subtracks mode the lighting event lives on another track than the [first].
     if text == '[first]' then
-        local _, _, lt_take = _find_target('lighting')
+        local _, _, lt_take = FindVenueTarget('lighting')
         if not lt_take then return end
         local lt_ppq = r.MIDI_GetPPQPosFromProjTime(lt_take, cursor)
         if not FindManualLightingAtPpq(lt_take, lt_ppq) then
@@ -152,7 +153,7 @@ function InsertVenueEventAtPlayhead(text)
             if cat == kind then
                 c_track, c_item, c_take = track, item, take
             else
-                c_track, c_item, c_take = FindNamedTrackMIDI(ManualGenTargetName(cat))
+                c_track, c_item, c_take = FindNamedTrackMIDI(VenueTargetName(cat))
             end
             if c_item then
                 local entry = by_take[c_take]
@@ -166,7 +167,7 @@ function InsertVenueEventAtPlayhead(text)
         end
     end
 
-    local name = ManualGenTargetName(kind)
+    local name = VenueTargetName(kind)
     r.PreventUIRefresh(1)
     r.Undo_BeginBlock2(0)
     local removed = {}
@@ -229,7 +230,7 @@ end
 
 -- kind: 'lighting' or 'postproc' (CategorizeVenueEvent's own names).
 function BlendVenuePresetAtPlayhead(kind)
-    local track, item, take = _find_target(kind)
+    local track, item, take = FindVenueTarget(kind)
     if not track then return end
 
     local cur_ppq = r.MIDI_GetPPQPosFromProjTime(take, r.GetCursorPosition())
@@ -298,7 +299,7 @@ function BlendVenuePresetAtPlayhead(kind)
     local placed_t = FormatTime(r.MIDI_GetProjTimeFromPPQPos(take, cur_ppq))
     local lines = {
         ('Copied the active %s preset to the playhead as a blend anchor (%s).'):format(
-            label, ManualGenTargetName(kind)),
+            label, VenueTargetName(kind)),
         '',
         ('  Source:  %s   %s'):format(src.msg, at(src)),
         ('  Placed:  %s   %s'):format(src.msg, placed_t),
@@ -377,9 +378,9 @@ function GenerateManualKeyframes()
     -- Lighting is read from one take and the keyframes written to another; in VENUE mode
     -- both are the VENUE take. Every position below is in the lighting take's ticks
     -- until the write, which converts through project time.
-    local track, item, take = _find_target('lighting')
+    local track, item, take = FindVenueTarget('lighting')
     if not track then return end
-    local kf_track, kf_item, kf_take = _find_target('keyframe')
+    local kf_track, kf_item, kf_take = FindVenueTarget('keyframe')
     if not kf_track then return end
 
     local ppq       = GetTakePPQPerQN(take)
@@ -444,23 +445,23 @@ function GenerateManualKeyframes()
 
     -- Clear existing keyframe events in range
     ClearVenueKeyframesInRange(kf_take,
-        _ppq_between(take, start_ppq, kf_take), _ppq_between(take, end_ppq, kf_take))
+        VenuePpqBetween(take, start_ppq, kf_take), VenuePpqBetween(take, end_ppq, kf_take))
 
     -- Insert new keyframe events at their already-computed alignment grid position (beat,
     -- half-beat, quarter-beat, etc. per S.venue_kf_inst_subdiv for instrument-aware modes) -
     -- no further snapping, or a coarser half-beat re-snap would collapse finer positions.
     for _, ev in ipairs(ctrl_events) do
         r.MIDI_InsertTextSysexEvt(kf_take, false, false,
-            _ppq_between(take, ev.ppq, kf_take), 1, ev.text)
+            VenuePpqBetween(take, ev.ppq, kf_take), 1, ev.text)
     end
 
     r.Undo_EndBlock2(0, 'RB Generate Manual Keyframes (' .. #ctrl_events .. ' events)', -1)
     r.PreventUIRefresh(-1)
     r.UpdateArrange()
 
-    if ManualGenUsesSubtracks() then
+    if VenueTargetUsesSubtracks() then
         S.status = ('Generated %d keyframe events (%s).'):format(
-            #ctrl_events, ManualGenTargetName('keyframe'))
+            #ctrl_events, VenueTargetName('keyframe'))
     else
         S.status = ('Generated %d keyframe events.'):format(#ctrl_events)
     end
@@ -485,7 +486,7 @@ function RemoveVenueEventsByType(remove_type)
 
     -- The takes to clear: VENUE alone, or each existing subtrack of a covered category.
     local targets, missing = {}, {}
-    if ManualGenUsesSubtracks() then
+    if VenueTargetUsesSubtracks() then
         for _, cat in ipairs(VENUE_SUBTRACKS) do
             if cats[cat.key] then
                 local track, item, take = FindNamedTrackMIDI(cat.track_name)
@@ -502,7 +503,7 @@ function RemoveVenueEventsByType(remove_type)
             return
         end
     else
-        local track, item, take = _find_target('special')
+        local track, item, take = FindVenueTarget('special')
         if not track then return end
         targets[1] = { track = track, item = item, take = take }
     end
@@ -532,7 +533,7 @@ function RemoveVenueEventsByType(remove_type)
     r.UpdateArrange()
 
     local scope = has_sel and 'time selection' or 'full song'
-    if ManualGenUsesSubtracks() then
+    if VenueTargetUsesSubtracks() then
         S.status = ('Removed %d %s events (%s, subtracks).'):format(count, tname, scope)
         if #missing > 0 then
             S.last_result = 'Not found, skipped: ' .. table.concat(missing, ', ')

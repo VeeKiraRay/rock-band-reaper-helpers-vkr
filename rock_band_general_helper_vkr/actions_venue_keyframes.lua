@@ -1,18 +1,19 @@
 -- Keyframes tab: bulk regeneration of [first]/[next] keyframes for every manual lighting
--- event already on the VENUE track.
--- Requires: FindNamedTrackMIDI, GetTakePPQPerQN, GetTimeSelection, MANUAL_LIGHTING_SET,
---           GenerateKeyframesForSpan, ClearVenueKeyframesInRange, r, S (globals)
+-- event already on the VENUE track - or, with Target = Subtracks, for every one on
+-- "VENUE lighting", writing the keyframes to "VENUE keyevents".
+-- Requires: FindVenueTarget, VenueTargetName, VenueTargetUsesSubtracks, VenuePpqBetween
+--           (actions_venue_manual.lua), GetTakePPQPerQN, GetTimeSelection,
+--           MANUAL_LIGHTING_SET, GenerateKeyframesForSpan, ClearVenueKeyframesInRange,
+--           r, S (globals)
 
 function RegenerateVenueKeyframes()
-    local track, item, take = FindNamedTrackMIDI('VENUE')
-    if not track then
-        S.status = 'No VENUE track found.'
-        return
-    end
-    if not item then
-        S.status = 'No MIDI item on VENUE track.'
-        return
-    end
+    -- Lighting is read from one take and the keyframes written to another; with Target =
+    -- VENUE both are the VENUE take. Every position below is in the lighting take's ticks
+    -- until the write, which converts through project time.
+    local track, item, take = FindVenueTarget('lighting')
+    if not track then return end
+    local kf_track, kf_item, kf_take = FindVenueTarget('keyframe')
+    if not kf_track then return end
 
     local ppq = GetTakePPQPerQN(take)
 
@@ -74,20 +75,32 @@ function RegenerateVenueKeyframes()
         return
     end
 
+    -- Generate every span first, from the lighting take, then write: clearing the keyframe
+    -- take never changes what a later span reads (in VENUE mode they are one take, and the
+    -- clear only removes keyframes, which no span reads).
+    local planned = {}
+    for _, span in ipairs(spans) do
+        planned[#planned + 1] = {
+            span   = span,
+            events = GenerateKeyframesForSpan(take, span.start_ppq, span.end_ppq, ppq, S.venue_kf_rate),
+        }
+    end
+
     r.PreventUIRefresh(1)
     r.Undo_BeginBlock2(0)
-    r.MarkTrackItemsDirty(track, item)
+    r.MarkTrackItemsDirty(kf_track, kf_item)
 
     local total = 0
-    for _, span in ipairs(spans) do
-        ClearVenueKeyframesInRange(take, span.start_ppq, span.end_ppq)
-
-        local ctrl_events = GenerateKeyframesForSpan(take, span.start_ppq, span.end_ppq, ppq, S.venue_kf_rate)
-        for _, ev in ipairs(ctrl_events) do
+    for _, p in ipairs(planned) do
+        ClearVenueKeyframesInRange(kf_take,
+            VenuePpqBetween(take, p.span.start_ppq, kf_take),
+            VenuePpqBetween(take, p.span.end_ppq, kf_take))
+        for _, ev in ipairs(p.events) do
             -- Already placed on its alignment grid (beat/half-beat/quarter-beat, etc.) by
             -- GenerateKeyframesForSpan - no further snapping, or a coarser half-beat re-snap
             -- would collapse finer instrument-aware positions onto the nearest half-beat/beat.
-            r.MIDI_InsertTextSysexEvt(take, false, false, ev.ppq, 1, ev.text)
+            r.MIDI_InsertTextSysexEvt(kf_take, false, false,
+                VenuePpqBetween(take, ev.ppq, kf_take), 1, ev.text)
             total = total + 1
         end
     end
@@ -97,6 +110,9 @@ function RegenerateVenueKeyframes()
     r.UpdateArrange()
 
     local scope = has_sel and 'time selection' or 'full song'
-    S.status = ('Regenerated %d keyframe events across %d manual lighting section(s) (%s).')
-        :format(total, #spans, scope)
+    local where = VenueTargetUsesSubtracks()
+        and (' (%s -> %s)'):format(VenueTargetName('lighting'), VenueTargetName('keyframe'))
+        or ''
+    S.status = ('Regenerated %d keyframe events across %d manual lighting section(s) (%s)%s.')
+        :format(total, #spans, scope, where)
 end

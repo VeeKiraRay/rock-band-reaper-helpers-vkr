@@ -15,7 +15,7 @@
 --                   POSTPROC_DISPLAY, POSTPROC_LABELS, POSTPROC_TIPS,
 --                   KF_ALIGN_LABELS, VenueEventTooltip, RawVenueEventText,
 --                   ComboGroupHeader, RadioGroupWidth, LabelColWidth,
---                   ManualGenTargetName, ManualGenUsesSubtracks, VENUE_SUBTRACKS,
+--                   VenueTargetName, VenueTargetUsesSubtracks, VENUE_SUBTRACKS,
 --                   FindTrackByName
 
 -- Cached VENUE take and the PPQ of every manual lighting event on it, refreshed via
@@ -28,7 +28,7 @@
 -- switch invalidates the pointer between polls), and this tab's own Add buttons force a
 -- rescan so the gate reopens the frame after a lighting event is added. Correctness never
 -- depends on this cache - both actions re-check the take for themselves.
--- In Subtracks mode the cached take is "VENUE lighting" instead (ManualGenTargetName), and
+-- In Subtracks mode the cached take is "VENUE lighting" instead (VenueTargetName), and
 -- the poll also caches whether any subtrack exists, for the inline hint.
 local _poll         = MakeProjectPoll(1.0, 5.0)
 local _venue_take
@@ -53,13 +53,13 @@ function DrawVenueManualTab()
     local _take_valid = _venue_take and r.ValidatePtr2(0, _venue_take, 'MediaItem_Take*')
     if _poll(_force_rescan) or (_venue_take and not _take_valid) then
         _force_rescan = false
-        local _, _, _tk = FindNamedTrackMIDI(ManualGenTargetName('lighting'))
+        local _, _, _tk = FindNamedTrackMIDI(VenueTargetName('lighting'))
         _venue_take = _tk
         _take_valid = _venue_take ~= nil
         _manual_lt  = nil
         if _take_valid then _manual_lt, _lt_tol = _ScanManualLighting(_venue_take) end
         _subtracks_missing = false
-        if ManualGenUsesSubtracks() then
+        if VenueTargetUsesSubtracks() then
             _subtracks_missing = true
             for _, _cat in ipairs(VENUE_SUBTRACKS) do
                 if FindTrackByName(_cat.track_name) then _subtracks_missing = false; break end

@@ -49,6 +49,9 @@
 --       work on the subtracks too. If a subtrack is missing, you are told to
 --       create them first. Run Copy all to main track when done - the game reads
 --       only VENUE.
+--     - Venue > Keyframes: the same Target choice (one setting, shared with Manual
+--       gen). Subtracks reads the manual lighting events on VENUE lighting and
+--       writes the regenerated keyframes to VENUE keyevents.
 --     - Venue > Manual gen: new Insert choice, Add (as before) or Replace.
 --       Replace first removes the events of the same kind at the playhead, then
 --       adds the new one: a new lighting preset replaces the old one but leaves a
