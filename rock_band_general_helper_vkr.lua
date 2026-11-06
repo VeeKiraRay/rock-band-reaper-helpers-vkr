@@ -41,7 +41,14 @@
 --     - Workflow is its own tab now, no longer a General sub-tab.
 --     - New Events tab for the EVENTS track tools, with two sub-tabs.
 --       General holds "List event sections" (moved from Venue > Actions);
---       Manual gen is the former Venue > Events sub-tab, unchanged.
+--       Manual gen is the former Venue > Events sub-tab.
+--     - Events > Manual gen "Insert bookends" now follows the official charts:
+--       [crowd_realtime] (the idle crowd) at measure 1 in place of
+--       [crowd_normal], [prc_intro] at measure 2 (was 1) with [crowd_noclap]
+--       and [crowd_normal] (a placeholder: change it to mellow or intense to
+--       suit the song), and [crowd_noclap] on [prc_outro]. A re-run used to
+--       delete every [crowd_normal] in the song; crowd events are now removed
+--       only on the bookend measures, so crowd changes you placed mid-song stay.
 --     - Venue > Manual gen: new Target choice, VENUE (as before) or Subtracks.
 --       Subtracks writes each event to its own Sub VENUE track (made by Venue >
 --       Actions > Copy all to subtracks): cameras, lighting, post proc, special

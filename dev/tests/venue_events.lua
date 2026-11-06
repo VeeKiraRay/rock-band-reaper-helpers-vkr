@@ -837,23 +837,71 @@ else
 
     -- Bookend items are created with QN lengths so measure counts don't
     -- depend on the open project's tempo (120 QN = 30 measures in 4/4).
+    -- Every type-1 text event as { msg = { time, ... } } (ReadTextEvents keeps one
+    -- time per msg; the bookends write [crowd_noclap] twice).
+    local function ReadTextEventTimes(take)
+        local out = {}
+        local _, _, _, textcnt = r.MIDI_CountEvts(take)
+        for i = 0, textcnt - 1 do
+            local ok, _, _, ppq, typ, msg = r.MIDI_GetTextSysexEvt(take, i)
+            if ok and typ == 1 then
+                out[msg] = out[msg] or {}
+                table.insert(out[msg], r.MIDI_GetProjTimeFromPPQPos(take, ppq))
+            end
+        end
+        for _, l in pairs(out) do table.sort(l) end
+        return out
+    end
+    local function near(a, b) return a and math.abs(a - b) < 0.01 end
+
     Test.it('bookends: full set on a long item, recalculated on re-run', function()
         WithEventsFixture(true, function(take)
             local E = LastFullMeasure(take)
             Test.expect(E and E >= 7, 'fixture long enough (E=' .. tostring(E) .. ')')
             InsertEventsBookends()
             local ev = ReadTextEvents(take)
-            Test.expect(TextEvtCount(take) == 6, TextEvtCount(take) .. ' events (want 6)')
-            local function near(a, b) return a and math.abs(a - b) < 0.01 end
-            Test.expect(near(ev['[prc_intro]'],   MeasureStart(1)),     'intro at measure 1')
-            Test.expect(near(ev['[crowd_normal]'], MeasureStart(1)),    'crowd at measure 1')
+            local all = ReadTextEventTimes(take)
+            Test.expect(TextEvtCount(take) == 9, TextEvtCount(take) .. ' events (want 9)')
+            Test.expect(near(ev['[crowd_realtime]'], MeasureStart(1)),  'realtime at measure 1')
+            Test.expect(near(ev['[crowd_normal]'],   MeasureStart(2)),  'normal at measure 2')
+            Test.expect(near(ev['[prc_intro]'],   MeasureStart(2)),     'intro at measure 2')
             Test.expect(near(ev['[music_start]'], MeasureStart(3)),     'music_start at measure 3')
             Test.expect(near(ev['[end]'],         MeasureStart(E)),     '[end] at measure E')
             Test.expect(near(ev['[music_end]'],   MeasureStart(E - 2)), '[music_end] at E-2')
             Test.expect(near(ev['[prc_outro]'],   MeasureStart(E - 5)), '[prc_outro] at E-5')
+            local nc = all['[crowd_noclap]'] or {}
+            Test.expect(#nc == 2 and near(nc[1], MeasureStart(2)) and near(nc[2], MeasureStart(E - 5)),
+                        'noclap on [prc_intro] and [prc_outro] (' .. #nc .. ')')
             -- re-run: removes and re-inserts, count unchanged
             InsertEventsBookends()
-            Test.expect(TextEvtCount(take) == 6, 're-run is idempotent')
+            Test.expect(TextEvtCount(take) == 9, 're-run is idempotent')
+        end, 120, true)
+    end)
+
+    Test.it('bookends: re-run keeps mid-song crowd events, replaces the old crowd_normal', function()
+        WithEventsFixture(true, function(take)
+            -- the old bookend layout: [prc_intro] + [crowd_normal] at measure 1
+            local function put(measure, msg)
+                local ppq = r.MIDI_GetPPQPosFromProjTime(take, MeasureStart(measure))
+                r.MIDI_InsertTextSysexEvt(take, false, false, ppq, 1, msg)
+            end
+            put(1, '[prc_intro]')
+            put(1, '[crowd_normal]')
+            put(10, '[crowd_noclap]')     -- the author's own, mid-song
+            put(12, '[crowd_normal]')
+            put(14, '[crowd_realtime]')
+            InsertEventsBookends()
+            local all = ReadTextEventTimes(take)
+            local cn = all['[crowd_normal]'] or {}
+            Test.expect(#cn == 2 and near(cn[1], MeasureStart(2)) and near(cn[2], MeasureStart(12)),
+                        'measure-1 crowd_normal moved to measure 2, measure-12 one kept')
+            local nc = all['[crowd_noclap]'] or {}
+            Test.expect(#nc == 3 and near(nc[2], MeasureStart(10)), 'mid-song noclap kept (' .. #nc .. ')')
+            local rt = all['[crowd_realtime]'] or {}
+            Test.expect(#rt == 2 and near(rt[1], MeasureStart(1)) and near(rt[2], MeasureStart(14)),
+                        'realtime at measure 1, mid-song one kept')
+            local pi = all['[prc_intro]'] or {}
+            Test.expect(#pi == 1 and near(pi[1], MeasureStart(2)), 'one [prc_intro], at measure 2')
         end, 120, true)
     end)
 
@@ -863,9 +911,9 @@ else
             Test.expect(not E or E < 7, 'fixture short enough (E=' .. tostring(E) .. ')')
             InsertEventsBookends()
             local ev = ReadTextEvents(take)
-            Test.expect(TextEvtCount(take) == 3, TextEvtCount(take) .. ' events (want 3)')
-            Test.expect(ev['[prc_intro]'] and ev['[crowd_normal]'] and ev['[music_start]'],
-                        'start trio present')
+            Test.expect(TextEvtCount(take) == 5, TextEvtCount(take) .. ' events (want 5)')
+            Test.expect(ev['[crowd_realtime]'] and ev['[prc_intro]'] and ev['[crowd_noclap]']
+                        and ev['[crowd_normal]'] and ev['[music_start]'], 'start events present')
             Test.expect(not ev['[end]'], 'no [end] on short item')
             Test.expect(S.last_result and S.last_result:find('End events skipped', 1, true),
                         'skip reported in result')

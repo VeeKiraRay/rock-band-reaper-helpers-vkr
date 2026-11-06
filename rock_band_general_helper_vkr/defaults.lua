@@ -665,15 +665,20 @@ TIPS = {
     venue_ev_add     = "Insert the shown event at the exact playhead position on the\n" ..
                        "EVENTS track.\n\nFully undoable.",
     venue_ev_bookends = "Insert the minimal event set every song needs:\n" ..
-                        "  measure 1:  [prc_intro] + [crowd_normal]\n" ..
+                        "  measure 1:  [crowd_realtime] (idle crowd)\n" ..
+                        "  measure 2:  [prc_intro] + [crowd_noclap] + [crowd_normal]\n" ..
+                        "              (change [crowd_normal] to mellow or intense\n" ..
+                        "              to suit the song)\n" ..
                         "  measure 3:  [music_start]\n" ..
-                        "  measure E-5 / E-2 / E:  [prc_outro] / [music_end] / [end]\n" ..
+                        "  measure E-5:  [prc_outro] + [crowd_noclap]\n" ..
+                        "  measure E-2 / E:  [music_end] / [end]\n" ..
                         "where E is the last measure fully contained in the MIDI item.\n" ..
-                        "Items shorter than 7 full measures skip the three end events.\n\n" ..
-                        "Existing instances of these six events are removed first, so\n" ..
-                        "re-running recalculates their positions. A different event\n" ..
-                        "already sitting on a target measure makes that bookend be\n" ..
-                        "skipped (reported in the result).\n\nFully undoable.",
+                        "Items shorter than 7 full measures skip the end events.\n\n" ..
+                        "Existing bookend events are removed first, so re-running\n" ..
+                        "recalculates their positions. Crowd events are removed only\n" ..
+                        "on the bookend measures - ones you placed elsewhere stay.\n" ..
+                        "A different event already sitting on a target measure makes\n" ..
+                        "that bookend be skipped (reported in the result).\n\nFully undoable.",
     venue_ev_clear   = "Remove every text event from the EVENTS track.\n" ..
                        "The track name event is left as is.\n\nFully undoable.",
 

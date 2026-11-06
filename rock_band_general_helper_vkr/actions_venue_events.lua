@@ -322,18 +322,32 @@ function ClearAllEventsTexts()
     S.last_result = nil
 end
 
+-- One instance per song: every existing copy is removed before re-inserting.
 local BOOKEND_EVENTS = {
-    '[prc_intro]', '[crowd_normal]', '[music_start]',
+    '[prc_intro]', '[music_start]',
     '[prc_outro]', '[music_end]', '[end]',
 }
+-- Crowd events can recur through a song, so a re-run removes these only where
+-- a bookend put them (see InsertEventsBookends). Older versions wrote
+-- [crowd_normal] at measure 1, which a re-run therefore also replaces.
+local BOOKEND_CROWD = { ['[crowd_realtime]'] = true, ['[crowd_noclap]'] = true, ['[crowd_normal]'] = true }
 
--- Insert the minimal event set every song needs: [prc_intro] + [crowd_normal]
--- at measure 1, [music_start] at measure 3, and - when the MIDI item is at
--- least 7 full measures long - [prc_outro] / [music_end] / [end] at measures
+-- Insert the minimal event set every song needs: [crowd_realtime] at measure 1
+-- (the idle crowd), [prc_intro] + [crowd_noclap] + [crowd_normal] at measure 2,
+-- [music_start] at measure 3, and - when the MIDI item is at least 7 full
+-- measures long - [prc_outro] + [crowd_noclap] / [music_end] / [end] at measures
 -- E-5 / E-2 / E, where E is the last measure fully contained in the item.
--- Existing instances of these six events are removed first, so re-running
--- recalculates their positions. A foreign non-crowd event already sitting on
--- a target spot makes that bookend be skipped (same-spot rule).
+-- Official RB3 charts start the first section shortly before [music_start],
+-- with [crowd_noclap] on it and the crowd leaving realtime for a mood there
+-- (normal most often, else mellow or intense). [crowd_normal] is a placeholder
+-- for the author to change; the closing noclap is ready for a [crowd_clap] the
+-- author adds mid-song.
+-- Existing [prc_intro] / [music_start] / [prc_outro] / [music_end] / [end] are
+-- removed first, so re-running recalculates their positions. The crowd events
+-- are removed only at measure 1, measure 2, E-5 and where the old [prc_intro] /
+-- [prc_outro] sat, so crowd events placed elsewhere are kept. A foreign
+-- non-crowd event already sitting on a target spot makes that bookend be
+-- skipped (same-spot rule).
 function InsertEventsBookends()
     local track, item, take = _require_take()
     if not track then return end
@@ -355,29 +369,59 @@ function InsertEventsBookends()
     end
 
     local plan = {
-        { measure = 1, msg = '[prc_intro]'   },
-        { measure = 1, msg = '[crowd_normal]' },
-        { measure = 3, msg = '[music_start]' },
+        { measure = 1, msg = '[crowd_realtime]' },
+        { measure = 2, msg = '[prc_intro]'      },
+        { measure = 2, msg = '[crowd_noclap]'   },
+        { measure = 2, msg = '[crowd_normal]'   },
+        { measure = 3, msg = '[music_start]'    },
     }
     local end_events_skipped = false
     if last_full and last_full >= 7 then
-        plan[#plan + 1] = { measure = last_full - 5, msg = '[prc_outro]' }
-        plan[#plan + 1] = { measure = last_full - 2, msg = '[music_end]' }
-        plan[#plan + 1] = { measure = last_full,     msg = '[end]'       }
+        plan[#plan + 1] = { measure = last_full - 5, msg = '[prc_outro]'    }
+        plan[#plan + 1] = { measure = last_full - 5, msg = '[crowd_noclap]' }
+        plan[#plan + 1] = { measure = last_full - 2, msg = '[music_end]'    }
+        plan[#plan + 1] = { measure = last_full,     msg = '[end]'          }
     else
         end_events_skipped = true
+    end
+    for _, p in ipairs(plan) do
+        local t = m_time[p.measure]
+        if not t then t = ({r.TimeMap_GetMeasureInfo(0, p.measure - 1)})[1] end
+        p.ppq = r.MIDI_GetPPQPosFromProjTime(take, t)
     end
 
     local bookend_set = {}
     for _, msg in ipairs(BOOKEND_EVENTS) do bookend_set[msg] = true end
 
+    -- Spots where a bookend crowd event may be removed: this run's crowd spots
+    -- plus wherever the previous run's [prc_intro] / [prc_outro] sat (the item
+    -- may have changed length since, moving E-5).
+    local crowd_spots = {}
+    for _, p in ipairs(plan) do
+        if _is_crowd(p.msg) then crowd_spots[_round_ppq(p.ppq)] = true end
+    end
+    local _, _, _, textcnt = r.MIDI_CountEvts(take)
+    for i = 0, textcnt - 1 do
+        local ok, _, _, ppq, evt_type, msg = r.MIDI_GetTextSysexEvt(take, i)
+        if ok and evt_type == 1 and (msg == '[prc_intro]' or msg == '[prc_outro]') then
+            crowd_spots[_round_ppq(ppq)] = true
+        end
+    end
+
     r.PreventUIRefresh(1)
     r.Undo_BeginBlock2(0)
     r.MarkTrackItemsDirty(track, item)
 
-    -- Remove existing instances of the six bookend events
-    local removed = DeleteTextEventsInRange(take, -math.huge, math.huge,
-                                            function(msg) return not bookend_set[msg] end)
+    -- Remove the previous bookends (reverse order: deleting shifts later indices)
+    local removed = 0
+    for i = textcnt - 1, 0, -1 do
+        local ok, _, _, ppq, evt_type, msg = r.MIDI_GetTextSysexEvt(take, i)
+        if ok and evt_type == 1 and (bookend_set[msg]
+            or (BOOKEND_CROWD[msg] and crowd_spots[_round_ppq(ppq)])) then
+            r.MIDI_DeleteTextSysexEvt(take, i)
+            removed = removed + 1
+        end
+    end
 
     -- Insert at the planned spots, skipping occupied ones (crowd events may
     -- stack anywhere and anything may stack on a crowd event). `placed`
@@ -386,9 +430,7 @@ function InsertEventsBookends()
     local scan = ScanEventsTextEvents(take)
     local lines, inserted, placed = {}, 0, {}
     for _, p in ipairs(plan) do
-        local t = m_time[p.measure]
-        if not t then t = ({r.TimeMap_GetMeasureInfo(0, p.measure - 1)})[1] end
-        local ppq = r.MIDI_GetPPQPosFromProjTime(take, t)
+        local ppq = p.ppq
         local rp  = _round_ppq(ppq)
         local spot_msg
         if not _is_crowd(p.msg) then
