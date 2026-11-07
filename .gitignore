@@ -89,6 +89,7 @@ dev/tests/golden/*
 
 *.zip
 
-# Venue research probes: they read a locally built corpus (RB3 DLC MIDIs with each
-# song's venue merged back in) that needs a tool not shared here, so they stay local.
-dev/tools/venue_*_probe_offline.lua
+# Research probes: one-off measurements over local corpora (official charts, decrypted
+# multitracks, a venue-merged MIDI set) a clone does not have. Their lasting parts -
+# shared readers, the measured method cores, parity checks - live in dev/tools/.
+dev/probes/
