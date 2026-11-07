@@ -72,7 +72,8 @@ TIPS = {
         "frequency and pitch range untouched.\n" ..
         "The Piano / keys preset targets the Tuner: wide frequency range, " ..
         "strict threshold, and a lower Min RMS level for quiet stems. " ..
-        "Single-note lines only - YIN cannot track chords.\n\n" ..
+        "Clean single-note lines only - YIN cannot track chords, and other " ..
+        "sounds in the stem pull it an octave or more too low.\n\n" ..
         "Presets are one-shot: sliders stay editable afterwards. Refine " ..
         "further by hand or with Auto-tune YIN from reference.",
 

@@ -35,6 +35,9 @@
 --       selection, status line and Copy result. The audio source dropdown
 --       updates on its own when tracks or items are added (within about a
 --       second), so the Refresh tracks button is gone.
+--     - The Piano / keys preset is now called "Piano / keys (clean
+--       single-note lines)": it reads an isolated single-note line
+--       exactly, but not a stem where other sounds play along.
 --   v0.2
 --     - The window title now carries the script version - "Rock Band Pitch
 --       Tuner v0.2". A bug report that quotes the title says which version

@@ -81,10 +81,11 @@ YIN_PRESETS = {
     -- pitch range: RB3 keys only cover C2-C4 (48-72), but the tuner should
     -- report the true sounding pitch so the author decides how to wrap the
     -- part into the playable range.
-    -- YIN is monophonic: single-note lines only, chords confuse it.
+    -- YIN is monophonic: clean single-note lines only. Chords, and other sounds in the stem
+    -- (bleed, notes ringing over each other), pull it onto periods 3x / 5x too long.
     -- keys = true makes YINPresetCombo run a soft track sanity check
     -- (warns in the result panel if the selected tracks look vocal-related).
-    { label = 'Piano / keys (tuner, single notes)',
+    { label = 'Piano / keys (clean single-note lines)',
       threshold = 0.10, min_freq = 45, max_freq = 2000, window_ms = 50,
       tuner_rms = 0.002, keys = true },
 }

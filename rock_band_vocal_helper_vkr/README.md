@@ -158,9 +158,11 @@ A **Vocal style preset** combo sits above the YIN sliders on this sub-tab, on Pl
 | **High female / falsetto (soprano)** | Threshold 0.15, 220–1200 Hz, window 20 ms, pitch range C4–C6 (60–84)                             |
 | **Breathy / raspy (style only)**  | Threshold 0.25, window 45 ms — frequency range and pitch constraints untouched                     |
 | **Clean / sustained (style only)**| Threshold 0.10, window 30 ms — frequency range and pitch constraints untouched                     |
-| **Piano / keys (tuner, single notes)** | Threshold 0.10, 45–2000 Hz, window 50 ms, tuner Min RMS level 0.002 — no pitch-range constraint |
+| **Piano / keys (clean single-note lines)** | Threshold 0.10, 45–2000 Hz, window 50 ms, tuner Min RMS level 0.002 — no pitch-range constraint |
 
 The five voice-range presets (Low male through High female) also enable the Min/Max pitch range constraints at the listed values — useful as a first line of defense against YIN's octave-snap errors. The two style-only presets and Piano/keys leave pitch-range constraints as they were. Piano/keys additionally shows a soft warning if the selected tracks look vocal-named, since it's meant for a quiet single-note instrument stem instead.
+
+**What Piano / keys is good for:** a clean, isolated single-note line - a piano or keyboard melody, a synth lead - where the Tuner reads the exact sounding note, octave included. It needs the line on its own: once other sounds share the stem (guitar bleed, other instruments, notes ringing over each other, chords) YIN starts reading notes an octave and a fifth, or two octaves and a third, too low.
 
 #### YIN Detection settings
 

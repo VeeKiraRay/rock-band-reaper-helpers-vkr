@@ -59,6 +59,9 @@
 --       the voices - the way a spectrogram shows them - and lets both vote:
 --       about 4 points more harmony notes right in the measurements, most
 --       of it on harmonies above the lead, some an octave above.
+--     - The Piano / keys preset is now called "Piano / keys (clean
+--       single-note lines)": it reads an isolated single-note line
+--       exactly, but not a stem where other sounds play along.
 --   v1.20
 --     - The window title now carries the script version - "Rock Band Vocal
 --       Helper v1.20". A bug report that quotes the title says which version
