@@ -34,7 +34,7 @@ local _tdir   = _dir .. 'tests/'
 
 local results = { vocal = nil, general = nil, instrument = nil,
                   vocal_midi = nil, general_midi = nil, instrument_midi = nil,
-                  instrument_drums_2x = nil, instrument_overdrive = nil,
+                  instrument_drums_2x = nil, instrument_overdrive = nil, instrument_chord_tuner = nil,
                   general_stem_import = nil,
                   dsp_algo = nil, vocal_algo = nil, general_algo = nil,
                   instrument_algo = nil, midi_length_rules = nil,
@@ -172,6 +172,12 @@ function Loop()
         end
         r.ImGui_SameLine(ctx)
         draw_status(results.instrument_overdrive)
+
+        if r.ImGui_Button(ctx, 'Keys Tuner Tests', 155, 24) then
+            run('run_instrument_chord_tuner.lua', 'instrument_chord_tuner')
+        end
+        r.ImGui_SameLine(ctx)
+        draw_status(results.instrument_chord_tuner)
 
         if r.ImGui_Button(ctx, 'Stem Import Tests', 155, 24) then
             run('run_general_stem_import.lua', 'general_stem_import')
