@@ -55,11 +55,17 @@ local function Loop()
         -- describe the previous project's tracks.
         S.od_pending         = nil
         S.od_overview        = nil
+        -- Keys > Tuner: its accessors, chart and key belong to the old project.
+        StopChordTuner()
+        S.ct_keys_idx, S.ct_bass_idx = -1, -1
+        S.ct_result, S.ct_chart, S.ct_key, S.ct_history, S.ct_note_history = nil, nil, nil, {}, {}
+        S.ct_pass, S.ct_pass_job, S.ct_pass_frames = nil, nil, {}
         local loaded = LoadSettings()
         S.status = loaded and 'Project switched: loaded saved settings.'
                            or 'Project switched.'
         SetDefaultMIDITracks()
         SetDefaultDifficultyTracks()
+        SetDefaultChordTunerTracks()
     end
 
     -- Poll first, so the first frame builds the lists once, not twice.
@@ -67,6 +73,7 @@ local function Loop()
     if tracks_due or not S.all_track_list then RefreshTrackLists() end
     local midi_tracks  = S.midi_track_list
 
+    S.ct_tab_active = false   -- the Keys > Tuner sub-tab sets it while drawn
     r.ImGui_SetNextWindowSize(ctx, 560, 660, r.ImGui_Cond_FirstUseEver())
     local visible, open = r.ImGui_Begin(ctx, WINDOW_TITLE, true)
     if visible then
@@ -197,6 +204,26 @@ local function Loop()
             end
 
             ------------------------------------------------------------
+            -- Keys tab: Tuner (always), WIP (the MIDI converters, Show WIPs = Yes)
+            ------------------------------------------------------------
+            if r.ImGui_BeginTabItem(ctx, 'Keys') then
+                _new_tab = 'Keys'
+                if r.ImGui_BeginTabBar(ctx, '##keys_subtabs') then
+                    if r.ImGui_BeginTabItem(ctx, 'Tuner') then
+                        S.ct_tab_active = true
+                        DrawKeysTunerTab()
+                        r.ImGui_EndTabItem(ctx)
+                    end
+                    if S.show_wip_tabs and r.ImGui_BeginTabItem(ctx, 'WIP') then
+                        DrawKeysTab(ctx)
+                        r.ImGui_EndTabItem(ctx)
+                    end
+                    r.ImGui_EndTabBar(ctx)
+                end
+                r.ImGui_EndTabItem(ctx)
+            end
+
+            ------------------------------------------------------------
             -- WIP: Drums tab
             ------------------------------------------------------------
             if S.show_wip_tabs and r.ImGui_BeginTabItem(ctx, 'Drums') then
@@ -249,15 +276,6 @@ local function Loop()
                     RunAction(ConvertDrums)
                 end
 
-                r.ImGui_EndTabItem(ctx)
-            end
-
-            ------------------------------------------------------------
-            -- WIP: Keys tab
-            ------------------------------------------------------------
-            if S.show_wip_tabs and r.ImGui_BeginTabItem(ctx, 'Keys') then
-                _new_tab = 'Keys'
-                DrawKeysTab(ctx)
                 r.ImGui_EndTabItem(ctx)
             end
 
@@ -362,7 +380,8 @@ local function Loop()
         r.ImGui_End(ctx)
     end
 
-    if open then r.defer(Loop) end
+    ChordTunerTick()   -- Keys > Tuner: stops itself when its sub-tab was not drawn
+    if open then r.defer(Loop) else StopChordTuner() end
 end
 
 r.defer(Loop)

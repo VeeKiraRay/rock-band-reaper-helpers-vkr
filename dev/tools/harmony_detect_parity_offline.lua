@@ -19,6 +19,7 @@ local _dir  = (arg[0]:match('^(.+[\\/])') or './')
 local _root = _dir .. '../../'
 dofile(_dir .. 'smf_reader.lua')
 dofile(_root .. 'lib/reaper_dsp.lua')
+dofile(_root .. 'lib/reaper_spectrum.lua')
 dofile(_root .. 'lib/reaper_harmony_detect.lua')
 local H = dofile(_dir .. 'harmony_audio_core.lua')
 local SP = dofile(_dir .. 'harmony_spectral_core.lua')(H.SR, false)

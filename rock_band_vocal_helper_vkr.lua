@@ -156,6 +156,7 @@ for _, _f in ipairs({
     _dir  .. 'lib/reaper_helper_common.lua',
     _dir  .. 'lib/reaper_helper_ui.lua',
     _dir  .. 'lib/reaper_script_links.lua',
+    _dir  .. 'lib/reaper_spectrum.lua',
     _dir  .. 'lib/reaper_harmony_detect.lua',
     _dir  .. 'lib/reaper_key_detect.lua',
     _dir  .. 'lib/reaper_key_profiles.lua',
@@ -195,6 +196,7 @@ dofile(_dir  .. 'lib/reaper_midi_helpers.lua')
 dofile(_dir  .. 'lib/reaper_helper_common.lua')
 dofile(_dir  .. 'lib/reaper_helper_ui.lua')
 dofile(_dir  .. 'lib/reaper_script_links.lua')
+dofile(_dir  .. 'lib/reaper_spectrum.lua')         -- spectrum for the Harmony readout
 dofile(_dir  .. 'lib/reaper_harmony_detect.lua')   -- Pitch > Tuner Harmony readout
 dofile(_dir  .. 'lib/reaper_key_detect.lua')       -- ... its key snap "From charted lead"
 dofile(_dir  .. 'lib/reaper_key_profiles.lua')

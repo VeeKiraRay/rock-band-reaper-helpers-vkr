@@ -25,6 +25,14 @@ function SetDefaultMIDITracks()
     })
 end
 
+-- Keys > Tuner audio stems (the names the General Helper's stem import gives them).
+function SetDefaultChordTunerTracks()
+    SetDefaultsByName({
+        ['KEYS AUDIO'] = 'ct_keys_idx',
+        ['BASS AUDIO'] = 'ct_bass_idx',
+    })
+end
+
 -- Pro Keys, Keys, Guitar/Bass and Drums difficulty tracks.
 function SetDefaultDifficultyTracks()
     SetDefaultsByName({

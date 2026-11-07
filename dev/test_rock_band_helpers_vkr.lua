@@ -47,7 +47,7 @@ local results = { vocal = nil, general = nil, instrument = nil,
                   difficulty_score = nil,
                   difficulty_bpm = nil, difficulty_suggester = nil,
                   metadata_genres = nil, key_detect = nil, harmony_style = nil,
-                  harmony_detect = nil }
+                  harmony_detect = nil, chord_detect = nil }
 
 local COL_OK  = 0x55DD55FF
 local COL_ERR = 0xFF5555FF
@@ -344,6 +344,14 @@ function Loop()
         end
         r.ImGui_SameLine(ctx)
         draw_status(results.harmony_detect)
+
+        r.ImGui_Spacing(ctx)
+
+        if r.ImGui_Button(ctx, 'Chord Detect Tests', 155, 24) then
+            run('run_chord_detect.lua', 'chord_detect')
+        end
+        r.ImGui_SameLine(ctx)
+        draw_status(results.chord_detect)
 
         r.ImGui_Spacing(ctx)
         r.ImGui_Separator(ctx)

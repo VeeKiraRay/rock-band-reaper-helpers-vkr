@@ -14,9 +14,10 @@
 --                  overdrive; validate what is already authored
 --     Tab Input  - guitar/keys/vocal tab entry guide
 --     MIDI       - MIDI alignment, length sync, pattern replace
+--     Keys       - Tuner: chord names from the keys audio stem
 --   Work-in-progress tabs (General > Settings > Show WIPs?):
 --     Drums      - convert GM MIDI to Rock Band 5-lane drum notation
---     Keys       - hand split, Pro Keys conversion + animation, 5-Lane Keys conversion
+--     Keys > WIP - hand split, Pro Keys conversion + animation, 5-Lane Keys conversion
 --     Guitar     - convert raw MIDI to Expert Guitar gems, validate
 --
 --   Built with Claude (Anthropic) - https://claude.ai
@@ -39,6 +40,36 @@
 --       longer scroll out of sight. The track dropdowns now update on their
 --       own: adding, renaming or deleting a track, or adding an item to one,
 --       shows up within about a second. The Refresh tracks button is gone.
+--     - New Keys > Tuner sub-tab, the first one in a Keys tab that is now
+--       always shown (the old Keys tools are under Keys > WIP, shown with
+--       Show WIPs). Pick the keys audio (KEYS AUDIO is picked for you) and
+--       press Start: it names the chord in the keys stem at the edit cursor,
+--       or of the last 0.2 s while playing. It shows the best chord and how
+--       sure it is (clear, likely, maybe, unsure), the top three - each with
+--       its notes, e.g. Dm (D+F+A) - the other reading when "Prefer plain
+--       chords" changes it ("Em (Em7?)"), and for a 7th chord the triad
+--       above its root, which a one-hand Pro Keys part often plays. With a
+--       Pro Keys chord charted under the cursor it reads that chord's whole
+--       length and shows the charted notes; otherwise it reads 0.2 s from
+--       the cursor (or 0.45 s, Read length Long, for slow held chords).
+--       Optional: the bass audio (nudges the root) and the song key (from
+--       the charted vocals, the charted Pro Keys, or picked). Read-only;
+--       stops on its own after 60 s with the cursor still, as the vocal Tuner.
+--       Measured on official songs: about 8 in 10 chords right first on the
+--       songs it was tuned on, 6 in 10 (8 in 10 in the top three) on songs it
+--       had not seen; it depends a lot on the song, so treat it as a
+--       suggestion.
+--     - Keys > Tuner shows every reading two ways: Single (the reading as
+--       one note; the octave is a guess) and Chord, under the charted chord
+--       (when there is one), with a history of each (oldest first).
+--       Passage check (on by default): with playback stopped it reads the
+--       next 4 s from the cursor and says whether the keys play single notes
+--       (a melody, broken chords) or chords, dimming the line it does not
+--       favour, so a single-note part is not read as a chord per key press.
+--       Dragging the cursor re-reads only the new audio. Measured on official
+--       songs: about half the single-note passages recognised while chord
+--       passages are rarely called single notes; much better on a clean
+--       melody.
 --     - The rest of this entry is what changed in these tabs after General
 --       Helper v0.9.62.
 --     - New Difficulty > Generate sub-tab. Builds Hard, Medium and Easy for
@@ -349,9 +380,17 @@ local _files = {
     _dir  .. 'lib/reaper_difficulty_score_vocals.lua',
     _dir  .. 'lib/reaper_difficulty_tiers.lua',
     _dir  .. 'lib/reaper_difficulty_read.lua',
+    -- Keys > Tuner: the chord reader (spectrum and dsp first: it reads their constants at
+    -- load time) and the song key for its key prior.
+    _dir  .. 'lib/reaper_dsp.lua',
+    _dir  .. 'lib/reaper_spectrum.lua',
+    _dir  .. 'lib/reaper_chord_detect.lua',
+    _dir  .. 'lib/reaper_key_detect.lua',
+    _dir  .. 'lib/reaper_key_profiles.lua',
     _mdir .. 'defaults.lua',
     _mdir .. 'settings.lua',
     _mdir .. 'helpers.lua',
+    _mdir .. 'chord_tuner.lua',
     _mdir .. 'actions_drums.lua',
     _mdir .. 'actions_drums_2x.lua',
     _mdir .. 'actions_keys.lua',
@@ -394,6 +433,7 @@ local _files = {
     _mdir .. 'actions_overdrive.lua',
     _mdir .. 'actions_overdrive_validate.lua',
     _mdir .. 'ui_keys.lua',
+    _mdir .. 'ui_keys_tuner.lua',
     _mdir .. 'ui_difficulty_generate.lua',
     _mdir .. 'ui_difficulty.lua',
     _mdir .. 'ui_overdrive.lua',
@@ -429,3 +469,4 @@ local _autoloaded = LoadSettings()
 if _autoloaded then S.status = 'Loaded saved settings.' end
 SetDefaultMIDITracks()
 SetDefaultDifficultyTracks()
+SetDefaultChordTunerTracks()

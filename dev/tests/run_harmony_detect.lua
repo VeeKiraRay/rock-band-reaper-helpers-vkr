@@ -35,6 +35,7 @@ r.ShowConsoleMsg('======  Harmony detect - unit tests  ======\n')
 
 dofile(_tdir .. 'framework.lua')
 dofile(_root .. 'lib/reaper_dsp.lua')              -- ComputeCMND
+dofile(_root .. 'lib/reaper_spectrum.lua')
 dofile(_root .. 'lib/reaper_harmony_detect.lua')
 
 dofile(_tdir .. 'harmony_detect.lua')

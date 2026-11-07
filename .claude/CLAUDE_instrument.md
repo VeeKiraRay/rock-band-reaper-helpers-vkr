@@ -8,11 +8,13 @@ Read `CLAUDE.md` first for shared architecture, conventions, and Lua specifics.
 
 ## How the script is used
 
-Five stable tabs are always visible: **General | Difficulty | Overdrive | Tab Input | MIDI**
+Six stable tabs are always visible: **General | Difficulty | Overdrive | Tab Input | MIDI | Keys**
 
 **Overdrive tab** — generates overdrive phrases (116), unisons, drum fills (120-124) and vocal overdrive for the whole song, and validates what is already authored (read-only, with an overview strip). One page: an Instrument dropdown (All / Drums / Bass / Guitar / Keys / Vocals — groups, so tracks that must match are always written together), one settings block per generator with an include checkbox, one **Generate** button, then **Validate**. A time selection is ignored. See "Feature: Overdrive" below.
 
-Three WIP tabs appear only when **Show WIPs? = Yes** in the General tab (persisted setting, default No): **Drums | Keys | Guitar**. These tabs function at a basic level but have known issues and are not ready for general users.
+**Keys tab** — sub-tabs **Tuner** (always) and **WIP** (only with Show WIPs). *Tuner* names the chord in the keys audio stem at the edit cursor, or of the last 0.2 s while playing - read-only. See "Feature: Keys > Tuner" below.
+
+The WIP views appear only when **Show WIPs? = Yes** in the General tab (persisted setting, default No): the **Drums** and **Guitar** tabs and the **Keys > WIP** sub-tab. These tabs function at a basic level but have known issues and are not ready for general users.
 
 **Window footer** (every tab) — time selection, status, Copy result, Undo; the tabs scroll above it. Track lists refresh on their own (`CLAUDE.md` → "Track lists refresh themselves"). Shared implementation: `CLAUDE.md` → "Window footer".
 
@@ -34,7 +36,7 @@ Three WIP tabs appear only when **Show WIPs? = Yes** in the General tab (persist
 - Pro Drums checkbox: inserts cymbal marker notes 110/111/112 alongside gem notes.
 - Auto-insert or Preview-only workflow.
 
-**Keys tab** — convert piano MIDI to various Rock Band keys formats.
+**Keys > WIP sub-tab** — convert piano MIDI to various Rock Band keys formats.
 - **Hand Split**: source, right-hand target, left-hand target. Split by MIDI channel (Guitar Pro: ch1=RH, ch2=LH) or pitch threshold.
 - **Convert to Pro Keys**: octave-shift all notes into C2–C4 (48–72); optional lane shift marker insertion.
 - **Pro Keys Animation**: copy C2–C4 notes from an Expert PK source to animation target tracks.
@@ -167,7 +169,7 @@ Every Validate action (all four sub-tabs, H/M/E only — never Expert) also runs
 | `rock_band_instrument_helper_vkr.lua` | Entry point: ReaImGui check, path derivation, dofile calls, startup |
 | `rock_band_instrument_helper_vkr/defaults.lua` | `S`, `TIPS` |
 | `rock_band_instrument_helper_vkr/settings.lua` | `SaveSettings`, `LoadSettings` (project key: `RBInstrumentHelperVKR/settings_v1`) |
-| `rock_band_instrument_helper_vkr/helpers.lua` | `SetDefaultMIDITracks`, `SetDefaultDifficultyTracks` — smart default track selection. The track and action helpers both helpers need (`FindTrackByName`, `GetTakePPQPerQN`, `GetTempoContextBefore`, `RefreshTrackLists`, `RunAction`) are in `lib/reaper_helper_common.lua` |
+| `rock_band_instrument_helper_vkr/helpers.lua` | `SetDefaultMIDITracks`, `SetDefaultDifficultyTracks`, `SetDefaultChordTunerTracks` — smart default track selection. The track and action helpers both helpers need (`FindTrackByName`, `GetTakePPQPerQN`, `GetTempoContextBefore`, `RefreshTrackLists`, `RunAction`) are in `lib/reaper_helper_common.lua` |
 | `rock_band_instrument_helper_vkr/overdrive_read.lua` | `OD_PITCH`, `OD_FILL_LO/HI`, `OD_PHRASE_PITCH`, `OD_SOLO_PITCH`, `OD_QN_EPS`, `OD_INST_GROUPS`, `OD_VOCAL_TRACK`, `OD_HARM_TRACK`, `OD_GROUP_CHOICES`, `OdInstGroup`, span helpers (`OdSpansOverlap`, `OdSameQN`, `OdSameSpan`, `OdAnyOverlap`, `OdSpanListsEqual`), bar helpers (`OdCountedBeats`, `OdReadBars`, `OdBarAt`, `OdBarStartingAt`, `OdBarsOfSpan`, `OdBarActivity`, `OdQNToSec`), `OdSectionFamily`, `OD_TOM_MARKERS`, `OdCrashBars`, `OdTrackTakes`, `OdReadPitchNotes`, `OdBuildModel`, `OdFinishModel`, `OdWhere` (global); `PitchSpans`, `FillSpans`, `ReadEventsTrack` (local) — the Overdrive tab's song model, all in quarter notes. Reads through `difficulty_read.lua`'s `FindTrackExact` / `ReadGemEvents` rather than a second reader |
 | `rock_band_instrument_helper_vkr/overdrive_interest.lua` | `OdBarInterest`, `OdBandTogetherness` (global); `PercentileRanks`, `WindowTerms`, `BarSignature`, weights (local) — per-bar "eventfulness" from `DIFFICULTY_PRIMITIVES`. Pure |
 | `rock_band_instrument_helper_vkr/actions_overdrive_fills.lua` | `OD_FILL_PACINGS`, `OD_FILL_MIN_GAP_SEC`, `OdAutoFillPacing`, `OdPlanFills`, `OdActivationQN`, `OdSplitEarlyFills` (global) — drum fill planner. Pure |
@@ -193,7 +195,9 @@ Every Validate action (all four sub-tabs, H/M/E only — never Expert) also runs
 | `rock_band_instrument_helper_vkr/actions_difficulty_drums_checks.lua` | `DRUMS_RANGE`, `DRUMS_RULES`, `ReadDrumsNotes`, `GroupDrumsHits`, `ReadDrumsTierEvents`, `DrumGemName`, `DrumLabel`, `CollectDrumsChecks` (global) — the Drums tier reader, the RBN tempo thresholds (shared with the Generate planner) and every Validate check as `DiffIssue` categories |
 | `rock_band_instrument_helper_vkr/actions_difficulty_drums.lua` | `CopyDrumsDiff`, `ValidateDrumsDiff`, `ValidateAllDrums` (global) — Drums Validate report and Copy to Difficulty, plus the two cross-tier checks (kick count vs Expert, Hard disco mix event) |
 | `rock_band_instrument_helper_vkr/difficulty_generate_drums.lua` | `GenDrumsPlanTier`, `GEN_DRUMS_PARAMS`, `GenDrumsIsVerse`, `GenDrums2xInput`, `GenDrumsSinglePedal` (global) — the Drums Generate planner (limb by limb). Pure; reads `DRUMS_RULES` and `Gen5RetimeDenseRuns` at call time |
-| `rock_band_instrument_helper_vkr/ui_keys.lua` | `DrawKeysTab` (global) — Keys tab rendering |
+| `rock_band_instrument_helper_vkr/ui_keys.lua` | `DrawKeysTab` (global) — Keys > WIP sub-tab rendering |
+| `rock_band_instrument_helper_vkr/chord_tuner.lua` | `StartChordTuner`, `StopChordTuner`, `ChordTunerTick`, `ChordTunerReread`, `RefreshChordTunerProject`, `CHORD_KEY_MODES` (global) — Keys > Tuner: the poll, the readings (charted span / fixed window / playing), the key and chart reads, the audio accessors. Read-only |
+| `rock_band_instrument_helper_vkr/ui_keys_tuner.lua` | `DrawKeysTunerTab` (global) — Keys > Tuner sub-tab rendering |
 | `rock_band_instrument_helper_vkr/difficulty_generate_retime.lua` | `Gen5RetimeDenseRuns` (global) — Hard's fast-run rewrite: dense runs on fast songs moved one grid slower (16ths → 8th triplets → 8ths) with a color-order-preserving DP. Pure, loaded before the planner; shared with the same offline consumers |
 | `rock_band_instrument_helper_vkr/difficulty_generate_hopo.lua` | `Gen5IsAutoHopo`, `Gen5MarkHopos`, `Gen5ForceHopoSpans` (global) — which notes hammer on, and the force-HOPO markers Guitar/Bass Hard gets to keep Expert's. Pure |
 | `rock_band_instrument_helper_vkr/difficulty_generate_colors.lua` | `Gen5ReduceChordSize`, `Gen5ReduceChordSizeKeys`, `Gen5KeysEasyMotion`, `Gen5NarrowSpan`, `Gen5ShiftSegments`, `Gen5ShiftBars`, `Gen5ClampOrShiftBars` (global) — chord size/span and moving lines under a tier's top lane. Pure, loaded before the planner |
@@ -266,9 +270,15 @@ lib/reaper_difficulty_score.lua, lib/reaper_difficulty_score_vocals.lua, lib/rea
                                   the score modules are also what reaper_difficulty_read.lua calls
 lib/reaper_difficulty_read.lua → FindTrackExact, ReadGemEvents, … (chart readers, shared with the
                                   General Helper's Metadata > Difficulty and dev/calibration/)
+lib/reaper_dsp.lua             → OpenYINContext / CloseYINContext (Keys > Tuner's accessors), YIN core
+lib/reaper_spectrum.lua        → SpectrumMagnitudes (before the chord lib: it reads SPECTRUM_NFFT)
+lib/reaper_chord_detect.lua    → ChordFrameChroma, ChordRank, ChordBassPc, … (Keys > Tuner)
+lib/reaper_key_detect.lua, lib/reaper_key_profiles.lua
+                               → KeyFeatures, KeyRankSet, RB_KEY_PROFILES (Keys > Tuner's song key)
 defaults.lua                   → S, TIPS
 settings.lua                   → SaveSettings, LoadSettings
-helpers.lua                    → SetDefaultMIDITracks, SetDefaultDifficultyTracks
+helpers.lua                    → SetDefaultMIDITracks, SetDefaultDifficultyTracks, SetDefaultChordTunerTracks
+chord_tuner.lua                → StartChordTuner, StopChordTuner, ChordTunerTick, CHORD_KEY_MODES
 actions_drums.lua              → ConvertDrums
 actions_drums_2x.lua           → DoubleBassPlan, MarkDoubleBassKicks,
                                   Remove2XKicks
@@ -329,6 +339,7 @@ actions_overdrive.lua          → OdUnisonGroups, OdPlanInstruments, OdJobs,
                                   GenerateOverdrive
 actions_overdrive_validate.lua → OdValidateModel, OdBuildOverview, ValidateOverdrive
 ui_keys.lua                    → DrawKeysTab
+ui_keys_tuner.lua              → DrawKeysTunerTab
 ui_difficulty_generate.lua     → DrawDifficultyGenerateTab
 ui_difficulty.lua              → DrawDifficultyTab
 ui_overdrive.lua               → DrawOverdriveTab (reads OD_FILL_PACINGS at load time)
@@ -354,8 +365,8 @@ The entry point sets `WINDOW_TITLE` right after `lib/reaper_imgui_helpers.lua` l
 
 Section `RBInstrumentHelperVKR`, key `settings_v1` — its own key, so saving in one helper never overwrites the other's settings. Auto-loads on script open and on project switch. Values these tabs saved under the General Helper's `RBHelperVKR` key before the split are deliberately not read back (a fresh start, the user's choice); the General Helper's next Save drops them from its blob.
 
-**Saved:** the MIDI converter options (`mc_*`, except track indices), the Tab Input format and mode (`mc_gtr_tab_format`, `tab_input_mode`), the Difficulty tab's Guitar/Bass instrument radio (`diff_gb_instrument`) and the Keys sub-tab's "Reduce using Pro Keys" checkbox (`diff_5k_pk_reduce`), MIDI Alignment and Length (`ma_mode`, `mn_*`), `show_wip_tabs`, and every Overdrive tab setting (`od_group`, the three include checkboxes, `od_beats_per_phrase`, `od_unison_share`, `od_keepout_start`, `od_together`, `od_vocal_overlap`, `od_keepout_od`, `od_keepout_unison`, `od_fill_pacing`, `od_fill_sections`, `od_fill_skip_early`, `od_fill_keepout_end`, `od_vocal_every`). `od_pending` and `od_overview` are session-only and cleared on project switch; so are Difficulty > Generate's choices (`diff_gen_*`).
-**Not saved:** track indices — positional, brittle. `SetDefaultMIDITracks` re-detects PART DRUMS and PART GUITAR target tracks by name; `SetDefaultDifficultyTracks` re-detects all Difficulty-tab tracks (Pro Keys, Keys, Guitar/Bass, Drums, PART DRUMS_2X) by name. Both only assign fields that are still -1.
+**Saved:** the MIDI converter options (`mc_*`, except track indices), the Tab Input format and mode (`mc_gtr_tab_format`, `tab_input_mode`), the Difficulty tab's Guitar/Bass instrument radio (`diff_gb_instrument`) and the Keys sub-tab's "Reduce using Pro Keys" checkbox (`diff_5k_pk_reduce`), MIDI Alignment and Length (`ma_mode`, `mn_*`), `show_wip_tabs`, Keys > Tuner's key source, manual key, Prefer plain chords, Read length and Passage check (`ct_key_mode`, `ct_key_tonic`, `ct_key_minor`, `ct_plain`, `ct_read_long`, `ct_passage`), and every Overdrive tab setting (`od_group`, the three include checkboxes, `od_beats_per_phrase`, `od_unison_share`, `od_keepout_start`, `od_together`, `od_vocal_overlap`, `od_keepout_od`, `od_keepout_unison`, `od_fill_pacing`, `od_fill_sections`, `od_fill_skip_early`, `od_fill_keepout_end`, `od_vocal_every`). `od_pending` and `od_overview` are session-only and cleared on project switch; so are Difficulty > Generate's choices (`diff_gen_*`).
+**Not saved:** track indices — positional, brittle. `SetDefaultMIDITracks` re-detects PART DRUMS and PART GUITAR target tracks by name; `SetDefaultDifficultyTracks` re-detects all Difficulty-tab tracks (Pro Keys, Keys, Guitar/Bass, Drums, PART DRUMS_2X) by name; `SetDefaultChordTunerTracks` picks KEYS AUDIO and BASS AUDIO for Keys > Tuner. Both only assign fields that are still -1.
 
 ---
 
@@ -514,6 +525,19 @@ A set of drum-fill and overdrive authoring tips, checked against the original pl
 - That section **skips itself** when the project already has a PART or EVENTS track, so it never touches a real song.
 
 ---
+
+## Feature: Keys > Tuner
+
+Chord names from the keys audio stem, for checking or charting Pro Keys by ear. The method is `lib/reaper_chord_detect.lua` (see its header and the CLAUDE.md lib table); `chord_tuner.lua` only decides *which audio* to read and when.
+
+- **Readings.** Stopped with a PART REAL_KEYS_X chord under the cursor: that chord's own span (start + `CHORD_ATTACK_S`, a frame every `CHORD_HOP_S`, at most `CHORD_SPAN_MAX`) - the chart gives the timing only, never the answer, and its pitch classes are shown as "Charted:" beside the reading. Stopped without one: `CHORD_READ_FRAMES.short` / `.long` frames from the cursor, and a hint that charting the chord's start reads the whole chord. Playing: the `CHORD_PLAY_FRAMES` frames ending at the playhead. These choices were measured offline on the official songs (charted span best; a fixed window loses ~2.6 points at its best length, Short suits chords under half a second, Long held chords; a tempo-sized window did no better; the shortest playing window is best).
+- **Bass:** the optional bass stem's YIN pitch class over the same stretch (readings `CHORD_BASS_STEP_S` apart, at most 4), voted, as the root prior.
+- **Key:** `S.ct_key_mode` off (default) / vocals (`KEY_RESULT_SETS[1]` from PART VOCALS) / prokeys (the 'Pro Keys only' set from PART REAL_KEYS_X) / manual. Re-read with the chart on the shared project poll (`MakeProjectPoll(1.0, 5.0)`) and whenever a setting changes (`ChordTunerReread`).
+- **Readout** (labelled rows, in this order): *Charted* first, always in the primary colour (the no-chart hint in its place), then *Single* - the reading as one note (`SingleNote`: the chroma's strongest pitch class, the best-measured note namer, in the octave where that class's harmonic sum is largest; octave unscored) - then *Chord*: the best chord over the bass (`ChordNameOverBass`), its confidence band (`ChordConfidence`), the other reading in brackets when Prefer plain chords off/on disagree, the triad above a 7th chord's root (`ChordUpperTriad` - a one-hand Pro Keys part often charts it), the top three (each with its notes, `ChordNotes`: Dm (D+F+A)), then two histories, *Chords* and *Notes* (oldest first; a reading joins when it differs from the last). The passage verdict dims the whole row it does not favour - label, value and, for Chord, its confidence and the Top 3 label.
+- **Passage check** (`S.ct_passage`, on by default): single notes or chords over ~4 s, from the audio alone (`ChordPassage`; Pro Keys parts are often single notes or broken chords, and a chord name per key press would mislead). **Stopped only** - a 4 s verdict cannot keep up with playback (tried: notes passed before it finished). Frames on a fixed `CHORD_PASS_HOP_S` grid cached by index (`S.ct_pass_frames`), kept across cursor moves so a drag re-reads only new frames (a 0.3 s nudge: 5 of 66); 4 s from one frame before the cursor, `PASS_PER_POLL` per poll, read after the chord reading finishes. The verdict dims the readout line it does not favour (Single or Chord). Measured (dev, chart-free): about half the single-note passages found with 90% of chord passages kept; a clean single-note melody (an AI-separated user song) 34 of 36. YIN (the vocal helper's piano preset) was measured for naming the note and lost to the spectral reading: it locks onto periods 3x or 5x too long on keys stems.
+- **Never stalls the window:** a stopped reading is analysed `FRAMES_PER_POLL` frames per 100 ms poll; playing reads its two frames per poll.
+- **Stops itself** when the Tuner sub-tab was not drawn that frame (`S.ct_tab_active`, cleared at the top of `Loop`, set by the sub-tab), on a project switch, when the window closes, and - as the vocal Tuner - after `IDLE_STOP_S` (60 s) with playback stopped, the cursor unmoved and no reading left in progress (`S.ct_last_move_t`, reset by any move and by playing); accessors are closed then and at exit (`r.atexit`).
+- **Testing:** `dev/tests/run_chord_detect.lua` (the lib, offline too) and `dev/tools/chord_detect_parity_offline.lua` (the lib vs the measured core, `all` re-measures accuracy). The controller has no REAPER suite; it was checked against a mocked REAPER API.
 
 ## Feature: double-bass detection
 

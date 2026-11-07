@@ -110,7 +110,34 @@ S = {
     audio_track_list      = nil,
     midi_track_list       = nil,
     -- UI visibility (persisted)
-    show_wip_tabs           = false, -- show the Drums, Keys and Guitar tabs
+    show_wip_tabs           = false, -- show the Drums and Guitar tabs and Keys > WIP
+    -- Keys > Tuner (persisted unless noted; track indices are not, as everywhere)
+    ct_keys_idx         = -1,     -- keys audio (KEYS AUDIO by default)
+    ct_bass_idx         = -1,     -- bass audio, optional (BASS AUDIO by default)
+    ct_key_mode         = 'off',  -- one of CHORD_KEY_MODES: off / vocals / prokeys / manual
+    ct_key_tonic        = 0,      -- manual key: tonic pitch class (0 = C)
+    ct_key_minor        = false,  -- manual key: minor
+    ct_plain            = true,   -- prefer plain chords (7th / sus4 penalties)
+    ct_read_long        = false,  -- stopped, nothing charted: read 0.45 s instead of 0.2 s
+    ct_passage          = true,   -- passage check: single notes or chords over ~4 s
+    -- Keys > Tuner, session only
+    ct_active           = false,
+    ct_tab_active       = false,  -- set while the Tuner sub-tab is drawn
+    ct_last_t           = 0,
+    ct_last_pos         = nil,
+    ct_last_playing     = nil,
+    ct_last_move_t      = nil,    -- when the cursor last moved (or playback ran): idle stop
+    ct_job              = nil,    -- a stopped reading in progress
+    ct_result           = nil,    -- the last reading, for the readout
+    ct_history          = {},     -- chord readings, oldest first
+    ct_note_history     = {},     -- single-note readings, oldest first
+    ct_audio            = {},     -- open accessors: { keys = {item, ctx}, bass = ... }
+    ct_chart            = nil,    -- charted Pro Keys chords (timing for stopped readings)
+    ct_key              = nil,    -- the key in use: { tonic, minor, name, mask } or nil
+    ct_key_why          = nil,    -- why a chosen key source gave no key
+    ct_pass_frames      = {},     -- passage check: per-pitch sums by grid frame
+    ct_pass_job         = nil,    -- passage check: a stopped read in progress
+    ct_pass             = nil,    -- passage check: the last verdict, for the readout
     -- Overdrive tab (persisted unless noted)
     od_group            = 0,     -- index into OD_GROUP_CHOICES, 0-based: 0 = All
     od_inc_phrases      = true,
@@ -743,9 +770,64 @@ TIPS = {
     diff_drums_validate_all = "Validate all four Drums difficulty ranges in one combined report.\n\n" ..
                               "Read-only - no project changes are made.\n" ..
                               "Respects time selection if active.",
-    show_wip_tabs        = "Show work-in-progress tabs (Drums, Keys, Guitar).\n\n" ..
+    show_wip_tabs        = "Show work-in-progress tabs (Drums, Guitar, and Keys > WIP).\n\n" ..
                            "They work at a basic level but have known issues and are\n" ..
                            "not ready for general use. Set to No to hide them from the tab bar.",
+    -- Keys > Tuner
+    ct_keys_track        = "The keys audio stem to read. A track named KEYS AUDIO is\n" ..
+                           "picked automatically.",
+    ct_bass_track        = "Optional: the bass audio stem. Its note nudges the chord's\n" ..
+                           "root (measured: a few more chords right). A track named\n" ..
+                           "BASS AUDIO is picked automatically.",
+    ct_key_mode          = "The song key nudges the names toward chords that fit it.\n" ..
+                           "A correct key improves the result; a wrong one can hurt.\n\n" ..
+                           "Off: no key.\n" ..
+                           "From charted vocals: the key Metadata > Song key reads\n" ..
+                           "from PART VOCALS.\n" ..
+                           "From charted Pro Keys: the key read from PART REAL_KEYS_X.\n" ..
+                           "Manual: pick it.",
+    ct_plain             = "Prefer plain chords: a chord's notes have overtones that look\n" ..
+                           "like a 7th or a sus4 (an E's overtone is a B, so C can read as\n" ..
+                           "Cmaj7). On by default - measured clearly better on the\n" ..
+                           "official songs.\n\n" ..
+                           "Turn it off for songs built mostly on 7th chords (funk, soul,\n" ..
+                           "jazz). The other reading is shown in brackets either way when\n" ..
+                           "the two disagree.",
+    ct_read_length       = "How much audio a stopped reading takes when no Pro Keys chord\n" ..
+                           "is charted under the cursor.\n\n" ..
+                           "Short (0.2 s): best for most songs - chords often change\n" ..
+                           "within half a second.\n" ..
+                           "Long (0.45 s): for slow, held chords (ballads, pads).\n\n" ..
+                           "With a charted chord under the cursor the Tuner reads that\n" ..
+                           "chord's own length instead (most accurate).",
+    ct_toggle            = "Start / stop reading chords from the keys stem.\n\n" ..
+                           "Stopped: park the edit cursor on a chord's start.\n" ..
+                           "Playing: shows the chord of the last 0.2 s.\n" ..
+                           "It stops on its own when the cursor has not moved for 60 s.\n\n" ..
+                           "Expect roughly 6 in 10 chords right first and 8 in 10 in the\n" ..
+                           "top three on a new song - much better on some songs, worse\n" ..
+                           "on others. Treat it as a suggestion and trust your ears.",
+    ct_confidence        = "How far the best chord leads the second, and how often a\n" ..
+                           "lead like that was right on the official songs:\n\n" ..
+                           "clear  ~95%\nlikely ~80%\nmaybe  ~60%\nunsure ~40% - check the top three.",
+    ct_passage           = "Passage check: over about 4 seconds of the keys stem, does the\n" ..
+                           "part play single notes (a melody, broken chords) or chords?\n" ..
+                           "Pro Keys is often single notes, and naming every key press as a\n" ..
+                           "chord would mislead. With playback stopped it reads 4 s from\n" ..
+                           "the cursor (not while playing: 4 s cannot keep up), then dims\n" ..
+                           "the Single or the Chord line, whichever it does not favour.\n\n" ..
+                           "Measured on official songs: about half of the single-note\n" ..
+                           "passages are recognised, and chord passages are rarely called\n" ..
+                           "single notes. A clean melody does much better.",
+    ct_passage_line      = "Single notes or chords over the next 4 s from the cursor\n" ..
+                           "(see Passage check).",
+    ct_single            = "The reading as one note: its strongest pitch class, right\n" ..
+                           "about 6 in 10 times on official songs and more on a clean\n" ..
+                           "melody. The octave is a guess - place the note in the Pro Keys\n" ..
+                           "range yourself.",
+    ct_hint_nochart      = "No charted chord here: reading %s from the cursor. Charting the " ..
+                           "chord's start (PART REAL_KEYS_X) lets the Tuner read the whole " ..
+                           "chord; place the cursor on the chord's start.",
     -- Overdrive tab
     od_group             = "Which part to generate for.\n\n" ..
                            "All generates every part, including unisons across the band.\n" ..

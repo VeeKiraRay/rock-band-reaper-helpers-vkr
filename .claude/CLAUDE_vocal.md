@@ -209,6 +209,7 @@ lib/reaper_script_links.lua    → SCRIPT_LINK_GROUPS, ScriptLinkBasename, IsRun
                                   FilterScriptLinkGroups, LaunchReaScript, DrawGeneralLinksTab
                                   (General > Other tools sub-tab; shared with the general
                                   helper, which documents the behaviour in CLAUDE_general.md)
+lib/reaper_spectrum.lua        → SpectrumMagnitudes, SpectrumHann (loaded before the harmony lib)
 lib/reaper_harmony_detect.lua  → HarmonyAnalyseFrame, HarmonySpectralPitch, HarmonyVote*, HarmonyScale (Tuner Harmony readout)
 lib/reaper_key_detect.lua      → KeyFeatures, KeyRankSet, KeyName (its key snap "From charted lead")
 lib/reaper_key_profiles.lua    → RB_KEY_PROFILES (generated)
@@ -239,7 +240,7 @@ ui.lua                         → Loop (also calls r.defer(Loop))
 
 **Second entry point: `rock_band_pitch_tuner_vkr.lua` (repo root).** Standalone Pitch
 Tuner window. It has no module folder of its own — it dofiles a subset of this
-helper's modules: `lib/reaper_imgui_helpers.lua`, `lib/reaper_dsp.lua`, `lib/reaper_helper_common.lua`, `lib/reaper_helper_ui.lua`, `lib/reaper_harmony_detect.lua`, `lib/reaper_key_detect.lua`, `lib/reaper_key_profiles.lua`, then
+helper's modules: `lib/reaper_imgui_helpers.lua`, `lib/reaper_dsp.lua`, `lib/reaper_helper_common.lua`, `lib/reaper_helper_ui.lua`, `lib/reaper_spectrum.lua`, `lib/reaper_harmony_detect.lua`, `lib/reaper_key_detect.lua`, `lib/reaper_key_profiles.lua`, then
 `defaults.lua`, `tips.lua`, `settings.lua`, `helpers.lua`, `tuner.lua`,
 `ui_common.lua`, `ui_tuner.lua`, and runs its own minimal `Loop` calling
 `DrawVocalTrackSelectors({ audio = true })` + `DrawTunerTab()` + `DrawResultPanel()`

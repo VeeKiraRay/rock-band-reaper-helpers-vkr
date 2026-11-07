@@ -23,7 +23,8 @@
 -- Not covered: a voice an octave ABOVE the lead (removed together with the lead), and a third
 -- voice (measured at ~25%, too weak to show).
 --
--- Requires: ComputeCMND (lib/reaper_dsp.lua).
+-- Requires: ComputeCMND (lib/reaper_dsp.lua); SPECTRUM_NFFT / SpectrumHann /
+-- SpectrumMagnitudes (lib/reaper_spectrum.lua, loaded BEFORE this file).
 
 HARMONY_SR = 16000          -- the analysis rate the method was measured at
 
@@ -254,7 +255,7 @@ end
 -- port against it.
 
 local SPEC_L     = 2048                 -- window (128 ms at HARMONY_SR)
-local NFFT       = 4096                 -- zero-padded
+local NFFT       = SPECTRUM_NFFT        -- zero-padded (lib/reaper_spectrum.lua, load it first)
 local DF         = SR / NFFT
 local SPEC_F_TOP = 4000                 -- partials summed up to here
 local SPEC_MAX_H = 20
@@ -263,49 +264,6 @@ local SPEC_STEP  = 0.1                  -- candidate step, semitones
 -- Read HARMONY_SPEC_N samples (at HARMONY_SR) from t - HARMONY_SPEC_LEAD seconds.
 HARMONY_SPEC_N    = SPEC_L
 HARMONY_SPEC_LEAD = (SPEC_L // 2) / SR
-
-local REV, COS, SIN, HANN
-local function SpecTables()
-    if REV then return end
-    REV, COS, SIN, HANN = {}, {}, {}, {}
-    local bits = math.floor(math.log(NFFT, 2) + 0.5)
-    for i = 0, NFFT - 1 do
-        local rv, x = 0, i
-        for _ = 1, bits do rv = rv * 2 + (x % 2); x = x // 2 end
-        REV[i] = rv
-    end
-    for k = 0, NFFT // 2 - 1 do
-        COS[k] = math.cos(-2 * math.pi * k / NFFT)
-        SIN[k] = math.sin(-2 * math.pi * k / NFFT)
-    end
-    for i = 1, SPEC_L do HANN[i] = 0.5 - 0.5 * math.cos(2 * math.pi * (i - 1) / (SPEC_L - 1)) end
-end
-
-local function Magnitudes(x)            -- x[1..SPEC_L], windowed; bins 0..NFFT/2
-    local xr, xi = {}, {}
-    for i = 0, NFFT - 1 do xr[i], xi[i] = 0, 0 end
-    for i = 1, SPEC_L do xr[REV[i - 1]] = x[i] end
-    local size = 2
-    while size <= NFFT do
-        local half, step = size // 2, NFFT // size
-        for st = 0, NFFT - 1, size do
-            local k = 0
-            for j = st, st + half - 1 do
-                local l = j + half
-                local wr, wi = COS[k], SIN[k]
-                local tr = wr * xr[l] - wi * xi[l]
-                local ti = wr * xi[l] + wi * xr[l]
-                xr[l], xi[l] = xr[j] - tr, xi[j] - ti
-                xr[j], xi[j] = xr[j] + tr, xi[j] + ti
-                k = k + step
-            end
-        end
-        size = size * 2
-    end
-    local m = {}
-    for b = 0, NFFT // 2 do m[b] = math.sqrt(xr[b] * xr[b] + xi[b] * xi[b]) end
-    return m
-end
 
 -- Bins of a partial at f: +-1.5% (a quarter semitone), at least the window's main lobe.
 local function BinRange(f, lobe)
@@ -339,10 +297,10 @@ function HarmonySpectralPitch(mono, lead_pitch, cents)
     local e = 0
     for i = 1, SPEC_L do e = e + mono[i] * mono[i] end
     if math.sqrt(e / SPEC_L) < SILENT then return nil end
-    SpecTables()
+    local hann = SpectrumHann(SPEC_L)
     local x = {}
-    for i = 1, SPEC_L do x[i] = mono[i] * HANN[i] end
-    local m = Magnitudes(x)
+    for i = 1, SPEC_L do x[i] = mono[i] * hann[i] end
+    local m = SpectrumMagnitudes(x, SPEC_L)
     local lobe = 2 * SR / SPEC_L
     -- The lead near its chart: the best harmonic sum within +-1 st.
     local f_chart = 440 * 2 ^ ((lead_pitch - 69) / 12 + cents / 1200)

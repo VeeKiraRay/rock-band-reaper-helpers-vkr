@@ -44,6 +44,13 @@ local function SerializeSettings()
         'mns32=' .. S.mn_sustain_32nds,
         'mngm='  .. S.mn_gap_mode,
         'swip='   .. (S.show_wip_tabs and '1' or '0'),
+        -- Keys > Tuner
+        'ctkm='   .. S.ct_key_mode,
+        'ctkt='   .. S.ct_key_tonic,
+        'ctkn='   .. (S.ct_key_minor and '1' or '0'),
+        'ctpl='   .. (S.ct_plain and '1' or '0'),
+        'ctrl='   .. (S.ct_read_long and '1' or '0'),
+        'ctpa='   .. (S.ct_passage and '1' or '0'),
         -- Overdrive tab
         'odgrp=' .. S.od_group,
         'odiph=' .. (S.od_inc_phrases and '1' or '0'),
@@ -103,6 +110,16 @@ local function DeserializeSettings(str)
         elseif k == 'mns32' then S.mn_sustain_32nds    = tonumber(v) or S.mn_sustain_32nds
         elseif k == 'mngm'  then S.mn_gap_mode         = (v == '1') and 1 or 0
         elseif k == 'swip'   then S.show_wip_tabs      = (v == '1')
+        -- Keys > Tuner
+        elseif k == 'ctkm' then
+            for _, m in ipairs(CHORD_KEY_MODES or {}) do if m == v then S.ct_key_mode = v end end
+        elseif k == 'ctkt' then
+            local t = tonumber(v)
+            if t and t >= 0 and t <= 11 then S.ct_key_tonic = math.floor(t) end
+        elseif k == 'ctkn' then S.ct_key_minor = (v == '1')
+        elseif k == 'ctpl' then S.ct_plain     = (v == '1')
+        elseif k == 'ctrl' then S.ct_read_long = (v == '1')
+        elseif k == 'ctpa' then S.ct_passage   = (v == '1')
         -- Overdrive tab
         elseif k == 'odgrp' then
             local g = tonumber(v)

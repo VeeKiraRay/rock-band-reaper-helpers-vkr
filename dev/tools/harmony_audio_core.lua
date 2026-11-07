@@ -66,7 +66,10 @@ local read_all = H.read_all
 -- songs.dta: vocal channels, pans, tuning, key
 ----------------------------------------------------------------------
 
-function H.DtaInfo(dta, sn)
+-- inst: the tracks-block instrument whose channels to read ('vocals' default, or 'keys',
+-- 'bass', 'guitar', 'drum'). The result carries it, so Decode caches each stem apart.
+function H.DtaInfo(dta, sn, inst)
+    inst = inst or 'vocals'
     local text = '\n' .. dta:gsub(';[^\n]*', '')
     local esc = sn:gsub('%p', '%%%0')
     local s = text:find('\n%(' .. esc .. '%s')
@@ -75,8 +78,8 @@ function H.DtaInfo(dta, sn)
     local entry = text:sub(s, e)
     local tracks = entry:match('%(tracks(.-)%(pans')
     if not tracks then return nil, 'no tracks block' end
-    local list = tracks:match('%(vocals%s*%(([%d%s]+)%)') or tracks:match('%(vocals%s+(%d+)%s*%)')
-    if not list then return nil, 'no vocal channels' end
+    local list = tracks:match('%(' .. inst .. '%s*%(([%d%s]+)%)') or tracks:match('%(' .. inst .. '%s+(%d+)%s*%)')
+    if not list then return nil, 'no ' .. inst .. ' channels' end
     local ch = {}
     for d in list:gmatch('%d+') do ch[#ch + 1] = tonumber(d) end
     local pans = {}
@@ -85,12 +88,20 @@ function H.DtaInfo(dta, sn)
     local cents = tonumber(entry:match('%(tuning_offset_cents%s+(-?[%d%.]+)%s*%)') or '0') or 0
     local tonic = tonumber(entry:match('%(vocal_tonic_note%s+(%d+)%s*%)') or '')
     local tonality = tonumber(entry:match('%(song_tonality%s+(%d+)%s*%)') or '')
-    return { ch = ch, pans = pans, cents = cents, tonic = tonic and tonic % 12, minor = tonality == 1 }
+    return { ch = ch, pans = pans, cents = cents, tonic = tonic and tonic % 12, minor = tonality == 1,
+             inst = inst }
 end
 
 ----------------------------------------------------------------------
--- Decode: mogg -> 16 kHz stereo s16le of the vocal channels
+-- Decode: mogg -> 16 kHz stereo s16le of one instrument's channels (info.inst)
 ----------------------------------------------------------------------
+
+-- Cache / temp file stem: vocals keep the plain shortname (the existing cache), every
+-- other stem gets its instrument appended so it never reads the cached vocals.
+local function Stem(info, sn)
+    if not info.inst or info.inst == 'vocals' then return sn end
+    return sn .. '_' .. info.inst
+end
 
 local CACHE = os.getenv('HAP_CACHE')
 if CACHE then CACHE = CACHE:gsub('[\\/]$', '') .. '\\' end
@@ -98,14 +109,14 @@ if CACHE then CACHE = CACHE:gsub('[\\/]$', '') .. '\\' end
 function H.Decode(mogg_path, info, sn)
     local mono = #info.ch == 1
     if CACHE then
-        local pcm = read_all(CACHE .. sn .. '.s16')
+        local pcm = read_all(CACHE .. Stem(info, sn) .. '.s16')
         if pcm and #pcm >= 4 * SR then return pcm, mono end
     end
     local data = read_all(mogg_path)
     if not data or #data < 8 then return nil, 'cannot read mogg' end
     local off = string.unpack('<I4', data, 5)
     if data:sub(off + 1, off + 4) ~= 'OggS' then return nil, 'no OggS at header offset' end
-    local ogg, raw = TMP .. 'hap_' .. sn .. '.ogg', TMP .. 'hap_' .. sn .. '.raw'
+    local ogg, raw = TMP .. 'hap_' .. Stem(info, sn) .. '.ogg', TMP .. 'hap_' .. Stem(info, sn) .. '.raw'
     local f = assert(io.open(ogg, 'wb'))
     f:write(data:sub(off + 1))
     f:close()
@@ -125,7 +136,7 @@ function H.Decode(mogg_path, info, sn)
     end
     if CACHE then
         os.execute(('mkdir "%s" 2>nul'):format(CACHE:sub(1, -2)))
-        raw = CACHE .. sn .. '.s16'
+        raw = CACHE .. Stem(info, sn) .. '.s16'
     end
     local cmd = ('"%s" -v error -y -i "%s" -filter_complex "pan=stereo|c0=%s|c1=%s" -ar %d -f s16le "%s"')
         :format(FFMPEG, ogg, expr(left), expr(right), SR, raw)

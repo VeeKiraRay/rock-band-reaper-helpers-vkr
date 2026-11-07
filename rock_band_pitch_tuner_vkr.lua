@@ -89,6 +89,7 @@ local _files = {
     _dir  .. 'lib/reaper_dsp.lua',
     _dir  .. 'lib/reaper_helper_common.lua',
     _dir  .. 'lib/reaper_helper_ui.lua',
+    _dir  .. 'lib/reaper_spectrum.lua',         -- spectrum for the Harmony readout
     _dir  .. 'lib/reaper_harmony_detect.lua',   -- Harmony readout
     _dir  .. 'lib/reaper_key_detect.lua',       -- its key snap "From charted lead"
     _dir  .. 'lib/reaper_key_profiles.lua',
