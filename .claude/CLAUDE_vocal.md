@@ -166,7 +166,7 @@ ui.lua:
 | `rock_band_vocal_helper_vkr/helpers.lua`            | `IsOnGrid`, `SetDefaultTracks`, `AutoDetectLyricsFile`, `RunActionErrorCleanup` — the track/action helpers it used to carry are in `lib/reaper_helper_common.lua` |
 | `rock_band_vocal_helper_vkr/pipeline.lua`           | `ResolveAnalysisRange`, `ResolveApplyPitchTarget`, `RunDetection`, `AssignPitches`, `ApplyPitchRange`, `FindNearestRefPitch`, `FormatResult` |
 | `rock_band_vocal_helper_vkr/autotune.lua`           | `AutoTune`, `AutoTuneYIN`, `ApplyAutoTuneResult`, format helpers                                                                             |
-| `rock_band_vocal_helper_vkr/tuner.lua`              | `StartTuner`, `StopTuner`, `RunTuner`; `FindItemAtPos`, `OpenContextForItem` (local)                                                         |
+| `rock_band_vocal_helper_vkr/tuner.lua`              | `StartTuner`, `StopTuner`, `RunTuner`, `RefreshTunerLead`, `ResetTunerHarmony`; `FindItemAtPos`, `OpenContextForItem` and the Harmony readout helpers (local) |
 | `rock_band_vocal_helper_vkr/actions.lua`            | `Preview`, `Generate`, `RunAutoTune`, `RunAutoTuneYIN`, `ApplyPitchChangesAction`, `SnapDraft`; `ResolveTracks`, `ResolveApplyPitchTracks` (local) |
 | `rock_band_vocal_helper_vkr/actions_lyrics.lua`     | `ParseLyricsFile`, `ParseLyricsLines`, `ClearLyricsInRange`, `ClearLyricsAction`, `AssignLyricsAction`; `ReadLyricsFileContent`, `ClearLyricEvents` (local) |
 | `rock_band_vocal_helper_vkr/actions_phrases.lua`    | `CreatePhrasesAction`, `NoteLenPPQ`; `SnapDown`, `SnapUp`, `NearestBeatPpq`, `NearestHalfBeatPpq`, `NearestQuarterBeatPpq`, `NearestMeasurePpq`, `CollectScopedAndLyrics`, `FindMismatches`, `RunPhase1`, `GrowEdge`, `RunPhase2` (local) |
@@ -192,7 +192,7 @@ ui.lua:
 - `actions_snap_key.lua`: `NextScalePitch`
 - `settings.lua`: `bool_to_num`, `num_to_bool`, `SerializeSettings`, `DeserializeSettings`
 - `autotune.lua`: `FineCandidates`, `EvaluateParams`
-- `tuner.lua`: `FindItemAtPos`, `OpenContextForItem`
+- `tuner.lua`: `FindItemAtPos`, `OpenContextForItem`; Harmony readout: `ReadLeadNotes`, `LeadKey`, `SnapScale`, `LeadNoteAt`, `ReadAt`, `HarmonyAt`, `NewTally`, `TallyFrame`, `ShowTally`, `TunerNoteJobStep`, `StartNoteJob`, `RunHarmony`
 - `ui_common.lua`: `KeysPresetTrackWarnings`
 
 **Load order:**
@@ -209,13 +209,16 @@ lib/reaper_script_links.lua    → SCRIPT_LINK_GROUPS, ScriptLinkBasename, IsRun
                                   FilterScriptLinkGroups, LaunchReaScript, DrawGeneralLinksTab
                                   (General > Other tools sub-tab; shared with the general
                                   helper, which documents the behaviour in CLAUDE_general.md)
+lib/reaper_harmony_detect.lua  → HarmonyAnalyseFrame, HarmonySpectralPitch, HarmonyVote*, HarmonyScale (Tuner Harmony readout)
+lib/reaper_key_detect.lua      → KeyFeatures, KeyRankSet, KeyName (its key snap "From charted lead")
+lib/reaper_key_profiles.lua    → RB_KEY_PROFILES (generated)
 defaults.lua                   → S, DEFAULTS, constants
 tips.lua                       → TIPS
 settings.lua                   → SaveSettings, LoadSettings
 helpers.lua                    → IsOnGrid, SetDefaultTracks, AutoDetectLyricsFile, RunActionErrorCleanup
 pipeline.lua                   → RunDetection, AssignPitches, FormatResult
 autotune.lua                   → AutoTune, AutoTuneYIN
-tuner.lua                      → StartTuner, StopTuner, RunTuner
+tuner.lua                      → StartTuner, StopTuner, RunTuner, RefreshTunerLead, ResetTunerHarmony
 actions.lua                    → Preview, Generate, RunAutoTune, RunAutoTuneYIN,
                                   ApplyPitchChangesAction, SnapDraft
 actions_lyrics.lua             → ParseLyricsFile, ParseLyricsLines, ClearLyricsInRange,
@@ -236,7 +239,7 @@ ui.lua                         → Loop (also calls r.defer(Loop))
 
 **Second entry point: `rock_band_pitch_tuner_vkr.lua` (repo root).** Standalone Pitch
 Tuner window. It has no module folder of its own — it dofiles a subset of this
-helper's modules: `lib/reaper_imgui_helpers.lua`, `lib/reaper_dsp.lua`, `lib/reaper_helper_common.lua`, `lib/reaper_helper_ui.lua`, then
+helper's modules: `lib/reaper_imgui_helpers.lua`, `lib/reaper_dsp.lua`, `lib/reaper_helper_common.lua`, `lib/reaper_helper_ui.lua`, `lib/reaper_harmony_detect.lua`, `lib/reaper_key_detect.lua`, `lib/reaper_key_profiles.lua`, then
 `defaults.lua`, `tips.lua`, `settings.lua`, `helpers.lua`, `tuner.lua`,
 `ui_common.lua`, `ui_tuner.lua`, and runs its own minimal `Loop` calling
 `DrawVocalTrackSelectors({ audio = true })` + `DrawTunerTab()` + `DrawResultPanel()`
@@ -299,6 +302,60 @@ Read-only — never modifies the project. Polls `SampleYINAt` at the current pla
 **YIN and pitch range settings** — shared with the other Pitch sub-tabs (`S.yin_*`, `S.min_pitch`, `S.max_pitch`). Changes on the Tuner sub-tab are immediately reflected elsewhere and vice versa.
 
 **State fields:** `S.tuner_pitch`, `S.tuner_prev_pitch`, `S.tuner_pitch_name`, `S.tuner_pitch_hz`, `S.tuner_pitch_ts`, `S.tuner_quiet_since`, `S.tuner_history` — session-only, not saved. `S.tuner_rms_threshold` — persisted.
+
+#### Harmony readout (experimental)
+
+A checkbox in the Pitch Tuner section (`S.tuner_harmony`, persisted `thm`). Read-only. Below
+the solo readout and history it draws two lines:
+
+- **HARM1** — the charted lead note at the playhead (the note being cancelled) and how clearly
+  the audio has it (`(NN% conf)`, amber under 75%). A different heard pitch is named
+  (`- sung as X`) only at 75%+: a loud harmony shifts the lead's measured period.
+- **HARM2** — the second voice, `(NN% agree)` = the share of analysed slices voting for it
+  (amber under 80%), then `- so far in this note` (playing) or `- whole note` (stopped).
+  Otherwise: `only one voice found` (+ `left and right differ - maybe a doubled lead` when at
+  least half the single-voice slices have L/R correlation under 0.7), `lead silent` (no
+  charted lead note at the playhead - nothing is computed; the solo line shows the voice),
+  `reading the note...`, `(quiet)`.
+
+**Method:** `lib/reaper_harmony_detect.lua` (pure). It is the method measured offline on the
+decrypted official moggs (round 5 of the 2026-11 harmony probe rounds; the probes themselves
+are local, the measured implementation is `dev/tools/harmony_audio_core.lua`) and must stay
+identical to it: `dev/tools/harmony_detect_parity_offline.lua` compares the lib with that core
+frame by frame. Fixed parameters, no sliders - the YIN sliders and presets do not apply.
+Frames are read at 16 kHz (`HARMONY_SR`, the measured rate) from the tuner's own accessor
+(`S.tuner_yctx`), stereo kept for the L/R correlation.
+
+**Lead chart:** `S.tuner_lead_idx` (session-only; `SetDefaultTracks` picks HARM1, else PART
+VOCALS). `RefreshTunerLead` reads its pitched notes (vocal range, `#` lyrics dropped, muted
+notes skipped) into `S.tuner_lead`, again after a project edit (`MakeProjectPoll(1.0, 5.0)`) or a
+track change.
+
+**Playing vs stopped:** while playing, each poll adds one frame to a vote that resets when the
+lead note changes (`S.tuner_vote`). Stopped (the cursor moved), the whole lead note under the
+cursor is read: slices every 30 ms over its middle 70%, at most 15, 3 per poll so the window
+never stalls (`S.tuner_note_job`, advanced by `TunerNoteJobStep` at the top of `RunTuner`
+before the position-unchanged skip). Stopping the tuner turns a half-finished reading into a
+result.
+
+**Key snap:** `S.tuner_key_mode` (`tkm`): `TUNER_KEY_OFF` (default), `TUNER_KEY_LEAD` (key from
+the lead chart via `lib/reaper_key_detect.lua`'s PART VOCALS set; needs `KEY_MIN_NOTES` notes,
+else the combo says "too few notes - off"), or 2..13 = a key note C..B with `S.tuner_key_minor`
+(`tkq`, the Major/Minor combo shown beside it).
+
+**Spectral reading too:** `S.tuner_spectral` (`tsp`, default off - each reading costs one
+4096-point FFT in Lua, a few ms). For every frame `HarmonyAnalyseFrame` analysed, `HarmonyAt`
+also reads a 128 ms window (`HARMONY_SPEC_N` from `t - HARMONY_SPEC_LEAD`) and
+`HarmonySpectralPitch` gives the loudest harmonic sum within an octave once the lead's
+partials are masked; `TallyFrame` adds it to the same vote (`HarmonyVoteAddPitch`, not counted
+as a frame). Measured as 'mask 128ms max, pooled with base'; the measured implementation is
+`dev/tools/harmony_spectral_core.lua`, and the parity tool checks the port against it too. Toggling it resets
+the vote (one reading mixing both would mean neither).
+
+**Limits (measured):** about a third of harmony notes exactly right, half with the right pitch
+class; a voice an octave above the lead cannot be read (cancelled with it; the spectral reading
+finds some); a third voice was measured at ~25% and is not shown. Per-reading numbers came
+from a probe round on the Tuner's way of reading (slice vs held vote vs whole note).
 
 ### Note Placement parameters
 
@@ -664,6 +721,7 @@ Assign Lyrics only ever guarantees word *i* ↔ the *i*-th vocal-range note — 
 - [ ] Phrase Similarity: groups similar phrases; flags differing notes; same-key vs contour mode both work.
 - [ ] Scan pitch slides: shows warning when no time selection; result in global panel.
 - [ ] YIN threshold changed on Pitch > Slide is visible on Pitch > Placement - Built-in (same `S.yin_*` state).
+- [ ] Tuner Harmony readout (both windows): ticking it shows Lead chart (HARM1 picked when present) and Key snap; picking a key note shows Major/Minor beside it. Playing a harmony section: HARM1 shows the charted lead, HARM2 settles within a few polls and says "so far in this note"; between lead notes both lines say lead silent. Stopped with the cursor in a note: "reading the note..." then "whole note", no stall. A clean solo passage may say "only one voice found", but on real recordings a solo note usually still shows some HARM2 at low agreement (measured: a second voice claimed on 95% of uncharted-harmony lead notes, 25% of them at 80%+; 15% with the spectral reading on) - read the agreement, not the presence. "Spectral reading too": ticking it re-reads at once; time a stopped whole-note reading with it on and off (no visible stall expected). Editing the lead chart while running is picked up within ~1 s. Stop keeps the last readout; closing the window releases the audio file.
 - [ ] YIN presets: combo appears on the Placement - Built-in, Tuner and Slide sub-tabs; a voice-range preset sets all four YIN sliders and enables Min/Max pitch; a style-only preset changes only threshold and window; status bar reports the preset label.
 - [ ] Piano preset: with "PART VOCALS" MIDI destination and/or a "VOCALS"-named audio source selected, applying it shows the vocal-track warning(s) in the result panel (both when both match); with keys-named tracks, no warning; settings apply in every case.
 - [ ] Save → modify slide sliders → reload project → values restored.

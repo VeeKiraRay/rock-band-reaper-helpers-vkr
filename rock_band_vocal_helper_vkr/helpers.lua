@@ -58,6 +58,18 @@ function SetDefaultTracks()
         end
     end
 
+    -- Tuner Harmony readout: the lead chart it cancels, HARM1 first, else PART VOCALS.
+    S.tuner_lead_idx = -1
+    for _, name in ipairs({ 'HARM1', 'PART VOCALS' }) do
+        if S.tuner_lead_idx < 0 then
+            for i = 0, n - 1 do
+                local tr = r.GetTrack(0, i)
+                local _, tname = r.GetTrackName(tr)
+                if tname == name and TrackHasMIDI(tr) then S.tuner_lead_idx = i; break end
+            end
+        end
+    end
+
     -- Harmony destinations: name-only match (tracks may start empty)
     for _, pair in ipairs({
         { field = 'harm_dst1_idx', name = 'HARM1' },

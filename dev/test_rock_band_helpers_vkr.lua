@@ -46,7 +46,8 @@ local results = { vocal = nil, general = nil, instrument = nil,
                   script_links = nil, window_title = nil, helper_ui = nil,
                   difficulty_score = nil,
                   difficulty_bpm = nil, difficulty_suggester = nil,
-                  metadata_genres = nil, key_detect = nil }
+                  metadata_genres = nil, key_detect = nil, harmony_style = nil,
+                  harmony_detect = nil }
 
 local COL_OK  = 0x55DD55FF
 local COL_ERR = 0xFF5555FF
@@ -327,6 +328,22 @@ function Loop()
         end
         r.ImGui_SameLine(ctx)
         draw_status(results.key_detect)
+
+        r.ImGui_Spacing(ctx)
+
+        if r.ImGui_Button(ctx, 'Harmony Style Tests', 155, 24) then
+            run('run_harmony_style.lua', 'harmony_style')
+        end
+        r.ImGui_SameLine(ctx)
+        draw_status(results.harmony_style)
+
+        r.ImGui_Spacing(ctx)
+
+        if r.ImGui_Button(ctx, 'Harmony Detect Tests', 155, 24) then
+            run('run_harmony_detect.lua', 'harmony_detect')
+        end
+        r.ImGui_SameLine(ctx)
+        draw_status(results.harmony_detect)
 
         r.ImGui_Spacing(ctx)
         r.ImGui_Separator(ctx)

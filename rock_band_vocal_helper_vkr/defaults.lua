@@ -126,6 +126,10 @@ DEFAULTS = {
     yin_rms_gate          = 0.005,
     yin_vote_windows      = 3,
     tuner_rms_threshold   = 0.005,
+    tuner_harmony         = false,   -- Harmony readout (second voice beside the charted lead)
+    tuner_key_mode        = 0,       -- key snap: TUNER_KEY_OFF / TUNER_KEY_LEAD / 2..13 = C..B
+    tuner_key_minor       = false,   -- with a picked key note: minor instead of major
+    tuner_spectral        = false,   -- Harmony readout: add the spectral reading's votes
 
     velocity          = 100,
 
@@ -168,6 +172,10 @@ S = {
     yin_rms_gate          = DEFAULTS.yin_rms_gate,
     yin_vote_windows      = DEFAULTS.yin_vote_windows,
     tuner_rms_threshold   = DEFAULTS.tuner_rms_threshold,
+    tuner_harmony         = DEFAULTS.tuner_harmony,
+    tuner_key_mode        = DEFAULTS.tuner_key_mode,
+    tuner_key_minor       = DEFAULTS.tuner_key_minor,
+    tuner_spectral        = DEFAULTS.tuner_spectral,
 
     velocity          = DEFAULTS.velocity,
 
@@ -241,7 +249,20 @@ S = {
     tuner_history        = {},      -- up to 10 recent note names, [1] = newest
     tuner_prev_pitch     = nil,     -- MIDI note of detection before the current one
     tuner_quiet_since    = nil,     -- r.time_precise() when silence began; nil when pitch is detected
+
+    -- Pitch Tuner Harmony readout (session-only, not persisted; see tuner.lua)
+    tuner_lead_idx       = -1,      -- lead chart track (HARM1 / PART VOCALS by SetDefaultTracks)
+    tuner_lead           = nil,     -- { track, notes, key_scale } read from that track
+    tuner_harm           = {},      -- what the readout shows (ResetTunerHarmony)
+    tuner_vote           = nil,     -- votes since the current lead note began
+    tuner_vote_note      = nil,     -- that lead note
+    tuner_note_job       = nil,     -- stopped: the whole-note reading in progress
 }
+
+-- Key snap choices for the Tuner's Harmony readout (S.tuner_key_mode). 2..13 = the key note
+-- C..B picked by hand (HARM_NOTE_NAMES order), with S.tuner_key_minor.
+TUNER_KEY_OFF  = 0
+TUNER_KEY_LEAD = 1
 
 function ResetDetection()
     S.rms_threshold  = DEFAULTS.rms_threshold

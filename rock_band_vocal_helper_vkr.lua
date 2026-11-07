@@ -43,6 +43,22 @@
 --     - Harmonies: the Target track dropdowns list only MIDI tracks, like
 --       Source. They listed every track, so an audio track could be picked
 --       and the run then stopped with "No MIDI item on destination".
+--     - Pitch > Tuner: new Harmony readout (experimental). Tick it and pick
+--       the lead chart (HARM1, or PART VOCALS): below the usual readout, HARM1
+--       shows the charted lead note and how clearly the audio has it, HARM2
+--       the second voice in the same vocal recording. It cancels the charted
+--       lead note from the audio and reads what is left. While playing,
+--       HARM2 is a vote over the current lead note so far; with playback
+--       stopped, the whole note under the cursor is read. Its "% agree" says
+--       how many slices voted for it. Optional key snap: off, the key worked
+--       out from the lead chart, or a key you pick. Read-only - it never
+--       writes notes. Measured on official songs, about a third of harmony
+--       notes come out exactly right and half with the right note name;
+--       a harmony an octave above the lead and a third voice cannot be read.
+--       "Spectral reading too" (off by default) adds a second way of reading
+--       the voices - the way a spectrogram shows them - and lets both vote:
+--       about 4 points more harmony notes right in the measurements, most
+--       of it on harmonies above the lead, some an octave above.
 --   v1.20
 --     - The window title now carries the script version - "Rock Band Vocal
 --       Helper v1.20". A bug report that quotes the title says which version
@@ -140,6 +156,9 @@ for _, _f in ipairs({
     _dir  .. 'lib/reaper_helper_common.lua',
     _dir  .. 'lib/reaper_helper_ui.lua',
     _dir  .. 'lib/reaper_script_links.lua',
+    _dir  .. 'lib/reaper_harmony_detect.lua',
+    _dir  .. 'lib/reaper_key_detect.lua',
+    _dir  .. 'lib/reaper_key_profiles.lua',
     _mdir .. 'defaults.lua',
     _mdir .. 'tips.lua',
     _mdir .. 'settings.lua',
@@ -176,6 +195,9 @@ dofile(_dir  .. 'lib/reaper_midi_helpers.lua')
 dofile(_dir  .. 'lib/reaper_helper_common.lua')
 dofile(_dir  .. 'lib/reaper_helper_ui.lua')
 dofile(_dir  .. 'lib/reaper_script_links.lua')
+dofile(_dir  .. 'lib/reaper_harmony_detect.lua')   -- Pitch > Tuner Harmony readout
+dofile(_dir  .. 'lib/reaper_key_detect.lua')       -- ... its key snap "From charted lead"
+dofile(_dir  .. 'lib/reaper_key_profiles.lua')
 
 -- Window title with this script's own @version, read from the header above.
 -- ui.lua passes it to ImGui_Begin; the "###" id inside keeps saved window

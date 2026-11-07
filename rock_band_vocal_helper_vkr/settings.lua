@@ -59,6 +59,10 @@ local SETTINGS = {
     { key='pst',    field='phrase_sim_threshold',                   kind='int'  },
     { key='psk',    field='phrase_same_key',                        kind='bool' },
     { key='trms',   field='tuner_rms_threshold',       fmt='%.4f', kind='float' },
+    { key='thm',    field='tuner_harmony',                          kind='bool' },
+    { key='tkm',    field='tuner_key_mode',                         kind='int'  },
+    { key='tkq',    field='tuner_key_minor',                        kind='bool' },
+    { key='tsp',    field='tuner_spectral',                         kind='bool' },
     { key='swip',   field='show_wip_tabs',                        kind='bool'  },
 }
 

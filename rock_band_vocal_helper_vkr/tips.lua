@@ -537,6 +537,69 @@ TIPS = {
         "Auto-stops if you leave the Tuner sub-tab, or if no new\n" ..
         "pitch has been detected for 60 seconds.",
 
+    tuner_harmony =
+        "Also read a second voice (a harmony) beside the lead, from the same\n" ..
+        "vocal recording. Experimental.\n\n" ..
+        "Uses the lead chart below: at the playhead it takes the charted lead\n" ..
+        "note, cancels that note from the audio, and reads what is left.\n" ..
+        "While playing, the reading is a vote over the polls since the lead\n" ..
+        "note began; when stopped, the whole lead note under the cursor is\n" ..
+        "read at once.\n\n" ..
+        "Measured on official songs: about a third of harmony notes come out\n" ..
+        "exactly right, half with the right note name. Most misses are an\n" ..
+        "octave or a semitone off. Treat it as a hint to check by ear.\n\n" ..
+        "Cannot hear: a harmony an octave ABOVE the lead (cancelled with it;\n" ..
+        "\"Spectral reading too\" finds some), or a third voice. Needs a\n" ..
+        "charted lead note at the playhead.",
+
+    tuner_lead_chart =
+        "The charted lead the Harmony readout cancels - usually HARM1, or\n" ..
+        "PART VOCALS when the song has no harmony tracks yet.\n\n" ..
+        "Its notes say which pitch the lead sings at the playhead; '#'\n" ..
+        "(unpitched) notes are skipped. Edits to this track are picked up\n" ..
+        "within about a second.",
+
+    tuner_key_snap =
+        "Move a harmony reading that is one semitone outside the key into\n" ..
+        "the key (only when the votes point that way).\n\n" ..
+        "Off -> no snap.\n" ..
+        "From charted lead -> the key worked out from the lead chart (the\n" ..
+        "same detector as the General Helper's Metadata > Song key).\n" ..
+        "A key note -> that key; pick major or minor next to it.\n\n" ..
+        "Measured: about 1 point more accurate with the right key. A wrong\n" ..
+        "key makes it worse, and a song with notes outside its key (a raised\n" ..
+        "7th in minor, a borrowed chord) can be snapped away from them.",
+
+    tuner_spectral =
+        "Also read the voices the way a spectrogram shows them, and let both\n" ..
+        "readings vote on each note.\n\n" ..
+        "The spectral reading looks at a longer stretch of audio (128 ms),\n" ..
+        "removes the lead's overtones and picks the pitch whose overtones are\n" ..
+        "loudest. Alone it finds the note name more often but the octave less\n" ..
+        "often; together with the normal reading it was right more often than\n" ..
+        "either.\n\n" ..
+        "Measured on official songs: about 4 points more harmony notes exactly\n" ..
+        "right, most of it on harmonies above the lead - including an octave\n" ..
+        "above, which the normal reading cannot hear (about 1 in 4 instead of\n" ..
+        "1 in 7). Readings at 80%+ agreement are right more often too.\n\n" ..
+        "Costs a few milliseconds per reading; off by default.",
+
+    tuner_key_quality =
+        "Major, or natural minor (the raised 7th of harmonic minor counts\n" ..
+        "as outside the key).",
+
+    tuner_harm_lead =
+        "HARM1 is the charted lead note the readout cancels. The percentage\n" ..
+        "says how clearly the audio has that note (a pitch within 2 semitones\n" ..
+        "of the chart). \"Sung as\" names a different pitch only when it is\n" ..
+        "clear: a loud harmony can shift the lead's measured pitch.",
+
+    tuner_harm_agree =
+        "Agreement: the share of the analysed slices that voted for this note.\n\n" ..
+        "Measured on official songs (whole-note reading): 80% or more was right\n" ..
+        "about 3 times in 4; 60-80% about 6 in 10; under 60% about 4 in 10.\n" ..
+        "Amber below 80%.",
+
     -- General tab
     show_wip_tabs =
         "Show work-in-progress tabs (Note Placement).\n\n" ..

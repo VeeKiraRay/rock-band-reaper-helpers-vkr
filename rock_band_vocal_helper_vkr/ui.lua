@@ -41,6 +41,8 @@ function Loop()
         S.tuner_pitch_ts    = nil
         S.tuner_quiet_since = nil
         S.tuner_history     = {}
+        S.tuner_lead        = nil
+        ResetTunerHarmony()
         RefreshTrackLists()
         local loaded = LoadSettings()
         S.status = loaded and 'Project switched: loaded saved settings.'

@@ -8,8 +8,142 @@
 --
 -- Requires globals: r, ctx, S, TIPS, YINPresetCombo, SectionHeader, ResetYIN,
 --                   LabelColWidth, SliderTooltip, Tooltip, Btn, RunAction,
---                   StartTuner, StopTuner, PitchName, BTN_H, WIDTH_STD,
---                   RB3_MIN_PITCH, RB3_MAX_PITCH
+--                   StartTuner, StopTuner, PitchName, BTN_H, WIDTH_STD, WIDTH_SHORT,
+--                   RB3_MIN_PITCH, RB3_MAX_PITCH, TrackCombo, ResetTunerHarmony,
+--                   HARM_NOTE_NAMES, TUNER_KEY_OFF, TUNER_KEY_LEAD
+
+local COL_DIM   = 0xAAAAAAFF
+local COL_AMBER = 0xFFC04CFF
+
+-- Key snap combo entries: Off, From charted lead, then the 12 key notes.
+local function KeySnapLabel(mode)
+    if mode == TUNER_KEY_OFF then return 'Off' end
+    if mode == TUNER_KEY_LEAD then
+        local lead = S.tuner_lead
+        if lead and lead.key then return ('From charted lead (%s)'):format(lead.key.name) end
+        if lead and lead.notes then return 'From charted lead (too few notes - off)' end
+        return 'From charted lead'
+    end
+    return HARM_NOTE_NAMES[mode - 1] or '?'
+end
+
+-- Harmony settings rows: lead chart track and key snap. lbl_col: the tab's label column.
+local function DrawHarmonySettings(lbl_col)
+    r.ImGui_Text(ctx, 'Lead chart')
+    r.ImGui_SameLine(ctx, lbl_col)
+    r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
+    S.tuner_lead_idx = TrackCombo('##tur_lead', S.tuner_lead_idx, S.midi_track_list or {})
+    Tooltip(TIPS.tuner_lead_chart)
+
+    r.ImGui_Text(ctx, 'Key snap')
+    r.ImGui_SameLine(ctx, lbl_col)
+    r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
+    if r.ImGui_BeginCombo(ctx, '##tur_key', KeySnapLabel(S.tuner_key_mode)) then
+        for m = TUNER_KEY_OFF, 13 do
+            if r.ImGui_Selectable(ctx, KeySnapLabel(m) .. '##tkm' .. m, S.tuner_key_mode == m) then
+                S.tuner_key_mode = m
+            end
+        end
+        r.ImGui_EndCombo(ctx)
+    end
+    Tooltip(TIPS.tuner_key_snap)
+    if S.tuner_key_mode >= 2 then
+        r.ImGui_SameLine(ctx)
+        r.ImGui_SetNextItemWidth(ctx, WIDTH_SHORT)
+        if r.ImGui_BeginCombo(ctx, '##tur_keyq', S.tuner_key_minor and 'Minor' or 'Major') then
+            if r.ImGui_Selectable(ctx, 'Major', not S.tuner_key_minor) then S.tuner_key_minor = false end
+            if r.ImGui_Selectable(ctx, 'Minor', S.tuner_key_minor) then S.tuner_key_minor = true end
+            r.ImGui_EndCombo(ctx)
+        end
+        Tooltip(TIPS.tuner_key_quality)
+    end
+
+    local sp_changed, sp_on = r.ImGui_Checkbox(ctx, 'Spectral reading too##tur_spec', S.tuner_spectral)
+    if sp_changed then
+        S.tuner_spectral = sp_on
+        ResetTunerHarmony()   -- a vote mixing both ways of reading would mean neither
+        S.tuner_last_play_pos = nil
+    end
+    Tooltip(TIPS.tuner_spectral)
+end
+
+-- "A2  220.0 Hz" for a MIDI note.
+local function NoteHz(p) return ('%s  %.1f Hz'):format(PitchName(p), 440.0 * 2.0 ^ ((p - 69) / 12.0)) end
+
+local function Dim(text, col)
+    r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Text(), col or COL_DIM)
+    r.ImGui_TextWrapped(ctx, text)
+    r.ImGui_PopStyleColor(ctx)
+end
+
+-- The readout lines under the solo readout: HARM1 (the lead heard near its chart) and
+-- HARM2 (the voted second voice). See tuner.lua's Harmony readout section.
+local function DrawHarmonyReadout()
+    local h = S.tuner_harm or {}
+    r.ImGui_Spacing(ctx)
+    r.ImGui_TextDisabled(ctx, 'Harmony readout (experimental)')
+
+    if not S.tuner_active and not h.mode then
+        Dim('Start the tuner to read the voices.')
+        return
+    end
+    if h.mode == 'nolead' then
+        Dim('HARM1: -  (pick a lead chart track with notes)')
+        return
+    end
+    if h.mode == 'quiet' or not h.mode then
+        Dim('HARM1: -  (quiet)')
+        return
+    end
+    if h.mode == 'silent' then
+        Dim('HARM1: -  (no charted lead note here)')
+        Dim('HARM2: -  (lead silent - the voice above is what is heard)')
+        return
+    end
+
+    -- HARM1: the charted lead note being cancelled; the confidence says how clearly the
+    -- audio has it. A clearly heard different pitch is named beside it. (Below 75% the
+    -- heard pitch is not trusted: a loud harmony shifts the lead's measured period.)
+    r.ImGui_Text(ctx, 'HARM1: ' .. NoteHz(h.chart))
+    r.ImGui_SameLine(ctx)
+    if h.lead_conf then
+        r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Text(), h.lead_conf >= 0.75 and COL_DIM or COL_AMBER)
+        r.ImGui_Text(ctx, ('(%.0f%% conf)'):format(h.lead_conf * 100))
+        r.ImGui_PopStyleColor(ctx)
+        Tooltip(TIPS.tuner_harm_lead)
+        if h.lead and h.lead ~= h.chart and h.lead_conf >= 0.75 then
+            r.ImGui_SameLine(ctx)
+            r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Text(), COL_AMBER)
+            r.ImGui_Text(ctx, '- sung as ' .. PitchName(h.lead))
+            r.ImGui_PopStyleColor(ctx)
+        end
+    else
+        r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Text(), COL_AMBER)
+        r.ImGui_Text(ctx, '(not clear in the audio)')
+        r.ImGui_PopStyleColor(ctx)
+        Tooltip(TIPS.tuner_harm_lead)
+    end
+
+    -- HARM2: the vote.
+    local where = (h.mode == 'held') and 'so far in this note' or 'whole note'
+    if h.mode == 'note_busy' and not h.harm then
+        Dim('HARM2: reading the note...')
+    elseif h.harm then
+        r.ImGui_Text(ctx, 'HARM2: ' .. NoteHz(h.harm))
+        r.ImGui_SameLine(ctx)
+        r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Text(), (h.agree or 0) >= 0.8 and COL_DIM or COL_AMBER)
+        r.ImGui_Text(ctx, ('(%.0f%% agree)'):format((h.agree or 0) * 100))
+        r.ImGui_PopStyleColor(ctx)
+        Tooltip(TIPS.tuner_harm_agree)
+        r.ImGui_SameLine(ctx)
+        r.ImGui_TextDisabled(ctx, '- ' .. where)
+    elseif h.single then
+        Dim(h.doubled and 'HARM2: -  (only one voice found; left and right differ - maybe a doubled lead)'
+                      or  'HARM2: -  (only one voice found)')
+    else
+        Dim('HARM2: -')
+    end
+end
 
 function DrawTunerTab()
     r.ImGui_Spacing(ctx)
@@ -17,7 +151,7 @@ function DrawTunerTab()
     local lbl_col_tur = LabelColWidth({
         'Vocal style preset', 'YIN threshold', 'Min frequency (Hz)',
         'Max frequency (Hz)', 'Window (ms)', 'Min confidence',
-        'Min RMS level', 'Min pitch', 'Max pitch',
+        'Min RMS level', 'Min pitch', 'Max pitch', 'Lead chart', 'Key snap',
     })
     YINPresetCombo('##tur', lbl_col_tur)
     local _
@@ -110,6 +244,16 @@ function DrawTunerTab()
     r.ImGui_Text(ctx, state_label)
     r.ImGui_PopStyleColor(ctx)
 
+    r.ImGui_Spacing(ctx)
+    local harm_changed, harm_on = r.ImGui_Checkbox(ctx, 'Harmony readout (experimental)##tur_harm', S.tuner_harmony)
+    if harm_changed then
+        S.tuner_harmony = harm_on
+        ResetTunerHarmony()
+        S.tuner_last_play_pos = nil   -- read again now, even with the cursor standing still
+    end
+    Tooltip(TIPS.tuner_harmony)
+    if S.tuner_harmony then DrawHarmonySettings(lbl_col_tur) end
+
     r.ImGui_Separator(ctx)
 
     -- Current pitch display (highlighted)
@@ -152,6 +296,8 @@ function DrawTunerTab()
         r.ImGui_Text(ctx, table.concat(S.tuner_history, '  '))
         r.ImGui_PopStyleColor(ctx)
     end
+
+    if S.tuner_harmony then DrawHarmonyReadout() end
 
     local quiet_delay = (r.GetPlayState() & 1 ~= 0) and 1.5 or 0.0
     if S.tuner_quiet_since and r.time_precise() - S.tuner_quiet_since > quiet_delay then

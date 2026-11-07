@@ -4,7 +4,8 @@
 -- @about
 --   Standalone window for the Pitch > Tuner sub-tab of the Rock Band Vocal
 --   Helper. Reads audio from the selected source track at the playhead and
---   shows the detected note, frequency, confidence and a short history strip.
+--   shows the detected note, frequency, confidence and a short history strip,
+--   plus an optional Harmony readout: the second voice beside the charted lead.
 --
 --   The tuner remains available as a sub-tab inside the vocal helper; this
 --   entry point offers the same UI in its own window so it can stay visible
@@ -13,9 +14,20 @@
 --   Built with Claude (Anthropic) - https://claude.ai
 --
 --   v0.3
---     - No change to what this window does. The Vocal Helper moved its
---       Tuner tab under Pitch (Vocal Helper v1.21), so the Start/Stop
---       tooltip and the helper's auto-stop message now say Tuner sub-tab.
+--     - New Harmony readout (experimental): tick it and pick the lead chart
+--       (HARM1, or PART VOCALS) to see, below the usual note and history, the
+--       charted lead note (HARM1) and the second voice heard beside it in the
+--       vocal recording (HARM2, with how many slices agreed on it). Playing,
+--       it follows the current lead note; stopped, it reads the whole note
+--       under the cursor. Optional key snap. Read-only, like the rest of this
+--       window. A harmony an octave above the lead and a third voice cannot
+--       be read. "Spectral reading too" (off by default) adds a
+--       spectrogram-style reading that votes alongside: a few more harmony
+--       notes right, some of them an octave above the lead. Same feature as
+--       the Vocal Helper's Pitch > Tuner (v1.21).
+--     - The Vocal Helper moved its Tuner tab under Pitch (Vocal Helper
+--       v1.21), so the Start/Stop tooltip and the helper's auto-stop message
+--       now say Tuner sub-tab.
 --     - The audio source dropdown has a "(none)" entry, and the status panel
 --       at the bottom shows the active time selection, as in the helpers -
 --       both now share their code with every helper.
@@ -77,6 +89,9 @@ local _files = {
     _dir  .. 'lib/reaper_dsp.lua',
     _dir  .. 'lib/reaper_helper_common.lua',
     _dir  .. 'lib/reaper_helper_ui.lua',
+    _dir  .. 'lib/reaper_harmony_detect.lua',   -- Harmony readout
+    _dir  .. 'lib/reaper_key_detect.lua',       -- its key snap "From charted lead"
+    _dir  .. 'lib/reaper_key_profiles.lua',
     _mdir .. 'defaults.lua',
     _mdir .. 'tips.lua',
     _mdir .. 'settings.lua',
@@ -143,6 +158,8 @@ local function Loop()
         S.tuner_pitch_ts    = nil
         S.tuner_quiet_since = nil
         S.tuner_history     = {}
+        S.tuner_lead        = nil
+        ResetTunerHarmony()
         RefreshTrackLists()
         local loaded = LoadSettings()
         S.status = loaded and 'Project switched: loaded saved settings.'
