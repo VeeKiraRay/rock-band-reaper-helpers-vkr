@@ -217,6 +217,15 @@ local function Loop()
             end
 
             ------------------------------------------------------------
+            -- Animation tab (ui_animation.lua): Beat
+            ------------------------------------------------------------
+            if r.ImGui_BeginTabItem(ctx, 'Animation') then
+                _new_tab = 'Animation'
+                DrawAnimationTab()
+                r.ImGui_EndTabItem(ctx)
+            end
+
+            ------------------------------------------------------------
             -- Events tab (ui_venue_events.lua): General + Manual gen
             ------------------------------------------------------------
             if r.ImGui_BeginTabItem(ctx, 'Events') then

@@ -188,6 +188,8 @@ S = {
     -- { message=.., on_confirm=function() ... end } - set by CopyAllSubtracksToMain when
     -- VENUE already has events; consumed by the confirm popup in ui_venue.lua.
     venue_subtrack_copy_pending = nil,
+    -- Animation > Beat
+    beat_half_style      = 0,    -- half-time downbeat: 0=every other bar 1=every bar (persisted: 'abhs')
     -- UI visibility (persisted)
     show_wip_tabs           = false, -- show the Tempo Map tab
     -- Workflow checklist (Workflow tab)
@@ -528,6 +530,25 @@ TIPS = {
                       "Venue > Actions > Copy all to subtracks).\n\n" ..
                       "Shared with Manual gen's Target. The game, the Venue validators and\n" ..
                       "Preview read only VENUE: run Copy all to main track when you are done.",
+    anim_beat_full = "Write a BEAT note on every quarter note, from measure 1 up to [end]\n" ..
+                     "(or inside the time selection, never past [end]).\n\n" ..
+                     "A downbeat note (12) on each bar's first beat, an upbeat note (13)\n" ..
+                     "on the others. Every time signature counts in quarter notes from\n" ..
+                     "the bar line, as the official charts do: 6/8 gets three notes,\n" ..
+                     "7/8 four.\n\n" ..
+                     "Needs a BEAT track and an [end] event on EVENTS. Existing BEAT notes\n" ..
+                     "in the range are replaced. One undo step.",
+    anim_beat_half = "Half-speed BEAT track, for animations: a note on every other quarter\n" ..
+                     "note (beats 1 and 3 in 4/4). Each bar starts again on its first beat,\n" ..
+                     "so in 3/4 or 6/8 the shorter gap comes before the next bar.\n" ..
+                     "The beat just before [end] always gets a note (Magma needs it).\n\n" ..
+                     "Select a section first to halve only that part.\n" ..
+                     "Range, checks and undo as Generate beats.",
+    anim_beat_half_style = "Where half-time beats put the downbeat note.\n\n" ..
+                           "Every other bar: the first bar of the range gets a downbeat, the\n" ..
+                           "next bar starts with an upbeat, and so on. This is how CAT and most\n" ..
+                           "official halved songs do it.\n" ..
+                           "Every bar: a downbeat on every bar's first beat.",
     venue_mg_replace = "What the Add buttons do with events already at the playhead.\n\n" ..
                        "Add: insert next to them (stacks build up).\n" ..
                        "Replace: first remove the events of the same family on that spot,\n" ..

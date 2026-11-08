@@ -8,6 +8,7 @@
 --     General    - stem import, audio alignment, count-in positioning, song fade out, settings,
 --                  buttons that open the other tools in this set
 --     Workflow   - per-project authoring workflow checklist
+--     Animation  - Beat: write the BEAT track (normal or half time)
 --     Events     - list song sections, insert EVENTS track events at the
 --                  playhead
 --     Venue      - list, validate, and generate VENUE track events
@@ -39,6 +40,16 @@
 --     - General > Settings > Show WIPs? now shows only the Tempo Map tab. The
 --       Instrument Helper has its own switch for its WIP tabs.
 --     - Workflow is its own tab now, no longer a General sub-tab.
+--     - New Animation tab, between Workflow and Events. Its Beat sub-tab
+--       writes the BEAT track from measure 1 up to the [end] event, or inside
+--       the time selection: a downbeat note on each bar's first beat and an
+--       upbeat note on every other quarter note, in every time signature (7/8 = four notes, as the
+--       official charts do). "Generate half-time beats" puts a note on every
+--       other quarter, for animations; its downbeat goes on every other bar
+--       (as CAT and most official halved songs do) or on every bar. The beat
+--       just before [end] always gets a note, as Magma requires. Needs a
+--       BEAT track and an [end] event; existing BEAT notes in the range are
+--       replaced. One undo step.
 --     - New Events tab for the EVENTS track tools, with two sub-tabs.
 --       General holds "List event sections" (moved from Venue > Actions);
 --       Manual gen is the former Venue > Events sub-tab.
@@ -252,6 +263,7 @@ for _, _f in ipairs({
     _mdir .. 'helpers.lua',
     _mdir .. 'venue.lua',
     _mdir .. 'venue_awareness.lua',
+    _mdir .. 'animation_beat.lua',
     _mdir .. 'venue_camera_priority.lua',
     _mdir .. 'section_events.lua',
     _mdir .. 'venue_themes.lua',
@@ -289,6 +301,7 @@ for _, _f in ipairs({
     _mdir .. 'ui_venue_keyframes.lua',
     _mdir .. 'ui_venue_players.lua',
     _mdir .. 'ui_workflow.lua',
+    _mdir .. 'ui_animation.lua',
     _mdir .. 'ui_metadata_genre.lua',
     _mdir .. 'ui_metadata_key.lua',
     _mdir .. 'ui_metadata.lua',
@@ -329,6 +342,7 @@ dofile(_mdir .. 'settings.lua')
 dofile(_mdir .. 'helpers.lua')
 dofile(_mdir .. 'venue.lua')
 dofile(_mdir .. 'venue_awareness.lua')
+dofile(_mdir .. 'animation_beat.lua')       -- uses FindEventTime from venue_awareness.lua
 dofile(_mdir .. 'venue_camera_priority.lua')
 dofile(_mdir .. 'section_events.lua')
 dofile(_mdir .. 'venue_themes.lua')
@@ -369,6 +383,7 @@ dofile(_mdir .. 'ui_venue_preview.lua')
 dofile(_mdir .. 'ui_venue_keyframes.lua')
 dofile(_mdir .. 'ui_venue_players.lua')
 dofile(_mdir .. 'ui_workflow.lua')
+dofile(_mdir .. 'ui_animation.lua')
 dofile(_mdir .. 'ui_metadata_genre.lua')
 dofile(_mdir .. 'ui_metadata_key.lua')
 dofile(_mdir .. 'ui_metadata.lua')

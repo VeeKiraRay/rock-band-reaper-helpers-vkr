@@ -8,7 +8,7 @@ Read `CLAUDE.md` first for shared architecture, conventions, and Lua specifics.
 
 ## How the script is used
 
-Five stable tabs are always visible: **General | Workflow | Events | Venue | Metadata**
+Six stable tabs are always visible: **General | Workflow | Animation | Events | Venue | Metadata**
 
 **Metadata tab** has three sub-tabs: Genre, Difficulty and **Song key** (suggests `vocal_tonic_note` / `song_tonality` from the charted notes; see `song_key.lua` and `ui_metadata_key.lua` below, and `dev/tools/key_detect_fit_offline.lua`, which fits the profiles against the official charts and prints their cross-validated agreement with `songs.dta`). Genre and Difficulty, in detail: **Genre** converts a real-world genre into the closest supported major genre and subgenre; it is a pure lookup over two static tables and is listed first because it works with no project open at all. Like Difficulty it states outright that it is advisory - but for a different reason, and the two wordings should not be merged: Difficulty's inputs are measurements of the author's own MIDI, whereas every genre mapping is a hand-made judgment call, so only Genre invites the reader to push back on it. **Difficulty** estimates what rank a finished Expert chart should carry. Both are read-only.
 
@@ -56,6 +56,8 @@ One WIP tab appears only when **Show WIPs? = Yes** in the General tab (persisted
 6. Use **Generate tempo map** to insert REAPER tempo markers at detected downbeats.
 7. Use **Auto-tune threshold** (read-only) to find the RMS threshold that best matches existing reference markers — useful before a full generation run when threshold is uncertain.
 8. Use **Clear generated markers** to remove auto-generated markers and start over. Respects time selection: if active, only markers within the selection are cleared; otherwise all markers except the root are cleared.
+
+**Animation tab** (`ui_animation.lua`, `DrawAnimationTab`) — sub-tabs: **Beat** (writes the BEAT track; see "Feature: Animation > Beat" below). Character, Drums, Keys and Guitar are planned, one sub-tab per feature.
 
 **Events tab** (`ui_venue_events.lua`, `DrawEventsTab`) — the EVENTS-track tools, a main tab since v0.9.63 (before that: the List event sections button in Venue > Actions, and Venue > Events). Two sub-tabs:
 
@@ -172,6 +174,7 @@ The section's **keyframes are emitted either way** — only the lighting event i
 | `rock_band_general_helper_vkr/venue_sprites.lua` | `LoadVenueSprite`, `DrawVenueTooltipSprite`, `BeginVenueTooltip`, `EndVenueTooltip`, `VenueEventTooltip`, `RawVenueEventText`, `VenueSpriteFoldersFound` (global); `DIRECTED_SPRITE_NAMES`, `VENUE_SPRITE_ROOT` (module-level globals). JPEG-only. Checks `resources/img/spritesheets/{category}/` (large) then `resources/img/spritesheets/{category} small/` (small) — no third-party fallback. Frame count is read from the filename (`{key}_f{N}_spritesheet.jpg`). Display size scales by `S.venue_preview_scale` (1 or 2). Cache stores `{image, frame_count, cols, rows}` per sprite. |
 | `rock_band_general_helper_vkr/venue_lighting.lua` | `MANUAL_LIGHTING_SET`, `LIGHTING_OFFSET_16THS`, `INST_KF_MODES`, `KF_ALIGN_LABELS`, `FindNextMeasureStartPpq`, `CollectInstNotePositions`, `GenerateKeyframesForSpan`, `GenerateLightingEvents`, `GenerateThemedSectionEvents`, `SnapPpqToHalfBeat` (global); `MANUAL_LIGHTING_POOL`, `AUTO_LIGHTING_POOL`, lighting constants, `SnapPpqToNearestBeat`, `BlendPpq`, `EmitBlendDuplicates`, `ResolveThemeSection`, `EmitThemeSection` (local) |
 | `rock_band_general_helper_vkr/venue_generator.lua` | `GenerateVenueEvents`, `DeleteTextEventsInRange` (predicate-driven deleter backing all clear functions), `ClearVenueTextEventsInRange`, `ClearVenueNonCameraEventsInRange`, `ClearVenueExceptLPInRange`, `ClearVenueKeyframesInRange`, `FindActiveVenuePresetsBefore` (global) |
+| `rock_band_general_helper_vkr/animation_beat.lua` | `BeatPlan` (pure), `ReadProjectBars`, `GenerateBeatTrack`, `BEAT_PITCH_DOWN`, `BEAT_PITCH_UP` (global); `Fail` (local) — Animation > Beat |
 | `rock_band_general_helper_vkr/workflow.lua` | `ParseWorkflowContent`, `ParseWorkflowFile`, `LoadWorkflowFiles`, `EscapeWF`, `UnescapeWF` (global); `FindBraceGroups`, `StripBraceGroups` (local) — Workflow sub-tab's `.txt` template parser (pure over string content) + `resources/workflow/` folder scanner |
 | `rock_band_general_helper_vkr/actions_workflow.lua` | `CompositeKey`, `PruneToWorkflowEntries`, `SaveWorkflowState`, `LoadWorkflowState`, `SelectWorkflowFile`, `ToggleWorkflowItem`, `ComputeWorkflowStats` (global) — Workflow checklist state, persistence (`workflow_v1` ExtState key), template-switch pruning, and the pure progress-count helper |
 | `rock_band_general_helper_vkr/metadata_genres.lua` | `RB3_GENRE_ORDER`, `RB3_GENRES` — the supported genre vocabulary, **29 major genres and 126 subgenres**, transcribed from `_external_docs/Subgenre Descriptions - RBN_C3 Documentation.htm`. Data only, pure. Note that page's own intro prose says "120 subgenre groupings, under 21 major genres" while the page **enumerates 29 and 126**; the enumeration is correct (checked against the tool that does the final selection), so the counts must not be "corrected" back to the prose — `dev/tests/metadata_genres.lua` asserts both numbers. Per-subgenre `blurb`/`elements`/`artists`/`albums` are **optional and mostly absent**: only 33 of the 126 carry any description at all, so every consumer must render correctly from a bare label. **No `.dta` tokens, deliberately** — token spellings drift between game eras (RB1/RB2 `urban` became RB3 `hiphoprap`) and are scoped to their parent (`subgenre_pop` is Pop-Punk under `punk` but Pop under `poprock`), and the packaging tool that writes `songs.dta` has its own picker. |
@@ -205,6 +208,7 @@ The section's **keyframes are emitted either way** — only the lighting event i
 | `rock_band_general_helper_vkr/ui_venue_preview.lua` | `DrawVenuePreviewTab` (global) — Preview sub-tab rendering; caches the VENUE event lists + muted instruments, refreshed on any project state change with a 5 s fallback and a self-pause when one read takes ≥ 0.15 s. Each column is a **PPQ group** (`_group_at`), not one event: camera groups resolve through `PickPriorityCameraEvent`, lighting/post-process take the group's last event. When no shot in a group fits the Players combo the group's last event is drawn in red and `_FALLBACK_NOTE` explains the game's own fallbacks below the row. Lighting/post-process arrive already collapsed by `AnnotateVenueBlends`, so a blend anchor is never a card of its own; `_transition_line` turns its annotations into the line under each timestamp (`blends into next` / `blending now` / `hard cut to next`, blank for camera and for the last event of a kind). That line is drawn even when blank — a column one text line shorter than its neighbours would push its sprite out of alignment. |
 | `rock_band_general_helper_vkr/ui_venue_players.lua` | `DrawActivePlayersRow` (global) — Active players dot row shown under every Venue sub-tab and in the standalone preview; PART-track play-state scan cached via `MakeProjectPoll(1.0, 5.0)`, playhead lookup recomputed on playhead change (≥ 0.5 s cadence during playback) |
 | `rock_band_general_helper_vkr/ui_venue_keyframes.lua` | `DrawVenueKeyframesTab` (global) — Keyframes sub-tab rendering |
+| `rock_band_general_helper_vkr/ui_animation.lua` | `DrawAnimationTab` (global); `DrawAnimationBeatTab` (local) — the Animation tab: its sub-tab bar and the Beat sub-tab |
 | `rock_band_general_helper_vkr/ui_workflow.lua` | `DrawGeneralWorkflowTab` (global) — Workflow tab rendering (the name predates the tab being promoted from General) |
 | `rock_band_general_helper_vkr/ui.lua` | `Loop`, `r.defer(Loop)` |
 
@@ -260,6 +264,7 @@ venue_awareness.lua            → GetMutedInstruments, GetCoopRequiredInstrumen
                                   GetDirectedRequiredInstruments, FilterPool,
                                   ReadEventSections, ListEventSections, FindMusicStartTime,
                                   INST_LETTER_NAMES
+animation_beat.lua             → BeatPlan, ReadProjectBars, GenerateBeatTrack
 venue_camera_priority.lua      → CAM_PRIORITY_TIERS, CAM_PRIORITY, CAM_GENERIC_FALLBACK,
                                   CameraShotPriority, CameraShotFitsBand,
                                   PickPriorityCameraEvent
@@ -323,6 +328,7 @@ ui_venue_preview.lua           → DrawVenuePreviewTab
 ui_venue_players.lua           → DrawActivePlayersRow
 ui_venue_keyframes.lua         → DrawVenueKeyframesTab
 ui_workflow.lua                → DrawGeneralWorkflowTab
+ui_animation.lua               → DrawAnimationTab
 song_key.lua                   → SuggestProjectSongKey (loaded after metadata_genres_lookup.lua)
 song_key_audio.lua             → SongKeyAudioStart/Step/Busy/Cancel/Result, SuggestAudioSongKey
 ui_metadata_key.lua            → DrawMetadataKeyTab (loaded before ui_metadata.lua)
@@ -346,7 +352,7 @@ ui.lua                         → Loop (also calls r.defer(Loop))
 
 Section `RBHelperVKR`, key `settings_v1`. Auto-loads on script open.
 
-**Saved:** all tempo map sliders — primary source (`tm_rms_threshold`, `tm_rms_window_ms`, `tm_search_window_ms`, `tm_drift_threshold_ms`, `tm_bpm_failsafe`, `tm_first_measure`, `tm_timesig_num`, `tm_override_failsafe`), fallback source (`tm_fb_rms_threshold`, `tm_fb_rms_window_ms`, `tm_fb_use_flux`), auto-tune (`tm_autotune_density`), the Venue settings, Show WIPs?, and the Workflow sub-tab's selected template name (`workflow_file_name`) and "Show completion timestamp" checkbox (`workflow_show_ts`). The Instrument Helper's tabs save under their own key (`.claude/CLAUDE_instrument.md` → Save / Load); a blob saved before the split still carries their fields, which `DeserializeSettings` ignores and the next Save drops.
+**Saved:** all tempo map sliders — primary source (`tm_rms_threshold`, `tm_rms_window_ms`, `tm_search_window_ms`, `tm_drift_threshold_ms`, `tm_bpm_failsafe`, `tm_first_measure`, `tm_timesig_num`, `tm_override_failsafe`), fallback source (`tm_fb_rms_threshold`, `tm_fb_rms_window_ms`, `tm_fb_use_flux`), auto-tune (`tm_autotune_density`), the Venue settings, Show WIPs?, and the Workflow sub-tab's selected template name (`workflow_file_name`) and "Show completion timestamp" checkbox (`workflow_show_ts`), and Animation > Beat's half-time downbeat style (`beat_half_style`, key `abhs`). The Instrument Helper's tabs save under their own key (`.claude/CLAUDE_instrument.md` → Save / Load); a blob saved before the split still carries their fields, which `DeserializeSettings` ignores and the next Save drops.
 **Not saved:** track indices — positional, brittle. `SetDefaultTracks` re-detects the tempo map and Song key audio tracks by name. It only assigns fields that are still -1 (do not override saved state).
 
 **Own ExtState keys, guarded through `SaveSettings`/`LoadSettings`:** the Section gen sub-tab's per-section configs (`vsec_v1`, `actions_venue_section.lua`) and the Workflow sub-tab's checklist state (`workflow_v1`, `actions_workflow.lua`) each live under their own key rather than the `settings_v1` scalar blob — both hold a variable-length, dynamically-keyed collection rather than a small fixed set of fields.
@@ -724,6 +730,23 @@ The `(N parts)` annotation appears only for lettered groups with `sub_count > 1`
 
 ---
 
+
+## Feature: Animation > Beat
+
+`animation_beat.lua` writes the BEAT track (note 12 = downbeat on a bar's first beat, 13 = upbeat on its other beats - "upbeat" as the RBN docs, CAT and the community template name it; user-facing text uses the words, not the numbers) - what CAT's "Create BEAT track notes" and "Halve BEAT track notes" do. `BeatPlan(bars, opts)` is pure; `GenerateBeatTrack(half)` reads the measures with `TimeMap_GetMeasureInfo` and writes in quarter notes (`MIDI_GetPPQPosFromProjQN`), so no tick rate is assumed.
+
+Rules, measured over the official RB3 DLC BEAT tracks (591 songs):
+- **One note per quarter note, counted from each bar line, in every meter.** 6/8 gets three notes on quarters, not two dotted quarters. A quarter that starts inside the bar gets a note even when the bar ends half a beat later: 7/8 = `D u u u`, 5/8 = `D u u`. CAT and the RBN doc's 7/8 example count only full beats (7/8 = three notes); no official 7/8 bar does that, so the official way was chosen.
+- **Measure 1 up to `[end]`, never on it.** 589/591 official tracks start at measure 1; 541 end one quarter before `[end]`, only 5 put a note on it. A time selection narrows the range (start inclusive, end exclusive) and is clipped to `[end]`. Existing BEAT notes starting in the range are replaced; a whole-song run replaces every note in the take.
+- **Half time**: a note every two quarters, each bar restarting at its bar line, so odd bars (3/4, 5/4, 6/8) leave the shorter gap before the next bar (CAT; 2 of the 3 official songs with halved odd bars). Bars too short for two notes (2/4, 3/8, 4/8 halved; 1/4, 2/8 normal) are written with the strict spacing and no fallback - a method waits for user data or official evidence.
+- **The beat just before `[end]` always gets a note**, half time included. Magma refuses a song without one (verified with Magma: 4/4 with `[end]` on beat 3 fails when beat 2 is empty). Half time steps one beat instead of two when the next step would reach `[end]`, as CAT does, so the last bar can end `D u u` (beats 1, 3, 4).
+- **Half-time downbeat** (`S.beat_half_style`): 0 = every other bar (default: CAT and about 12 of 14 halved official songs), 1 = every bar. Parity counts from the bar holding the range start, so a selected halved section starts on a 12.
+- Velocity 100 (official); length a 16th (CAT; length has no effect in game).
+- Needs a BEAT track and an `[end]` text event on EVENTS. No MIDI item on BEAT -> one is created from measure 1 to `[end]`; an item too short for the range stops the run instead of being resized. One undo block.
+
+**The RBN doc's BEAT rule is wrong or outdated.** The RBN documentation says every measure must have at least one downbeat (12) and one upbeat (13) "for in-game animations", as a Magma compile error, and that a short measure such as 1/4 is best merged with a neighbouring measure. Tested with Magma: all three modes (normal, half time with the downbeat every other bar, half time with it every bar) compile, with bars that have no 12. The only BEAT check Magma enforced was the beat before `[end]` (above). CAT's halving and most halved official songs also leave every second bar without a 12. The doc also describes halving as being for animation purposes.
+
+Tests: `dev/tests/animation_beat.lua` (planner cases also run offline with a stub `r`; the integration cases need a project with no BEAT / EVENTS track whose first bars are 4/4).
 
 ## Glossary
 

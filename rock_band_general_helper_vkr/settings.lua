@@ -35,6 +35,7 @@ local function SerializeSettings()
         'vsecm='  .. S.venue_sec_mode,
         'vmgt='   .. S.venue_mg_target,
         'vmgr='   .. S.venue_mg_replace,
+        'abhs='   .. S.beat_half_style,
         'vsectm=' .. S.venue_sec_tmpl_name,
         'vpscl='   .. S.venue_preview_scale,
         'vpan='    .. (S.venue_preview_animate and '1' or '0'),
@@ -73,6 +74,7 @@ local function DeserializeSettings(str)
         elseif k == 'vsecm'  then S.venue_sec_mode          = tonumber(v) or 0
         elseif k == 'vmgt'   then S.venue_mg_target         = (v == '1') and 1 or 0
         elseif k == 'vmgr'   then S.venue_mg_replace        = (v == '1') and 1 or 0
+        elseif k == 'abhs'   then S.beat_half_style         = (v == '1') and 1 or 0
         elseif k == 'vsectm' then S.venue_sec_tmpl_name     = v
         elseif k == 'vpscl'   then S.venue_preview_scale   = tonumber(v) or 1
         elseif k == 'vpan'    then S.venue_preview_animate = (v == '1')

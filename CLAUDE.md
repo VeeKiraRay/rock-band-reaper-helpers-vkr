@@ -548,6 +548,8 @@ Before that isolation, two runners went unnoticed missing a library for months.
     song_key.lua     song_key_audio.lua      ← Metadata > Song key: chart and audio
     ui_metadata_key.lua                        readers, tab body
     ui_metadata.lua                          ← Metadata tab shell (Genre, Difficulty, Song key)
+    animation_beat.lua                       ← Animation > Beat: the BEAT track planner
+    ui_animation.lua                           and action, the Animation tab body
 
   rock_band_instrument_helper_vkr.lua        ← entry point (only file users run)
   rock_band_instrument_helper_vkr/
