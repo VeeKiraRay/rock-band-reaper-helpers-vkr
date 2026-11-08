@@ -41,7 +41,7 @@ local results = { vocal = nil, general = nil, instrument = nil,
                   quick_actions = nil, spritesheet = nil, venue_events = nil,
                   venue_subtracks = nil, venue_phrase_pacing = nil,
                   venue_labels = nil, workflow = nil, animation_beat = nil,
-                  animation_character = nil,
+                  animation_character = nil, animation_drums = nil,
                   guitar_theory = nil, music_notation = nil,
                   karplus_strong = nil, wav_writer = nil,
                   script_links = nil, window_title = nil, helper_ui = nil,
@@ -449,6 +449,14 @@ function Loop()
         end
         r.ImGui_SameLine(ctx)
         draw_status(results.animation_character)
+
+        r.ImGui_Spacing(ctx)
+
+        if r.ImGui_Button(ctx, 'Animation Drums Tests', 155, 24) then
+            run('run_animation_drums.lua', 'animation_drums')
+        end
+        r.ImGui_SameLine(ctx)
+        draw_status(results.animation_drums)
 
         r.ImGui_Spacing(ctx)
         r.ImGui_Separator(ctx)

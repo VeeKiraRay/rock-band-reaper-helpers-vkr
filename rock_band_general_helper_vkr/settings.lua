@@ -45,6 +45,14 @@ local function SerializeSettings()
         'acgv='   .. S.char_gap_vox_bars,
         'acig='   .. (S.char_idle_gaps and '1' or '0'),
         'acmd='   .. S.char_mode,
+        'adcr='   .. S.drum_anim_crash,
+        'adbh='   .. (S.drum_anim_blue_hh and '1' or '0'),
+        'admc='   .. S.drum_anim_min_cym,
+        'adfl='   .. (S.drum_anim_flam and '1' or '0'),
+        'adsv='   .. (S.drum_anim_snare_variety and '1' or '0'),
+        'adso='   .. (S.drum_anim_soft and '1' or '0'),
+        'adra='   .. (S.drum_anim_ride_alt and '1' or '0'),
+        'adfll='  .. (S.drum_anim_flam_late and '1' or '0'),
         'vsectm=' .. S.venue_sec_tmpl_name,
         'vpscl='   .. S.venue_preview_scale,
         'vpan='    .. (S.venue_preview_animate and '1' or '0'),
@@ -92,6 +100,14 @@ local function DeserializeSettings(str)
         elseif k == 'acgv'   then S.char_gap_vox_bars       = math.max(1, math.min(8, tonumber(v) or 2))
         elseif k == 'acig'   then S.char_idle_gaps          = (v == '1')
         elseif k == 'acmd'   then S.char_mode               = (v == '1') and 1 or 0
+        elseif k == 'adcr'   then S.drum_anim_crash         = (v == '1') and 1 or 0
+        elseif k == 'adbh'   then S.drum_anim_blue_hh       = (v == '1')
+        elseif k == 'admc'   then S.drum_anim_min_cym       = math.max(2, math.min(8, tonumber(v) or 3))
+        elseif k == 'adfl'   then S.drum_anim_flam          = (v == '1')
+        elseif k == 'adsv'   then S.drum_anim_snare_variety = (v == '1')
+        elseif k == 'adso'   then S.drum_anim_soft          = (v == '1')
+        elseif k == 'adra'   then S.drum_anim_ride_alt      = (v == '1')
+        elseif k == 'adfll'  then S.drum_anim_flam_late     = (v == '1')
         elseif k == 'vsectm' then S.venue_sec_tmpl_name     = v
         elseif k == 'vpscl'   then S.venue_preview_scale   = tonumber(v) or 1
         elseif k == 'vpan'    then S.venue_preview_animate = (v == '1')

@@ -101,7 +101,7 @@ Items 1 and 2 are covered by `dev/tests/script_links.lua`, which checks the regi
 | `lib/reaper_helper_common.lua` | `FindTrackByName`, `TrackAtIndex`, `GetTakePPQPerQN`, `GetTempoContextBefore`, `TrackHasAudio`, `TrackHasMIDI`, `RefreshTrackLists`, `RunAction`, `MakeProjectPoll` — track and action helpers the General, Instrument and Vocal helpers share. Writes the caller's `S` (`*_track_list`, `status`, `last_result`), so each script declares those fields. `RunAction` calls the script's optional global `RunActionErrorCleanup()` after a failed action (the vocal helper closes its open YIN context there) |
 | `lib/reaper_helper_ui.lua` | `TrackCombo`, `MidiEditorTrackWarning`, `DrawResultPanel`, `HelperFooterHeight`, `DrawHelperFooter`, `HelperCopyText` — UI every window draws (see "Window footer" below). `TrackCombo` matches by REAPER track index and offers `(none)` (`-1`): an optional input left unset, or a required one not picked yet — actions resolve indices through `TrackAtIndex` and ask for a track when it returns nil. `DrawResultPanel()` draws the last result (a line with a tab renders as two columns) |
 | `lib/reaper_dsp.lua` | `ComputeRMSContour`, `OpenYINContext`, `YINWindowSize`, `ReadMonoWindow`, `QuickRMS`, `ComputeCMND`, `SearchYINTau`, `MedianVote`, `DetectPitchYIN`, `SampleYINAt`, `GateAndSplit`, `ApplyMinOffset` |
-| `lib/reaper_midi_helpers.lua` | `FindMIDIItem`, `FindFirstMIDIItem`, `ReadAllMIDINotesOnTrack`, `ClearNotesAtPitchesInRange`, `InsertNotes`, … |
+| `lib/reaper_midi_helpers.lua` | `FindMIDIItem`, `FindFirstMIDIItem`, `ReadAllMIDINotesOnTrack`, `ClearNotesAtPitchesInRange`, `InsertNotes`, `ReplaceNotesBulk` (one `MIDI_GetAllEvts` / `MIDI_SetAllEvts` round trip: Difficulty > Generate, Animation > Drums), … |
 | `lib/reaper_guitar_theory.lua` | `GuitarShapeToPitches`, `GuitarNormalizeIntervals`, `GuitarClassifyChordType`, `GuitarSuggestRBMapping`, `GuitarAnalyzeShape`, `GuitarParseFretInput`, `GuitarAnalyzeShapeAllTunings` — pure, no `r`/`ctx`/`S` |
 | `lib/reaper_music_notation.lua` | Staff notation model: `NOTATION_CLEFS`, `KEY_SIGNATURES`, `NotationStepToNatural`, `NotationStepToPitch`, `NotationNoteName`, `NotationKeySigAlteration(s)`, `NotationSoundingStep`, `NotationKeySigSlots`, `RBPitchName`, `PianoKeyLayout` — pure, no `r`/`ctx`/`S` |
 | `lib/reaper_script_links.lua` | `SCRIPT_LINK_GROUPS`, `ScriptLinkBasename`, `IsRunningScriptLink`, `FilterScriptLinkGroups`, `LaunchReaScript`, `DrawGeneralLinksTab` — the General > Other tools sub-tab, shared by the general, instrument and vocal helpers |
@@ -548,9 +548,10 @@ Before that isolation, two runners went unnoticed missing a library for months.
     song_key.lua     song_key_audio.lua      ← Metadata > Song key: chart and audio
     ui_metadata_key.lua                        readers, tab body
     ui_metadata.lua                          ← Metadata tab shell (Genre, Difficulty, Song key)
-    animation_beat.lua                       ← Animation > Beat (BEAT track) and
-    animation_character.lua                    > Character (animation states): planners
-    ui_animation.lua                           and actions, the Animation tab body
+    animation_beat.lua                       ← Animation > Beat (BEAT track),
+    animation_character.lua                    > Character (animation states) and
+    animation_drums.lua                        > Drums (drummer notes): planners and
+    ui_animation.lua                           actions, the Animation tab body
 
   rock_band_instrument_helper_vkr.lua        ← entry point (only file users run)
   rock_band_instrument_helper_vkr/

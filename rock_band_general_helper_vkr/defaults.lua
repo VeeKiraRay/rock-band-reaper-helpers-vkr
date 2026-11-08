@@ -199,6 +199,15 @@ S = {
     char_mode            = 0,    -- 0=Generate 1=Manual (persisted: 'acmd')
     char_manual_part     = 1,    -- Manual part, index into CHAR_PARTS (not persisted)
     char_manual_state    = '[play]', -- Manual state, an event text from CHAR_STATES (not persisted)
+    -- Animation > Drums (all persisted: 'adcr' 'admc' 'adfl' 'adsv' 'adso' 'adra' 'adfll')
+    drum_anim_crash         = 0,     -- default crash: 0 = crash 2, 1 = crash 1
+    drum_anim_blue_hh       = false, -- blue cymbal = open hi-hat (false = ride)
+    drum_anim_min_cym       = 3,     -- fast cymbal hits in a row before the hands alternate
+    drum_anim_flam          = true,  -- snare + yellow tom = both hands on the snare
+    drum_anim_snare_variety = true,  -- slow lone snares: right hand / both hands by context
+    drum_anim_soft          = false, -- soft snare and crash notes
+    drum_anim_ride_alt      = false, -- riding a crash in 8ths alternates soft and hard
+    drum_anim_flam_late     = false, -- a flam's left hand a 1/32 note late
     -- UI visibility (persisted)
     show_wip_tabs           = false, -- show the Tempo Map tab
     -- Workflow checklist (Workflow tab)
@@ -553,7 +562,45 @@ TIPS = {
                      "The beat just before [end] always gets a note (Magma needs it).\n\n" ..
                      "Select a section first to halve only that part.\n" ..
                      "Range, checks and undo as Generate beats.",
-    char_set_all = "Set every part's active state at once. The rows below can then be\n" ..
+    drum_anim_crash = "Which crash a green cymbal gem plays: crash 2 on the drummer's right\n" ..
+                      "(next to the ride) or crash 1 on the left (next to the hi-hat).\n\n" ..
+                      "Official charts choose per song: some use crash 1 for nearly every\n" ..
+                      "crash, others almost never. Crash 2 is the commoner overall. Pick what\n" ..
+                      "the recording sounds like; edit single crashes by hand after.",
+    drum_anim_blue = "What a blue cymbal gem plays.\n\n" ..
+                     "Ride: the ride cymbal. A lone blue hit (no other blue within a beat)\n" ..
+                     "is played as a crash 1 accent.\n" ..
+                     "Open hi-hat: for charts that put the closed hi-hat on yellow and the\n" ..
+                     "open hi-hat on blue - every blue hit is the hi-hat.\n\n" ..
+                     "Official charts: most play blue as the ride; ~10% of songs play it as\n" ..
+                     "the hi-hat nearly every time.",
+    drum_anim_min_cym = "Fast hi-hat / cymbal hits (under ~130 ms apart, e.g. 16ths at 120 BPM\n" ..
+                        "or 8ths at 240 BPM) switch to alternating hands only after this many\n" ..
+                        "in a row; until then the right hand plays them. Hi-hat 16ths also\n" ..
+                        "alternate from 110 BPM, and always in a disco beat. Slower cymbals\n" ..
+                        "stay on the right hand.\n\n" ..
+                        "3 matches the official charts best. CAT uses 4.",
+    drum_anim_flam = "Snare and yellow tom together: both hands on the snare instead of\n" ..
+                     "snare + tom 1. Official charts do this 83% of the time.",
+    drum_anim_snare_variety = "Lone snare hits with nothing fast around them:\n" ..
+                              "  - in a slow snare-only passage, the right hand plays them;\n" ..
+                              "  - on the beat after a pause or next to toms, both hands (an accent).\n" ..
+                              "Off: the left hand plays them all. Official charts play these\n" ..
+                              "~50% left, ~30% right, ~20% both hands.",
+    drum_anim_soft = "Snare and crash hits use the soft notes. Official charts use soft hits\n" ..
+                     "on ~10% of hits.",
+    drum_anim_ride_alt = "When the drummer rides a crash in 8th notes, alternate soft and hard\n" ..
+                         "hits so it looks less robotic (an RBN doc tip). Rare in official\n" ..
+                         "charts (6% of 8th-note crash riding, 13% when slow); quarters and\n" ..
+                         "16ths are never alternated.",
+    drum_anim_flam_late = "The left hand of a flam lands a 1/32 note after the right (an RBN\n" ..
+                          "doc tip for a more realistic flam). Official charts put both hands\n" ..
+                          "on the same tick.",
+    drum_anim_generate = "Write the animation notes on PART DRUMS and PART DRUMS_2X from their\n" ..
+                         "Expert gems. Existing animation notes are replaced - on the whole\n" ..
+                         "track, or only inside the time selection. Hi-hat pedal notes are\n" ..
+                         "never touched. Muted tracks are skipped. One undo step.",
+    char_set_all ="Set every part's active state at once. The rows below can then be\n" ..
                    "changed one by one.",
     char_gap_inst = "Drums, guitar, bass and keys go [idle] when they rest at least this\n" ..
                     "long (from the end of a note to the next note), and come back 1 beat\n" ..

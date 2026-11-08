@@ -278,6 +278,59 @@ local function DrawAnimationCharacterTab()
     end
 end
 
+-- Drums sub-tab: the options and Generate.
+local function DrawAnimationDrumsTab()
+    r.ImGui_TextWrapped(ctx, 'Writes the drummer\'s hand and kick animation notes on PART DRUMS ' ..
+                             'and PART DRUMS_2X from the Expert gems: which drum or cymbal, and ' ..
+                             'which hand - alternating only when the hits come fast, following ' ..
+                             'the beat, and moving around the kit without crossing the arms. ' ..
+                             'The hi-hat pedal notes are not generated.')
+    r.ImGui_Spacing(ctx)
+
+    local lbl_col = LabelColWidth({ 'Default crash', 'Blue cymbal', 'Min cymbal hits' })
+    local radio_w = RadioGroupWidth({ 'Crash 2 (right)', 'Crash 1 (left)', 'Ride', 'Open hi-hat' })
+    r.ImGui_Text(ctx, 'Default crash')
+    r.ImGui_SameLine(ctx, lbl_col)
+    if r.ImGui_RadioButton(ctx, 'Crash 2 (right)##da_crash', S.drum_anim_crash == 0) then S.drum_anim_crash = 0 end
+    Tooltip(TIPS.drum_anim_crash)
+    r.ImGui_SameLine(ctx, lbl_col + radio_w)
+    if r.ImGui_RadioButton(ctx, 'Crash 1 (left)##da_crash', S.drum_anim_crash == 1) then S.drum_anim_crash = 1 end
+    Tooltip(TIPS.drum_anim_crash)
+
+    r.ImGui_Text(ctx, 'Blue cymbal')
+    r.ImGui_SameLine(ctx, lbl_col)
+    if r.ImGui_RadioButton(ctx, 'Ride##da_blue', not S.drum_anim_blue_hh) then S.drum_anim_blue_hh = false end
+    Tooltip(TIPS.drum_anim_blue)
+    r.ImGui_SameLine(ctx, lbl_col + radio_w)
+    if r.ImGui_RadioButton(ctx, 'Open hi-hat##da_blue', S.drum_anim_blue_hh) then S.drum_anim_blue_hh = true end
+    Tooltip(TIPS.drum_anim_blue)
+
+    r.ImGui_Text(ctx, 'Min cymbal hits')
+    r.ImGui_SameLine(ctx, lbl_col)
+    r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
+    _, S.drum_anim_min_cym = r.ImGui_SliderInt(ctx, '##da_mincym', S.drum_anim_min_cym, 2, 8, '%d hits')
+    SliderTooltip(TIPS.drum_anim_min_cym)
+
+    _, S.drum_anim_flam = r.ImGui_Checkbox(ctx, 'Snare + yellow tom as a flam##da_flam', S.drum_anim_flam)
+    Tooltip(TIPS.drum_anim_flam)
+    _, S.drum_anim_snare_variety = r.ImGui_Checkbox(ctx, 'Slow snare variety##da_sv', S.drum_anim_snare_variety)
+    Tooltip(TIPS.drum_anim_snare_variety)
+    _, S.drum_anim_soft = r.ImGui_Checkbox(ctx, 'Soft snare and crash hits##da_soft', S.drum_anim_soft)
+    Tooltip(TIPS.drum_anim_soft)
+    _, S.drum_anim_ride_alt = r.ImGui_Checkbox(ctx, 'Crash riding: alternate soft and hard##da_ra',
+                                               S.drum_anim_ride_alt)
+    Tooltip(TIPS.drum_anim_ride_alt)
+    _, S.drum_anim_flam_late = r.ImGui_Checkbox(ctx, 'Flam: left hand slightly late##da_fl',
+                                                S.drum_anim_flam_late)
+    Tooltip(TIPS.drum_anim_flam_late)
+
+    r.ImGui_Spacing(ctx)
+    if Btn('Generate drum animations', BTN_H) then
+        RunAction(GenerateDrumAnimations)
+    end
+    Tooltip(TIPS.drum_anim_generate)
+end
+
 -- Animation main tab. Body only: the caller owns BeginTabItem / EndTabItem.
 function DrawAnimationTab()
     if r.ImGui_BeginTabBar(ctx, '##animation_subtabs') then
@@ -287,6 +340,10 @@ function DrawAnimationTab()
         end
         if r.ImGui_BeginTabItem(ctx, 'Character') then
             DrawAnimationCharacterTab()
+            r.ImGui_EndTabItem(ctx)
+        end
+        if r.ImGui_BeginTabItem(ctx, 'Drums') then
+            DrawAnimationDrumsTab()
             r.ImGui_EndTabItem(ctx)
         end
         r.ImGui_EndTabBar(ctx)

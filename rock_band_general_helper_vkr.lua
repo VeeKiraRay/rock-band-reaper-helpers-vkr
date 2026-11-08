@@ -9,7 +9,8 @@
 --                  buttons that open the other tools in this set
 --     Workflow   - per-project authoring workflow checklist
 --     Animation  - Beat: write the BEAT track (normal or half time);
---                  Character: band member animation states per part
+--                  Character: band member animation states per part;
+--                  Drums: the drummer's hand and kick animation notes
 --     Events     - list song sections, insert EVENTS track events at the
 --                  playhead
 --     Venue      - list, validate, and generate VENUE track events
@@ -62,6 +63,18 @@
 --       replaces the one there, including Idle intense, Play solo (guitar and
 --       bass) and the drummer's two ride options, and shows the part's state at the playhead and the bar it
 --       started from. Each state's tooltip carries its RBN description.
+--     - Animation > Drums writes the drummer's animation notes (which drum or
+--       cymbal, which hand, the kick) on PART DRUMS and PART DRUMS_2X from the
+--       Expert gems. The hands follow the official charts: they alternate only
+--       when hits come fast, in step with the beat, moving around the kit
+--       without crossing the arms, disco hi-hat 16ths alternate, a lone blue
+--       cymbal is a crash accent, and slow snares vary between hands. Measured
+--       against the official charts, the hand is right on 93% of one-hand hits
+--       (CAT's rules: 84%). Options as in CAT - default crash, soft hits, the
+--       snare + yellow tom flam (now on by default), min cymbal hits - plus
+--       Blue cymbal (ride or open hi-hat), slow snare variety, soft / hard
+--       crash riding and a late left hand on flams. The hi-hat pedal (note 25)
+--       is left to you. Notes are written in one pass, not one by one.
 --     - New Events tab for the EVENTS track tools, with two sub-tabs.
 --       General holds "List event sections" (moved from Venue > Actions);
 --       Manual gen is the former Venue > Events sub-tab.
@@ -277,6 +290,7 @@ for _, _f in ipairs({
     _mdir .. 'venue_awareness.lua',
     _mdir .. 'animation_beat.lua',
     _mdir .. 'animation_character.lua',
+    _mdir .. 'animation_drums.lua',
     _mdir .. 'venue_camera_priority.lua',
     _mdir .. 'section_events.lua',
     _mdir .. 'venue_themes.lua',
@@ -357,6 +371,7 @@ dofile(_mdir .. 'venue.lua')
 dofile(_mdir .. 'venue_awareness.lua')
 dofile(_mdir .. 'animation_beat.lua')       -- uses FindEventTime from venue_awareness.lua
 dofile(_mdir .. 'animation_character.lua')
+dofile(_mdir .. 'animation_drums.lua')
 dofile(_mdir .. 'venue_camera_priority.lua')
 dofile(_mdir .. 'section_events.lua')
 dofile(_mdir .. 'venue_themes.lua')
