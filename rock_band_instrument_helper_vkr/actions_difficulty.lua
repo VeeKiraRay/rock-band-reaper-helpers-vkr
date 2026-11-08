@@ -23,10 +23,6 @@ local PK_MAX_JUMP  = { H=11, M=9, E=7 }   -- X has no jump restriction
 local PK_MIN_SP    = { M=0.5, E=1.0 }
 local PK_ADV_SP    = { M=1.0, E=2.0 }
 local PK_ALLOW_SH  = { X=true, H=true, M=false, E=false }  -- allow mid-song lane shifts
--- "Unchanged copy" and "NOT REDUCED" are advisories on Pro Keys: on a simple Expert an
--- official Hard is sometimes Expert as it is (3 of 352 RB3 DLC songs exactly, 13 at 95%+
--- of the notes), and the RBN doc has no rule that Hard must differ.
-local PK_PROGRESSION = { advisory = true }
 
 -- Three primary range positions (easiest to read in-game): C range, F range, A range.
 -- Non-primary positions (D=2, E=4, G=7) are technically valid but harder to read.
@@ -805,7 +801,7 @@ function ValidateProKeysDiff(diff_label)
         local block, extra = CheckDifficultyProgression(
             DIFF_NAMES[diff_label], DIFF_NAMES[higher_dl],
             events, higher_events, PK_MIN, PK_MIN,
-            CountNotes(events), higher_count, PK_PROGRESSION)
+            CountNotes(events), higher_count)
         report = block .. report
         total  = total + extra
     end
@@ -872,7 +868,7 @@ function ValidateAllProKeys()
                         local block, extra = CheckDifficultyProgression(
                             DIFF_NAMES[dl], DIFF_NAMES[prev_dl],
                             evs, prev_events, PK_MIN, PK_MIN,
-                            CountNotes(evs), prev_count, PK_PROGRESSION)
+                            CountNotes(evs), prev_count)
                         report = block .. report
                         total  = total + extra
                     end

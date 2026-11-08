@@ -18,7 +18,7 @@
 -- The instruments Generate supports, in dropdown order - which is also the run order of
 -- All instruments, so Pro Keys comes before Keys (Keys follows the Pro Keys this run
 -- generated). Adding one is one entry here plus its planner. idx_field is the
--- track field the instrument's own Difficulty sub-tab uses, so the selection is shared
+-- track field Validate & copy uses for that instrument, so the selection is shared
 -- rather than duplicated. Pro Keys has a track per tier: tier_fields instead.
 GEN_INSTRUMENTS = {
     { key = 'gtr',  label = 'Guitar', track_name = 'PART GUITAR', idx_field = 'diff_gtr_idx',  kind = 'gb' },
@@ -60,6 +60,81 @@ function GenInstrumentByKey(key)
         if inst.key == key then return inst end
     end
     return nil
+end
+
+-- Generate's options, in display order. key = the GenStyleValues field, field = the S
+-- field Custom edits, drums = shown only for Drums / All instruments. Option values are
+-- what the planners take (opts.fast_runs, opts.between, ...).
+-- rules: every rule without a row of its own, VKR (the tool author's choices, marked
+-- "User rule" in docs/difficulty_reduction.md) or Official (GEN_RULE_SETS.official,
+-- difficulty_generate_params.lua: those with an official alternative switched to it).
+-- GenerateDifficulties applies it around the whole run (GenWithRules).
+GEN_STYLE_ROWS = {
+    { key = 'busy_drop', label = 'Hard 8th runs', field = 'diff_gen_busy_drop', id = 'gen_busy',
+      opts = { { 'auto', 'Auto' }, { 1, 'Drop 1 per bar' }, { 2, 'Drop 2 per bar' } } },
+    { key = 'fast_runs', label = 'Hard fast runs', field = 'diff_gen_fast_runs', id = 'gen_fast',
+      opts = { { 'rewrite', 'Rewrite' }, { 'auto', 'Auto' }, { 'thin', 'Thin' } } },
+    { key = 'drums_between', label = 'Drums Medium', field = 'diff_gen_drums_between', id = 'gen_dbtw', drums = true,
+      opts = { { 'beats', 'Beats' }, { 'none', 'None' }, { 'keep', 'Keep' } } },
+    { key = 'drums_eighths', label = 'Drums fast 8ths', field = 'diff_gen_drums_eighths', id = 'gen_d8', drums = true,
+      opts = { { 'hands', 'Hands' }, { 'beats', 'Beats' } } },
+    { key = 'rules', label = 'Other rules', field = 'diff_gen_rules', id = 'gen_rules',
+      opts = { { 'vkr', 'VKR' }, { 'official', 'Official' } } },
+}
+
+-- The rule styles. VKR: the tool author's own rules (the golden songs are checked with
+-- it). Official: each option at what official charts do (checked against the official
+-- corpus). Custom: no preset - the rows are editable and start from the style shown
+-- before it (GenSetStyle).
+GEN_STYLES = {
+    { key = 'vkr', label = 'VKR',
+      values = { busy_drop = 'auto', fast_runs = 'rewrite', drums_between = 'beats', drums_eighths = 'hands',
+                 rules = 'vkr' } },
+    { key = 'official', label = 'Official',
+      values = { busy_drop = 'auto', fast_runs = 'thin', drums_between = 'beats', drums_eighths = 'beats',
+                 rules = 'official' } },
+    { key = 'custom', label = 'Custom' },
+}
+
+local function GenStyleByKey(key)
+    for _, st in ipairs(GEN_STYLES) do
+        if st.key == key then return st end
+    end
+    return GEN_STYLES[1]
+end
+
+-- The option values Generate runs with: the style's preset, or Custom's own S fields.
+function GenStyleValues()
+    local st = GenStyleByKey(S.diff_gen_style)
+    if st.values then return st.values end
+    local v = {}
+    for _, row in ipairs(GEN_STYLE_ROWS) do v[row.key] = S[row.field] end
+    return v
+end
+
+-- Switch the rule style. Into Custom: its own values when it has them (saved with the
+-- project, or set this session - S.diff_gen_custom_set), else the values the previous
+-- style showed.
+function GenSetStyle(key)
+    if key == 'custom' and S.diff_gen_style ~= 'custom' and not S.diff_gen_custom_set then
+        local from = GenStyleValues()
+        for _, row in ipairs(GEN_STYLE_ROWS) do S[row.field] = from[row.key] end
+    end
+    if key == 'custom' then S.diff_gen_custom_set = true end
+    S.diff_gen_style = GenStyleByKey(key).key
+end
+
+-- The result's first line: the style, and with Custom every option's value.
+function GenStyleLine(values)
+    local st = GenStyleByKey(S.diff_gen_style)
+    if st.values then return 'Rule style: ' .. st.label end
+    local parts = {}
+    for _, row in ipairs(GEN_STYLE_ROWS) do
+        for _, o in ipairs(row.opts) do
+            if o[1] == values[row.key] then parts[#parts + 1] = row.label .. ' ' .. o[2] end
+        end
+    end
+    return 'Rule style: Custom - ' .. table.concat(parts, ', ')
 end
 
 -- Pro Keys planner events carry real pitches (offs = pitch - 0).
@@ -227,7 +302,7 @@ end
 
 -- The same-tier Pro Keys chart Keys follows, as { { qn, qn_e }... }, or nil when there
 -- is no such track or it is empty.
--- by_name false: the Pro Keys sub-tab's track selection only (auto-detected at startup),
+-- by_name false: the Pro Keys track selection only (auto-detected at startup),
 --   so Keys never follows a track the user did not pick.
 -- by_name true (All instruments): the default track name, like every other track in
 --   that mode.
@@ -554,7 +629,7 @@ local function DrumsLines(dl, log, opts)
     end
     if (log.snare_runs or 0) > 0 then
         lines[#lines + 1] = ('    %d "and" hit%s of long 8th snare runs removed - quarter notes on the beats (%d+ BPM)'):format(
-            log.snare_runs, log.snare_runs == 1 and '' or 's', GEN_DRUMS_PARAMS.easy_snare_run_bpm or 0)
+            log.snare_runs, log.snare_runs == 1 and '' or 's', log.snare_run_bpm or 0)
     end
     if (log.expert_runs or 0) > 0 then
         lines[#lines + 1] = ('    %d bar%s with a fill Hard rewrote off the 8th grid: reduced from Expert\'s notes instead'):format(
@@ -590,7 +665,7 @@ end
 -- same way whether Guitar is part of this run or not, so generating Bass alone gives what
 -- All instruments gives. A run starting at Hard plans Guitar's Hard from its Expert and its
 -- Medium from that; a run starting at Medium plans it from Guitar's Hard as it is.
--- Track: by name in All instruments, else the Guitar sub-tab's selection - and by name
+-- Track: by name in All instruments, else the Guitar track selection - and by name
 -- when nothing is selected there, since Bass and Keys always follow PART GUITAR.
 -- Returns { H = log.busy_bars, M = log.rhythm_bars } (entries nil when there is nothing).
 local function GuitarRefs(sel_s, sel_e, by_name, busy_drop, first_tier, fast_runs)
@@ -867,7 +942,14 @@ end
 --   whether to make Expert's too-short sustains plain notes first. pk_pull_back: true /
 --   false once asked whether to shorten Pro Keys Hard's sustains because Hard would equal
 --   Expert.
+-- The run uses the rule style's "Other rules" set (GenWithRules): the planners' parameter
+-- tables are switched for it and put back when it ends. A run after a popup switches again.
+local GenerateRun
 function GenerateDifficulties(inst_key, tiers, force, answers)
+    return GenWithRules(GenStyleValues().rules, GenerateRun, inst_key, tiers, force, answers)
+end
+
+function GenerateRun(inst_key, tiers, force, answers)
     answers = answers or {}
     local targets, skipped, err = ResolveTargets(inst_key)
     if not targets then
@@ -905,7 +987,7 @@ function GenerateDifficulties(inst_key, tiers, force, answers)
             local item, take
             if tr then item, take = FindFirstMIDIItem(tr) end
             if not tr then
-                missing = ('%s: no %s track - select it on the Pro Keys sub-tab'):format(t.inst.label, 'PART REAL_KEYS_' .. dl)
+                missing = ('%s: no %s track - select it in the Pro Keys track rows'):format(t.inst.label, 'PART REAL_KEYS_' .. dl)
                 break
             elseif not item then
                 missing = ('%s: %s has no MIDI item'):format(t.inst.label,
@@ -917,7 +999,7 @@ function GenerateDifficulties(inst_key, tiers, force, answers)
         local src, src_shifts = {}, nil
         if src_track then src, src_shifts = ReadTier(t.inst, src_track, src_dl, sel_s, read_e) end
         if not src_track then
-            skipped[#skipped + 1] = ('%s: no %s track - select it on the Pro Keys sub-tab'):format(
+            skipped[#skipped + 1] = ('%s: no %s track - select it in the Pro Keys track rows'):format(
                 t.inst.label, 'PART REAL_KEYS_' .. src_dl)
         elseif #src == 0 then
             skipped[#skipped + 1] = ('%s: %s has no notes to generate from'):format(t.inst.label, DIFF_NAMES[src_dl])
@@ -991,20 +1073,23 @@ function GenerateDifficulties(inst_key, tiers, force, answers)
         return
     end
 
-    local lines, total_errors = {}, 0
+    -- The rule style's option values (VKR / Official presets, or Custom's own).
+    -- busy_drop 'auto' (or anything else) leaves busy_drop unset: the planner decides from
+    -- the tempo at the first note.
+    -- Hard fast runs: 'auto' | 'thin' | 'rewrite' (GEN5_PARAMS.fast_runs_default).
+    local style = GenStyleValues()
+    local lines, total_errors = { GenStyleLine(style), '' }, 0
     local scope = sel_s and ' [time selection]' or ''
     Lap('read')
 
-    -- 'auto' (or anything else) leaves busy_drop unset: the planner decides from the tempo
-    -- at the first note.
-    -- Hard fast runs: 'auto' | 'thin' | 'rewrite' (GEN5_PARAMS.fast_runs_default).
-    local fast_runs = S.diff_gen_fast_runs
-    local busy = S.diff_gen_busy_drop
+    local fast_runs = style.fast_runs
+    local busy = style.busy_drop
     local busy_drop = (busy == 1 or busy == 2) and busy or nil
-    -- Guitar leads Bass, Keys and Pro Keys on Hard's busy bars and Medium's rhythm (GuitarRefs).
+    -- Guitar leads Bass, Keys and Pro Keys on Hard's busy bars and Medium's rhythm (GuitarRefs);
+    -- not under the Official rules, where each part is reduced on its own.
     local refs = {}
     for _, job in ipairs(jobs) do
-        if job.inst.key ~= 'gtr' and job.inst.kind ~= 'drums' then
+        if job.inst.key ~= 'gtr' and job.inst.kind ~= 'drums' and GenRulesFollowGuitar(style.rules) then
             refs = GuitarRefs(sel_s, read_e, inst_key == GEN_ALL_KEY, busy_drop, tiers[1], fast_runs)
             break
         end
@@ -1200,8 +1285,8 @@ function GenerateDifficulties(inst_key, tiers, force, answers)
                 out, log = GenPKPlanTier(dl, upper, opts)
                 pk_generated[dl] = out
             elseif inst.kind == 'drums' then
-                opts = { fast_runs = fast_runs, between = S.diff_gen_drums_between, ctx = job.drums_ctx,
-                         busy_drop = busy_drop, eighth_hands = S.diff_gen_drums_eighths }
+                opts = { fast_runs = fast_runs, between = style.drums_between, ctx = job.drums_ctx,
+                         busy_drop = busy_drop, eighth_hands = style.drums_eighths }
                 local plan_in = upper
                 if dl == 'H' then
                     opts.keep_cymbals = DrumsKeptCymbals(d.track, job.drums_ctx, tiers, sel_s, sel_e)
@@ -1219,8 +1304,8 @@ function GenerateDifficulties(inst_key, tiers, force, answers)
                                                     RangeLo(inst, UPPER[dl]), false)
                     else
                         job.single_mem = job.single_mem or SinglePedalTiers(job, sel_s, read_e,
-                            { fast_runs = fast_runs, between = S.diff_gen_drums_between, busy_drop = busy_drop,
-                              eighth_hands = S.diff_gen_drums_eighths })
+                            { fast_runs = fast_runs, between = style.drums_between, busy_drop = busy_drop,
+                              eighth_hands = style.drums_eighths })
                         single = job.single_mem[UPPER[dl]]
                     end
                     single_kicks = 0

@@ -1,13 +1,15 @@
 -- Offline evaluation of the Difficulty > Generate Drums planner (difficulty_generate_drums.lua)
 -- against the official RB3 DLC charts. Plain Lua 5.4, no REAPER:
 --
---   lua dev/calibration/run_generate_eval_drums_offline.lua [fast_runs] [beats|hands|off] [holdout]
+--   lua dev/calibration/run_generate_eval_drums_offline.lua [fast_runs] [beats|hands|off] [official] [holdout]
 --
 -- fast_runs: rewrite | auto | thin (default GEN5_PARAMS.fast_runs_default). 'thin' is the
 -- official-like behaviour (no note ever moves); 'rewrite' moves fill runs, which then
 -- never line up with an official onset - expect a lower Hard F1 there.
 -- beats | hands: the "Drums fast 8ths" setting (opts.eighth_hands; default
 -- GEN_DRUMS_PARAMS.lower_eighth_hands_default); off: that rule switched off.
+-- official: the Official rule style - Thin and Beats unless given, and the Official "Other
+-- rules" (GEN_RULE_SETS.official, difficulty_generate_params.lua).
 --
 -- For each tier it feeds the OFFICIAL upper tier to the planner (X>H, H>M, M>E) and
 -- compares the result with the official lower tier: onset precision / recall / F1, and per
@@ -25,9 +27,10 @@
 
 local _dir  = (arg and arg[0] or ''):match('^(.+[\\/])') or './'
 local _root = _dir .. '../../'
-local FAST, MODE, DIAG, EIGHTH = nil, 'dev', false, nil
+local FAST, MODE, DIAG, EIGHTH, OFFICIAL = nil, 'dev', false, nil, false
 for _, a in ipairs(arg or {}) do
     if a == 'holdout' then MODE = 'holdout' elseif a == 'diag' then DIAG = true
+    elseif a == 'official' then OFFICIAL = true
     elseif a == 'beats' or a == 'hands' or a == 'off' then EIGHTH = a else FAST = a end
 end
 
@@ -41,6 +44,10 @@ dofile(_root .. 'rock_band_instrument_helper_vkr/difficulty_generate_params.lua'
 dofile(_root .. 'rock_band_instrument_helper_vkr/difficulty_generate_retime.lua')
 dofile(_root .. 'rock_band_instrument_helper_vkr/difficulty_generate_drums.lua')
 if EIGHTH == 'off' then GEN_DRUMS_PARAMS.lower_eighth_hands_bpm = nil end
+if OFFICIAL then
+    FAST, EIGHTH = FAST or 'thin', EIGHTH or 'beats'
+    GenApplyRules('official')
+end
 
 -- diag: keep rate by lane x beat class, generated vs official, from the same upper tier.
 local KEEP, MATCH = {}, 0.05
@@ -314,8 +321,9 @@ local function F1(st)
     local r_ = st.tp / math.max(1, st.off)
     return 100 * p, 100 * r_, p + r_ > 0 and 200 * p * r_ / (p + r_) or 0
 end
-P('Drums Generate evaluation - %d %s songs, fast runs: %s, fast 8ths: %s', songs, MODE, FAST or GEN5_PARAMS.fast_runs_default,
-  EIGHTH or GEN_DRUMS_PARAMS.lower_eighth_hands_default)
+P('Drums Generate evaluation - %d %s songs, fast runs: %s, fast 8ths: %s, rules: %s', songs, MODE,
+  FAST or GEN5_PARAMS.fast_runs_default, EIGHTH or GEN_DRUMS_PARAMS.lower_eighth_hands_default,
+  OFFICIAL and 'Official' or 'VKR')
 P('')
 P('%-8s %7s %7s %7s  %8s   %s', 'tier', 'prec', 'recall', 'F1', 'notes', 'per lane recall / precision (K R Y B G)')
 for _, row in ipairs({ { 'H', 'H' }, { 'M', 'M' }, { 'E', 'E' }, { 'chain H', 'chainH' }, { 'chain M', 'chainM' },

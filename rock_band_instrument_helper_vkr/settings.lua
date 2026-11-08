@@ -31,8 +31,21 @@ local function SerializeSettings()
         -- Tab Input guide
         'mcgtf='  .. S.mc_gtr_tab_format,
         'tabim='  .. S.tab_input_mode,
-        -- Difficulty tab: Guitar/Bass instrument selector
-        'dgbi='   .. S.diff_gb_instrument,
+        -- Difficulty tab: the instrument dropdowns
+        'dgin='   .. S.diff_gen_instrument,
+        'dvci='   .. S.diff_vc_instrument,
+        -- Difficulty > Generate: rule style, Custom's option values, the 2x pedal checkbox
+        'dgst='   .. S.diff_gen_style,
+        'dg2x='   .. (S.diff_gen_drums_2x_on_1x and '1' or '0'),
+        -- Custom's values only once Custom has some (GenSetStyle): a project that never
+        -- used Custom saves none, so Custom later starts from the style shown before it.
+        S.diff_gen_custom_set and table.concat({
+            'dgbd=' .. tostring(S.diff_gen_busy_drop),
+            'dgfr=' .. S.diff_gen_fast_runs,
+            'dgdb=' .. S.diff_gen_drums_between,
+            'dgde=' .. S.diff_gen_drums_eighths,
+            'dgor=' .. S.diff_gen_rules,
+        }, ';') or 'dgcs=0',
         -- Difficulty tab: Keys Copy reduced-using-Pro-Keys checkbox
         'd5kpkr=' .. (S.diff_5k_pk_reduce and '1' or '0'),
         -- MIDI alignment
@@ -92,8 +105,27 @@ local function DeserializeSettings(str)
         -- Tab Input guide
         elseif k == 'mcgtf'  then S.mc_gtr_tab_format  = tonumber(v) or 0
         elseif k == 'tabim'  then S.tab_input_mode     = tonumber(v) or 0
-        -- Difficulty tab: Guitar/Bass instrument selector
-        elseif k == 'dgbi'   then S.diff_gb_instrument = (v == 'bass') and 'bass' or 'gtr'
+        -- Difficulty tab: the instrument dropdowns (an unknown key keeps the current pick)
+        elseif k == 'dgin' then
+            if v == GEN_ALL_KEY or GenInstrumentByKey(v) then S.diff_gen_instrument = v end
+        elseif k == 'dvci' then
+            if GenInstrumentByKey(v) then S.diff_vc_instrument = v end
+        -- Difficulty > Generate: rule style and Custom's option values
+        elseif k == 'dgst' then
+            for _, st in ipairs(GEN_STYLES) do if st.key == v then S.diff_gen_style = v end end
+        elseif k == 'dgbd' or k == 'dgfr' or k == 'dgdb' or k == 'dgde' or k == 'dgor' then
+            local field = ({ dgbd = 'diff_gen_busy_drop', dgfr = 'diff_gen_fast_runs', dgdb = 'diff_gen_drums_between',
+                             dgde = 'diff_gen_drums_eighths', dgor = 'diff_gen_rules' })[k]
+            for _, row in ipairs(GEN_STYLE_ROWS) do
+                if row.field == field then
+                    -- Only a value the row offers (busy_drop's 1 and 2 are numbers).
+                    for _, o in ipairs(row.opts) do
+                        if tostring(o[1]) == v then S[field] = o[1] S.diff_gen_custom_set = true end
+                    end
+                end
+            end
+        elseif k == 'dgcs' then S.diff_gen_custom_set = false   -- saved without Custom values
+        elseif k == 'dg2x' then S.diff_gen_drums_2x_on_1x = (v == '1')
         -- Difficulty tab: Keys Copy reduced-using-Pro-Keys checkbox
         elseif k == 'd5kpkr' then S.diff_5k_pk_reduce  = (v == '1')
         -- MIDI alignment

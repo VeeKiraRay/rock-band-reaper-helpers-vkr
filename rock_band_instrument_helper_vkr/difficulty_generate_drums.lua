@@ -109,9 +109,16 @@ GEN_DRUMS_PARAMS = {
     -- tempo (HardAndBackbeat). nil = off.
     easy_and_backbeat_bpm = 110,
     -- Easy: a run of _min+ hand hits an 8th apart, each with a snare, keeps only the beats
-    -- from this tempo (EasySnareRuns). nil = off.
+    -- from this tempo (SnareRuns). nil = off.
     easy_snare_run_bpm = 120,
     easy_snare_run_min = 5,
+    -- Medium: the same from this tempo (official thins them on Medium too). nil = off.
+    medium_snare_run_bpm = nil,
+    -- Easy: a two-hand hit an 8th before a crash loses its hi-hat/ride (EasyBeforeCrash).
+    easy_before_crash = true,
+    -- Easy's quarter-note fills: 'more' (the beats or the "and"s, whichever keeps more of
+    -- the fill) | 'beats' (always the beats). See GridFillRuns.
+    easy_fill_phase = 'more',
 }
 
 local function NearInt(x, tol) return math.abs(x - math.floor(x + 0.5)) <= tol end
@@ -643,7 +650,9 @@ local function GridFillRuns(evs, step, grid)
         -- beats on a tie - an 8th run on the "and"s keeps its "and"s (Rb R R -> Rb . R).
         -- Never on Medium's 8th grid: its shifted phase would be the 16th "e"s and "a"s.
         local Phase = OnGrid
-        if grid >= 1 - EPS and shifted > on then Phase = OnShifted; on = shifted end
+        if grid >= 1 - EPS and shifted > on and GEN_DRUMS_PARAMS.easy_fill_phase ~= 'beats' then
+            Phase = OnShifted; on = shifted
+        end
         local last
         for k = a, b do
             local ev = evs[k]
@@ -1239,6 +1248,7 @@ end
 -- hat-only hit before a crash is left alone.
 local function EasyBeforeCrash(evs)
     local n = 0
+    if not GEN_DRUMS_PARAMS.easy_before_crash then return n end
     for i = 1, #evs - 1 do
         local a, b = evs[i], evs[i + 1]
         if not a.rolled and math.abs(b.qn - a.qn - 0.5) <= EPS and IsCymbal(b, GRN) and Has(b, GRN)
@@ -1814,12 +1824,11 @@ local function LowerEighthHands(evs, dl, mode)
     return n
 end
 
--- Easy from easy_snare_run_bpm: a run of easy_snare_run_min or more hand hits an 8th apart,
--- each with a snare (a build-up, `RY RY RY RY R R`), keeps only the hits on the beats - the
--- "and"s lose their hands (a kick there stays). Medium keeps such runs. Returns the number
--- of hits changed.
-local function EasySnareRuns(evs)
-    local from = GEN_DRUMS_PARAMS.easy_snare_run_bpm
+-- From `from` BPM (Easy: easy_snare_run_bpm; Medium: medium_snare_run_bpm, off by default):
+-- a run of easy_snare_run_min or more hand hits an 8th apart, each with a snare (a
+-- build-up, `RY RY RY RY R R`), keeps only the hits on the beats - the "and"s lose their
+-- hands (a kick there stays). Returns the number of hits changed.
+local function SnareRuns(evs, from)
     if not from then return 0 end
     local min = GEN_DRUMS_PARAMS.easy_snare_run_min or 5
     local hands = {}
@@ -2127,8 +2136,9 @@ PlanTier = function(dl, events, opts)
     evs = Compact(evs)
     DoubleCrashes(evs)
     log.runs_broken = BreakEighthRuns(evs, dl, dl == 'H' and events or nil)
-    if dl == 'E' then
-        log.snare_runs = EasySnareRuns(evs)
+    if dl ~= 'H' then
+        log.snare_run_bpm = dl == 'E' and GEN_DRUMS_PARAMS.easy_snare_run_bpm or GEN_DRUMS_PARAMS.medium_snare_run_bpm
+        log.snare_runs = SnareRuns(evs, log.snare_run_bpm)
         evs = Compact(evs)
     end
     if dl ~= 'H' then

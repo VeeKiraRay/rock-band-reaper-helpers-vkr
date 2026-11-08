@@ -3,6 +3,11 @@
 --
 --   lua dev/calibration/run_generate_eval_offline.lua            -- development songs
 --   lua dev/calibration/run_generate_eval_offline.lua holdout    -- the hold-out, ONCE
+--   lua dev/calibration/run_generate_eval_offline.lua official   -- the Official rule style
+--
+-- official (with any mode): the Official style - Hard fast runs Thin and the Official
+-- "Other rules" (GEN_RULE_SETS.official, difficulty_generate_params.lua), Bass and Keys not
+-- following Guitar. Without it: VKR, the planner's own defaults.
 --
 -- For Guitar, Bass and Keys it feeds each OFFICIAL upper tier to the planner (X>H, H>M,
 -- M>E) and compares the result with the official lower tier: precision and recall of
@@ -23,7 +28,10 @@
 
 local _dir  = (arg and arg[0] or ''):match('^(.+[\\/])') or './'
 local _root = _dir .. '../../'
-local MODE  = arg and arg[1] or 'dev'
+local MODE, OFFICIAL = 'dev', false
+for _, a in ipairs(arg or {}) do
+    if a == 'official' then OFFICIAL = true else MODE = a end
+end
 
 r = {}  -- the difficulty modules only touch r inside functions this script never calls
 
@@ -41,6 +49,11 @@ dofile(_root .. 'rock_band_instrument_helper_vkr/difficulty_generate_colors.lua'
 dofile(_root .. 'rock_band_instrument_helper_vkr/difficulty_generate_rhythm.lua')
 dofile(_root .. 'rock_band_instrument_helper_vkr/difficulty_generate_5lane.lua')
 dofile(_root .. 'rock_band_instrument_helper_vkr/difficulty_generate_prokeys.lua')
+local RULES = OFFICIAL and 'official' or 'vkr'
+if OFFICIAL then
+    GenApplyRules(RULES)
+    GEN5_PARAMS.fast_runs_default = 'thin'
+end
 
 local CORPUS = _root .. '_external_docs/all_rb3_dlc_reference_songs/'
 local OUT    = _dir .. 'generate_eval_report.txt'
@@ -259,7 +272,7 @@ local function Evaluate(with_chain, only_kind, only_dl)
     end
     for _, d in ipairs(DATA) do
         local inst, tiers = d.inst, d.tiers
-        local ref = inst.key ~= 'guitar' and refs[d.song] or {}
+        local ref = inst.key ~= 'guitar' and GenRulesFollowGuitar(RULES) and refs[d.song] or {}
         -- hard: Easy only, the Hard its "and" phrases look at (GEN5_PARAMS.and_phrase).
         local function Opts(dl, chain, shifts, hard)
             return { busy_ref = dl == 'H' and ref.H or nil,
@@ -400,9 +413,9 @@ Evaluate(true)
 local lines = {}
 local function L(s) lines[#lines + 1] = s or '' end
 
-L(('Generate evaluation - %s songs (%d), %s'):format(
+L(('Generate evaluation - %s songs (%d), %s, rule style %s'):format(
     MODE == 'holdout' and 'HELD-OUT' or 'development', n_songs,
-    MODE == 'holdout' and 'report this once' or 'tune on these'))
+    MODE == 'holdout' and 'report this once' or 'tune on these', OFFICIAL and 'Official' or 'VKR'))
 L('P/R/F1: onsets generated from the OFFICIAL upper tier vs the official tier.')
 L('copy F1: the same for plain Copy (keep everything). chain F1: Expert>Hard>Medium>Easy')
 L('on generated tiers only. color: matched onsets with exactly the official colors.')

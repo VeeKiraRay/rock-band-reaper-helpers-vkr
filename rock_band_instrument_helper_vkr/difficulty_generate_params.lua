@@ -282,3 +282,77 @@ function GenKeepHardLanes(out, upper, lanes)
     for _ in pairs(used) do n = n + 1 end
     return res, n
 end
+
+----------------------------------------------------------------------
+-- Rule sets ("Other rules": VKR / Official)
+----------------------------------------------------------------------
+
+-- The Official rule set: the user rules that have an official alternative, switched to it.
+-- VKR is the parameter tables as written above (and in difficulty_generate_drums.lua);
+-- Official changes only the entries below, for the length of one Generate run. Each entry:
+-- the table's global name, the key path, the official value (nil turns a rule off).
+-- Not every user rule is here: those with no official alternative, or whose alternative
+-- needs code first, are the same in both sets (docs/difficulty_reduction.md says which).
+-- Bass, Keys and Pro Keys following Guitar (busy_ref / rhythm_ref) is not a parameter:
+-- the action leaves the refs out under Official (GenRulesFollowGuitar).
+GEN_RULE_SETS = {
+    vkr = {},
+    official = {
+        -- Guitar, Bass, Keys, Pro Keys
+        { 'GEN5_PARAMS', { 'fill_beats', 'M' }, false },
+        { 'GEN5_PARAMS', { 'max_keep', 'H' }, nil },
+        { 'GEN5_PARAMS', { 'color_fallback_keep', 'H' }, nil },
+        { 'GEN5_PARAMS', { 'color_fallback_keep', 'M' }, nil },
+        { 'GEN5_PARAMS', { 'offbeat_fallback_keep', 'M' }, nil },
+        { 'GEN5_PARAMS', { 'and_phrase', 'kinds', 'k5' }, false },
+        { 'GEN5_PARAMS', { 'and_phrase', 'kinds', 'pk' }, false },
+        -- Drums
+        { 'GEN_DRUMS_PARAMS', { 'hard_16th_min_run' }, 3 },
+        { 'GEN_DRUMS_PARAMS', { 'kick_under_snare', 'H' }, true },
+        { 'GEN_DRUMS_PARAMS', { 'kick_under_snare', 'M' }, true },
+        { 'GEN_DRUMS_PARAMS', { 'hard_end_of_bar_kick' }, false },
+        { 'GEN_DRUMS_PARAMS', { 'medium_fallback_keep' }, nil },
+        { 'GEN_DRUMS_PARAMS', { 'medium_tom_pair_sparse_keep' }, false },
+        { 'GEN_DRUMS_PARAMS', { 'lower_cymbal_change' }, false },
+        { 'GEN_DRUMS_PARAMS', { 'easy_cymbal_change_quarter_bpm' }, nil },
+        { 'GEN_DRUMS_PARAMS', { 'easy_quiet_half_kicks' }, false },
+        { 'GEN_DRUMS_PARAMS', { 'easy_and_backbeat_bpm' }, nil },
+        { 'GEN_DRUMS_PARAMS', { 'easy_before_crash' }, false },
+        { 'GEN_DRUMS_PARAMS', { 'easy_fill_phase' }, 'beats' },
+        { 'GEN_DRUMS_PARAMS', { 'medium_snare_run_bpm' }, 120 },
+    },
+}
+
+-- Switch the parameter tables to rule set `key` ('vkr' | 'official'). Returns a function
+-- that puts every changed value back. The tables must be loaded (call it at run time).
+function GenApplyRules(key)
+    local saved = {}
+    for _, e in ipairs(GEN_RULE_SETS[key] or {}) do
+        local t, path = _G[e[1]], e[2]
+        for i = 1, #path - 1 do t = t and t[path[i]] end
+        if t then
+            local k = path[#path]
+            saved[#saved + 1] = { t, k, t[k] }
+            t[k] = e[3]
+        end
+    end
+    return function()
+        for i = #saved, 1, -1 do
+            local s = saved[i]
+            s[1][s[2]] = s[3]
+        end
+    end
+end
+
+-- Run fn(...) under rule set `key`, then restore the tables - also when fn raises an
+-- error, which is raised again afterwards so the caller sees it as before.
+function GenWithRules(key, fn, ...)
+    local restore = GenApplyRules(key)
+    local res = table.pack(pcall(fn, ...))
+    restore()
+    if not res[1] then error(res[2], 0) end
+    return table.unpack(res, 2, res.n)
+end
+
+-- Bass, Keys and Pro Keys follow Guitar's choices on Hard's busy bars and Medium's rhythm.
+function GenRulesFollowGuitar(key) return key ~= 'official' end

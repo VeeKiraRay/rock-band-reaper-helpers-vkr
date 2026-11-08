@@ -79,6 +79,24 @@
 --       and skips any that is missing or muted - then generate one difficulty
 --       or the whole Hard > Medium > Easy chain. Generate never writes to a
 --       muted track: a muted track picked for one instrument stops the run.
+--     - The Difficulty tab has two sub-tabs: Generate (first) and Validate &
+--       copy, which replaces the four instrument sub-tabs - pick the
+--       instrument from a dropdown, then copy or validate as before. Both
+--       dropdowns follow each other (except Generate's All instruments).
+--     - Generate's Style row picks the rules: VKR (the tool author's own -
+--       mostly official, with some choices of their own, such as Hard fast
+--       runs rewritten one grid slower), Official (most of those choices
+--       turned off, closer to official charts but not the same as them)
+--       or Custom (set each option yourself; it keeps its own values once
+--       used, and the first time starts from the style shown before). VKR
+--       and Official show their option values read-only. The
+--       result's first line names the style. Other rules covers the rules
+--       with no row of their own: Official turns off the ones that have an
+--       official version (Drums: no Medium hi-hat fallback, no kick under
+--       the snare, the hat before a crash kept on Easy, ...; Guitar, Bass
+--       and Keys: Hard may equal Expert, no following Guitar, ...).
+--     - Generate's style, Custom's options, the instrument picks and the
+--       2x pedal checkbox are saved with the project's settings.
 --     - It reduces the way official charts do, not just enough to pass
 --       Validate. It keeps downbeats and beats first; Medium loses most 8ths
 --       and Easy about half the beats. Measured against the official RB3 DLC
@@ -184,7 +202,10 @@
 --       advisory under the RBN doc's quarter and half. Interval jumps are
 --       advisories. Official charts break both doc rules often (Easy: 42% of
 --       gaps under a half note), so as errors they flagged nearly every chart.
---       "Unchanged copy" and "NOT REDUCED" are advisories on Pro Keys too.
+--       "Unchanged copy" and "NOT REDUCED" are advisories now, on every
+--       instrument: official charts sometimes keep every note when a part
+--       is already simple (Hard = Expert's note count: Keys 15 of 352
+--       official songs, Bass 11 of 483).
 --     - Validate, every instrument: a difficulty that keeps every note but
 --       holds some sustains shorter is no longer "NOT REDUCED"; it reports
 --       "only sustain lengths differ".

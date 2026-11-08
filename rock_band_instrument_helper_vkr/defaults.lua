@@ -78,27 +78,37 @@ S = {
     -- Guitar/Bass difficulty (not persisted - auto-detected by name)
     diff_gtr_idx          = -1,
     diff_bass_idx         = -1,
-    diff_gb_instrument    = 'gtr',  -- 'gtr' or 'bass' (persisted)
     -- Drums difficulty (not persisted - auto-detected by name)
     diff_drums_idx        = -1,
     diff_drums2x_idx      = -1,   -- PART DRUMS_2X (double bass pedal), Generate only
-    diff_gen_drums_2x_on_1x = false,  -- Generate: PART DRUMS holds the 2x bass pedal chart (opt-in)
-    -- Difficulty > Generate: instrument dropdown, a GEN_INSTRUMENTS key or 'all'
-    -- (session only - not persisted, starts on Guitar)
+    diff_gen_drums_2x_on_1x = false,  -- Generate: PART DRUMS holds the 2x bass pedal chart (opt-in, persisted)
+    -- Difficulty > Generate: instrument dropdown, a GEN_INSTRUMENTS key or 'all' (persisted)
     diff_gen_instrument   = 'gtr',
-    -- Difficulty > Generate: notes a full bar of 8ths loses on Hard - 'auto', 1 or 2
-    -- (session only; Auto decides from the song's tempo, see GEN5_PARAMS.fast_8ths_bpm)
+    -- Difficulty > Validate & copy: instrument dropdown, a GEN_INSTRUMENTS key (persisted).
+    -- Follows Generate's pick whenever that is one instrument, and the other way round.
+    diff_vc_instrument    = 'gtr',
+    -- Difficulty > Generate: rule style - 'vkr' | 'official' | 'custom' (persisted). VKR and
+    -- Official run their GEN_STYLES preset; the fields below are Custom's own values
+    -- (persisted; GenStyleValues, actions_difficulty_generate.lua).
+    diff_gen_style        = 'vkr',
+    -- Custom has values of its own (loaded from the project's settings, or Custom was
+    -- picked this session): switching to Custom keeps them instead of copying the preset.
+    diff_gen_custom_set   = false,
+    -- Notes a full bar of 8ths loses on Hard - 'auto', 1 or 2 (Auto decides from the
+    -- song's tempo, see GEN5_PARAMS.fast_8ths_bpm)
     diff_gen_busy_drop    = 'auto',
-    -- (session only) 'auto' | 'thin' | 'rewrite' - see GEN5_PARAMS.fast_runs_default
+    -- 'auto' | 'thin' | 'rewrite' - see GEN5_PARAMS.fast_runs_default
     diff_gen_fast_runs    = 'rewrite',
-    -- (session only) Drums Medium: a kick/snare between hi-hat notes - 'beats' (keep those
-    -- on a beat, as official charts do) | 'none' (the RBN doc) | 'keep'. See
-    -- difficulty_generate_drums.lua (opts.between).
+    -- Drums Medium: a kick/snare between hi-hat notes - 'beats' (keep those on a beat, as
+    -- official charts do) | 'none' (the RBN doc) | 'keep'. See difficulty_generate_drums.lua
+    -- (opts.between).
     diff_gen_drums_between = 'beats',
-    -- (session only) Drums Medium/Easy at fast tempos: which of three hand hits an 8th apart
-    -- goes - 'hands' (the least important hand gems; default, user choice 2026-10-14) | 'beats'
-    -- (the "and"s, as official charts do). See difficulty_generate_drums.lua (opts.eighth_hands).
+    -- Drums Medium/Easy at fast tempos: which of three hand hits an 8th apart goes -
+    -- 'hands' (the least important hand gems; VKR) | 'beats' (the "and"s, as official charts
+    -- do). See difficulty_generate_drums.lua (opts.eighth_hands).
     diff_gen_drums_eighths = 'hands',
+    -- Every rule without its own option row: 'vkr' | 'official' (GEN_STYLE_ROWS).
+    diff_gen_rules        = 'vkr',
     -- Difficulty tab: pending overwrite confirmation (not persisted, transient UI
     -- state). nil = no popup. Otherwise: { message = string, on_confirm = function()
     -- ... end, confirm_label = string? } - set by a Copy*Diff call or by
@@ -561,9 +571,6 @@ TIPS = {
                            "Respects time selection if active.",
 
     -- Difficulty tab - Guitar/Bass
-    diff_gb_instrument = "Switch which instrument's track and difficulty ranges are shown below.\n\n" ..
-                         "Guitar and Bass share identical RBN authoring rules (ranges, chord\n" ..
-                         "legality, sustain/HOPO rules) - only the track differs.",
     diff_gb_track      = "Guitar/Bass difficulty track (PART GUITAR or PART BASS, matching the\n" ..
                          "instrument selected above).\n" ..
                          "All four difficulties live on this single track in separate pitch ranges:\n" ..
@@ -610,8 +617,30 @@ TIPS = {
                           "Drums covers PART DRUMS_2X (double bass pedal) too: it runs\n" ..
                           "after PART DRUMS, and each 2X difficulty plays the kicks of the\n" ..
                           "PART DRUMS difficulty one step up. The result lists both tracks.",
-    diff_gen_track      = "The instrument's track. Shared with that instrument's own\n" ..
-                          "Difficulty sub-tab - changing it here changes it there too.",
+    diff_gen_track      = "The instrument's track. Shared with Validate & copy -\n" ..
+                          "changing it here changes it there too.",
+    diff_vc_instrument  = "Which instrument to copy or validate. Follows the instrument\n" ..
+                          "picked in Generate (and the other way round), except when\n" ..
+                          "Generate is on All instruments.\n\n" ..
+                          "Guitar and Bass share the same RBN authoring rules (ranges, chord\n" ..
+                          "legality, sustain/HOPO rules) - only the track differs.",
+    diff_gen_style      = "Which set of rules Generate follows.\n\n" ..
+                          "VKR: the tool author's own rules - mostly what official charts\n" ..
+                          "do, with choices of their own where a chart played better\n" ..
+                          "another way (for example Hard fast runs rewritten one grid\n" ..
+                          "slower instead of thinned).\n" ..
+                          "Official: what official charts do, wherever the two differ.\n" ..
+                          "Custom: pick each option yourself. Keeps its own values once\n" ..
+                          "you have used it (and saved settings bring them back); the\n" ..
+                          "first time it starts from the style shown before it.\n\n" ..
+                          "With VKR and Official the options below show the values used\n" ..
+                          "and cannot be changed. Saved with the project's settings.",
+    diff_gen_rules      = "Every rule that has no option row of its own.\n\n" ..
+                          "VKR: the tool author's choices where they differ from official\n" ..
+                          "charts.\n" ..
+                          "Official: most of those choices turned off, so the result is\n" ..
+                          "closer to official charts. Not the same as them: a few rules\n" ..
+                          "have no official version yet.",
     diff_gen_drums_2x_on_1x = "For a song charted only in its double bass pedal version, on\n" ..
                           "PART DRUMS (no PART DRUMS_2X). PART DRUMS is then generated the\n" ..
                           "way a PART DRUMS_2X would be: its Expert stays, and each lower\n" ..

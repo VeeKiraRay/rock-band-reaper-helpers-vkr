@@ -1,5 +1,6 @@
 -- Difficulty > Generate sub-tab: build Hard, Medium and Easy automatically.
 -- Requires (globals): S, r, ctx, TIPS, GEN_INSTRUMENTS, GEN_ALL_KEY, GenInstrumentByKey,
+--   GEN_STYLES, GEN_STYLE_ROWS, GenStyleValues, GenSetStyle,
 --   GenerateDifficulties (actions_difficulty_generate.lua), TrackCombo, Btn,
 --   BtnGroupWidth, LabelColWidth, RadioGroupWidth, SectionHeader, Tooltip, RunAction, BTN_H,
 --   WIDTH_STD.
@@ -12,9 +13,10 @@ function DrawDifficultyGenerateTab(ctx, midi_tracks)
         .. 'charts do, reduces chords and colors, shortens sustains, then checks the result '
         .. 'with the same rules Validate uses.')
 
-    SectionHeader('Instrument')
-    local lbl_col = LabelColWidth({ 'Instrument', 'Track', '2X track', 'Expert track', 'Medium track', 'Hard 8th runs',
-                                    'Hard fast runs', 'Drums Medium' })
+    r.ImGui_Spacing(ctx)
+    local col_labels = { 'Instrument', 'Track', '2X track', 'Expert track', 'Medium track', 'Style' }
+    for _, row in ipairs(GEN_STYLE_ROWS) do col_labels[#col_labels + 1] = row.label end
+    local lbl_col = LabelColWidth(col_labels)
 
     local cur_key  = S.diff_gen_instrument
     local cur_inst = GenInstrumentByKey(cur_key)
@@ -24,7 +26,10 @@ function DrawDifficultyGenerateTab(ctx, midi_tracks)
     if r.ImGui_BeginCombo(ctx, '##diff_gen_inst', cur_inst and cur_inst.label or ALL_LABEL) then
         for _, inst in ipairs(GEN_INSTRUMENTS) do
             local is_sel = inst.key == cur_key
-            if r.ImGui_Selectable(ctx, inst.label, is_sel) then S.diff_gen_instrument = inst.key end
+            if r.ImGui_Selectable(ctx, inst.label, is_sel) then
+                S.diff_gen_instrument = inst.key
+                S.diff_vc_instrument  = inst.key   -- Validate & copy follows a single instrument
+            end
             if is_sel then r.ImGui_SetItemDefaultFocus(ctx) end
         end
         local all_sel = cur_key == GEN_ALL_KEY
@@ -38,7 +43,7 @@ function DrawDifficultyGenerateTab(ctx, midi_tracks)
     cur_inst = GenInstrumentByKey(S.diff_gen_instrument)
     local no_track = false
     if cur_inst and cur_inst.tier_fields then
-        -- Pro Keys: a track per tier, the same selection as the Pro Keys sub-tab.
+        -- Pro Keys: a track per tier, the same selection as Validate & copy.
         for _, row in ipairs({ { 'X', 'Expert track' }, { 'H', 'Hard track' },
                                { 'M', 'Medium track' }, { 'E', 'Easy track' } }) do
             local field = cur_inst.tier_fields[row[1]]
@@ -73,35 +78,8 @@ function DrawDifficultyGenerateTab(ctx, midi_tracks)
             .. 'Pro Keys it just generated; Drums 2X takes its kicks from the PART DRUMS tiers just made.')
     end
 
-    -- Two rows of radios, aligned on one per-option pitch (RadioGroupWidth).
-    local rows = {
-        { label = 'Hard 8th runs', field = 'diff_gen_busy_drop', id = 'gen_busy', tip = TIPS.diff_gen_busy_drop,
-          opts = { { 'auto', 'Auto' }, { 1, 'Drop 1 per bar' }, { 2, 'Drop 2 per bar' } } },
-        { label = 'Hard fast runs', field = 'diff_gen_fast_runs', id = 'gen_fast', tip = TIPS.diff_gen_fast_runs,
-          opts = { { 'rewrite', 'Rewrite' }, { 'auto', 'Auto' }, { 'thin', 'Thin' } } },
-    }
-    -- Drums only (or All instruments): Medium's kick/snare between hi-hat notes.
-    local key_now = S.diff_gen_instrument
-    if key_now == 'drums' or key_now == GEN_ALL_KEY then
-        rows[#rows + 1] = { label = 'Drums Medium', field = 'diff_gen_drums_between', id = 'gen_dbtw',
-                            tip = TIPS.diff_gen_drums_between,
-                            opts = { { 'beats', 'Beats' }, { 'none', 'None' }, { 'keep', 'Keep' } } }
-        rows[#rows + 1] = { label = 'Drums fast 8ths', field = 'diff_gen_drums_eighths', id = 'gen_d8',
-                            tip = TIPS.diff_gen_drums_eighths,
-                            opts = { { 'hands', 'Hands' }, { 'beats', 'Beats' } } }
-    end
-    local all = {}
-    for _, row in ipairs(rows) do for _, o in ipairs(row.opts) do all[#all + 1] = o[2] end end
-    local drums_rows = key_now == 'drums' or key_now == GEN_ALL_KEY
-    local radio_w = RadioGroupWidth(all)
-    for _, row in ipairs(rows) do
-        r.ImGui_Text(ctx, row.label)
-        for i, o in ipairs(row.opts) do
-            r.ImGui_SameLine(ctx, lbl_col + (i - 1) * radio_w)
-            if r.ImGui_RadioButton(ctx, o[2] .. '##' .. row.id, S[row.field] == o[1]) then S[row.field] = o[1] end
-            Tooltip(row.tip)
-        end
-    end
+    -- A fact about the song's chart, not a rule choice: editable in every style.
+    local drums_rows = S.diff_gen_instrument == 'drums' or S.diff_gen_instrument == GEN_ALL_KEY
     if drums_rows then
         local _, v = r.ImGui_Checkbox(ctx, 'Only 2x bass pedal authored on PART DRUMS##gen_2x_on_1x',
                                       S.diff_gen_drums_2x_on_1x)
@@ -109,6 +87,47 @@ function DrawDifficultyGenerateTab(ctx, midi_tracks)
         Tooltip(TIPS.diff_gen_drums_2x_on_1x)
     end
 
+    -- Rule style, then its options. The rows show the values the style runs with
+    -- (GenStyleValues); only Custom edits them. All radios share one per-option pitch.
+    r.ImGui_Spacing(ctx)
+    r.ImGui_Separator(ctx)
+    SectionHeader('Rules')
+    local rows = {}
+    for _, row in ipairs(GEN_STYLE_ROWS) do
+        if drums_rows or not row.drums then rows[#rows + 1] = row end
+    end
+    local all = {}
+    for _, st in ipairs(GEN_STYLES) do all[#all + 1] = st.label end
+    for _, row in ipairs(rows) do for _, o in ipairs(row.opts) do all[#all + 1] = o[2] end end
+    local radio_w = RadioGroupWidth(all)
+
+    r.ImGui_Text(ctx, 'Style')
+    for i, st in ipairs(GEN_STYLES) do
+        r.ImGui_SameLine(ctx, lbl_col + (i - 1) * radio_w)
+        if r.ImGui_RadioButton(ctx, st.label .. '##gen_style', S.diff_gen_style == st.key) then GenSetStyle(st.key) end
+        Tooltip(TIPS.diff_gen_style)
+    end
+
+    local values = GenStyleValues()
+    local locked = S.diff_gen_style ~= 'custom'   -- snapshot: a click below cannot change it
+    for _, row in ipairs(rows) do
+        r.ImGui_Text(ctx, row.label)
+        if locked then r.ImGui_BeginDisabled(ctx) end
+        for i, o in ipairs(row.opts) do
+            r.ImGui_SameLine(ctx, lbl_col + (i - 1) * radio_w)
+            if r.ImGui_RadioButton(ctx, o[2] .. '##' .. row.id, values[row.key] == o[1]) and not locked then
+                S[row.field] = o[1]
+            end
+            -- Tooltip() skips disabled items; the read-only rows keep theirs.
+            if r.ImGui_IsItemHovered(ctx, r.ImGui_HoveredFlags_AllowWhenDisabled()) then
+                r.ImGui_SetTooltip(ctx, TIPS[row.field])
+            end
+        end
+        if locked then r.ImGui_EndDisabled(ctx) end
+    end
+
+    r.ImGui_Spacing(ctx)
+    r.ImGui_Separator(ctx)
     SectionHeader('Generate')
     local key = S.diff_gen_instrument
     local labels = { 'Hard', 'Medium', 'Easy', 'Hard > Medium > Easy' }

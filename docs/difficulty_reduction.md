@@ -41,6 +41,50 @@ The Generate sub-tab's options, and the rules they switch:
 | Drums fast 8ths | Hands / Beats | Drums Medium/Easy at fast tempos: which of three hand hits an 8th apart goes. |
 | Only 2x bass pedal authored on PART DRUMS | off / on | Drums: treat PART DRUMS as the double-bass chart (see Drums 2X). |
 
+The first four (and "Other rules", below) come from the **rule style**: VKR (the project
+author's rules - every default in this document), Official (closer to the official charts) or
+Custom (the user's own pick per row).
+
+| Row | VKR | Official |
+|---|---|---|
+| Hard 8th runs | Auto | Auto |
+| Hard fast runs | Rewrite | Thin |
+| Drums Medium | Beats | Beats |
+| Drums fast 8ths | Hands | Beats |
+| Other rules | VKR | Official |
+
+### Other rules: Official
+
+The Official rule set (`GEN_RULE_SETS.official`, `difficulty_generate_params.lua`) turns the
+user rules below to their official alternative for the length of one Generate run. It does not
+make Generate chart as Harmonix did: it only takes most of the user rules away. Every other rule
+is the same in both sets - those with no official alternative, the structural ones (drums limb
+by limb), and a few whose alternative is not built yet (Keys following Pro Keys, one rhythm model
+for every instrument, rolled chords, the busy-bar rest discount, the Drums 2X ladder).
+
+- Drums Hard: 16th snare pairs need a third hit (`hard_16th_min_run` 3); the kick under the
+  snare goes (`kick_under_snare`); no end-of-bar kick (`hard_end_of_bar_kick`).
+- Drums Medium: no hi-hat fallback (`medium_fallback_keep`); sparse bars lose tom pairs too
+  (`medium_tom_pair_sparse_keep`); long 8th snare runs to the beats from 120 BPM
+  (`medium_snare_run_bpm`).
+- Drums Medium/Easy: no cymbal-change rules (`lower_cymbal_change`,
+  `easy_cymbal_change_quarter_bpm`).
+- Drums Easy: quiet half bars lose their kicks (`easy_quiet_half_kicks`); no "and"-backbeat rule
+  (`easy_and_backbeat_bpm`); the hi-hat before a crash stays (`easy_before_crash`); quarter-note
+  fills on the beats (`easy_fill_phase` 'beats').
+- Guitar, Bass, Keys: no Medium note per beat in busy bars (`fill_beats`); Hard may equal Expert
+  and neither Hard nor Medium is eased by color (`max_keep`, `color_fallback_keep`); Medium keeps
+  its isolated off-beats (`offbeat_fallback_keep`); no "and"-phrase rule (`and_phrase`); Bass,
+  Keys and Pro Keys do not follow Guitar's choices.
+
+Measured on the development songs, each rule on its own over the Official rows: the drums
+Medium fallback gave the largest change (Medium agreement +0.7), the kick under the snare the
+next (Hard kick precision +4 points); the 5-lane rules +0.1 to +0.5 each (Keys Medium color +2.3
+with the color fallback off). The whole Official style against VKR, agreement on the
+development songs: Drums Hard 91.9 -> 93.0, Medium 94.1 -> 95.1, Easy 93.5 -> 93.7, chain
+Medium 93.3 -> 94.3, chain Easy 89.5 -> 90.3; Guitar, Bass, Keys and Pro Keys equal or higher on
+every tier, except chain Easy for Guitar and Bass (-0.1 each). No Validate errors either way.
+
 ---
 
 ## Drums
@@ -265,8 +309,9 @@ tom 45 of 48 times (tom -> snare), the snare 10 of 15 (snare -> tom).
 *RBN doc:* "No 3-limb hits (ie. Simultaneous kick, snare, and crash all at the same time)."
 *Official charts:* KRY -> RY.
 
-**Long 8th snare runs: Medium keeps them** - see Easy. *Official charts* thin them on Medium too
-(5+ snare hits an 8th apart kept whole 15% at 120-129 BPM); *user rule* to keep Medium as is.
+**Long 8th snare runs: Medium keeps them** - `medium_snare_run_bpm` (off) - see Easy. *Official charts* thin them on Medium too
+(5+ snare hits an 8th apart kept whole 15% at 120-129 BPM); *user rule* to keep Medium as is. The
+Official rules thin them from 120 BPM, as Easy does.
 
 ### Easy
 
@@ -285,11 +330,11 @@ the density test: a sparse verse keeps its cymbal (official: hi-hat 61%, ride 90
 In a two-hand bar, a half bar with no hand hit keeps its kicks (`KG KB K K` -> `G B K K`).
 *User rule.* *Official charts* keep a kick-only beat there 20% of the time.
 
-**Fills to quarter notes from 120 BPM** - `GridFillRuns`, `DRUMS_RULES.roll_easy_quarter_bpm`
+**Fills to quarter notes from 120 BPM** - `GridFillRuns`, `DRUMS_RULES.roll_easy_quarter_bpm`, `easy_fill_phase`
 A once-per-song decision by the song's tempo (bar 1 or the first note, the faster). A fill
 continues across a quarter-note gap, so a fill Medium broke up still goes to quarters from its
 start. The quarter grid picks the beats or the "and"s, whichever keeps more of the fill (the
-beats on a tie).
+beats on a tie; `easy_fill_phase` 'more'). The Official rules put them on the beats ('beats').
 *RBN doc:* "Depending on tempo, you may want to reduce Medium's 8th note fills to quarter notes."
 *User rule* for the phase pick (official puts such quarters on the beats more often; -0.3
 agreement).
@@ -316,9 +361,9 @@ Where Easy (not Medium) moved 8th hats to quarters, a two-hand "and" keeps its d
 before loses its cymbal. *Official charts:* the "and" keeps its drum 87%; the beat's cymbal kept
 11%. Where Medium was already on quarters, Easy keeps the "and" as Medium has it (official 72%).
 
-**No hi-hat right before a crash** - `EasyBeforeCrash`
+**No hi-hat right before a crash** - `EasyBeforeCrash`, `easy_before_crash`
 A hat + snare/tom hit an 8th before a crash loses its hat (`RY | G` -> `R | G`). Hat-only hits stay.
-*User rule:* official Easy drops that hat only 34% under 130 BPM.
+*User rule:* official Easy drops that hat only 34% under 130 BPM. The Official rules keep it.
 
 **A lone drum "and" goes from 140 BPM** - `EasyLoneAnds`, `easy_lone_and_bpm` 140
 A snare/tom/kick on an "and" (no cymbal) with a beat hit an 8th before and after goes.

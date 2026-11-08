@@ -1328,18 +1328,18 @@ Test.it('Hard that equals Expert is detected, and pull_back shortens every susta
         ('complex: %.3f QN, cut %s; expected a 1/16 note'):format(c[1].qn_e - c[1].qn, tostring(clog.pull_cut)))
 end)
 
-Test.it('progression: same notes with shorter sustains is a reduction; advisory never counts', function()
+Test.it('progression: same notes with shorter sustains is a reduction; a copy is an advisory, never counted', function()
     local function E(s, e, p) return { s = s, e = e, pitches = { p } } end
     local upper = { E(0, 0.5, 60), E(1, 1.5, 62) }
     local same  = { E(0, 0.5, 60), E(1, 1.5, 62) }
     local short = { E(0, 0.3, 60), E(1, 1.5, 62) }
     local block, extra = CheckDifficultyProgression('Hard', 'Expert', same, upper, 48, 48, 2, 2)
-    Test.expect(extra == 2 and block:find('NOT REDUCED', 1, true), 'copy: expected 2 issues, got ' .. extra)
+    Test.expect(extra == 0, 'copy: expected no counted issue, got ' .. extra)
+    Test.expect(block:find('Advisory: Hard appears', 1, true) and block:find('Advisory: Expert has 2 notes', 1, true)
+        and block:find('NOT REDUCED', 1, true), 'copy: both findings as advisories: ' .. block)
     block, extra = CheckDifficultyProgression('Hard', 'Expert', short, upper, 48, 48, 2, 2)
     Test.expect(extra == 0 and block:find('only sustain lengths differ (1 sustain shorter)', 1, true),
         'shorter sustain: expected no issue, got ' .. extra .. ': ' .. block)
-    block, extra = CheckDifficultyProgression('Hard', 'Expert', same, upper, 48, 48, 2, 2, { advisory = true })
-    Test.expect(extra == 0 and block:find('Advisory: Hard appears', 1, true), 'advisory: got ' .. extra .. ': ' .. block)
 end)
 
 ----------------------------------------------------------------------
@@ -2472,6 +2472,68 @@ Test.it('Drums Easy from 120 BPM: a run of 5+ 8th snare hits keeps only the beat
     Test.expect(DAt(four, 1.5) ~= nil, '4 hits: the run stays')
     local slow = GenDrumsPlanTier('E', Run(6, 110), { ctx = ctx })
     Test.expect(DAt(slow, 1.5) ~= nil, '110 BPM: the run stays')
+    -- Medium keeps the run (VKR); the Official rules thin it there too (medium_snare_run_bpm).
+    local med = GenDrumsPlanTier('M', Run(6, 128), { ctx = ctx, between = 'keep' })
+    Test.expect(DAt(med, 1.5) ~= nil, 'Medium, VKR: the run stays')
+    local med_o, mlog = GenWithRules('official', GenDrumsPlanTier, 'M', Run(6, 128), { ctx = ctx, between = 'keep' })
+    Test.expect(not DAt(med_o, 1.5) and not DAt(med_o, 2.5), 'Medium, Official: the "and"s go')
+    Test.expect(mlog.snare_run_bpm == 120, 'Medium, Official: the log names the tempo')
+end)
+
+Test.section('Generate planner - rule sets (VKR / Official)')
+
+Test.it('GenApplyRules switches the Official values and its restore puts every one back', function()
+    local before = {}
+    for i, e in ipairs(GEN_RULE_SETS.official) do
+        local t = _G[e[1]]
+        for k = 1, #e[2] - 1 do t = t[e[2][k]] end
+        before[i] = t[e[2][#e[2]]]
+    end
+    local restore = GenApplyRules('official')
+    Test.expect(GEN_DRUMS_PARAMS.medium_fallback_keep == nil, 'Official: no Medium fallback')
+    Test.expect(GEN5_PARAMS.fill_beats.M == false, 'Official: no note per beat in busy bars')
+    Test.expect(GEN5_PARAMS.and_phrase.kinds.k5 == false, 'Official: no "and"-phrase rule')
+    restore()
+    for i, e in ipairs(GEN_RULE_SETS.official) do
+        local t = _G[e[1]]
+        for k = 1, #e[2] - 1 do t = t[e[2][k]] end
+        Test.expect(t[e[2][#e[2]]] == before[i], e[1] .. '.' .. table.concat(e[2], '.') .. ' not restored')
+    end
+    -- Every entry names a key the tables have (a typo would switch nothing).
+    for _, e in ipairs(GEN_RULE_SETS.official) do
+        local t = _G[e[1]]
+        for k = 1, #e[2] - 1 do t = t and t[e[2][k]] end
+        Test.expect(type(t) == 'table', e[1] .. '.' .. table.concat(e[2], '.') .. ': no such table')
+    end
+    Test.expect(GenRulesFollowGuitar('vkr') and not GenRulesFollowGuitar('official'), 'only VKR follows Guitar')
+end)
+
+Test.it('GenWithRules restores the tables when the run raises an error, and raises it again', function()
+    local before = GEN_DRUMS_PARAMS.medium_fallback_keep
+    local ok, err = pcall(GenWithRules, 'official', function() error('boom', 0) end)
+    Test.expect(not ok and err == 'boom', 'the error should come through')
+    Test.expect(GEN_DRUMS_PARAMS.medium_fallback_keep == before, 'the tables should be restored')
+    local a, b = GenWithRules('vkr', function(x) return x, 2 end, 1)
+    Test.expect(a == 1 and b == 2, 'the return values should come through')
+end)
+
+Test.it('Drums Easy, Official: the hat + snare before a crash keeps its hat', function()
+    local up = { DH(2, { 0, 2 }), DH(3, { 0, 1 }), DH(3.5, { 1, 2 }), DH(4, { 0, 4 }), DH(5, { 1, 2 }) }
+    local out = GenWithRules('official', GenDrumsPlanTier, 'E', up, { between = 'keep' })
+    Test.expect(DHas(DAt(out, 3.5), 1) and DHas(DAt(out, 3.5), 2), 'the "and" before the crash keeps snare and hat')
+end)
+
+Test.it('Drums Easy quarter-note fill on the "and"s: VKR keeps the "and"s, Official the beats', function()
+    -- Medium: a yellow-tom fill an 8th apart from an "and", three "and"s and two beats, 128 BPM.
+    local toms = { [2] = { { qn = 0, qn_e = 8 } } }
+    local med = { DH(0, { 0, 4 }, 128) }
+    for _, q in ipairs({ 0.5, 1, 1.5, 2, 2.5 }) do med[#med + 1] = DH(q, { 2 }, 128) end
+    med[#med + 1] = DH(4, { 0, 4 }, 128)
+    local ctx = { toms = toms, sections = { { qn = 0, name = 'intro' } } }
+    local v = GenDrumsPlanTier('E', med, { ctx = ctx })
+    Test.expect(DAt(v, 0.5) ~= nil and DAt(v, 2.5) ~= nil and not DAt(v, 1), 'VKR: the "and"s (more hits)')
+    local o = GenWithRules('official', GenDrumsPlanTier, 'E', med, { ctx = ctx })
+    Test.expect(DAt(o, 1) ~= nil and DAt(o, 2) ~= nil and not DAt(o, 1.5), 'Official: the beats')
 end)
 
 Test.it('Drums Easy: the quarter-note fill switch reads the tempo at bar 1 when it is faster', function()
