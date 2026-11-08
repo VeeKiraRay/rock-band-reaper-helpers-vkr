@@ -36,6 +36,15 @@ local function SerializeSettings()
         'vmgt='   .. S.venue_mg_target,
         'vmgr='   .. S.venue_mg_replace,
         'abhs='   .. S.beat_half_style,
+        'acsd='   .. S.char_active.drums,
+        'acsg='   .. S.char_active.guitar,
+        'acsb='   .. S.char_active.bass,
+        'acsv='   .. S.char_active.vocals,
+        'acsk='   .. S.char_active.keys,
+        'acgi='   .. S.char_gap_inst_bars,
+        'acgv='   .. S.char_gap_vox_bars,
+        'acig='   .. (S.char_idle_gaps and '1' or '0'),
+        'acmd='   .. S.char_mode,
         'vsectm=' .. S.venue_sec_tmpl_name,
         'vpscl='   .. S.venue_preview_scale,
         'vpan='    .. (S.venue_preview_animate and '1' or '0'),
@@ -75,6 +84,14 @@ local function DeserializeSettings(str)
         elseif k == 'vmgt'   then S.venue_mg_target         = (v == '1') and 1 or 0
         elseif k == 'vmgr'   then S.venue_mg_replace        = (v == '1') and 1 or 0
         elseif k == 'abhs'   then S.beat_half_style         = (v == '1') and 1 or 0
+        elseif k:match('^acs[dgbvk]$') then
+            local group = ({ d = 'drums', g = 'guitar', b = 'bass', v = 'vocals', k = 'keys' })[k:sub(4)]
+            local n = tonumber(v)
+            if n and n >= 0 and n <= 2 then S.char_active[group] = math.floor(n) end
+        elseif k == 'acgi'   then S.char_gap_inst_bars      = math.max(1, math.min(8, tonumber(v) or 3))
+        elseif k == 'acgv'   then S.char_gap_vox_bars       = math.max(1, math.min(8, tonumber(v) or 2))
+        elseif k == 'acig'   then S.char_idle_gaps          = (v == '1')
+        elseif k == 'acmd'   then S.char_mode               = (v == '1') and 1 or 0
         elseif k == 'vsectm' then S.venue_sec_tmpl_name     = v
         elseif k == 'vpscl'   then S.venue_preview_scale   = tonumber(v) or 1
         elseif k == 'vpan'    then S.venue_preview_animate = (v == '1')

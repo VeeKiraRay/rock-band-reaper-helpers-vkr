@@ -190,6 +190,15 @@ S = {
     venue_subtrack_copy_pending = nil,
     -- Animation > Beat
     beat_half_style      = 0,    -- half-time downbeat: 0=every other bar 1=every bar (persisted: 'abhs')
+    -- Animation > Character
+    char_active = { drums = 0, guitar = 0, bass = 0, vocals = 0, keys = 0 },
+                                 -- per group: 0=[play] 1=[mellow] 2=[intense] (persisted: 'acsd' 'acsg' 'acsb' 'acsv' 'acsk')
+    char_gap_inst_bars   = 3,    -- instruments idle in gaps of this many bars (4 QN) or more (persisted: 'acgi')
+    char_gap_vox_bars    = 2,    -- vocals / HARM1, likewise (persisted: 'acgv')
+    char_idle_gaps       = true, -- false = stay active through every gap (persisted: 'acig')
+    char_mode            = 0,    -- 0=Generate 1=Manual (persisted: 'acmd')
+    char_manual_part     = 1,    -- Manual part, index into CHAR_PARTS (not persisted)
+    char_manual_state    = '[play]', -- Manual state, an event text from CHAR_STATES (not persisted)
     -- UI visibility (persisted)
     show_wip_tabs           = false, -- show the Tempo Map tab
     -- Workflow checklist (Workflow tab)
@@ -544,6 +553,43 @@ TIPS = {
                      "The beat just before [end] always gets a note (Magma needs it).\n\n" ..
                      "Select a section first to halve only that part.\n" ..
                      "Range, checks and undo as Generate beats.",
+    char_set_all = "Set every part's active state at once. The rows below can then be\n" ..
+                   "changed one by one.",
+    char_gap_inst = "Drums, guitar, bass and keys go [idle] when they rest at least this\n" ..
+                    "long (from the end of a note to the next note), and come back 1 beat\n" ..
+                    "before they play again. 1 bar = 4 quarter notes.\n\n" ..
+                    "Default 3 bars, as CAT. Official charts idle about half of the\n" ..
+                    "2-3 bar rests and most of the longer ones.",
+    char_gap_vox = "Vocals and HARM1 go [idle] (microphone down) when they rest at least\n" ..
+                   "this long. 1 bar = 4 quarter notes.\n\n" ..
+                   "Default 2 bars: official charts idle about 70% of the 2-3 bar vocal\n" ..
+                   "rests. The RBN vocal doc advises against idling for less than a bar.",
+    char_idle_gaps = "Off: parts stay in their active state through every rest. The song\n" ..
+                     "start ([idle] at bar 3 before a late first note) and [idle_realtime]\n" ..
+                     "after the last note are written either way.\n\n" ..
+                     "Rare in official charts: about 3% of parts with several long rests\n" ..
+                     "never idle. Charters more often skip the idle in a rest or two -\n" ..
+                     "generate with this on, then change single rests in Manual mode.",
+    char_generate = "Write the animation states on PART DRUMS, PART DRUMS_2X, PART GUITAR,\n" ..
+                    "PART BASS, PART KEYS, PART VOCALS and HARM1, from their Expert notes:\n" ..
+                    "  - the active state 1 beat before the part plays,\n" ..
+                    "  - [idle] 1 beat after it stops for a long rest (the gaps above),\n" ..
+                    "  - [idle] at bar 3 when the part starts later,\n" ..
+                    "  - [idle_realtime] 1 beat after its last note.\n\n" ..
+                    "Muted tracks and tracks with no Expert notes are skipped. Existing\n" ..
+                    "animation states are replaced - on the whole track, or only inside\n" ..
+                    "the time selection. One undo step.",
+    char_mode = "Generate: write the states for the whole song (or the time selection).\n" ..
+                "Manual: put one state at the playhead on one part.",
+    char_manual_part = "The track Manual writes to.",
+    char_manual_btn = "Inserts the state at the edit cursor on the part's track. When a\n" ..
+                      "state already sits on that spot the button reads Replace and swaps\n" ..
+                      "it. One undo step.\n\n" ..
+                      "The ride options (Drums) are not states: they replace only another\n" ..
+                      "ride option on that spot, and Generate leaves them alone.",
+    char_readout = "The part's state at the playhead: the last state event at or before\n" ..
+                   "it, and where that event is - on the playhead itself, or the bar.beat\n" ..
+                   "it started from.",
     anim_beat_half_style = "Where half-time beats put the downbeat note.\n\n" ..
                            "Every other bar: the first bar of the range gets a downbeat, the\n" ..
                            "next bar starts with an upbeat, and so on. This is how CAT and most\n" ..

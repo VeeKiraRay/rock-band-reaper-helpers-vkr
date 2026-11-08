@@ -8,7 +8,8 @@
 --     General    - stem import, audio alignment, count-in positioning, song fade out, settings,
 --                  buttons that open the other tools in this set
 --     Workflow   - per-project authoring workflow checklist
---     Animation  - Beat: write the BEAT track (normal or half time)
+--     Animation  - Beat: write the BEAT track (normal or half time);
+--                  Character: band member animation states per part
 --     Events     - list song sections, insert EVENTS track events at the
 --                  playhead
 --     Venue      - list, validate, and generate VENUE track events
@@ -50,6 +51,17 @@
 --       just before [end] always gets a note, as Magma requires. Needs a
 --       BEAT track and an [end] event; existing BEAT notes in the range are
 --       replaced. One undo step.
+--     - Animation > Character writes the band members' animation states on
+--       each part: [play], [mellow] or [intense] (picked per part, or Set all)
+--       one beat before the part plays, [idle] one beat after it stops for a
+--       long rest (3 bars for instruments, 2 for vocals by default, both
+--       adjustable, or never), [idle] at bar 3 when a part starts later, and
+--       [idle_realtime] after its last note. Covers PART DRUMS and DRUMS_2X,
+--       GUITAR, BASS, KEYS, VOCALS and HARM1, from their Expert notes; muted
+--       tracks are skipped. Manual mode inserts any state at the playhead, or
+--       replaces the one there, including Idle intense, Play solo (guitar and
+--       bass) and the drummer's two ride options, and shows the part's state at the playhead and the bar it
+--       started from. Each state's tooltip carries its RBN description.
 --     - New Events tab for the EVENTS track tools, with two sub-tabs.
 --       General holds "List event sections" (moved from Venue > Actions);
 --       Manual gen is the former Venue > Events sub-tab.
@@ -264,6 +276,7 @@ for _, _f in ipairs({
     _mdir .. 'venue.lua',
     _mdir .. 'venue_awareness.lua',
     _mdir .. 'animation_beat.lua',
+    _mdir .. 'animation_character.lua',
     _mdir .. 'venue_camera_priority.lua',
     _mdir .. 'section_events.lua',
     _mdir .. 'venue_themes.lua',
@@ -343,6 +356,7 @@ dofile(_mdir .. 'helpers.lua')
 dofile(_mdir .. 'venue.lua')
 dofile(_mdir .. 'venue_awareness.lua')
 dofile(_mdir .. 'animation_beat.lua')       -- uses FindEventTime from venue_awareness.lua
+dofile(_mdir .. 'animation_character.lua')
 dofile(_mdir .. 'venue_camera_priority.lua')
 dofile(_mdir .. 'section_events.lua')
 dofile(_mdir .. 'venue_themes.lua')
