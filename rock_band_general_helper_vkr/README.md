@@ -2,7 +2,7 @@
 
 ← [Back to overview and installation](../README.md)
 
-**Utility actions for custom song authoring in REAPER.** A REAPER ReaScript covering stem import and audio alignment, a per-project workflow checklist, VENUE/EVENTS track generation, and genre/difficulty-rank suggestions, spread across five always-visible tabs plus one experimental (work-in-progress) tab.
+**Utility actions for custom song authoring in REAPER.** A REAPER ReaScript covering stem import and audio alignment, a per-project workflow checklist, band animation generation, VENUE/EVENTS track generation, and genre/difficulty-rank suggestions, spread across six always-visible tabs plus one experimental (work-in-progress) tab.
 
 The instrument tools — Difficulty, Overdrive, Tab Input and MIDI — are in the **[Instrument Helper](../rock_band_instrument_helper_vkr/README.md)**.
 
@@ -11,7 +11,7 @@ The instrument tools — Difficulty, Overdrive, Tab Input and MIDI — are in th
 ## Quick start
 
 1. Open a REAPER project with your audio stems already imported.
-2. Run the script. The window opens with five tabs: **General | Workflow | Events | Venue | Metadata**, plus the WIP tab below.
+2. Run the script. The window opens with six tabs: **General | Workflow | Animation | Events | Venue | Metadata**, plus the WIP tab below.
 3. Try General → Actions → **Align all audio** to line up your stems, or jump straight to **Venue** to start authoring VENUE/EVENTS events.
 4. **Tempo Map** is experimental and hidden by default — enable it via General → Settings → **Show WIPs?** (see [README_WIP.md](README_WIP.md) for its full documentation).
 
@@ -19,12 +19,13 @@ The instrument tools — Difficulty, Overdrive, Tab Input and MIDI — are in th
 
 ## UI overview
 
-The window is organized into tabs plus a [footer](#window-footer) that is always visible at the bottom. Five tabs are always visible; one more (Tempo Map) is work-in-progress and hidden until enabled.
+The window is organized into tabs plus a [footer](#window-footer) that is always visible at the bottom. Six tabs are always visible; one more (Tempo Map) is work-in-progress and hidden until enabled.
 
 | Tab            | Purpose                                                                              |
 | -------------- | ------------------------------------------------------------------------------------ |
 | **General**    | Stem import, audio alignment, song fade out, settings save/load, and buttons that open the other tools |
 | **Workflow**   | A per-project authoring checklist from a template you can edit                      |
+| **Animation**  | Generate the BEAT track, the band's character animation states and the drummer's hand animations |
 | **Events**     | List the song sections and insert EVENTS-track markers at the playhead               |
 | **Venue**      | Validate and generate text events on the VENUE track                                |
 | **Metadata**   | Convert a real-world genre to the closest supported Rock Band genre, suggest a difficulty rank and tier for each finished Expert chart, and suggest the song key from the charted vocals |
@@ -166,6 +167,87 @@ Switching templates (via the combo) immediately drops checked history for any st
 
 ---
 
+## Animation tab
+
+Generates the animation data the game uses to move the band: the **BEAT** track, each part's **character states**, and the **drummer's hands and kick**. Contains three sub-tabs: **Beat**, **Character** and **Drums**. Keys and Guitar sub-tabs are planned.
+
+Every action respects the time selection (only that part of the song is rewritten) and is a single undo step. The rules were measured against the official Rock Band 3 DLC charts, so a generated song should look like an official one before you hand-edit anything.
+
+### Beat sub-tab
+
+<!-- TODO: screenshot of the Animation > Beat sub-tab -->
+![Animation - Beat sub-tab](../assets/g_animation_beat.jpg)
+
+Writes the **BEAT** track: a downbeat note on each bar's first beat and an upbeat note on every other beat, from measure 1 up to the `[end]` event. Needs a BEAT track and an `[end]` event on EVENTS; if BEAT has no MIDI item, one is created from measure 1 to `[end]`. Existing BEAT notes in the range are replaced.
+
+- **Generate beats** — one note per quarter note, counted from each bar line, in every time signature. A quarter note that starts inside a bar gets a note even when the bar ends half a beat later, so 7/8 gets `downbeat upbeat upbeat upbeat` and 6/8 gets three notes, as the official charts do.
+- **Generate half-time beats** — a note every two quarter notes, each bar restarting at its bar line. Use it for slow songs or sections where the band should move at half speed. Select a section first to halve only that part.
+- **Half-time downbeat** — **Every other bar** (default: what most halved official songs and CAT do) or **Every bar**.
+
+Two rules come from testing with Magma rather than from the documentation:
+
+- **The beat just before `[end]` always gets a note**, half time included — Magma refuses a song without it. Half time steps one beat instead of two at the very end to make room.
+- **Bars without a downbeat compile fine.** The RBN documentation says every measure needs a downbeat and an upbeat, but all three modes compile in Magma with bars that have no downbeat, and most halved official songs leave every second bar without one.
+
+Bars too short for the chosen spacing (e.g. a 2/4 bar in half time) are written with the strict spacing, without a warning — fix them by hand if needed.
+
+### Character sub-tab
+
+Writes the character animation state events on each part: an **active** state while the part plays, **idle** in long breaks and **idle realtime** after its last note. Parts: PART DRUMS, PART DRUMS_2X, PART GUITAR, PART BASS, PART KEYS, PART VOCALS and HARM1 (HARM2/3 and Pro Keys don't need them). Muted parts get nothing.
+
+A **Mode** radio switches between **Generate** (the whole song or the time selection) and **Manual** (one state at the playhead). Hovering any state shows the RBN description of how the character moves in it.
+
+#### Generate
+
+<!-- TODO: screenshot of the Animation > Character sub-tab, Generate mode -->
+![Animation - Character sub-tab, Generate](../assets/g_animation_character_generate.jpg)
+
+- **Set all** and one row per group — **Drums** (PART DRUMS + PART DRUMS_2X), **Guitar**, **Bass**, **Vocals** (PART VOCALS + HARM1), **Keys** — pick the active state: **Play**, **Mellow** or **Intense**. A row is greyed out when all its tracks are missing or muted.
+- **Instrument idle gap** (default 3 bars) and **Vocal idle gap** (default 2 bars) — how long a rest must be before the part goes idle. Official charts idle instruments in about half of 2-3 bar rests and most longer ones; vocals idle in most rests of 2 bars or more.
+- **Idle in long gaps** (default on) — off keeps every part active through its rests. A rare style in the official charts; editing single rests in Manual mode afterwards is the commoner variation.
+- **Generate character animations** — the active state goes about a beat before each run of notes, idle about a beat after it ends. A part whose first note comes well after bar 3 idles from bar 3 first. Idle realtime follows the part's last note. Existing state events are replaced (only inside the time selection, if there is one).
+
+#### Manual
+
+<!-- TODO: screenshot of the Animation > Character sub-tab, Manual mode -->
+![Animation - Character sub-tab, Manual](../assets/g_animation_character_manual.jpg)
+
+- **Part** — which track to write to.
+- **State** — every state: Play, Mellow, Intense, Play solo (guitar and bass only), Idle, Idle intense and Idle realtime. Drums also offer **Ride side swipe** and **Ride normal**, two drummer-only options from the RBN documentation.
+- **Insert** writes the state at the edit cursor. The button reads **Replace** when a state already sits exactly there; Replace swaps only that state.
+- **At playhead** shows the part's current state and where it was set — "on the playhead" or "from" a bar and beat — so you can see what you're about to change.
+
+### Drums sub-tab
+
+<!-- TODO: screenshot of the Animation > Drums sub-tab -->
+![Animation - Drums sub-tab](../assets/g_animation_drums.jpg)
+
+Writes the drummer's animation notes on PART DRUMS and PART DRUMS_2X from their Expert gems: which drum or cymbal each hit is, which hand plays it, and the kick. Existing animation notes are replaced (only inside the time selection, if there is one); muted tracks are skipped. **Hi-hat pedal notes are not generated** and are never touched, so pedal work you've placed by hand stays.
+
+The hands follow the official charts rather than alternating blindly:
+
+- Every piece has its usual hand, following the kit from left to right (hi-hat, crash 1, snare, tom 1, tom 2, floor tom, crash 2, ride): snare and tom 1 left, the rest right, with the hi-hat played crossed by the right hand.
+- Hands alternate only when hits come fast. Fast runs follow the beat: the beat and the "and" right, the "e" and "a" left. Disco hi-hat 16ths always alternate.
+- Moving around the kit, the hand on that side takes the new drum, so fills don't cross the arms. A drum straight after a cymbal is played by the other hand.
+- Two hits at once are split sensibly: snare left and cymbal right in a groove, hi-hat + crash as both crashes, snare + yellow tom as a flam.
+
+Measured against the official charts' own animation notes, the hand is right on 94% of one-hand hits (CAT's rules: 83%).
+
+| Option | Default | What it does |
+| ------ | ------- | ------------ |
+| **Default crash** | Crash 2 (right) | Which crash a green cymbal plays: crash 2 on the drummer's right or crash 1 on the left. Official charts choose per song. |
+| **Blue cymbal** | Ride | **Ride**, with a lone blue hit played as a crash 1 accent, or **Open hi-hat** for charts that put the closed hi-hat on yellow and the open hi-hat on blue (~10% of official songs). |
+| **Min cymbal hits** | 3 | How many fast cymbal hits in a row before the hands start alternating (CAT uses 4). |
+| **Snare + yellow tom as a flam** | On | Both hands on the snare instead of snare + tom 1 (official charts: 83%). |
+| **Slow snare variety** | On | Lone slow snares vary: right hand in snare-only passages, both hands for accents. Off: always the left hand. |
+| **Soft snare and crash hits** | Off | Uses the soft notes (official charts: ~10% of hits). |
+| **Crash riding: alternate soft and hard** | Off | An RBN documentation tip for riding a crash in 8ths; rare in the official charts. |
+| **Flam: left hand slightly late** | Off | An RBN documentation tip; official flams put both hands on the same tick. |
+
+The result lists, per track, the kicks, one-hand hits (right / left), two-hand hits and flams, then the options used.
+
+---
+
 ## Events tab
 
 Works on the **EVENTS** track: the song sections and markers that Venue's section-based generation and the game read. Contains two sub-tabs: **General** and **Manual gen**.
@@ -195,6 +277,8 @@ All Events actions are fully undoable.
 The Venue tab contains six sub-tabs, in this order: Actions, Themes gen, Section gen, Manual gen, Keyframes, Preview. (The EVENTS-track tools moved to the [Events tab](#events-tab) in v0.9.63.) The script finds the VENUE and EVENTS tracks automatically by name — no dropdown needed.
 
 An **Active players** row is shown below every sub-tab (see [below](#active-players-row)).
+
+<a id="venue-actions"></a>
 
 ### Actions sub-tab
 
@@ -287,15 +371,24 @@ Like Themes gen, this never re-states a preset that's already running: in Templa
 
 Shot-by-shot event insertion at the edit cursor.
 
+Two rows at the top set where and how events go in:
+
+- **Target** — **VENUE** (default) writes to the VENUE track. **Subtracks** writes each event to its own Sub VENUE track instead: cameras to *VENUE normal camera* / *VENUE directed camera*, lighting to *VENUE lighting*, `[first]` / `[next]` / `[previous]` and generated keyframes to *VENUE keyevents*, and so on. Create the subtracks first with [Copy all to subtracks](#venue-actions); a note appears if they're missing. The game, the Venue validators and Preview read only VENUE, so run **Copy all to main track** when you're done. The Keyframes sub-tab shares this setting.
+- **Insert** — what **Add** does with events already at the playhead. **Add** (default) inserts next to them, so a stack builds up. **Replace** first removes the events of the same family on that spot, then inserts. The families are cameras (normal and directed together, so a camera stack becomes the one new shot), lighting, post proc, bonus FX, and keyframes. Other families on the spot stay.
+
+Then one row per event type:
+
 - **Normal camera** — pick any `[coop_*]` shot; **Add** inserts it at the edit cursor.
 - **Directed camera** — pick any `[directed_*]` shot including BRE events; **Add** inserts it.
-- **Lighting** — pick any lighting preset; **Add** inserts `[lighting (name)]`. When a manual preset is selected, Keyframe align and Keyframe rate controls appear.
-- **Post proc** — pick any `[*.pp]` effect; **Add** inserts it.
+- **Lighting** — pick any lighting preset; **Add** inserts `[lighting (name)]`. **Blend** copies the preset that is currently running to the playhead, so the game fades into the next preset instead of cutting to it: place it a beat or two before where the new preset goes (see [blending](#venue-actions)). Blend reads what is on the track, not the dropdown.
+- **Keyframe align** + **Add** — generates `[first]`/`[next]` from the playhead to the next lighting event, the time selection end, or the VENUE item end, clearing existing keyframe events in that range first. `[first]` must share the tick of the manual lighting event it drives, so the row is blocked unless the playhead is on a manual lighting event (`verse`, `chorus`, `manual_cool`, `manual_warm`, `dischord`, `stomp`); hover **(blocked)** for why. The align modes and **Subdivision** are the same as on the [Keyframes sub-tab](#keyframes-sub-tab); **Keyframe rate** is this tab's own.
+- **Post proc** — pick any `[*.pp]` effect; **Add** inserts it. **Blend** works as for lighting.
 - **Special** — `[bonusfx]`, `[bonusfx_optional]`, `[first]`, `[next]`, `[previous]`; **Add** inserts the chosen event.
 - **Camera pacing** — shared camera pacing override (same state as the other gen tabs).
 - **Advance camera pacing** — moves the edit cursor forward by one jittered camera interval.
-- **Generate keyframes** — generates `[first]`/`[next]` from the cursor to the next lighting event, time selection end, or VENUE item end. Clears existing keyframe events in the range first. Only available when a manual lighting preset is selected. Fully undoable.
 - **Remove** — category dropdown (Camera / Lighting / Post proc / Special / All) + **Remove** button; removes matching events from the time selection (if active) or the full song. Fully undoable.
+
+Every Add, Blend and Remove is one undo step. Target and Insert are saved with the project's settings.
 
 ### Keyframes sub-tab
 
@@ -303,10 +396,11 @@ Shot-by-shot event insertion at the edit cursor.
 
 Bulk-regenerates `[first]`/`[next]` keyframes for every manual lighting event already sitting on the VENUE track — useful after moving or retiming a section rather than re-adding keyframes by hand.
 
+- **Target** — **VENUE** reads the lighting and writes the keyframes on the VENUE track; **Subtracks** reads the manual lighting events on *VENUE lighting* and writes `[first]`/`[next]` to *VENUE keyevents*. Shared with [Manual gen](#venue-manual-gen)'s Target.
 - **Keyframe align** — alignment mode: **Lighting start** (default, anchors at the lighting event itself), **Closest beat**, **Downbeat**, or five instrument-aware modes (**Guitar notes**, **Bass notes**, **Keys notes**, **Drum kicks**, **Drum snare**) that place `[next]` only at beats where notes exist on the corresponding PART track.
 - **Subdivision** — Every beat / Every half beat / Every quarter beat, shown only for the instrument-aware align modes.
 - **Keyframe rate** — this tab's own rate (beats), independent of Section gen's and Manual gen's.
-- **Regenerate keyframes** — finds every manual lighting event on VENUE (`verse`, `chorus`, `manual_cool`, `manual_warm`, `dischord`, `stomp`), and for each one inside the processing range, clears and regenerates its `[first]`/`[next]` running from that lighting event to the next lighting event of any kind. Only keyframe events are touched — camera, lighting, postproc, and bonus FX are left alone. Respects time selection (a section already in progress from before the selection is left untouched); otherwise processes the whole song. Fully undoable.
+- **Regenerate keyframes** — finds every manual lighting event on the target (`verse`, `chorus`, `manual_cool`, `manual_warm`, `dischord`, `stomp`), and for each one inside the processing range, clears and regenerates its `[first]`/`[next]` running from that lighting event to the next lighting event of any kind. Only keyframe events are touched — camera, lighting, postproc, and bonus FX are left alone. Respects time selection (a section already in progress from before the selection is left untouched); otherwise processes the whole song. Fully undoable.
 
 ### Preview sub-tab
 
@@ -325,7 +419,7 @@ Live readout of current, previous, and next venue events relative to the playhea
 - **blending now** — the playhead is inside that fade right now.
 - **hard cut to next** — no anchor, the game switches instantly. Perfectly valid, not an error.
 
-Camera cards never show this line; a camera cut never fades. To add an anchor by hand, use **Blend** on the [Manual gen sub-tab](#venue-manual-gen); to find changes that don't have one, use **Validate lighting/blends** on the [Actions sub-tab](#actions-sub-tab).
+Camera cards never show this line; a camera cut never fades. To add an anchor by hand, use **Blend** on the [Manual gen sub-tab](#venue-manual-gen); to find changes that don't have one, use **Validate lighting/blends** on the [Actions sub-tab](#venue-actions).
 
 Sprite previews require JPEG spritesheets installed under `resources/img/spritesheets/`. If no spritesheets are found, event names are shown as text with no image.
 

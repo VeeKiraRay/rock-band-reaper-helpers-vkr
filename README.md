@@ -5,8 +5,8 @@ Four REAPER ReaScript tools for custom Rock Band song authoring, sharing a commo
 | Script                                                                 | What it does                                                                                              |
 | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | **[Rock Band Vocal Helper](rock_band_vocal_helper_vkr/README.md)**     | Generate timing-aligned MIDI notes from a vocal stem, with pitch assignment and lyric assignment built in |
-| **[Rock Band General Helper](rock_band_general_helper_vkr/README.md)** | Stem import and audio alignment, audio-driven tempo map generation from a drum stem, a per-project workflow checklist, VENUE/EVENTS authoring and validation, and genre/difficulty-rank suggestions |
-| **[Rock Band Instrument Helper](rock_band_instrument_helper_vkr/README.md)** | Guitar, Bass, Drums, Keys and Pro Keys: difficulty generation, reduction and validation, overdrive and drum fills, ASCII tab input, and MIDI utilities |
+| **[Rock Band General Helper](rock_band_general_helper_vkr/README.md)** | Stem import and audio alignment, audio-driven tempo map generation from a drum stem, a per-project workflow checklist, band animations (BEAT track, character states, drummer hands), VENUE/EVENTS authoring and validation, and genre/difficulty-rank suggestions |
+| **[Rock Band Instrument Helper](rock_band_instrument_helper_vkr/README.md)** | Guitar, Bass, Drums, Keys and Pro Keys: difficulty generation, reduction and validation, overdrive and drum fills, ASCII tab input, MIDI utilities, and a chord tuner that names the chords in the keys stem |
 | **Rock Band Music Theory Helper**                                       | Interactive instrument reference — drum notation legend, common drum patterns, and a guitar chord-shape explorer, with hover highlighting and audio playback (playback needs [SWS](#sws-extension-audio-playback-only)) |
 
 ---

@@ -2,7 +2,7 @@
 
 ← [Back to main README](README.md)
 
-These tabs are enabled via **General → Settings → Show WIPs? = Yes**; they then appear after MIDI in the tab bar. They work at a basic level but have known issues and aren't ready for general use — expect rough edges.
+These views are enabled via **General → Settings → Show WIPs? = Yes**: the Drums and Guitar tabs appear after Keys in the tab bar, and the keys tools appear as the **WIP** sub-tab of the Keys tab. They work at a basic level but have known issues and aren't ready for general use — expect rough edges.
 
 ---
 
@@ -33,10 +33,10 @@ Converts General MIDI drum notes to Rock Band 5-lane format and writes them to t
 
 ---
 
-## Keys tab
+## Keys → WIP sub-tab
 
-<!-- TODO: screenshot of the Keys tab -->
-![Keys tab](../assets/g_wip_keys.jpg)
+<!-- TODO: screenshot of the Keys > WIP sub-tab -->
+![Keys - WIP sub-tab](../assets/g_wip_keys.jpg)
 
 Contains four conversion tools for piano MIDI → Rock Band keys formats. Each tool has its own source and target track selectors.
 

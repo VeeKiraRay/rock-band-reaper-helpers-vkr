@@ -180,11 +180,37 @@ These are the same settings used by Placement - Built-in. Adjusting them here ch
 
 The same Min pitch / Max pitch checkbox+slider pairs as Placement - Built-in. When enabled, detected pitches outside the range are octave-shifted back in before display. Useful for voices where YIN occasionally lands an octave too low or high.
 
+#### Harmony readout (experimental)
+
+<!-- TODO: screenshot of the Tuner with the Harmony readout on -->
+![Tuner - Harmony readout](../assets/v_tuner_harmony.jpg)
+
+Tick **Harmony readout (experimental)** to also read a **second voice** — a harmony sung beside the lead in the same vocal recording. It is read-only and meant as a hint for charting HARM2: check what it says by ear before you chart it.
+
+It uses the charted lead: at the playhead it takes the lead note from the chart, cancels that pitch from the audio, and reads what is left. So the lead has to be charted first, and the readout only works where a lead note is charted.
+
+Settings, shown when the checkbox is on:
+
+- **Lead chart** — the track with the charted lead. Defaults to HARM1, or PART VOCALS when the song has no harmony tracks yet. Unpitched (`#`) notes are skipped, and edits to the track are picked up within about a second.
+- **Key snap** — moves a reading that is one semitone outside the key into it, when the votes point that way. **Off** (default), **From charted lead** (the key worked out from the lead chart, the same detector as the General Helper's [Metadata → Song key](../rock_band_general_helper_vkr/README.md#song-key-sub-tab); it shows the key it found, or "too few notes - off"), or a key note with **Major / Minor** beside it. The right key helps a little; a wrong key makes it worse, and a song with notes outside its key can be snapped away from them.
+- **Spectral reading too** (default off) — adds a second way of reading the voices, the way a spectrogram shows them, and lets both vote on each note. It finds more harmonies above the lead, including some an octave above, which the normal reading cannot hear. Costs a few milliseconds per reading.
+
+Below the pitch display and history, two lines show the voices:
+
+| Line | Shows |
+| ---- | ----- |
+| **HARM1** | The charted lead note at the playhead, and how clearly the audio has it (`NN% conf`, amber under 75%). When the audio clearly has a different pitch, it is named: `- sung as X`. |
+| **HARM2** | The second voice, and how many of the readings agree on it (`NN% agree`, amber under 80%), followed by **so far in this note** (while playing: a vote that restarts with each lead note) or **whole note** (stopped: the whole lead note under the cursor is read at once, after a short "reading the note..."). |
+
+Other messages: **only one voice found** (sometimes with "left and right differ - maybe a doubled lead"), **lead silent** (no charted lead note at the playhead — the pitch display above shows whoever is singing), and **quiet**.
+
+**How far to trust it.** Measured on official songs, about a third of harmony notes come out exactly right and about half with the right note name; most misses are an octave or a semitone off. A harmony an octave above the lead is mostly missed (Spectral reading too finds some), and a third voice is not read. On a real recording a solo note usually still shows some HARM2 at low agreement, so read the agreement, not just whether a HARM2 note is shown.
+
 <a id="standalone-pitch-tuner"></a>
 
 #### Standalone Pitch Tuner
 
-`rock_band_pitch_tuner_vkr.lua` (repo root) is a separate script that opens just this sub-tab in its own window — load it the same way as the main scripts (**Actions → Show action list → Load ReaScript**). Handy for keeping the live readout visible while you work in another tab (Pitch, Lyrics) or in the MIDI editor, instead of the tuner stopping the moment you navigate away. Same underlying behaviour as the Tuner tab above, with two differences:
+`rock_band_pitch_tuner_vkr.lua` (repo root) is a separate script that opens just this sub-tab in its own window — load it the same way as the main scripts (**Actions → Show action list → Load ReaScript**). Handy for keeping the live readout visible while you work in another tab (Pitch, Lyrics) or in the MIDI editor, instead of the tuner stopping the moment you navigate away. Same underlying behaviour as the Tuner tab above, Harmony readout included, with two differences:
 
 - It shows the **Audio source** selector at the top, and the same [footer](#window-footer) as the main window without Undo — it makes no project edits.
 - It never stops on tab navigation — there are no tabs. The 60-second idle auto-stop still applies, and closing the window stops the tuner.
