@@ -21,6 +21,9 @@
 --     - The shared venue files it loads now spell the lighting keyframe
 --       trigger [prev] (General Helper v0.9.64). This window does not show
 --       keyframe events, so nothing here looks different.
+--     - The same settings files now store Animation > Drums' soft hits as two
+--       options, soft crash and soft snare (General Helper v0.9.64). This
+--       window has no drum options and saves them as it found them.
 --   v0.7
 --     - No change to this window. The General Helper's instrument tabs moved
 --       to the new Instrument Helper (General Helper v0.9.63), and the track

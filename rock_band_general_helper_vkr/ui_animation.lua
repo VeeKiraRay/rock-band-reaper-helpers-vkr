@@ -339,8 +339,11 @@ local function DrawAnimationDrumsTab()
     Tooltip(TIPS.drum_anim_flam)
     _, S.drum_anim_snare_variety = r.ImGui_Checkbox(ctx, 'Slow snare variety##da_sv', S.drum_anim_snare_variety)
     Tooltip(TIPS.drum_anim_snare_variety)
-    _, S.drum_anim_soft = r.ImGui_Checkbox(ctx, 'Soft snare and crash hits##da_soft', S.drum_anim_soft)
-    Tooltip(TIPS.drum_anim_soft)
+    _, S.drum_anim_soft_cym = r.ImGui_Checkbox(ctx, 'Soft crash hits##da_softc', S.drum_anim_soft_cym)
+    Tooltip(TIPS.drum_anim_soft_cym)
+    _, S.drum_anim_soft_snare = r.ImGui_Checkbox(ctx, 'Soft snare hits (ghost strokes)##da_softs',
+                                                 S.drum_anim_soft_snare)
+    Tooltip(TIPS.drum_anim_soft_snare)
     _, S.drum_anim_ride_alt = r.ImGui_Checkbox(ctx, 'Crash riding: alternate soft and hard##da_ra',
                                                S.drum_anim_ride_alt)
     Tooltip(TIPS.drum_anim_ride_alt)

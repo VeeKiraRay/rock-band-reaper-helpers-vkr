@@ -134,7 +134,8 @@ end
 --   onsets: { { qn, sec, K, R, Y, B, G (gems hit), Yt, Bt, Gt (under a tom marker),
 --               disco }, ... } sorted by qn, one per hit time
 --   opts:   crash1 (bool) - green cymbal on crash 1 instead of crash 2
---           soft (bool)   - soft snare / crash notes
+--           soft_cym (bool)   - soft crash notes (still a hit, lighter)
+--           soft_snare (bool) - soft snare notes (ghost strokes: the kit snare does not move)
 --           flam (bool)   - snare + yellow tom = both hands on the snare (default on)
 --           min_cym_hits  - cymbal hits in a row before fast cymbals alternate
 --           snare_variety (bool) - slow lone snares by the right hand in snare-only
@@ -329,9 +330,12 @@ function DrumAnimPlan(onsets, opts)
         for _, ph in ipairs(o.hands) do
             local info = DRUM_ANIM_PIECES[ph[1]]
             local key = ph[2]
-            local soft = opts.soft
-            if o.soft_hit ~= nil then soft = (opts.soft and not o.soft_hit) or (not opts.soft and o.soft_hit) end
-            if soft and info[key .. 's'] and (ph[1] == 'sn' or info.cym) then key = key .. 's' end
+            -- Soft snare notes are ghost strokes in game (the kit snare does not move);
+            -- soft cymbals still hit - hence two options.
+            local soft = (ph[1] == 'sn' and opts.soft_snare) or (info.cym and opts.soft_cym) or false
+            -- crash riding flips every other hit of the run against the option
+            if o.soft_hit ~= nil and info.cym then soft = (soft ~= o.soft_hit) end
+            if soft and info[key .. 's'] then key = key .. 's' end
             local qn = o.qn
             -- Option: in a flam the left hand lands slightly after the right (RBN doc
             -- tip; official flams are almost all on one tick - off by default).
@@ -406,7 +410,8 @@ function DrumAnimOptions()
     return {
         crash1         = S.drum_anim_crash == 1,
         blue_hh        = S.drum_anim_blue_hh,
-        soft           = S.drum_anim_soft,
+        soft_cym       = S.drum_anim_soft_cym,
+        soft_snare     = S.drum_anim_soft_snare,
         flam           = S.drum_anim_flam,
         min_cym_hits   = S.drum_anim_min_cym,
         snare_variety  = S.drum_anim_snare_variety,
@@ -565,7 +570,8 @@ function GenerateDrumAnimations()
     lines[#lines + 1] = '- Min cymbal hits: ' .. (o.min_cym_hits or DRUM_ANIM_PARAMS.min_cym_hits)
     lines[#lines + 1] = '- Snare + yellow tom as a flam: ' .. OnOff(o.flam)
     lines[#lines + 1] = '- Slow snare variety: ' .. OnOff(o.snare_variety)
-    lines[#lines + 1] = '- Soft snare and crash hits: ' .. OnOff(o.soft)
+    lines[#lines + 1] = '- Soft crash hits: ' .. OnOff(o.soft_cym)
+    lines[#lines + 1] = '- Soft snare hits (ghost strokes): ' .. OnOff(o.soft_snare)
     lines[#lines + 1] = '- Crash riding soft / hard: ' .. OnOff(o.crash_ride_alt)
     lines[#lines + 1] = '- Flam left hand late: ' .. OnOff(o.flam_late)
     lines[#lines + 1] = ''

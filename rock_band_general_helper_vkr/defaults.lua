@@ -204,13 +204,15 @@ S = {
     char_mode            = 0,    -- 0=Generate 1=Manual (persisted: 'acmd')
     char_manual_part     = 1,    -- Manual part, index into CHAR_PARTS (not persisted)
     char_manual_state    = '[play]', -- Manual state, an event text from CHAR_STATES (not persisted)
-    -- Animation > Drums (all persisted: 'adcr' 'admc' 'adfl' 'adsv' 'adso' 'adra' 'adfll')
+    -- Animation > Drums (all persisted: 'adcr' 'admc' 'adfl' 'adsv' 'adsc' 'adss' 'adra' 'adfll';
+    -- the old combined 'adso' is still read: 1 = both soft options on)
     drum_anim_crash         = 0,     -- default crash: 0 = crash 2, 1 = crash 1
     drum_anim_blue_hh       = false, -- blue cymbal = open hi-hat (false = ride)
     drum_anim_min_cym       = 3,     -- fast cymbal hits in a row before the hands alternate
     drum_anim_flam          = true,  -- snare + yellow tom = both hands on the snare
     drum_anim_snare_variety = true,  -- slow lone snares: right hand / both hands by context
-    drum_anim_soft          = false, -- soft snare and crash notes
+    drum_anim_soft_cym      = false, -- soft crash notes (still hit, lighter)
+    drum_anim_soft_snare    = false, -- soft snare notes (ghost strokes: the kit snare does not move)
     drum_anim_ride_alt      = false, -- riding a crash in 8ths alternates soft and hard
     drum_anim_flam_late     = false, -- a flam's left hand a 1/32 note late
     -- UI visibility (persisted)
@@ -616,8 +618,15 @@ TIPS = {
                               "  - on the beat after a pause or next to toms, both hands (an accent).\n" ..
                               "Off: the left hand plays them all. Official charts play these\n" ..
                               "~50% left, ~30% right, ~20% both hands.",
-    drum_anim_soft = "Snare and crash hits use the soft notes. Official charts use soft hits\n" ..
-                     "on ~10% of hits.",
+    drum_anim_soft_cym = "Every crash hit uses the soft crash notes. The drummer still hits the\n" ..
+                         "cymbal, with a lighter stroke.",
+    drum_anim_soft_snare = "Every snare hit uses the soft snare notes (28 / 29). In the game these\n" ..
+                           "are ghost strokes: the stick hovers over the snare and the snare on\n" ..
+                           "the kit does not move. Meant for quiet ghost notes, so with this on\n" ..
+                           "no snare hit in the song moves the snare.\n\n" ..
+                           "Official charts use soft snare notes for a few ghost notes in about\n" ..
+                           "half of the songs, never for every hit. For ghost notes, leave this\n" ..
+                           "off and change those notes by hand.",
     drum_anim_ride_alt = "When the drummer rides a crash in 8th notes, alternate soft and hard\n" ..
                          "hits so it looks less robotic (an RBN doc tip). Rare in official\n" ..
                          "charts (6% of 8th-note crash riding, 13% when slow); quarters and\n" ..

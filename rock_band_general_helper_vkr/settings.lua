@@ -51,7 +51,8 @@ local function SerializeSettings()
         'admc='   .. S.drum_anim_min_cym,
         'adfl='   .. (S.drum_anim_flam and '1' or '0'),
         'adsv='   .. (S.drum_anim_snare_variety and '1' or '0'),
-        'adso='   .. (S.drum_anim_soft and '1' or '0'),
+        'adsc='   .. (S.drum_anim_soft_cym and '1' or '0'),
+        'adss='   .. (S.drum_anim_soft_snare and '1' or '0'),
         'adra='   .. (S.drum_anim_ride_alt and '1' or '0'),
         'adfll='  .. (S.drum_anim_flam_late and '1' or '0'),
         'vsectm=' .. S.venue_sec_tmpl_name,
@@ -107,7 +108,13 @@ local function DeserializeSettings(str)
         elseif k == 'admc'   then S.drum_anim_min_cym       = math.max(2, math.min(8, tonumber(v) or 3))
         elseif k == 'adfl'   then S.drum_anim_flam          = (v == '1')
         elseif k == 'adsv'   then S.drum_anim_snare_variety = (v == '1')
-        elseif k == 'adso'   then S.drum_anim_soft          = (v == '1')
+        elseif k == 'adsc'   then S.drum_anim_soft_cym      = (v == '1')
+        elseif k == 'adss'   then S.drum_anim_soft_snare    = (v == '1')
+        -- before v0.9.64 one option made snare AND crash hits soft; a project saved
+        -- with it keeps both on (the next Save writes adsc / adss instead)
+        elseif k == 'adso'   then
+            S.drum_anim_soft_cym   = (v == '1')
+            S.drum_anim_soft_snare = (v == '1')
         elseif k == 'adra'   then S.drum_anim_ride_alt      = (v == '1')
         elseif k == 'adfll'  then S.drum_anim_flam_late     = (v == '1')
         elseif k == 'vsectm' then S.venue_sec_tmpl_name     = v

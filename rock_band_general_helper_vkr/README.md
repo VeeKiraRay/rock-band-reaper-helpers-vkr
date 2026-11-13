@@ -246,7 +246,8 @@ Measured against the official charts' own animation notes, the hand is right on 
 | **Min cymbal hits** | 3 | How many fast cymbal hits in a row before the hands start alternating (CAT uses 4). |
 | **Snare + yellow tom as a flam** | On | Both hands on the snare instead of snare + tom 1 (official charts: 83%). |
 | **Slow snare variety** | On | Lone slow snares vary: right hand in snare-only passages, both hands for accents. Off: always the left hand. |
-| **Soft snare and crash hits** | Off | Uses the soft notes (official charts: ~10% of hits). |
+| **Soft crash hits** | Off | Every crash hit uses the soft notes - still a hit, with a lighter stroke. |
+| **Soft snare hits (ghost strokes)** | Off | Every snare hit uses the soft notes (28 / 29). In game these are ghost strokes: the stick hovers and the kit's snare does not move. Official charts use them only for a few ghost notes - for those, change the notes by hand. |
 | **Crash riding: alternate soft and hard** | Off | An RBN documentation tip for riding a crash in 8ths; rare in the official charts. |
 | **Flam: left hand slightly late** | Off | An RBN documentation tip; official flams put both hands on the same tick. |
 

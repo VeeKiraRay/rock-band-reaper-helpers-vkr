@@ -72,6 +72,12 @@
 --       game's section names, so it is not translated: every game language
 --       shows the event text "prc_dj_intro" instead of its own name for it.
 --       Rename any you have.
+--     - Animation > Drums: "Soft snare and crash hits" is now two options,
+--       "Soft crash hits" and "Soft snare hits (ghost strokes)". In the game
+--       a soft snare note is a ghost stroke: the stick hovers and the snare
+--       on the kit does not move, so the old option left every snare hit in
+--       the song still. Soft cymbals still hit, just lighter. A project saved
+--       with the old option on gets both new ones on, as before.
 --     - The Structure row's tooltip notes that numbered verses and choruses
 --       get their own background clips in the video venues.
 --

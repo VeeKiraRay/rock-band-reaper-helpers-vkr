@@ -222,6 +222,26 @@ Test.it('crash riding soft / hard in 8ths (option)', function()
     Expect(Pitches(DrumAnimPlan(o, { crash_ride_alt = true })), '38@0 39@0.5 38@1 39@1.5')
     o = On(Run(0, 1, 4, 'G'), 120)
     Expect(Pitches(DrumAnimPlan(o, { crash_ride_alt = true })), '38@0 38@1 38@2 38@3', 'quarters stay hard')
+    -- with soft crash hits on, the riding flips the other way: soft, hard, soft, hard
+    o = On(Run(0, 0.5, 4, 'G'), 120)
+    Expect(Pitches(DrumAnimPlan(o, { crash_ride_alt = true, soft_cym = true })), '39@0 38@0.5 39@1 38@1.5',
+           'soft crash + riding')
+end)
+
+Test.it('soft crash and soft snare are separate options', function()
+    -- snare at 0, crash 2 at 4, hi-hat at 8 (no soft note), far apart
+    local list = { { 0, 'R' }, { 4, 'G' }, { 8, 'Y' } }
+    local base = { snare_variety = false }
+    local function Plan(extra)
+        local opts = {}
+        for k, v in pairs(base) do opts[k] = v end
+        for k, v in pairs(extra) do opts[k] = v end
+        return Pitches(DrumAnimPlan(On(list, 120), opts))
+    end
+    Expect(Plan({}), '26@0 38@4 31@8', 'both off')
+    Expect(Plan({ soft_cym = true }), '26@0 39@4 31@8', 'soft crash only: snare stays hard')
+    Expect(Plan({ soft_snare = true }), '28@0 38@4 31@8', 'soft snare only: crash stays hard')
+    Expect(Plan({ soft_cym = true, soft_snare = true }), '28@0 39@4 31@8', 'both on')
 end)
 
 ----------------------------------------------------------------------
