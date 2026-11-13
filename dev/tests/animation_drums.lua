@@ -285,18 +285,26 @@ else
         WithFixture(function()
             local _, d = MakeDrums('PART DRUMS', { { 0, 97 }, { 4, 97 }, { 4, 30 } })
             r.GetSet_LoopTimeRange(true, false, QNTime(2), QNTime(8), false)
-            GenerateDrumAnimations()
+            -- This test is about the selection, not the hands: with snare variety on, the
+            -- snare 4 QN after the last one is a both-hands accent (26 + 27).
+            local variety = S.drum_anim_snare_variety
+            S.drum_anim_snare_variety = false
+            local ok, err = pcall(GenerateDrumAnimations)
+            S.drum_anim_snare_variety = variety
+            if not ok then error(err, 0) end
             Expect(Anim(d), '26@4', 'old 30@4 replaced, nothing at 0')
         end)
     end)
 
     Test.it('one undo step removes the run', function()
         WithFixture(function()
-            local _, d = MakeDrums('PART DRUMS', { { 0, 96 }, { 1, 97 } })
+            local tr, d = MakeDrums('PART DRUMS', { { 0, 96 }, { 1, 97 } })
+            FixtureUndoPoint()   -- else the undo below deletes the fixture track too
             GenerateDrumAnimations()
             Test.expect(Anim(d) ~= '', 'notes written')
             r.Undo_DoUndo2(0)
-            Expect(Anim(d), '', 'after undo')
+            -- The take pointer can change across undo; read it again.
+            Expect(Anim(r.GetActiveTake(r.GetTrackMediaItem(tr, 0))), '', 'after undo')
         end)
     end)
 end

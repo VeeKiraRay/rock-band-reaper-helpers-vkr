@@ -406,6 +406,7 @@ else
 
     Test.it('one undo step removes the run', function()
         WithFixture(3, 32, function(beat)
+            FixtureUndoPoint()   -- else the undo below deletes the fixture tracks too
             GenerateBeatTrack(false)
             Test.expect(#ReadBeat(beat) == 8, 'expected 8 notes before undo')
             r.Undo_DoUndo2(0)

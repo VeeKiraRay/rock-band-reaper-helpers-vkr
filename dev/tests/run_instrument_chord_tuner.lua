@@ -42,6 +42,7 @@ dofile(_root .. 'lib/reaper_chord_detect.lua')
 dofile(_root .. 'lib/reaper_key_detect.lua')
 dofile(_root .. 'lib/reaper_key_profiles.lua')
 dofile(_mdir .. 'defaults.lua')
+dofile(_mdir .. 'actions_difficulty_generate.lua')   -- GEN_INSTRUMENTS / GEN_STYLES: settings.lua reads them
 dofile(_mdir .. 'settings.lua')
 dofile(_mdir .. 'helpers.lua')
 dofile(_mdir .. 'chord_tuner.lua')

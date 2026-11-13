@@ -232,11 +232,14 @@ else
 
     Test.it('one undo step removes a Generate run', function()
         WithParts(function()
-            local _, g = MakePart('PART GUITAR', { { 8, 9 } })
+            local tr, g = MakePart('PART GUITAR', { { 8, 9 } })
+            FixtureUndoPoint()   -- else the undo below deletes the fixture track too
             GenerateCharacterAnimations()
             Test.expect(#States(g) == 2, 'expected 2 events before undo')
             r.Undo_DoUndo2(0)
-            Test.expect(#States(g) == 0, 'undo must remove them, got ' .. #States(g))
+            -- The take pointer can change across undo; read it again.
+            local n = #States(r.GetActiveTake(r.GetTrackMediaItem(tr, 0)))
+            Test.expect(n == 0, 'undo must remove them, got ' .. n)
         end)
     end)
 end

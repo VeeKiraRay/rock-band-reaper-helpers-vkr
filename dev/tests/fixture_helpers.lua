@@ -132,6 +132,14 @@ function FindFixtureTrack(pattern, from_idx)
     return nil
 end
 
+-- Make an undo point for a fixture just built. Building tracks and items in a
+-- test creates none, so an undo test's Undo_DoUndo2 would go back to the last
+-- point BEFORE the fixture and delete its tracks too. Call this after building
+-- the fixture and before the action under test.
+function FixtureUndoPoint()
+    r.Undo_OnStateChangeEx2(0, 'Test fixture', -1, -1)
+end
+
 -- Create an empty named track at the end of the project. Returns absolute index.
 function CreateEmptyFixtureTrack(name)
     local n = r.CountTracks(0)
