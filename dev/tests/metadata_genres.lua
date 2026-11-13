@@ -86,6 +86,29 @@ Test.it('a repeated subgenre key across genres resolves to its own parent', func
 end)
 
 ----------------------------------------------------------------------
+Test.it('every major genre has an animation style, and every style is used', function()
+    local used = {}
+    for _, gk in ipairs(RB3_GENRE_ORDER) do
+        local st = GENRE_ANIM_STYLE[gk]
+        Test.expect(st and ANIM_STYLES[st], gk .. ' has no animation style')
+        if st then used[st] = true end
+    end
+    for gk in pairs(GENRE_ANIM_STYLE) do
+        Test.expect(RB3_GENRES[gk], 'style table names an unknown genre: ' .. gk)
+    end
+    for _, key in ipairs(ANIM_STYLE_ORDER) do
+        Test.expect(ANIM_STYLES[key] and used[key], key .. ' is listed but no genre uses it')
+    end
+end)
+
+Test.it('animation styles follow the game table (spot checks), unknown -> rocker', function()
+    Test.expect(GenreAnimStyle('metal').label == 'Banger', 'metal')
+    Test.expect(GenreAnimStyle('j_rock').label == 'Spazz', 'j_rock')
+    Test.expect(GenreAnimStyle('new_wave').label == 'Dramatic', 'new_wave')
+    Test.expect(GenreAnimStyle('hip_hop_rap').label == 'Rocker', 'hip_hop_rap')
+    Test.expect(GenreAnimStyle('no_such_genre').label == 'Rocker', 'unknown genre')
+end)
+
 Test.section('Extended vocabulary (metadata_genres_ext.lua)')
 
 Test.it('every family in the order list has a label and at least one entry', function()

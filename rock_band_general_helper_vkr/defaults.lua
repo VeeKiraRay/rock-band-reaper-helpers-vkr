@@ -145,6 +145,7 @@ S = {
     -- must reset it (see DrawForward in ui_metadata_genre.lua).
     genre_family_idx      = 1,
     genre_ext_idx         = 1,
+    genre_mode            = 1,    -- 1 = Animation style, 2 = Genre converter (session only too)
     -- Cached filtered track lists (not persisted - rebuilt by RefreshTrackLists)
     all_track_list        = nil,
     audio_track_list      = nil,
@@ -234,6 +235,11 @@ TIPS = {
     load          = "Load previously saved settings from this project.",
 
     -- Metadata > Genre
+    genre_mode_style =
+        "Which band animation style each supported major genre gives in game.",
+    genre_mode_converter =
+        "Convert the genre you would call the song into the closest supported\n" ..
+        "major genre and subgenre.",
     genre_family =
         "Narrows the genre list below.\n\n" ..
         "The full list runs past 200 entries, which is more than a\n" ..

@@ -78,6 +78,13 @@
 --       on the kit does not move, so the old option left every snare hit in
 --       the song still. Soft cymbals still hit, just lighter. A project saved
 --       with the old option on gets both new ones on, as before.
+--     - Metadata > Genre has two views: Animation style (new, shown first)
+--       and the Genre converter. Animation style lists the four band
+--       animation styles - Rocker, Banger, Dramatic, Spazz - and which major
+--       genres give each: the genre decides how the whole band moves in game
+--       and which directed camera cuts exist. Magma has no other setting for
+--       it (community tools such as MiloMod can change it afterwards). The
+--       converter's result now names the style of each suggested genre.
 --     - The Structure row's tooltip notes that numbered verses and choruses
 --       get their own background clips in the video venues.
 --

@@ -20,7 +20,12 @@
 -- Results are drawn INLINE rather than into S.last_result: they change as the combo
 -- moves, and the shared panel is wiped whenever the main tab changes.
 --
+-- A second mode, shown first: Animation style - the game's genre -> band animation style
+-- table (metadata_genres.lua). The converter's result names each pair's style too.
+--
 -- Requires globals: r, ctx, S, TIPS, Tooltip, SectionHeader, LabelColWidth, WIDTH_STD,
+--                   RB3_GENRE_ORDER, RB3_GENRES, ANIM_STYLE_ORDER, ANIM_STYLES,
+--                   GENRE_ANIM_STYLE, GenreAnimStyle (metadata_genres.lua),
 --                   GENRE_FAMILY_ORDER, GENRE_FAMILIES (metadata_genres_ext.lua),
 --                   GenresInFamily, ResolveExtendedGenre (metadata_genres_lookup.lua)
 
@@ -122,6 +127,7 @@ local function DrawForward(lbl_col)
     for i, c in ipairs(res.candidates) do
         r.ImGui_Text(ctx, ('%d.  %s  /  %s'):format(i, c.genre_label, c.sub_label))
         r.ImGui_Indent(ctx)
+        r.ImGui_Text(ctx, 'Animation style: ' .. GenreAnimStyle(c.genre_key).label)
         r.ImGui_TextWrapped(ctx, c.why)
         if c.sub.blurb and c.sub.blurb ~= '' then
             DimWrapped('Described as: ' .. c.sub.blurb)
@@ -146,8 +152,83 @@ local function DrawForward(lbl_col)
 end
 
 ----------------------------------------------------------------------
+-- Animation style: which supported genre gives which band style
+----------------------------------------------------------------------
+
+local function DrawAnimStyles()
+    r.ImGui_TextWrapped(ctx,
+        'The song\'s major genre picks how the band moves in game: one of four animation ' ..
+        'styles, for the whole band. It also changes which directed camera cuts are ' ..
+        'available, since some cuts exist only for one style. A genre the game does not ' ..
+        'know gets Rocker.')
+    r.ImGui_Spacing(ctx)
+    DimWrapped(
+        'Official songs have set the style per song inside their own game files, and many ' ..
+        'differ from this table. A custom song built with Magma has no such setting, so ' ..
+        'its genre decides the style - unless the built song is edited afterwards with a ' ..
+        'community tool such as MiloMod, which can set it for customs.')
+
+    for _, key in ipairs(ANIM_STYLE_ORDER) do
+        local st = ANIM_STYLES[key]
+        local names = {}
+        for _, gk in ipairs(RB3_GENRE_ORDER) do
+            if GENRE_ANIM_STYLE[gk] == key then names[#names + 1] = RB3_GENRES[gk].label end
+        end
+        r.ImGui_Spacing(ctx)
+        r.ImGui_Separator(ctx)
+        r.ImGui_Spacing(ctx)
+        r.ImGui_Text(ctx, st.label)
+        r.ImGui_Indent(ctx)
+        r.ImGui_TextWrapped(ctx, table.concat(names, ', '))
+        r.ImGui_Unindent(ctx)
+    end
+
+    -- What else picks the moves (game files: the clip bank is
+    -- instrument x character gender x anim_tempo x style; the per-part animation
+    -- events then pick moves inside it).
+    r.ImGui_Spacing(ctx)
+    r.ImGui_Separator(ctx)
+    r.ImGui_Spacing(ctx)
+    r.ImGui_Text(ctx, 'What else shapes the animations')
+    r.ImGui_Indent(ctx)
+    r.ImGui_TextWrapped(ctx,
+        'The style is one of four things that pick the set of moves a band member uses:')
+    r.ImGui_TextWrapped(ctx, '- Instrument: each part has its own moves.')
+    r.ImGui_TextWrapped(ctx, '- Gender: each character\'s own, set in the character ' ..
+        'creator - not song data. Some directed cuts have moves for one gender only: a ' ..
+        'male guitarist can slide on his knees, a female guitarist blows a kiss to the ' ..
+        'camera (Dramatic songs only).')
+    r.ImGui_TextWrapped(ctx, '- Speed: Magma\'s Animation speed (anim_tempo in ' ..
+        'songs.dta) - slow, medium or fast. A missing value counts as medium.')
+    r.ImGui_TextWrapped(ctx, '- Style: from the genre, as above.')
+    r.ImGui_Spacing(ctx)
+    r.ImGui_TextWrapped(ctx,
+        'During the song, each part\'s animation events ([idle], [play], [mellow], ' ..
+        '[intense], ...) choose which of those moves play - see the Animation tab\'s ' ..
+        'Character sub-tab.')
+    r.ImGui_Unindent(ctx)
+end
+
+----------------------------------------------------------------------
+
+local MODE_LABELS = { 'Animation style', 'Genre converter' }
 
 function DrawMetadataGenreTab(ctx)
+    -- Mode: one view at a time. Session only, like the converter's combos.
+    local mode = S.genre_mode == 2 and 2 or 1
+    if r.ImGui_RadioButton(ctx, MODE_LABELS[1] .. '##genre_mode', mode == 1) then S.genre_mode = 1 end
+    Tooltip(TIPS.genre_mode_style)
+    r.ImGui_SameLine(ctx)
+    if r.ImGui_RadioButton(ctx, MODE_LABELS[2] .. '##genre_mode', mode == 2) then S.genre_mode = 2 end
+    Tooltip(TIPS.genre_mode_converter)
+    r.ImGui_Spacing(ctx)
+
+    if mode == 1 then
+        SectionHeader('Animation style')
+        DrawAnimStyles()
+        return
+    end
+
     SectionHeader('Genre converter')
 
     r.ImGui_TextWrapped(ctx,

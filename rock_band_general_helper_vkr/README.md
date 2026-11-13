@@ -471,7 +471,22 @@ Contains three sub-tabs: **Genre**, **Difficulty** and **Song key**. All three a
 
 ![Genre sub-tab](../assets/g_metadata_genre.jpg)
 
-Converts the genre you'd actually call your song into the closest genre Rock Band supports.
+Two views, picked with the radio at the top: **Animation style** (shown first) and **Genre converter**.
+
+**Animation style** shows how the song's major genre decides the way the band moves in game. Each genre gives one of four animation styles for the whole band, and the style also decides which directed camera cuts are available. A genre the game does not know gets Rocker.
+
+| Style | Major genres |
+|---|---|
+| **Rocker** | Alternative, Blues, Classic Rock, Country, Fusion, Hip-Hop/Rap, Indie Rock, Pop-Rock, Prog, R&B/Soul/Funk, Reggae/Ska, Rock, Southern Rock, World, Other |
+| **Banger** | Grunge, Metal, Nu-Metal |
+| **Dramatic** | Classical, Emo, Glam, Inspirational, Jazz, New Wave, Pop/Dance/Electronic |
+| **Spazz** | J-Rock, Latin, Novelty, Punk |
+
+Official songs have set the style per song inside their own game files, and many differ from this table. A custom song built with Magma has no such setting, so its genre decides the style - unless the built song is edited afterwards with a community tool such as MiloMod, which can set it for customs.
+
+The style is one of four things that pick the set of moves a band member uses: the **instrument**, the character's **gender** (set in the character creator, not song data; some directed cuts have moves for one gender only - a male guitarist can slide on his knees, a female guitarist blows a kiss to the camera in Dramatic songs), the song's **speed** (Magma's Animation speed, `anim_tempo` in songs.dta: slow, medium or fast; missing counts as medium) and the **style**. During the song, each part's animation events (`[idle]`, `[play]`, `[mellow]`, `[intense]`, ...) choose which of those moves play - see the Animation tab's Character sub-tab.
+
+**Genre converter** converts the genre you'd actually call your song into the closest genre Rock Band supports. Each suggested pair also shows the animation style it gives.
 
 Pick a broad **family** first, then the **genre** itself — the full list runs past 200 entries, which is more than one dropdown can be read from. Changing the family resets the genre below it.
 

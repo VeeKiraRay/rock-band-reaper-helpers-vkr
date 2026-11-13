@@ -427,3 +427,56 @@ RB3_GENRES = {
         },
     },
 }
+
+-- Band animation style per major genre: the game's own table (char/anim_genres.dta,
+-- read from the RB3 game files). The style picks the clip bank every band member loads,
+-- so it changes how the whole band moves and which directed camera cuts exist. A genre
+-- the game does not know falls back to rocker.
+-- An official song can override it per song inside its compiled milo (BandSongPref);
+-- Harmonix did so for many disc songs. A Magma-built custom has no such override, so
+-- for customs this table decides the style.
+ANIM_STYLE_ORDER = { 'rocker', 'banger', 'dramatic', 'spazz' }
+
+ANIM_STYLES = {
+    rocker   = { label = 'Rocker' },
+    banger   = { label = 'Banger' },
+    dramatic = { label = 'Dramatic' },
+    spazz    = { label = 'Spazz' },
+}
+
+GENRE_ANIM_STYLE = {
+    alternative          = 'rocker',
+    blues                = 'rocker',
+    classical            = 'dramatic',
+    classic_rock         = 'rocker',
+    country              = 'rocker',
+    emo                  = 'dramatic',
+    fusion               = 'rocker',
+    glam                 = 'dramatic',
+    grunge               = 'banger',
+    hip_hop_rap          = 'rocker',
+    indie_rock           = 'rocker',
+    inspirational        = 'dramatic',
+    jazz                 = 'dramatic',
+    j_rock               = 'spazz',
+    latin                = 'spazz',
+    metal                = 'banger',
+    new_wave             = 'dramatic',
+    novelty              = 'spazz',
+    nu_metal             = 'banger',
+    pop_dance_electronic = 'dramatic',
+    pop_rock             = 'rocker',
+    prog                 = 'rocker',
+    punk                 = 'spazz',
+    rnb_soul_funk        = 'rocker',
+    reggae_ska           = 'rocker',
+    rock                 = 'rocker',
+    southern_rock        = 'rocker',
+    world                = 'rocker',
+    other                = 'rocker',
+}
+
+-- The style entry for a major genre key; rocker for an unknown key, as in game.
+function GenreAnimStyle(genre_key)
+    return ANIM_STYLES[GENRE_ANIM_STYLE[genre_key] or 'rocker']
+end
