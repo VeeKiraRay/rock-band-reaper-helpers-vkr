@@ -306,22 +306,22 @@ Inspection and utility actions that don't fit the generation sub-tabs.
 
 **Validate lighting/blends** checks the lighting and post-process authoring on the VENUE track — the keyframe and blend rules described below. It's read-only: it never changes the track, it just tells you what it found and what to do about it.
 
-*Keyframes.* A `[first]` is a manual lighting event's own opening keyframe, so it belongs on that event's **exact tick**. The check reports:
+*Keyframes.* Only the manual presets (`verse`, `chorus`, `manual_cool`, `manual_warm`, `dischord`, `stomp`) react to keyframe events: `[next]` steps to the preset's next look, `[prev]` back one, `[first]` returns to the first look, and the looks loop. A preset always starts on its first look when the lighting changes to it, and restating the preset already running does not restart it. Most manual presets have just two looks, so `[next]` and `[prev]` land on the same look; the official charts use only `[next]`, often one per beat. `[first]` always goes to the first look, whichever look is showing, so it is the one to use where a part must start from the first look. Verse and chorus have four looks in arenas, big clubs and festivals, and two in small clubs and video venues.
 
-- **Manual lighting changes missing a `[first]`** — a manual preset (`verse`, `chorus`, `manual_cool`, `manual_warm`, `dischord`, `stomp`) that starts running where a different one was running before.
-- **`[first]` events off a lighting change** — every `[first]` that isn't on such an event, each with the reason and the fix: *move it* when it's within a beat of a change that's missing one (so fixing the first list doesn't leave you with two), or *delete it* when it sits on a blend anchor, on an automatic preset (which takes no keyframes), on a tick with no lighting event at all, or is a second copy on a tick that already has one.
+The check lists **keyframe events with no effect**, as advice rather than issues, since they are harmless:
 
-An event that repeats the preset already running gets no `[first]` and is never flagged for lacking one — see blending below.
+- any keyframe event under a preset that ignores them, or before the first lighting event;
+- a `[first]` before any `[next]` / `[prev]` in its preset — the preset is still on its first look. Versions before v0.9.64 wrote one of these on every manual lighting change; **Regenerate keyframes** on the Keyframes sub-tab rewrites those spans without it.
 
 *Blending.* By default a preset change is a **hard cut**: the new lighting snaps in at its event. To make it fade instead, the **outgoing** preset is restated a beat or two before the change, giving the game something to interpolate from:
 
 ```
-m3     [lighting (stomp)]  [first]
+m3     [lighting (stomp)]
 m9 b4  [lighting (stomp)]              <- blend anchor: the OLD preset, restated
-m10    [lighting (verse)]  [first]     <- the change itself never moves
+m10    [lighting (verse)]              <- the change itself never moves
 ```
 
-The anchor is just a duplicate of the preset that's already playing, so it starts no new keyframe train — the `[first]` at m3 keeps running straight through it. Post-process events blend the same way, independently of lighting.
+The anchor is just a duplicate of the preset that's already playing, so it starts no new keyframe train — the `[next]` train from m3 keeps running straight through it. Post-process events blend the same way, independently of lighting.
 
 The check lists **lighting changes** and **post proc changes with no blend anchor**, each naming the outgoing preset and where it started, so you know what to restate and where. A hard cut is a perfectly valid choice, so treat this as a list of places a fade *would* need an anchor rather than a list of mistakes. To add one, park the playhead a beat or two before the change and use **Blend** on the Manual gen sub-tab; the generation sub-tabs place them automatically from a theme's `lightpreset_blendin` / `postproc_blendin`.
 
@@ -344,7 +344,7 @@ Whole-song generation driven by a `.rbtheme` file.
 
 - **Theme** — select a `.rbtheme` file from the `resources/themes/` folder. Shows `(select a theme)` when none is loaded; Generate is disabled until a theme is chosen. If the folder is empty, all inputs are disabled.
 - **Camera pacing** — override the theme's camera cut rate, or keep the theme default. A jitter toggle adds ±20 % randomisation to cut intervals for a more natural feel.
-- **Keyframe align** — global alignment mode for `[first]`/`[next]` keyframe events. Options: Section start, Closest beat, Downbeat, and five instrument-aware modes (Guitar notes, Bass notes, Keys notes, Drum kicks, Drum snare) that place `[next]` only at beats where notes exist on the corresponding PART track.
+- **Keyframe align** — global alignment mode for the `[next]` keyframe events. Options: Section start, Closest beat, Downbeat, and five instrument-aware modes (Guitar notes, Bass notes, Keys notes, Drum kicks, Drum snare) that place `[next]` only at beats where notes exist on the corresponding PART track.
 - **Generate venue events** — generates camera cuts, lighting changes, manual-lighting keyframes, and post-process effects on the VENUE track. Camera pools are filtered by which PART instrument tracks are present and unmuted. Respects time selection (partial regeneration). Fully undoable.
 
 A section never re-states the lighting or post proc preset already running. If a section's theme pool offers alternatives, it picks one of those instead; if the pool holds only the running preset, that section simply keeps it and writes no event at all (the report counts these as *Kept running preset*). This matters because two identical events back to back is exactly how a blend anchor is written — a repeat would read as a fade you never asked for. Its keyframes are still generated, so a manual preset keeps animating across the boundary. If you genuinely want a duplicate, add it with **Blend** on the [Manual gen sub-tab](#venue-manual-gen).
@@ -358,8 +358,8 @@ Per-section manual configuration. Sections are read from `[prc_*]` markers on th
 - **Section selector** — pick a song section. **Refresh** re-reads sections from the EVENTS track.
 - Per-section settings:
   - **Lighting** — lighting preset for this section (manual or auto).
-  - **Keyframe align** — alignment mode for `[first]`/`[next]` events (disabled for auto/no lighting).
-  - **Keyframe rate** — how often `[first]`/`[next]` events are placed (beats).
+  - **Keyframe align** — alignment mode for the `[next]` events (disabled for auto/no lighting).
+  - **Keyframe rate** — how often `[next]` events are placed (beats).
   - **Light blendin** — place the lighting event N beats before the section start.
   - **Post-process** — post-process effect for this section.
   - **PP blendin** — place the post-process event N beats before the section start.
@@ -388,9 +388,9 @@ Then one row per event type:
 - **Normal camera** — pick any `[coop_*]` shot; **Add** inserts it at the edit cursor.
 - **Directed camera** — pick any `[directed_*]` shot including BRE events; **Add** inserts it.
 - **Lighting** — pick any lighting preset; **Add** inserts `[lighting (name)]`. **Blend** copies the preset that is currently running to the playhead, so the game fades into the next preset instead of cutting to it: place it a beat or two before where the new preset goes (see [blending](#venue-actions)). Blend reads what is on the track, not the dropdown.
-- **Keyframe align** + **Add** — generates `[first]`/`[next]` from the playhead to the next lighting event, the time selection end, or the VENUE item end, clearing existing keyframe events in that range first. `[first]` must share the tick of the manual lighting event it drives, so the row is blocked unless the playhead is on a manual lighting event (`verse`, `chorus`, `manual_cool`, `manual_warm`, `dischord`, `stomp`); hover **(blocked)** for why. The align modes and **Subdivision** are the same as on the [Keyframes sub-tab](#keyframes-sub-tab); **Keyframe rate** is this tab's own.
+- **Keyframe align** + **Add** — generates a `[next]` train from the playhead to the next lighting event, the time selection end, or the VENUE item end, clearing existing keyframe events in that range first. The train belongs to the manual lighting event under the playhead, so the row is blocked unless the playhead is on one (`verse`, `chorus`, `manual_cool`, `manual_warm`, `dischord`, `stomp`); hover **(blocked)** for why. Nothing goes on the lighting event itself: a preset always starts on its first look. The align modes and **Subdivision** are the same as on the [Keyframes sub-tab](#keyframes-sub-tab); **Keyframe rate** is this tab's own.
 - **Post proc** — pick any `[*.pp]` effect; **Add** inserts it. **Blend** works as for lighting.
-- **Special** — `[bonusfx]`, `[bonusfx_optional]`, `[first]`, `[next]`, `[prev]`; **Add** inserts the chosen event.
+- **Special** — `[bonusfx]`, `[bonusfx_optional]`, `[next]`, `[first]`, `[prev]`; **Add** inserts the chosen event. Each keyframe event's hover explains it (and how many looks the presets have per venue). Where a keyframe event would do nothing in game — under a preset that ignores keyframes, or a `[first]` while the preset is still on its first look — the row shows **(does nothing here)** with the reason, and the result after Add says it too.
 - **Camera pacing** — shared camera pacing override (same state as the other gen tabs).
 - **Advance camera pacing** — moves the edit cursor forward by one jittered camera interval.
 - **Remove** — category dropdown (Camera / Lighting / Post proc / Special / All) + **Remove** button; removes matching events from the time selection (if active) or the full song. Fully undoable.
@@ -401,13 +401,13 @@ Every Add, Blend and Remove is one undo step. Target and Insert are saved with t
 
 ![Keyframes sub-tab](../assets/g_venue_keyframes.jpg)
 
-Bulk-regenerates `[first]`/`[next]` keyframes for every manual lighting event already sitting on the VENUE track — useful after moving or retiming a section rather than re-adding keyframes by hand.
+Bulk-regenerates the `[next]` keyframes for every manual lighting event already sitting on the VENUE track — useful after moving or retiming a section rather than re-adding keyframes by hand.
 
-- **Target** — **VENUE** reads the lighting and writes the keyframes on the VENUE track; **Subtracks** reads the manual lighting events on *VENUE lighting* and writes `[first]`/`[next]` to *VENUE keyevents*. Shared with [Manual gen](#venue-manual-gen)'s Target.
+- **Target** — **VENUE** reads the lighting and writes the keyframes on the VENUE track; **Subtracks** reads the manual lighting events on *VENUE lighting* and writes the `[next]` keyframes to *VENUE keyevents*. Shared with [Manual gen](#venue-manual-gen)'s Target.
 - **Keyframe align** — alignment mode: **Lighting start** (default, anchors at the lighting event itself), **Closest beat**, **Downbeat**, or five instrument-aware modes (**Guitar notes**, **Bass notes**, **Keys notes**, **Drum kicks**, **Drum snare**) that place `[next]` only at beats where notes exist on the corresponding PART track.
 - **Subdivision** — Every beat / Every half beat / Every quarter beat, shown only for the instrument-aware align modes.
 - **Keyframe rate** — this tab's own rate (beats), independent of Section gen's and Manual gen's.
-- **Regenerate keyframes** — finds every manual lighting event on the target (`verse`, `chorus`, `manual_cool`, `manual_warm`, `dischord`, `stomp`), and for each one inside the processing range, clears and regenerates its `[first]`/`[next]` running from that lighting event to the next lighting event of any kind. Only keyframe events are touched — camera, lighting, postproc, and bonus FX are left alone. Respects time selection (a section already in progress from before the selection is left untouched); otherwise processes the whole song. Fully undoable.
+- **Regenerate keyframes** — finds every manual lighting event on the target (`verse`, `chorus`, `manual_cool`, `manual_warm`, `dischord`, `stomp`), and for each one inside the processing range, clears its keyframe events (an old `[first]` on the lighting event goes too) and writes a `[next]` train running from that lighting event to the next lighting event of any kind. Only keyframe events are touched — camera, lighting, postproc, and bonus FX are left alone. Respects time selection (a section already in progress from before the selection is left untouched); otherwise processes the whole song. Fully undoable.
 
 ### Preview sub-tab
 

@@ -8,11 +8,11 @@
 --           FindTrackByName, FindFirstMIDIItem, FormatTime, RB3_PHRASE_PITCH,
 --           r, S (globals)
 
--- Reason shown wherever a [first] is refused, in the UI's blocked hover and in the
--- action's own status line, so both read the same.
+-- Reason shown wherever keyframe generation is refused, in the UI's blocked hover and in
+-- the action's own status line, so both read the same.
 NO_LIGHTING_AT_PLAYHEAD_MSG =
-    '[first] must sit on the same tick as the manual lighting event it drives - ' ..
-    'no manual lighting event ([lighting (verse|chorus|manual_cool|manual_warm|' ..
+    'Keyframe Add writes the [next] keyframes for the manual lighting event under the ' ..
+    'playhead - no manual lighting event ([lighting (verse|chorus|manual_cool|manual_warm|' ..
     'dischord|stomp)]) found at the playhead.'
 
 -- Manual gen and the Keyframes tab write to VENUE (S.venue_mg_target 0) or to the Sub
@@ -129,19 +129,6 @@ function InsertVenueEventAtPlayhead(text)
     local cursor  = r.GetCursorPosition()
     local abs_ppq = r.MIDI_GetPPQPosFromProjTime(take, cursor)
 
-    -- Re-validate here, never trusting the UI frame's cached check (same discipline as
-    -- InsertEventsEvent). Returns before any Undo_* call, so a refusal leaves no undo point.
-    -- In Subtracks mode the lighting event lives on another track than the [first].
-    if text == '[first]' then
-        local _, _, lt_take = FindVenueTarget('lighting')
-        if not lt_take then return end
-        local lt_ppq = r.MIDI_GetPPQPosFromProjTime(lt_take, cursor)
-        if not FindManualLightingAtPpq(lt_take, lt_ppq) then
-            S.status = NO_LIGHTING_AT_PLAYHEAD_MSG
-            return
-        end
-    end
-
     -- Replace: the takes holding the family, grouped so one take is cleared once (in
     -- VENUE mode every category is the VENUE take). A missing subtrack on the clearing
     -- side has nothing to clear and is skipped.
@@ -191,6 +178,51 @@ function InsertVenueEventAtPlayhead(text)
     else
         S.status = ('Inserted %s at playhead (%s).'):format(text, name)
     end
+
+    -- A keyframe event that does nothing where it landed is inserted anyway (the user
+    -- asked for it), but the result says why it will not show in game.
+    if kind == 'keyframe' and text ~= VENUE_KEYFRAME_TYPO then
+        local reason = KeyframeNoEffectAtCursor(text, cursor)
+        if reason then
+            S.last_result = ('Inserted %s, but it does nothing in game here:\n%s'):format(text, reason)
+        end
+    end
+end
+
+-- Lighting events and keyframe events around the playhead, both in the lighting take's
+-- ticks (in Subtracks mode they live on two tracks). Returns lighting, keys, tol, lt_take
+-- or nil when there is no lighting take. Shared by the Add result above and the UI's
+-- "(does nothing here)" note, so both judge the same events.
+function ReadKeyframeContext()
+    local _, _, lt_take = FindNamedTrackMIDI(VenueTargetName('lighting'))
+    if not lt_take then return nil end
+    local _, _, kf_take = FindNamedTrackMIDI(VenueTargetName('keyframe'))
+    local lighting, keys = {}, {}
+    local function Read(take, want)
+        local _, _, _, n = r.MIDI_CountEvts(take)
+        for i = 0, n - 1 do
+            local ok, _, _, ppq, typ, msg = r.MIDI_GetTextSysexEvt(take, i)
+            if ok and typ == 1 and CategorizeVenueEvent(msg) == want then
+                local list = want == 'lighting' and lighting or keys
+                list[#list + 1] = { ppq = VenuePpqBetween(take, ppq, lt_take), msg = msg }
+            end
+        end
+    end
+    Read(lt_take, 'lighting')
+    if kf_take then Read(kf_take, 'keyframe') end
+    local by_ppq = function(a, b) return a.ppq < b.ppq end
+    table.sort(lighting, by_ppq)
+    table.sort(keys, by_ppq)
+    return lighting, keys, _spot_tol(lt_take), lt_take
+end
+
+-- Why a keyframe event `text` at project time `t` would do nothing, or nil.
+function KeyframeNoEffectAtCursor(text, t)
+    local lighting, keys, tol, lt_take = ReadKeyframeContext()
+    if not lighting then return nil end
+    local ppq = r.MIDI_GetPPQPosFromProjTime(lt_take, t)
+    local kind, lt = KeyframeNoEffect(text, ppq, lighting, keys, tol)
+    return kind and KeyframeNoEffectReason(kind, text, lt) or nil
 end
 
 -- ---------------------------------------------------------------------------
@@ -431,7 +463,7 @@ function GenerateManualKeyframes()
 
     -- Same span algorithm the Keyframes tab runs per manual lighting event; the playhead
     -- check above guarantees start_ppq is a lighting event's own tick, which is what
-    -- GenerateKeyframesForSpan assumes when it anchors [first] there.
+    -- GenerateKeyframesForSpan assumes when it starts the [next] train after it.
     local ctrl_events = GenerateKeyframesForSpan(take, start_ppq, end_ppq, ppq, S.venue_mg_kf_rate)
 
     if #ctrl_events == 0 then

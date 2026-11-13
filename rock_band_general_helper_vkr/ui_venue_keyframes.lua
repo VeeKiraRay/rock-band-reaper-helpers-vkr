@@ -1,5 +1,5 @@
 ﻿-- Venue > Keyframes sub-tab
--- Bulk-regenerates [first]/[next] keyframes for every manual lighting event already on the
+-- Bulk-regenerates [next] keyframes for every manual lighting event already on the
 -- VENUE track, respecting time selection.
 -- Target (VENUE / Subtracks) is the same S.venue_mg_target setting Manual gen shows.
 -- Requires globals: r, ctx, S, TIPS, Tooltip, SliderTooltip, RunAction, RegenerateVenueKeyframes,
@@ -7,7 +7,7 @@
 
 function DrawVenueKeyframesTab()
     r.ImGui_TextWrapped(ctx,
-        'Regenerate [first]/[next] keyframes for every manual lighting event already on the ' ..
+        'Regenerate [next] keyframes for every manual lighting event already on the ' ..
         'VENUE track (or, with Target = Subtracks, on VENUE lighting)')
     r.ImGui_Spacing(ctx)
 

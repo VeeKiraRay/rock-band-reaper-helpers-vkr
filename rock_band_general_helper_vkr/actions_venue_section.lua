@@ -283,9 +283,7 @@ function GenerateSectionEvent()
     -- half-beat snap helper. no_snap: skip snapping - keyframe ctrl_events are already
     -- placed on their own alignment grid (possibly finer than half-beat, e.g. quarter-beat
     -- instrument-aware modes) by GenerateThemedSectionEvents; re-snapping to half-beat would
-    -- collapse those finer positions onto the nearest half-beat/beat. A [first] carrying a
-    -- lighting event's tick is pre-snapped by SnapPpqToHalfBeat there so it still lands on
-    -- that event exactly.
+    -- collapse those finer positions onto the nearest half-beat/beat.
     local function insert_snapped(abs_ppq, text, no_snap)
         local snapped = no_snap and abs_ppq or SnapPpqToHalfBeat(abs_ppq, ppq)
         r.MIDI_InsertTextSysexEvt(take, false, false, snapped, 1, text)
@@ -486,7 +484,7 @@ function GenerateSectionEvent()
         lines[#lines + 1] = ('Lighting:           %d'):format(lt_count)
     end
     if ctrl_count > 0 then
-        lines[#lines + 1] = ('Control [first]/[next]: %d'):format(ctrl_count)
+        lines[#lines + 1] = ('Keyframes [next]:   %d'):format(ctrl_count)
     end
     if pp_count > 0 then
         lines[#lines + 1] = ('Post-process:       %d'):format(pp_count)

@@ -98,7 +98,7 @@ Sections without a number (e.g. `[prc_intro]`) match the bare key `intro`.
 |-------|------|-------------|
 | `allowed_lightpresets` | list of names | Lighting preset names (bare, without `[lighting (...)]` wrapper). One is picked per section instance, avoiding the preset already running (see "Never re-states a running preset" below). Valid names listed in `LIGHTING_VALID_SET` in `venue_themes.lua`. |
 | `allowed_postprocs` | list of `.pp` filenames | Post-process effect filenames. One picked per section instance, same avoidance. Valid set: 30 entries in `POSTPROC_VALID_SET`. Emitted as `[ProFilm_a.pp]` — filename wrapped in brackets. |
-| `keyframe_rate` | integer (beats) | `[first]`/`[next]` interval for manual lighting presets. Required if `allowed_lightpresets` includes any manual preset (`verse`, `chorus`, `manual_cool`, `manual_warm`, `dischord`, `stomp`). |
+| `keyframe_rate` | integer (beats) | `[next]` interval for manual lighting presets. Required if `allowed_lightpresets` includes any manual preset (`verse`, `chorus`, `manual_cool`, `manual_warm`, `dischord`, `stomp`). |
 | `lightpreset_blendin` | number (beats) | Blend into this section's lighting instead of cutting to it: re-state the **previously active** lighting preset this many beats before the section start. This section's own event never moves off the section start. Absent/0 = hard cut. See "Blend-in" below. |
 | `postproc_blendin` | number (beats) | Same for post-process, with its own independent offset. |
 | `camera_pacing` | string | Per-section camera pace override, overrides global `camera_pacing` for that section's duration. Same values as global. |
@@ -117,20 +117,19 @@ duplicated, giving the game an anchor to interpolate from instead of snapping.
 `postproc_blendin 2`:
 
 ```
-m3     [lighting (stomp)]  [ProFilm_a.pp]  [first]   <- section 1, untouched
+m3     [lighting (stomp)]  [ProFilm_a.pp]            <- section 1, untouched
 m9 b3  [ProFilm_a.pp]                         <- duplicate, postproc_blendin 2
 m9 b4  [lighting (stomp)]                     <- duplicate, lightpreset_blendin 1
-m10 b1 [lighting (verse)]  [ProFilm_b.pp]  [first]
+m10 b1 [lighting (verse)]  [ProFilm_b.pp]
 ```
 
 The blendin values belong to the **incoming** section (the doc's "how many
 beats BEFORE *this* section"); the duplicated content is the outgoing preset.
 Details, all in `BlendPpq` / `EmitBlendDuplicates` (`venue_lighting.lua`):
 
-- The duplicate is a **bare lighting event** — no `[first]`, no `[next]`. It
-  restates a preset that is already running, and only a preset *change* starts
-  a keyframe sequence, so section 1's train just carries on through it to the
-  boundary. (See "Keyframe placement rule" in `CLAUDE_general.md`; the
+- The duplicate is a **bare lighting event** — no keyframe of its own. It
+  restates a preset that is already running, which does not restart it in game,
+  so section 1's `[next]` train just carries on through it to the boundary. (See "Keyframe placement rule" in `CLAUDE_general.md`; the
   Keyframes tab re-derives the same rule from the track, which is what makes
   regenerating reproduce what was generated.)
 - Skipped when the preset isn't changing (lighting and postproc judged
@@ -155,7 +154,7 @@ to agree on it:
 |---|---|
 | `ResolveBlendSource` (Manual gen's **Blend** button) | refuse to add a third copy — the pair already *is* an anchor |
 | `ValidateVenueLightingBlends` (Actions ▸ **Validate lighting/blends**) | which preset changes have no anchor before them |
-| keyframe restatement test | a duplicate gets no `[first]` — it starts no train |
+| keyframe restatement test | a duplicate starts no keyframe span — the running train carries on |
 | `AnnotateVenueBlends` (Venue **Preview**) | which events are preset *state* and which are just anchors to collapse |
 
 It sits in `venue.lua` rather than beside the write side because the standalone
@@ -206,15 +205,14 @@ and post proc judged independently:
 **Keyframes are emitted either way** — the skip covers only the `lt_events` append. The
 previous section's `[next]` train was bounded by *its own* `sec_end_ppq`, so a kept
 manual preset with no train of its own here would run through the section with its
-lights frozen. `[first]` is withheld by the same test, which is the existing
-"only a change starts a train" rule and is what keeps the Keyframes tab's round trip
-working (it already treats a duplicate as neither starting nor ending a span, so
-removing the duplicate leaves its span continuous).
+lights frozen. The Keyframes tab's round trip still works: it treats a duplicate as
+neither starting nor ending a span, so removing the duplicate leaves its span
+continuous.
 
 Manual gen is exempt by design: an author who wants a duplicate there gets one.
 
 ### Valid lighting preset names (bare)
-`verse`, `chorus`, `manual_cool`, `manual_warm`, `dischord`, `stomp` (manual — require `[first]`/`[next]`)
+`verse`, `chorus`, `manual_cool`, `manual_warm`, `dischord`, `stomp` (manual — step between their looks on `[next]`)
 `loop_cool`, `loop_warm`, `harmony`, `frenzy`, `silhouettes`, `silhouettes_spot`,
 `searchlights`, `sweep`, `strobe_slow`, `strobe_fast`, `blackout_slow`, `blackout_fast`,
 `flare_slow`, `flare_fast`, `bre` (auto — no keyframes needed)
@@ -554,14 +552,16 @@ half-beat (`ppq / 2` ticks) in absolute project PPQ space. Snapping happens in t
 | `LIGHTING_INTERVAL_16THS` | 128 | Base spacing between lighting changes (~8 bars). |
 | `LIGHTING_JITTER` | 0.25 | ±25% random variation on each lighting interval. |
 | `LIGHTING_OFFSET_16THS` | 32 | Lighting changes start 2 bars into the range (gives camera a head start). |
-| `KEYFRAME_MIN_BEATS` | 1 | Min `[first]`/`[next]` interval when theme has no `keyframe_rate`. |
-| `KEYFRAME_MAX_BEATS` | 4 | Max `[first]`/`[next]` interval when theme has no `keyframe_rate`. |
+| `KEYFRAME_MIN_BEATS` | 1 | Min `[next]` interval when theme has no `keyframe_rate`. |
+| `KEYFRAME_MAX_BEATS` | 4 | Max `[next]` interval when theme has no `keyframe_rate`. |
 
 ---
 
 ## Keyframe alignment (`S.venue_keyframe_align`)
 
-Controls where `[first]` and `[next]` events land relative to the section start.
+Controls where the `[next]` events land relative to the section start. No keyframe goes on
+the lighting event itself: in game a preset always starts on its first look, and `[first]`
+there does nothing (see "Keyframe placement rule" in `CLAUDE_general.md`).
 Saved to project state as `vkfa` (integer 0–7).
 
 This same setting (and `S.venue_kf_inst_subdiv`) is shared by every keyframe generator in the
@@ -574,11 +574,11 @@ sharing one function, to avoid touching already-working generation paths.
 
 ### Modes 0–2 (standard)
 
-| Mode | Value | `[first]` position | `[next]` sequence starts from |
-|------|-------|--------------------|-------------------------------|
-| Section start | 0 | Section start | Section start + `kf_ticks` |
-| Closest beat  | 1 | Nearest beat to section start | `[first]` + `kf_ticks` |
-| Downbeat      | 2 | Section start | First measure boundary AFTER section start, then at `kf_ticks` intervals |
+| Mode | Value | `[next]` sequence starts from |
+|------|-------|-------------------------------|
+| Section start | 0 | Section start + `kf_ticks` |
+| Closest beat  | 1 | Nearest beat to section start when it is after it, then + `kf_ticks` |
+| Downbeat      | 2 | First measure boundary AFTER section start, then at `kf_ticks` intervals |
 
 **Downbeat implementation** (`FindNextMeasureStartPpq` in `venue_lighting.lua`):
 - Estimates the measure index from `TimeMap_timeToQN` ÷ 4
@@ -603,7 +603,6 @@ that have at least one qualifying note.
 | Drum kicks   | 6 | PART DRUMS  | 96 only |
 | Drum snare   | 7 | PART DRUMS  | 97 only |
 
-`[first]` is placed at the section start (no beat-snapping).  
 `[next]` events are placed at each beat/half-beat grid position within the section where at
 least one qualifying note starts. Grid positions with no notes are silently skipped.
 

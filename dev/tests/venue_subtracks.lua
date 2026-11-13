@@ -572,6 +572,7 @@ else
                 -- stomp at QN 4, its blend-in restatement a beat before the real change
                 -- to verse at QN 20.
                 InsertAtQN(4,  '[lighting (stomp)]')
+                InsertAtQN(4,  '[first]')            -- an old auto [first]: removed
                 InsertAtQN(19, '[lighting (stomp)]')
                 InsertAtQN(20, '[lighting (verse)]')
 
@@ -594,10 +595,11 @@ else
                     end
                 end
 
-                Test.expect(firsts[qn(4)], 'the stomp that changed the preset needs a [first]')
-                Test.expect(not firsts[qn(19)],
-                    'the restatement must not start a second sequence')
-                Test.expect(firsts[qn(20)], 'the change to verse needs a [first]')
+                Test.expect(next(firsts) == nil,
+                    'no [first] is written, and the old one on the stomp is gone')
+                Test.expect(not nexts[qn(4)] and not nexts[qn(20)],
+                    'no keyframe on a lighting change itself')
+                Test.expect(nexts[qn(24)], 'the change to verse gets its own [next] train')
                 -- The first span runs through its own restatement to the real change,
                 -- so at rate 4 it puts a [next] on QN 8/12/16 - past QN 19 would be
                 -- QN 20, which is the span end.
@@ -721,27 +723,38 @@ else
         end, 10)
     end)
 
-    Test.it('InsertVenueEventAtPlayhead refuses a [first] with no lighting event under it', function()
+    Test.it('InsertVenueEventAtPlayhead inserts keyframe events anywhere, saying when they do nothing', function()
         WithVenueFixture(function(_, _, take)
             local cur0 = r.GetCursorPosition()
             local ok, err = pcall(function()
                 InsertEvt(take, 1, '[lighting (stomp)]')
 
-                r.SetEditCurPos(8, false, false)          -- bare spot
-                S.status = 'Ready.'
+                -- On the lighting event: inserted, but still on the first look.
+                r.SetEditCurPos(1, false, false)
+                S.last_result = nil
                 InsertVenueEventAtPlayhead('[first]')
-                Test.expect(#ReadMsgs(take) == 1, 'nothing should have been inserted')
-                Test.expect(S.status == NO_LIGHTING_AT_PLAYHEAD_MSG,
-                    'expected the shared refusal message, got: ' .. tostring(S.status))
+                Test.expect(#ReadMsgs(take) == 2, '[first] is inserted')
+                Test.expect(S.last_result and S.last_result:find('first look', 1, true),
+                    'the result says why it does nothing: ' .. tostring(S.last_result))
 
-                r.SetEditCurPos(1, false, false)          -- on the lighting event
-                InsertVenueEventAtPlayhead('[first]')
-                Test.expect(#ReadMsgs(take) == 2, '[first] should be allowed on the lighting tick')
-
-                -- Other special events are never gated by this rule.
-                r.SetEditCurPos(8, false, false)
+                -- A [next], then a [first] after it: both have an effect, no note.
+                r.SetEditCurPos(4, false, false)
+                S.last_result = nil
                 InsertVenueEventAtPlayhead('[next]')
-                Test.expect(#ReadMsgs(take) == 3, '[next] must remain insertable anywhere')
+                Test.expect(#ReadMsgs(take) == 3 and S.last_result == nil,
+                    '[next] under stomp: ' .. tostring(S.last_result))
+                r.SetEditCurPos(6, false, false)
+                InsertVenueEventAtPlayhead('[first]')
+                Test.expect(#ReadMsgs(take) == 4 and S.last_result == nil,
+                    '[first] after a [next]: ' .. tostring(S.last_result))
+
+                -- Under an automatic preset: inserted, with the reason.
+                InsertEvt(take, 8, '[lighting (loop_warm)]')
+                r.SetEditCurPos(9, false, false)
+                InsertVenueEventAtPlayhead('[next]')
+                Test.expect(#ReadMsgs(take) == 6, '[next] is inserted')
+                Test.expect(S.last_result and S.last_result:find('ignores keyframe events', 1, true),
+                    'the result names the ignoring preset: ' .. tostring(S.last_result))
             end)
             r.SetEditCurPos(cur0, false, false)
             if not ok then error(err, 2) end
@@ -785,7 +798,6 @@ else
                 InsertVenueEventAtPlayhead('[lighting (stomp)]')
                 InsertVenueEventAtPlayhead('[ProFilm_a.pp]')
                 InsertVenueEventAtPlayhead('[bonusfx]')
-                -- [first] is checked against VENUE lighting, which now has stomp here.
                 InsertVenueEventAtPlayhead('[first]')
                 r.SetEditCurPos(2, false, false)
                 InsertVenueEventAtPlayhead('[next]')
@@ -822,19 +834,20 @@ else
         end, 10)
     end)
 
-    Test.it('[first] gate reads VENUE lighting, not VENUE', function()
+    Test.it('the keyframe note reads VENUE lighting, not VENUE', function()
         WithVenueFixture(function(_, _, venue_take)
             InsertEvt(venue_take, 1, '[lighting (stomp)]')   -- on VENUE only
             CopyVenueToSubtracks()
-            -- Empty VENUE lighting again: the gate must not fall back to VENUE.
+            -- Empty VENUE lighting again: the note must not fall back to VENUE.
             local lt_take = SubTake('lighting')
             DeleteTextEventsInRange(lt_take, -1, math.huge, nil)
             InSubtracksMode(function()
-                r.SetEditCurPos(1, false, false)
-                InsertVenueEventAtPlayhead('[first]')
-                Test.expect(S.status == NO_LIGHTING_AT_PLAYHEAD_MSG,
-                    'expected the gate refusal, got: ' .. tostring(S.status))
-                Test.expect(#ReadMsgs(SubTake('keyframe')) == 0, 'no [first] written')
+                r.SetEditCurPos(2, false, false)
+                S.last_result = nil
+                InsertVenueEventAtPlayhead('[next]')
+                Test.expect(#ReadMsgs(SubTake('keyframe')) == 1, '[next] written to VENUE keyevents')
+                Test.expect(S.last_result and S.last_result:find('before the first lighting event', 1, true),
+                    'no lighting on VENUE lighting yet: ' .. tostring(S.last_result))
             end)
         end, 10)
     end)
@@ -859,16 +872,20 @@ else
                 GenerateManualKeyframes()
                 Test.expect(S.status:find('Generated'), 'got: ' .. tostring(S.status))
 
-                local first_t
+                local first_next, n_first
+                n_first = 0
                 local _, _, _, n = r.MIDI_CountEvts(kf_take)
                 for i = 0, n - 1 do
                     local o, _, _, p, ty, msg = r.MIDI_GetTextSysexEvt(kf_take, i)
-                    if o and ty == 1 and msg == '[first]' then
-                        first_t = r.MIDI_GetProjTimeFromPPQPos(kf_take, p)
+                    if o and ty == 1 then
+                        local t = r.MIDI_GetProjTimeFromPPQPos(kf_take, p)
+                        if msg == '[first]' then n_first = n_first + 1 end
+                        if msg == '[next]' and (not first_next or t < first_next) then first_next = t end
                     end
                 end
-                Test.expect(first_t and math.abs(first_t - 4) < 0.01,
-                    '[first] should sit at 4 s, got ' .. tostring(first_t))
+                Test.expect(n_first == 0, 'no [first] written')
+                Test.expect(first_next and first_next > 4.01 and first_next < 12,
+                    'the [next] train should start after the stomp at 4 s, got ' .. tostring(first_next))
                 Test.expect(#ReadMsgs(lt_take) == 2, 'VENUE lighting gains nothing')
                 Test.expect(#ReadMsgs(venue_take) == 0, 'VENUE stays empty')
             end)
@@ -1047,13 +1064,13 @@ else
     Test.section('Keyframes tab Target = Subtracks (actions_venue_keyframes.lua)')
     ------------------------------------------------------------------
 
-    -- [first] times (seconds) on a take, sorted.
-    local function FirstTimes(take)
+    -- Times (seconds) of every `msg` event on a take, sorted.
+    local function KeyTimes(take, msg)
         local out = {}
         local _, _, _, n = r.MIDI_CountEvts(take)
         for i = 0, n - 1 do
-            local o, _, _, p, ty, msg = r.MIDI_GetTextSysexEvt(take, i)
-            if o and ty == 1 and msg == '[first]' then
+            local o, _, _, p, ty, m = r.MIDI_GetTextSysexEvt(take, i)
+            if o and ty == 1 and m == msg then
                 out[#out + 1] = r.MIDI_GetProjTimeFromPPQPos(take, p)
             end
         end
@@ -1082,10 +1099,16 @@ else
                 Test.expect(S.status:find('Regenerated') and S.status:find('VENUE keyevents', 1, true),
                     'status: ' .. tostring(S.status))
 
-                local firsts = FirstTimes(kf_take)
-                Test.expect(#firsts == 2 and math.abs(firsts[1] - 4) < 0.01
-                            and math.abs(firsts[2] - 12) < 0.01,
-                    '[first] at 4 s and 12 s, got ' .. table.concat(firsts, ','))
+                Test.expect(#KeyTimes(kf_take, '[first]') == 0, 'no [first] written')
+                -- A [next] train after each manual change (4 s and 12 s), none on them.
+                local after4, after12 = false, false
+                for _, t in ipairs(KeyTimes(kf_take, '[next]')) do
+                    Test.expect(math.abs(t - 4) > 0.01 and math.abs(t - 12) > 0.01,
+                        'a [next] sits on a lighting change at ' .. t)
+                    if t > 4 and t < 12 then after4 = true end
+                    if t > 12 then after12 = true end
+                end
+                Test.expect(after4 and after12, 'both manual presets get a [next] train')
                 Test.expect(#ReadMsgs(lt_take) == 2, 'VENUE lighting gains nothing')
                 Test.expect(#ReadMsgs(venue_take) == 0, 'VENUE stays empty')
             end)

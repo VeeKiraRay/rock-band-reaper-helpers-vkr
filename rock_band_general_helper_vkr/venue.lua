@@ -12,7 +12,7 @@
 -- The one home for the rule, since four places read it back off a track and must
 -- agree: ResolveBlendSource (Manual gen's Blend button refuses to add a third copy),
 -- ValidateVenueLightingBlends (reports changes with no anchor), the keyframe
--- restatement test - a duplicate carries no [first] precisely because it is this -
+-- restatement test - a duplicate starts no keyframe train precisely because it is this -
 -- and AnnotateVenueBlends below (the Preview collapses anchors out of its timeline).
 -- EmitBlendDuplicates (venue_lighting.lua) is the write side of the same rule.
 --

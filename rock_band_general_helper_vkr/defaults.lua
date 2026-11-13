@@ -407,13 +407,13 @@ TIPS = {
                       "text event, in timeline order, each with its measure/timestamp.",
     venue_validate_lighting =
                       "Check the VENUE track's lighting and post proc authoring. Read-only.\n\n" ..
-                      "[first] keyframes:\n" ..
-                      "  - every manual lighting event that CHANGES the running preset needs\n" ..
-                      "    a [first] on its exact tick\n" ..
-                      "  - a [first] anywhere else is reported with what to do about it:\n" ..
-                      "    move it (it is a beat or less off a change that is missing one),\n" ..
-                      "    or delete it (on a blend anchor, on an automatic preset, on a\n" ..
-                      "    tick with no lighting event, or a second copy)\n\n" ..
+                      "Keyframe events with no effect (listed as advice, not issues):\n" ..
+                      "  - [first] / [next] / [prev] under a preset that ignores them (all\n" ..
+                      "    but verse, chorus, manual_cool, manual_warm, dischord, stomp)\n" ..
+                      "  - a [first] before any [next] / [prev] in its preset - a preset\n" ..
+                      "    always starts on its first look, so it does nothing (this is\n" ..
+                      "    the [first] older versions wrote on every lighting change)\n" ..
+                      "  - keyframe events before the first lighting event\n\n" ..
                       "Blends:\n" ..
                       "  - a preset change fades only when the OUTGOING preset is restated\n" ..
                       "    shortly before it. Changes with no such anchor are listed, for\n" ..
@@ -500,8 +500,8 @@ TIPS = {
                       "Respects time selection: if a range is selected, only that range is\n" ..
                       "regenerated and events outside it are preserved.",
     venue_keyframe_align = "Where the FIRST [next] of a manual lighting keyframe sequence lands.\n\n" ..
-                           "[first] is not affected: it always sits on the manual lighting event's\n" ..
-                           "own tick - it is that event's initial keyframe.\n\n" ..
+                           "No keyframe goes on the lighting event itself: a preset always starts\n" ..
+                           "on its first look.\n\n" ..
                            "Keyframe rate only: first [next] one keyframe rate after the closest beat\n" ..
                            "                    (no extra keyframe at the section start).\n" ..
                            "Closest beat:       first [next] on the beat closest to the section start,\n" ..
@@ -525,8 +525,8 @@ TIPS = {
                         "actually playing. Refused, with a report naming what it found, when the\n" ..
                         "last two lighting events already match (a blend is in place), when a\n" ..
                         "lighting event is already on the playhead, or when none precedes it.\n\n" ..
-                        "The copy carries no keyframes: only a preset CHANGE starts a\n" ..
-                        "[first]/[next] sequence. Fully undoable.",
+                        "The copy carries no keyframes: restating the running preset does not\n" ..
+                        "restart it, so its [next] train runs on. Fully undoable.",
     venue_mg_blend_pp = "Copy the post-process effect that is currently running to the playhead,\n" ..
                         "so the game BLENDS into the next one instead of cutting to it.\n\n" ..
                         "Place the anchor a beat or two BEFORE where the new effect goes, then\n" ..
@@ -537,27 +537,57 @@ TIPS = {
                         "last two post-process events already match (a blend is in place), when\n" ..
                         "one is already on the playhead, or when none precedes it.\n\n" ..
                         "Fully undoable.",
-    venue_mg_kf_add = "Generate [first]/[next] keyframe events from the playhead to the next\n" ..
+    venue_mg_kf_add = "Generate [next] keyframe events from the playhead to the next\n" ..
                       "lighting event, the time selection end (if active), or the VENUE item end.\n\n" ..
-                      "[first] goes on the playhead, which must be the tick of a manual lighting\n" ..
-                      "event ([lighting (verse|chorus|manual_cool|manual_warm|dischord|stomp)]) -\n" ..
-                      "the whole row is blocked anywhere else.\n\n" ..
+                      "The playhead must be on a manual lighting event\n" ..
+                      "([lighting (verse|chorus|manual_cool|manual_warm|dischord|stomp)]) - the\n" ..
+                      "[next] train belongs to it. The whole row is blocked anywhere else.\n" ..
+                      "No keyframe goes on the event itself: a preset always starts on its\n" ..
+                      "first look.\n\n" ..
                       "Clears any existing [first]/[next]/[prev] events in that range first.\n" ..
                       "Fully undoable.",
+    venue_kf_next = "Step a manual lighting preset to its next look (looping round).\n\n" ..
+                    "Only the manual presets use keyframe events: verse, chorus,\n" ..
+                    "manual_cool, manual_warm, dischord and stomp. Every other preset\n" ..
+                    "ignores them.\n\n" ..
+                    "A preset change always starts on the first look. Most manual presets\n" ..
+                    "have two looks, so [next] toggles between them. The official charts\n" ..
+                    "use only [next], often one per beat.\n\n" ..
+                    "Looks per venue (all 44 venues read from the game files; every venue\n" ..
+                    "of a kind has the same presets):\n" ..
+                    "  verse, chorus: 4 in arenas, big clubs and festivals;\n" ..
+                    "                 2 in small clubs and video venues\n" ..
+                    "  stomp, dischord, manual_cool, manual_warm: 2 everywhere\n" ..
+                    "  (on PS3 the arenas run manual_cool / manual_warm on their own,\n" ..
+                    "  so [next] does nothing there)",
+    venue_kf_first = "Go to the manual lighting preset's first look.\n\n" ..
+                     "Unlike [next] and [prev], the result does not depend on which look\n" ..
+                     "is showing, so use it where a part must start from the first look.\n" ..
+                     "Right after a lighting change it does nothing: a preset always\n" ..
+                     "starts on its first look.\n\n" ..
+                     "Only verse, chorus, manual_cool, manual_warm, dischord and stomp\n" ..
+                     "react to it.",
+    venue_kf_prev = "Step a manual lighting preset back one look (looping round).\n\n" ..
+                    "With two looks it lands on the same look as [next]. Where verse and\n" ..
+                    "chorus have four looks (arenas, big clubs, festivals) it steps\n" ..
+                    "through them backwards - mix it with [next] to make your own\n" ..
+                    "sequence of looks there.\n\n" ..
+                    "Only verse, chorus, manual_cool, manual_warm, dischord and stomp\n" ..
+                    "react to it.",
     venue_mg_target = "Where this tab reads and writes events.\n\n" ..
                       "VENUE: the VENUE track.\n" ..
                       "Subtracks: the Sub VENUE tracks made by Venue > Actions > Copy all to\n" ..
                       "subtracks. Each event goes to its own track - cameras to VENUE normal\n" ..
                       "camera / VENUE directed camera, lighting to VENUE lighting, [first] /\n" ..
                       "[next] / [prev] and generated keyframes to VENUE keyevents, and so on.\n" ..
-                      "Blend and the [first] check read VENUE lighting / VENUE post proc.\n\n" ..
+                      "Blend and the keyframe checks read VENUE lighting / VENUE post proc.\n\n" ..
                       "The game, the Venue validators and Preview read only VENUE: run\n" ..
                       "Copy all to main track when you are done.\n\n" ..
                       "The Keyframes tab shares this setting.",
     venue_kf_target = "Where Regenerate keyframes reads lighting and writes keyframes.\n\n" ..
                       "VENUE: both on the VENUE track.\n" ..
                       "Subtracks: reads the manual lighting events on VENUE lighting and\n" ..
-                      "writes [first] / [next] to VENUE keyevents (Sub VENUE tracks, made by\n" ..
+                      "writes the [next] keyframes to VENUE keyevents (Sub VENUE tracks, made by\n" ..
                       "Venue > Actions > Copy all to subtracks).\n\n" ..
                       "Shared with Manual gen's Target. The game, the Venue validators and\n" ..
                       "Preview read only VENUE: run Copy all to main track when you are done.",
@@ -746,15 +776,14 @@ TIPS = {
                          "Click Refresh to re-read sections from the EVENTS track.",
     venue_sec_lighting = "Lighting preset for this section.\n\n" ..
                          "Manual presets (verse, chorus, manual_cool, manual_warm, dischord,\n" ..
-                         "stomp) require [first]/[next] keyframe events - set Keyframe rate\n" ..
-                         "to control the spacing.\n\n" ..
+                         "stomp) step between their looks on [next] keyframe events - set\n" ..
+                         "Keyframe rate to control the spacing.\n\n" ..
                          "Auto presets (loop_*, harmony, frenzy, silhouettes, etc.) need no\n" ..
                          "keyframes. Leave blank to skip lighting for this section.",
     venue_sec_postproc = "Post-process effect (.pp file) for this section.\n\n" ..
                          "Leave blank to skip.",
     venue_sec_kr       = "Keyframe rate in beats: how often [next] events are placed.\n\n" ..
-                         "Does not affect [first], which always sits on the lighting event's\n" ..
-                         "own tick. Keyframe align decides where the first [next] lands.\n\n" ..
+                         "Keyframe align decides where the first [next] lands.\n\n" ..
                          "Only used when the chosen lighting preset is a manual type\n" ..
                          "(verse, chorus, manual_cool, manual_warm, dischord, stomp).\n\n" ..
                          "Ctrl+click to type an exact value.",
@@ -764,8 +793,8 @@ TIPS = {
                          "re-stated as a blend anchor, which is what makes the game fade rather\n" ..
                          "than snap. 0 = hard cut at the section start.\n\n" ..
                          "The duplicate carries no keyframes: it restates a preset that is\n" ..
-                         "already running, and only a preset CHANGE starts a [first]/[next]\n" ..
-                         "sequence - the train from the original event runs on through it.\n\n" ..
+                         "already running, which does not restart it - the [next] train from\n" ..
+                         "the original event runs on through it.\n\n" ..
                          "Skipped when the preset is not changing, or when the blend point\n" ..
                          "would fall at or before the event it copies.\n\n" ..
                          "Ctrl+click to type an exact value.",
@@ -785,10 +814,11 @@ TIPS = {
     venue_kf_regenerate = "Find every manual lighting event ([lighting (verse)], (chorus),\n" ..
                           "(manual_cool), (manual_warm), (dischord), (stomp)) already on the\n" ..
                           "VENUE track (Target = Subtracks: on VENUE lighting, keyframes go to\n" ..
-                          "VENUE keyevents) and regenerate its [first]/[next] keyframes, running from\n" ..
+                          "VENUE keyevents) and regenerate its [next] keyframes, running from\n" ..
                           "that lighting event to the next lighting event of any kind.\n\n" ..
-                          "[first] is placed on the lighting event's own tick; Keyframe align\n" ..
-                          "decides where the first [next] lands.\n\n" ..
+                          "Keyframe align decides where the first [next] lands. No keyframe\n" ..
+                          "goes on the lighting event itself: a preset always starts on its\n" ..
+                          "first look (an old [first] there is removed).\n\n" ..
                           "Only [first]/[next]/[prev] events are cleared and replaced -\n" ..
                           "camera, lighting, post-process, and bonus FX are untouched.\n\n" ..
                           "Respects an active time selection (only lighting events inside the\n" ..

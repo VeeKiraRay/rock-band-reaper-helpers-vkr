@@ -178,9 +178,9 @@ Test.it('a single-entry pool shared by two sections emits one event, not two', f
         Test.expect(#pp == 1, 'expected 1 postproc event, got ' .. #pp)
         Test.expect(stats.pp_skipped == 1, 'expected 1 skipped postproc, got ' .. stats.pp_skipped)
 
-        -- Exactly one [first]: only the section that actually changed the preset.
-        Test.expect(CountText(ctrl, '[first]') == 1,
-            'expected 1 [first], got ' .. CountText(ctrl, '[first]'))
+        -- No [first] at all: a preset starts on its first look by itself.
+        Test.expect(CountText(ctrl, '[first]') == 0,
+            'expected no [first], got ' .. CountText(ctrl, '[first]'))
     end)
 end)
 
@@ -230,7 +230,7 @@ Test.it('incoming preset is honoured for the first section', function()
 
         Test.expect(#lt == 0, 'the running preset should not be re-stated; got ' .. #lt)
         Test.expect(stats.lt_skipped == 1, 'expected 1 skipped, got ' .. stats.lt_skipped)
-        Test.expect(CountText(ctrl, '[first]') == 0, 'a kept preset starts no keyframe run')
+        Test.expect(CountText(ctrl, '[first]') == 0, 'no [first] is ever written')
     end)
 end)
 

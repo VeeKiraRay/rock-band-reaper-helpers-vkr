@@ -21,7 +21,7 @@
 -- Cached VENUE take and the PPQ of every manual lighting event on it, refreshed via
 -- MakeProjectPoll (at most every 1 s and only when the project changed; 5 s fallback) -
 -- same pattern as ui_venue_events.lua. Backs the "is there a manual lighting event under
--- the playhead?" check that gates [first] insertion and keyframe generation. The
+-- the playhead?" check that gates keyframe generation. The
 -- positions are cached rather than re-read per frame because the playhead moves
 -- constantly while the event list does not, and a finished VENUE track carries thousands
 -- of text events. The cached take is validated every frame (item deletion / project
@@ -33,6 +33,7 @@
 local _poll         = MakeProjectPoll(1.0, 5.0)
 local _venue_take
 local _manual_lt    = nil   -- array of manual lighting PPQ positions
+local _kf_ctx       = nil   -- { lighting, keys } from ReadKeyframeContext (keyframe note)
 local _lt_tol       = 0     -- match tolerance in ticks (see FindManualLightingAtPpq)
 local _force_rescan = false
 local _subtracks_missing = false
@@ -57,7 +58,12 @@ function DrawVenueManualTab()
         _venue_take = _tk
         _take_valid = _venue_take ~= nil
         _manual_lt  = nil
-        if _take_valid then _manual_lt, _lt_tol = _ScanManualLighting(_venue_take) end
+        _kf_ctx     = nil
+        if _take_valid then
+            _manual_lt, _lt_tol = _ScanManualLighting(_venue_take)
+            local _l, _k = ReadKeyframeContext()
+            if _l then _kf_ctx = { lighting = _l, keys = _k } end
+        end
         _subtracks_missing = false
         if VenueTargetUsesSubtracks() then
             _subtracks_missing = true
@@ -120,8 +126,15 @@ function DrawVenueManualTab()
     r.ImGui_Spacing(ctx)
 
     -- Special events list
+    -- [next] leads the keyframe events: the official charts use only it. With two looks
+    -- (most manual presets) [prev] lands on the same look; [first] always goes to look 1.
     local _special_events = {
-        '[bonusfx]', '[bonusfx_optional]', '[first]', '[next]', '[prev]',
+        '[bonusfx]', '[bonusfx_optional]', '[next]', '[first]', '[prev]',
+    }
+    local _special_tips = {
+        ['[next]']  = TIPS.venue_kf_next,
+        ['[first]'] = TIPS.venue_kf_first,
+        ['[prev]']  = TIPS.venue_kf_prev,
     }
     local _special_labels = {
         ['[bonusfx]']          = 'Bonus FX',
@@ -271,8 +284,8 @@ function DrawVenueManualTab()
     end
     Tooltip(TIPS.venue_mg_blend_lt)
 
-    -- Keyframe settings: usable only on a manual lighting event's own tick, since
-    -- [first] has to share it. Snapshot once (BeginDisabled balance).
+    -- Keyframe settings: usable only on a manual lighting event's own tick - the [next]
+    -- train belongs to that event. Snapshot once (BeginDisabled balance).
     local _kf_dis = not _lt_at_playhead
     if _kf_dis then r.ImGui_BeginDisabled(ctx) end
 
@@ -393,10 +406,12 @@ function DrawVenueManualTab()
             if r.ImGui_Selectable(ctx, _special_labels[_sev] or _sev, _ssel) then
                 S.venue_mg_special = _sev
             end
+            if _special_tips[_sev] then Tooltip(_special_tips[_sev]) end
             if _ssel then r.ImGui_SetItemDefaultFocus(ctx) end
         end
         r.ImGui_EndCombo(ctx)
     end
+    if _special_tips[S.venue_mg_special] then Tooltip(_special_tips[S.venue_mg_special]) end
     r.ImGui_SameLine(ctx)
     local _mg_sp_dis = S.venue_mg_special == ''
     if _mg_sp_dis then r.ImGui_BeginDisabled(ctx) end
@@ -406,11 +421,17 @@ function DrawVenueManualTab()
         _force_rescan = true
     end
     if _mg_sp_dis then r.ImGui_EndDisabled(ctx) end
-    -- [first] is the only special event tied to a lighting event's position.
-    if S.venue_mg_special == '[first]' and not _lt_at_playhead then
-        r.ImGui_SameLine(ctx)
-        r.ImGui_TextDisabled(ctx, '(blocked)')
-        Tooltip(NO_LIGHTING_AT_PLAYHEAD_MSG)
+    -- A keyframe event is inserted wherever asked; where it would do nothing in game,
+    -- say so next to the button (the Add result repeats it).
+    if _special_tips[S.venue_mg_special] and _kf_ctx and _take_valid then
+        local _cur = r.MIDI_GetPPQPosFromProjTime(_venue_take, r.GetCursorPosition())
+        local _kind, _klt = KeyframeNoEffect(S.venue_mg_special, _cur,
+                                             _kf_ctx.lighting, _kf_ctx.keys, _lt_tol)
+        if _kind then
+            r.ImGui_SameLine(ctx)
+            r.ImGui_TextDisabled(ctx, '(does nothing here)')
+            Tooltip(KeyframeNoEffectReason(_kind, S.venue_mg_special, _klt))
+        end
     end
 
     -- ---- Camera pacing ----

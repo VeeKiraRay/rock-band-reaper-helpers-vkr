@@ -85,6 +85,25 @@
 --       and which directed camera cuts exist. Magma has no other setting for
 --       it (community tools such as MiloMod can change it afterwards). The
 --       converter's result now names the style of each suggested genre.
+--     - Venue: no more [first] on every manual lighting change. In game a
+--       lighting preset always starts on its first look, so a [first] there
+--       did nothing (the game's own code, read from the RB3 decompilation).
+--       Themes gen, Section gen, Keyframes and Manual gen's keyframe Add now
+--       write only the [next] train after the lighting event. Regenerate
+--       keyframes also removes the old [first]s in the spans it rewrites.
+--     - Validate lighting/blends no longer asks for a [first] on each manual
+--       change. Instead it lists keyframe events that do nothing in game -
+--       under a preset that ignores them (all but verse, chorus, manual_cool,
+--       manual_warm, dischord, stomp), before the first lighting event, or a
+--       [first] while the preset is still on its first look - as advice, not
+--       as issues.
+--     - Manual gen: [first] can be inserted anywhere now. Where a keyframe
+--       event would do nothing, the row shows "(does nothing here)" and the
+--       result says why. [next] is first in the Special list, and the
+--       keyframe events have their own tooltips: most manual presets have
+--       two looks, so [next] and [prev] land on the same one; verse and
+--       chorus have four in arenas, big clubs and festivals. [first] always
+--       goes to the first look, whichever look is showing.
 --     - The Structure row's tooltip notes that numbered verses and choruses
 --       get their own background clips in the video venues.
 --

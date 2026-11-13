@@ -345,8 +345,7 @@ function GenerateVenueEvents()
     -- no_snap: skip snapping - keyframe ctrl_events from GenerateThemedSectionEvents are
     -- already placed on their own alignment grid (possibly finer than half-beat, e.g.
     -- quarter-beat instrument-aware modes); re-snapping would collapse those positions
-    -- onto the nearest half-beat/beat. A [first] carrying a lighting event's tick is
-    -- pre-snapped by SnapPpqToHalfBeat there so it still lands on that event exactly.
+    -- onto the nearest half-beat/beat.
     local function insert_text(tick_offset, text, no_snap)
         local abs_ppq = range_start_ppq + tick_offset
         local snapped = no_snap and abs_ppq or SnapPpqToHalfBeat(abs_ppq, ppq)
@@ -520,7 +519,7 @@ function GenerateVenueEvents()
     end
     lines[#lines + 1] = ('Lighting (auto):    %d'):format(#lt_events - manual_count)
     lines[#lines + 1] = ('Lighting (manual):  %d'):format(manual_count)
-    lines[#lines + 1] = ('Control [first]/[next]: %d'):format(#ctrl_events)
+    lines[#lines + 1] = ('Keyframes [next]:   %d'):format(#ctrl_events)
     if #pp_events + forced_pp_count > 0 then
         lines[#lines + 1] = ('Post-process:       %d'):format(#pp_events + forced_pp_count)
     end

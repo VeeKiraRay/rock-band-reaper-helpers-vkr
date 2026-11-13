@@ -1,144 +1,122 @@
--- VENUE lighting/post-proc validation: [first] keyframe placement and blend anchors.
+-- VENUE lighting/post-proc validation: keyframe events with no effect, and blend anchors.
 -- Read-only - never writes to the track, never opens an undo block.
 -- Requires: FindNamedTrackMIDI, GetTakePPQPerQN, CategorizeVenueEvent,
 --           MANUAL_LIGHTING_SET, IsBlendAnchor, FormatTime, GetTimeSelection,
---           r, S (globals)
+--           VENUE_KEYFRAME_TYPO, r, S (globals)
 --
--- The two rules checked here are the same ones the generators write from, read back
--- off the track:
---   [first]  belongs on the exact tick of a manual lighting event that CHANGES the
---            running preset. An event restating the preset already running (a blend
---            anchor) starts no keyframe train, so it must NOT carry one - see
---            "Keyframe placement rule" in .claude/CLAUDE_general.md.
+-- Checked here, read back off the track:
+--   keyframes  [first] / [next] / [prev] that do nothing in game (KeyframeNoEffect
+--            below) - listed as advice, not counted as issues: they are harmless.
 --   blend    a preset change reads as a soft fade only when the OUTGOING preset is
 --            restated shortly before it. That restatement is the anchor - the same
 --            duplicate EmitBlendDuplicates emits from lightpreset_blendin /
 --            postproc_blendin, and the same one Manual gen's Blend button places.
 
--- How far from a lighting change a [first] can sit and still read as "meant for that
--- event, just misplaced" rather than a stray. One beat: the generators' own minimum
--- [next] spacing, so anything further out is a keyframe position in its own right.
-local NEAR_FIRST_BEATS = 1
+-- ---------------------------------------------------------------------------
+-- Keyframe events with no effect. How the game treats [first] / [next] / [prev]
+-- (LightPreset / LightPresetManager, read from the RB3 decompilation):
+--   - a preset change always starts the new preset on its first look (keyframe 0);
+--     restating the running preset does not restart it;
+--   - [first] goes to the first look, [next] / [prev] one look on / back, and manual
+--     presets loop; [first] while already on the first look does nothing;
+--   - only the manual presets (MANUAL_LIGHTING_SET: verse, chorus, manual_cool,
+--     manual_warm, dischord, stomp) react; every other preset ignores them.
+-- Not judged: a [next] / [prev] on the change tick itself. The new preset starts when
+-- the fade into it starts, which with a blend anchor is before the tick, so such an
+-- event may well count.
 
--- Index of the entry in `events` (sorted ascending by ppq) nearest ppq_pos, plus a
--- cursor to resume from on the next, later, lookup. Returns nil for an empty list.
-local function NearestIndex(events, ppq_pos, cursor)
-    if #events == 0 then return nil, 1 end
-    local i = math.max(1, math.min(cursor or 1, #events))
-    while i < #events and events[i + 1].ppq <= ppq_pos do i = i + 1 end
-    local best = i
-    if events[i + 1] and
-       math.abs(events[i + 1].ppq - ppq_pos) < math.abs(events[i].ppq - ppq_pos) then
-        best = i + 1
+local KEYFRAME_STEPS = { ['[next]'] = true, ['[prev]'] = true }
+
+-- Does the keyframe event `text` at `ppq` do nothing? Pure.
+--   lighting  sorted {ppq=, msg=} of every lighting event (same tick units as ppq)
+--   keys      sorted {ppq=, msg=} of the keyframe events around it (the judged event
+--             itself may be in the list - only [next] / [prev] are read from it)
+--   tol       ticks that still count as "on the same tick"
+-- Returns nil when it has an effect, else kind, lt:
+--   'no_preset'    before the first lighting event - nothing is running yet
+--   'ignored'      the running preset (lt) ignores keyframe events
+--   'first_look'   a [first] with no [next] / [prev] since its preset (lt) started:
+--                  still on the first look. Covers a [first] on the change tick.
+function KeyframeNoEffect(text, ppq, lighting, keys, tol)
+    tol = tol or 0
+    local idx
+    for i, ev in ipairs(lighting) do
+        if ev.ppq <= ppq + tol then idx = i else break end
     end
-    return best, i
+    if not idx then return 'no_preset' end
+    local lt = lighting[idx]
+    if not MANUAL_LIGHTING_SET[lt.msg] then return 'ignored', lt end
+    if text ~= '[first]' then return nil end
+    -- The preset's start: restatements before it do not restart it.
+    local start = idx
+    while start > 1 and lighting[start - 1].msg == lt.msg do start = start - 1 end
+    local start_ppq = lighting[start].ppq
+    for _, k in ipairs(keys) do
+        -- Any step from the preset's own tick on (it may count, see above) up to just
+        -- before this [first] may have moved the look.
+        if KEYFRAME_STEPS[k.msg] and k.ppq >= start_ppq - tol and k.ppq < ppq - tol then
+            return nil
+        end
+    end
+    return 'first_look', lighting[start]
+end
+
+-- One-line reason for a KeyframeNoEffect finding, for Manual gen's "(does nothing
+-- here)" hover and Add result (both already say that it does nothing).
+function KeyframeNoEffectReason(kind, text, lt)
+    if kind == 'no_preset' then
+        return 'It is before the first lighting event - no preset is running yet.'
+    elseif kind == 'ignored' then
+        return ('%s ignores keyframe events - only verse, chorus, manual_cool, manual_warm, ' ..
+                'dischord and stomp use them.'):format(lt.msg)
+    end
+    return ('%s is still on its first look - a lighting preset always starts on it, and ' ..
+            'no [next] / [prev] has moved it since.'):format(lt.msg)
 end
 
 -- ---------------------------------------------------------------------------
 
--- The whole validation, as a pure function over three sorted arrays of {ppq=, msg=}
--- (`firsts` needs only ppq). No REAPER calls, so the rules can be tested against
--- hand-built event lists without a project - same discipline as ResolveBlendSource.
+-- The whole validation, as a pure function over three sorted arrays of {ppq=, msg=}:
+-- lighting events, post proc events and keyframe events ([first] / [next] / [prev]).
+-- No REAPER calls, so the rules can be tested against hand-built event lists without a
+-- project - same discipline as ResolveBlendSource.
 --
 --   tol       ticks either side of an event that still count as "on this tick"
---   near_ppq  ticks within which a stray [first] is read as misplaced, not orphaned
 --
 -- Returns a findings table; every list is empty when the track is clean.
-function ValidateVenueLightingBlends(lighting, postproc, firsts, tol, near_ppq)
-    tol      = tol or 0
-    near_ppq = near_ppq or 0
+function ValidateVenueLightingBlends(lighting, postproc, keys, tol)
+    tol = tol or 0
 
     local out = {
-        missing_first  = {},   -- { idx=, ppq=, msg=, near_delta= }
-        stray_first    = {},   -- { ppq=, kind=, lt=, delta= }
+        no_effect      = {},   -- { ppq=, msg=, kind=, lt= } - advisory, not issues
         blend          = {
             lt = { missing = {}, changes = 0, anchored = 0 },
             pp = { missing = {}, changes = 0, anchored = 0 },
         },
         changes        = 0,    -- lighting preset changes, including the first event
-        manual_changes = 0,    -- of those, the manual presets (the ones wanting [first])
+        manual_changes = 0,    -- of those, the manual presets (the ones keyframes drive)
     }
 
     -- A lighting event is a preset CHANGE when it differs from the one immediately
     -- before it; the first event on the track always is one. Only ADJACENT events are
     -- compared, so two sections sharing a preset with a different one between them are
     -- each a real change.
-    local is_change = {}
     for i, ev in ipairs(lighting) do
-        is_change[i] = (i == 1) or (lighting[i - 1].msg ~= ev.msg)
-        if is_change[i] then
+        if i == 1 or lighting[i - 1].msg ~= ev.msg then
             out.changes = out.changes + 1
             if MANUAL_LIGHTING_SET[ev.msg] then out.manual_changes = out.manual_changes + 1 end
         end
     end
 
-    -- Does a [first] sit on this lighting event's own tick? Both lists are sorted, so
-    -- one monotonic pass over `firsts` covers every lighting event.
-    local has_first = {}
-    do
-        local fi = 1
-        for i, ev in ipairs(lighting) do
-            while fi <= #firsts and firsts[fi].ppq < ev.ppq - tol do fi = fi + 1 end
-            has_first[i] = firsts[fi] ~= nil and math.abs(firsts[fi].ppq - ev.ppq) <= tol
-        end
-    end
-
-    ---- Check 1: a manual lighting change with no [first] on its tick ----
-    local wants_first = {}
-    for i, ev in ipairs(lighting) do
-        if is_change[i] and MANUAL_LIGHTING_SET[ev.msg] and not has_first[i] then
-            wants_first[i] = true
-            out.missing_first[#out.missing_first + 1] = { idx = i, ppq = ev.ppq, msg = ev.msg }
-        end
-    end
-
-    ---- Check 2: a [first] that is not on a manual lighting change ----
-    local cursor, prev_ppq = 1, nil
-    for _, f in ipairs(firsts) do
-        local kind, lt, delta
-        if prev_ppq and math.abs(f.ppq - prev_ppq) <= tol then
-            kind = 'duplicate'
-        elseif #lighting == 0 then
-            kind = 'orphan'
-        else
-            local idx
-            idx, cursor = NearestIndex(lighting, f.ppq, cursor)
-            lt    = lighting[idx]
-            delta = f.ppq - lt.ppq
-            if math.abs(delta) <= tol then
-                -- On a lighting event, but not one that starts a keyframe train.
-                if not MANUAL_LIGHTING_SET[lt.msg] then
-                    kind = 'on_auto'
-                elseif not is_change[idx] then
-                    kind = 'on_restatement'
-                end   -- else: correctly placed - no finding
-            elseif math.abs(delta) <= near_ppq and wants_first[idx] then
-                -- Close to a change that is missing its own [first]: this is almost
-                -- certainly that [first], off by a nudge. Reported as "move it" rather
-                -- than "delete it", so acting on check 1 doesn't leave a duplicate.
-                kind = 'misaligned'
-            else
-                kind = 'orphan'
-            end
-        end
+    ---- Keyframe events that do nothing (KeyframeNoEffect) ----
+    for _, k in ipairs(keys) do
+        local kind, lt = KeyframeNoEffect(k.msg, k.ppq, lighting, keys, tol)
         if kind then
-            out.stray_first[#out.stray_first + 1] =
-                { ppq = f.ppq, kind = kind, lt = lt, delta = delta }
-        end
-        prev_ppq = f.ppq
-    end
-
-    -- Cross-link the two checks: a change missing its [first] says so when a misplaced
-    -- one was found nearby, so the report reads as one problem, not two.
-    for _, s in ipairs(out.stray_first) do
-        if s.kind == 'misaligned' then
-            for _, m in ipairs(out.missing_first) do
-                if lighting[m.idx] == s.lt then m.near_delta = s.delta end
-            end
+            out.no_effect[#out.no_effect + 1] = { ppq = k.ppq, msg = k.msg, kind = kind, lt = lt }
         end
     end
 
-    ---- Checks 3 and 4: preset changes with no blend anchor before them ----
+    ---- Preset changes with no blend anchor before them ----
     -- Lighting and post proc are judged independently, exactly as EmitBlendDuplicates
     -- decides them. The very first event of a kind is exempt: there is no outgoing
     -- preset to restate ahead of it.
@@ -181,7 +159,7 @@ function ValidateVenueLighting()
     -- Always read the WHOLE track, whatever the time selection: deciding whether an
     -- event is a change, and whether a blend anchor precedes it, needs the events
     -- before the selection. Only the reporting is scoped, further down.
-    local lighting, postproc, firsts = {}, {}, {}
+    local lighting, postproc, keys = {}, {}, {}
     local _, _, _, text_count = r.MIDI_CountEvts(take)
     for i = 0, text_count - 1 do
         local ok, _, _, ppq, evtype, msg = r.MIDI_GetTextSysexEvt(take, i)
@@ -193,30 +171,30 @@ function ValidateVenueLighting()
                 lighting[#lighting + 1] = { ppq = ppq, msg = msg }
             elseif cat == 'postproc' then
                 postproc[#postproc + 1] = { ppq = ppq, msg = msg }
-            elseif msg == '[first]' then
-                firsts[#firsts + 1] = { ppq = ppq }
+            elseif cat == 'keyframe' and msg ~= VENUE_KEYFRAME_TYPO then
+                -- [previous] is not a game event at all; the vocabulary check says so
+                keys[#keys + 1] = { ppq = ppq, msg = msg }
             end
         end
     end
 
-    if #lighting == 0 and #postproc == 0 and #firsts == 0 then
+    if #lighting == 0 and #postproc == 0 and #keys == 0 then
         S.status      = 'VENUE has no lighting or post proc events.'
-        S.last_result = 'The VENUE track has no [lighting*], *.pp] or [first] events to validate.'
+        S.last_result = 'The VENUE track has no lighting, post proc or keyframe events to validate.'
         return
     end
 
     local by_ppq = function(a, b) return a.ppq < b.ppq end
     table.sort(lighting, by_ppq)
     table.sort(postproc, by_ppq)
-    table.sort(firsts,   by_ppq)
+    table.sort(keys,     by_ppq)
 
     local ppq_per_qn = GetTakePPQPerQN(take)
-    -- Same 1/128-note "on this tick" tolerance Manual gen's [first] gate uses, so both
-    -- mean the same thing by it.
-    local tol      = math.floor(ppq_per_qn / 32)
-    local near_ppq = math.floor(ppq_per_qn * NEAR_FIRST_BEATS)
+    -- Same 1/128-note "on this tick" tolerance Manual gen uses, so both mean the same
+    -- thing by it.
+    local tol = math.floor(ppq_per_qn / 32)
 
-    local f = ValidateVenueLightingBlends(lighting, postproc, firsts, tol, near_ppq)
+    local f = ValidateVenueLightingBlends(lighting, postproc, keys, tol)
 
     -- Scope: report only findings whose own position falls inside the time selection.
     local sel_s, sel_e = GetTimeSelection()
@@ -232,17 +210,15 @@ function ValidateVenueLighting()
             end
             return out
         end
-        f.missing_first     = Keep(f.missing_first)
-        f.stray_first       = Keep(f.stray_first)
+        f.no_effect         = Keep(f.no_effect)
         f.blend.lt.missing  = Keep(f.blend.lt.missing)
         f.blend.pp.missing  = Keep(f.blend.pp.missing)
     end
 
     local function At(ppq) return FormatTime(r.MIDI_GetProjTimeFromPPQPos(take, ppq)) end
-    local function Beats(d) return ('%.2f beats'):format(math.abs(d) / ppq_per_qn) end
 
-    local total = #f.missing_first + #f.stray_first
-                  + #f.blend.lt.missing + #f.blend.pp.missing
+    -- Keyframe events with no effect are advice, not issues: they are harmless.
+    local total = #f.blend.lt.missing + #f.blend.pp.missing
 
     local lines = {}
     lines[#lines + 1] = total == 0
@@ -251,48 +227,29 @@ function ValidateVenueLighting()
             :format(total, total == 1 and '' or 's', scope_label)
     lines[#lines + 1] = ''
 
-    ---- Missing [first] ----
-    if #f.missing_first == 0 then
-        lines[#lines + 1] = 'Manual lighting changes missing a [first]: none.'
+    ---- Keyframe events with no effect (advice, not counted as issues) ----
+    if #f.no_effect == 0 then
+        lines[#lines + 1] = 'Keyframe events with no effect: none.'
     else
-        lines[#lines + 1] = ('Manual lighting changes missing a [first] (%d):'):format(#f.missing_first)
-        for _, m in ipairs(f.missing_first) do
-            local extra = m.near_delta
-                and ('   - a [first] sits %s away, see below'):format(Beats(m.near_delta))
-                or  ''
-            lines[#lines + 1] = ('  %s   %s%s'):format(At(m.ppq), m.msg, extra)
-        end
-    end
-    lines[#lines + 1] = ''
-
-    ---- Stray [first] ----
-    if #f.stray_first == 0 then
-        lines[#lines + 1] = '[first] events off a lighting change: none.'
-    else
-        lines[#lines + 1] = ('[first] events off a lighting change (%d):'):format(#f.stray_first)
-        for _, s in ipairs(f.stray_first) do
-            local why, fix
-            if s.kind == 'misaligned' then
-                why = ('%s %s %s at %s'):format(
-                    Beats(s.delta), s.delta > 0 and 'after' or 'before', s.lt.msg, At(s.lt.ppq))
-                fix = 'move it onto that event'
-            elseif s.kind == 'on_restatement' then
-                why = ('on %s, which restates the preset already running (a blend anchor)')
-                      :format(s.lt.msg)
-                fix = 'delete it: only a preset change starts a keyframe train'
-            elseif s.kind == 'on_auto' then
-                why = ('on %s, an automatic preset that takes no keyframes'):format(s.lt.msg)
-                fix = 'delete it'
-            elseif s.kind == 'duplicate' then
-                why = 'a second [first] on the same tick'
-                fix = 'delete one'
+        lines[#lines + 1] = ('Keyframe events with no effect (%d) - harmless, not counted as issues:')
+                            :format(#f.no_effect)
+        for _, k in ipairs(f.no_effect) do
+            local why
+            if k.kind == 'no_preset' then
+                why = 'before the first lighting event'
+            elseif k.kind == 'ignored' then
+                why = ('under %s, which ignores keyframe events'):format(k.lt.msg)
             else
-                why = 'no lighting event on this tick'
-                fix = 'delete it'
+                why = ('%s is still on its first look'):format(k.lt.msg)
             end
-            lines[#lines + 1] = ('  %s   %s'):format(At(s.ppq), why)
-            lines[#lines + 1] = ('           - %s'):format(fix)
+            lines[#lines + 1] = ('  %s   %s  -  %s'):format(At(k.ppq), k.msg, why)
         end
+        lines[#lines + 1] = '  Only verse, chorus, manual_cool, manual_warm, dischord and stomp use ' ..
+                            'keyframe events, and'
+        lines[#lines + 1] = '  a preset always starts on its first look, so a [first] before any ' ..
+                            '[next] does nothing.'
+        lines[#lines + 1] = '  Keyframes > Regenerate rewrites the manual presets\' keyframes ' ..
+                            '(and drops a [first] on their own tick).'
     end
     lines[#lines + 1] = ''
 
@@ -320,9 +277,9 @@ function ValidateVenueLighting()
     -- Always the whole track, even when the report above is scoped: the counts describe
     -- what was read, and reading everything is what makes the scoped findings correct.
     lines[#lines + 1] = 'Checked (whole track):'
-    lines[#lines + 1] = ('  %d lighting events - %d preset changes, %d of them manual (need a [first])')
+    lines[#lines + 1] = ('  %d lighting events - %d preset changes, %d of them manual (keyframes drive them)')
                         :format(#lighting, f.changes, f.manual_changes)
-    lines[#lines + 1] = ('  %d [first] events'):format(#firsts)
+    lines[#lines + 1] = ('  %d keyframe events'):format(#keys)
     lines[#lines + 1] = ('  Lighting blends:  %d of %d changes anchored')
                         :format(f.blend.lt.anchored, f.blend.lt.changes)
     lines[#lines + 1] = ('  Post proc blends: %d of %d changes anchored')
@@ -331,5 +288,9 @@ function ValidateVenueLighting()
     S.status = total == 0
         and 'VENUE lighting: no issues found.'
         or  ('VENUE lighting: %d issue%s found.'):format(total, total == 1 and '' or 's')
+    if #f.no_effect > 0 then
+        S.status = S.status:gsub('%.$', '') ..
+                   (' (%d keyframe event%s with no effect).'):format(#f.no_effect, #f.no_effect == 1 and '' or 's')
+    end
     S.last_result = table.concat(lines, '\n')
 end

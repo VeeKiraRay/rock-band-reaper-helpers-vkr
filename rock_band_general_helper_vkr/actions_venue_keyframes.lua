@@ -1,6 +1,8 @@
--- Keyframes tab: bulk regeneration of [first]/[next] keyframes for every manual lighting
+-- Keyframes tab: bulk regeneration of the [next] keyframes for every manual lighting
 -- event already on the VENUE track - or, with Target = Subtracks, for every one on
--- "VENUE lighting", writing the keyframes to "VENUE keyevents".
+-- "VENUE lighting", writing the keyframes to "VENUE keyevents". Each span is cleared
+-- first from the lighting event's own tick, so an old automatic [first] there (written
+-- before v0.9.64; it does nothing in game) goes too.
 -- Requires: FindVenueTarget, VenueTargetName, VenueTargetUsesSubtracks, VenuePpqBetween
 --           (actions_venue_manual.lua), GetTakePPQPerQN, GetTimeSelection,
 --           MANUAL_LIGHTING_SET, GenerateKeyframesForSpan, ClearVenueKeyframesInRange,

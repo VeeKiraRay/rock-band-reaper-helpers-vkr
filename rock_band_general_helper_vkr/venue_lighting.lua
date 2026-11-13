@@ -11,9 +11,12 @@
 -- EmitBlendDuplicates below is the WRITE side of the blend rule; its read side
 -- (IsBlendAnchor) lives in venue.lua, which the standalone Venue Preview loads.
 --
--- Keyframe placement rule: [first] always lands on the SAME tick as the manual
--- lighting event it drives - it is that event's own initial keyframe. The
--- S.venue_keyframe_align modes below decide only where the FIRST [next] lands.
+-- Keyframe placement rule: no [first] at a preset change. In game a lighting preset
+-- always starts on its first look, and [first] while still on it does nothing (the
+-- game's LightPreset code, read from the RB3 decompilation). So a manual preset's
+-- keyframes are a [next] train after its own tick; the S.venue_keyframe_align modes
+-- decide where the first [next] lands. (Before v0.9.64 a [first] was written on the
+-- lighting event's tick - harmless, Validate lists any left as having no effect.)
 
 local MANUAL_LIGHTING_POOL = {
     '[lighting (verse)]', '[lighting (chorus)]',
@@ -37,7 +40,7 @@ for _, v in ipairs(MANUAL_LIGHTING_POOL) do MANUAL_LIGHTING_SET[v] = true end
 
 -- Combo display order for lighting: two groups, each alphabetical by label. The
 -- manual/automatic split is functional - only the manual presets react to
--- [first]/[next] keyframes, and Manual gen gates its whole keyframe row on one
+-- [next] keyframes, and Manual gen gates its whole keyframe row on one
 -- being selected - so alphabetising the 22 presets into a single list would bury
 -- the one distinction that matters. Derived from the two pools above (bare names,
 -- '[lighting (x)]' -> 'x') so this file stays the only place deciding which
@@ -62,7 +65,7 @@ end
 -- Keyframe alignment mode labels (S.venue_keyframe_align, 0-based - mode N is
 -- KF_ALIGN_LABELS[N + 1]). Shared by every tab that draws the selector, so the
 -- wording can't drift between them. Each label names where the first [next]
--- lands; [first] is always on the lighting event itself.
+-- lands; no keyframe goes on the lighting event itself.
 KF_ALIGN_LABELS = {
     'Keyframe rate only', 'Closest beat', 'Downbeat',
     'Guitar notes', 'Bass notes', 'Keys notes',
@@ -100,8 +103,8 @@ end
 
 -- Half-beat snap - the grid venue_generator.lua's insert_text and
 -- actions_venue_section.lua's insert_snapped apply to every non-keyframe event.
--- Keyframes are inserted unsnapped, so a [first] meant to share a lighting
--- event's tick has to be snapped here to match where that event will land.
+-- Keyframes are inserted unsnapped; the themed generator snaps a lighting event's
+-- tick here to know where that event will land (its [next] train starts after it).
 -- Idempotent: re-snapping an already-snapped value returns it unchanged.
 function SnapPpqToHalfBeat(ppq_pos, ppq)
     local half_beat = math.floor(ppq / 2 + 0.5)
@@ -169,14 +172,14 @@ function CollectVocalPhraseStarts(venue_take, range_start_ppq, range_end_ppq)
                                     venue_take, range_start_ppq, range_end_ppq)
 end
 
--- Returns an array of {ppq, text} keyframe events ('[first]'/'[next]') for one manual-lighting
--- span [start_ppq, end_ppq), using the shared S.venue_keyframe_align / S.venue_kf_inst_subdiv
+-- Returns an array of {ppq, text} keyframe events ('[next]') for one manual-lighting span
+-- [start_ppq, end_ppq), using the shared S.venue_keyframe_align / S.venue_kf_inst_subdiv
 -- settings and the given rate in beats.
 --
 -- start_ppq IS the manual lighting event's own tick (both callers - the Keyframes tab's
--- per-span walk and Manual gen's playhead - guarantee that), so [first] always goes there.
--- In "Closest beat" mode the beat the sequence used to start on becomes the first [next]
--- instead; the other modes' [next] trains are unchanged.
+-- per-span walk and Manual gen's playhead - guarantee that). Every [next] lands after it:
+-- the preset starts on its first look by itself (Keyframe placement rule, top of file).
+-- In "Closest beat" mode a beat after the tick becomes the first [next].
 function GenerateKeyframesForSpan(take, start_ppq, end_ppq, ppq, kf_rate_beats)
     local ctrl_events = {}
     local align    = S.venue_keyframe_align
@@ -189,8 +192,6 @@ function GenerateKeyframesForSpan(take, start_ppq, end_ppq, ppq, kf_rate_beats)
             take, start_ppq, end_ppq)
         local subdiv_qn    = KeyframeSubdivQN(S.venue_kf_inst_subdiv)
         local subdiv_ticks = math.floor(subdiv_qn * ppq)
-
-        ctrl_events[#ctrl_events + 1] = { ppq = start_ppq, text = '[first]' }
 
         local sec_qn    = r.TimeMap_timeToQN(r.MIDI_GetProjTimeFromPPQPos(take, start_ppq))
         local grid_qn   = math.ceil(sec_qn / subdiv_qn + 1e-6) * subdiv_qn
@@ -208,8 +209,8 @@ function GenerateKeyframesForSpan(take, start_ppq, end_ppq, ppq, kf_rate_beats)
         end
     else
         -- Standard modes 0-2
-        -- Mode 1 ("Closest beat") snaps to the nearest beat; that position is now the
-        -- first [next] rather than [first], which stays on the lighting event.
+        -- Mode 1 ("Closest beat") snaps to the nearest beat; when that beat is after the
+        -- lighting event it is the first [next].
         local snap_ppq
         if align == 1 then
             snap_ppq = math.max(start_ppq, math.floor(start_ppq / ppq + 0.5) * ppq)
@@ -228,9 +229,6 @@ function GenerateKeyframesForSpan(take, start_ppq, end_ppq, ppq, kf_rate_beats)
             next_ppq = beat_anchor + kf_ticks
         end
 
-        if start_ppq < end_ppq then
-            ctrl_events[#ctrl_events + 1] = { ppq = start_ppq, text = '[first]' }
-        end
         if snap_ppq > start_ppq and snap_ppq < end_ppq then
             ctrl_events[#ctrl_events + 1] = { ppq = snap_ppq, text = '[next]' }
         end
@@ -280,14 +278,13 @@ function GenerateLightingEvents(range_16ths, ppq, pool_override)
             local end_16ths      = range_16ths
             if i < #lt_events then end_16ths = lt_events[i + 1].pos_16ths end
 
-            local ctrl_pos = ev.pos_16ths
-            local first    = true
+            -- [next] train after the event; no [first] (Keyframe placement rule)
+            local ctrl_pos = ev.pos_16ths + keyframe_16ths
             while ctrl_pos < end_16ths do
                 ctrl_events[#ctrl_events + 1] = {
                     tick = math.floor(ctrl_pos * sixteenth_ticks + 0.5),
-                    text = first and '[first]' or '[next]',
+                    text = '[next]',
                 }
-                first    = false
                 ctrl_pos = ctrl_pos + keyframe_16ths
             end
         end
@@ -374,9 +371,8 @@ end
 -- Emits the blend-anchor duplicates for section `res` (see BlendPpq above).
 --
 -- Deliberately keyframe-free, even for a manual preset: the duplicate restates a
--- preset that is already running, so it gets no [first] and the train from the
--- original event just carries on through it. See "only a preset CHANGE gets
--- [first]" in EmitThemeSection.
+-- preset that is already running, which does not restart it, so the [next] train
+-- from the original event just carries on through it.
 local function EmitBlendDuplicates(res, prev, range_start_ppq, lt_events, pp_events)
     if not prev then return end
     local blend_lt = BlendPpq(res, prev, range_start_ppq, 'lt')
@@ -436,30 +432,16 @@ local function EmitThemeSection(res, prev, take, range_start_ppq, range_end_ppq,
 
         -- Keyframes are emitted either way. The previous section's [next] train was
         -- bounded by ITS own sec_end_ppq, so a kept manual preset with no train of its
-        -- own here would run through this section with its lights frozen. Only [first]
-        -- is withheld, by the same lt_changes test - see below.
+        -- own here would run through this section with its lights frozen.
         if MANUAL_LIGHTING_SET[res.lt_text] then
             local kf_end = math.min(range_end_ppq, res.sec_end_ppq)
             local align  = S.venue_keyframe_align
 
-            -- Only a preset CHANGE starts a keyframe sequence. A section that keeps
-            -- the preset already running gets no [first] - the train from the event
-            -- that did start it carries straight on through this boundary. Same rule
-            -- the blend duplicates follow (EmitBlendDuplicates) and the one the
-            -- Keyframes tab re-derives from the track (RegenerateVenueKeyframes), so
-            -- generating and regenerating agree.
-            --
-            -- Where it is emitted, [first] shares the lighting event's tick - it is
-            -- that event's own initial keyframe. Snapped to the half-beat grid the
-            -- callers will snap the lighting event onto (keyframes themselves go in
-            -- unsnapped), so the two land on exactly the same tick.
+            -- No [first] at the change (Keyframe placement rule, top of file): the
+            -- preset starts on its first look by itself. The lighting event's tick,
+            -- snapped to the half-beat grid the callers snap the event onto - every
+            -- [next] below lands after it.
             local first_kf_ppq = SnapPpqToHalfBeat(sec_ppq, ppq)
-            if lt_changes and first_kf_ppq < kf_end then
-                ctrl_events[#ctrl_events + 1] = {
-                    tick = math.floor(first_kf_ppq - range_start_ppq + 0.5),
-                    text = '[first]',
-                }
-            end
 
             if align >= 3 and inst_note_positions then
                 -- Instrument-aware mode: [next] only at beat or half-beat grid positions
@@ -499,8 +481,8 @@ local function EmitThemeSection(res, prev, take, range_start_ppq, range_end_ppq,
 
                 -- Anchor for the [next] train: section start, or snapped to the nearest
                 -- beat (mode 1). Mode 1's snapped beat is the one case where the anchor
-                -- differs from the lighting event's own tick, and it becomes the first
-                -- [next] rather than the [first].
+                -- differs from the lighting event's own tick; when it is after the tick
+                -- it becomes the first [next].
                 local anchor_ppq
                 if align == 1 then
                     anchor_ppq = math.max(sec_ppq, SnapPpqToNearestBeat(sec_ppq, ppq))
@@ -518,7 +500,7 @@ local function EmitThemeSection(res, prev, take, range_start_ppq, range_end_ppq,
                 end
 
                 -- Skipped in every mode but 1, where the anchor IS the lighting
-                -- event's tick and [first] is already there.
+                -- event's tick (a keyframe there would do nothing).
                 if anchor_ppq < kf_end and anchor_ppq > first_kf_ppq then
                     ctrl_events[#ctrl_events + 1] = {
                         tick = math.floor(anchor_ppq - range_start_ppq + 0.5),

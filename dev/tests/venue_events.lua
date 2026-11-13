@@ -317,10 +317,11 @@ Test.it('project change fires at min 0, held back inside the min window', functi
 end)
 
 ----------------------------------------------------------------------
-Test.section('GenerateKeyframesForSpan ([first] on the lighting event)')
+Test.section('GenerateKeyframesForSpan (a [next] train after the lighting event)')
 ----------------------------------------------------------------------
--- start_ppq is always the manual lighting event's own tick, so [first] belongs
--- there. Align modes only decide where the first [next] lands. Modes 0 and 1 are
+-- start_ppq is always the manual lighting event's own tick. No keyframe goes there:
+-- a preset starts on its first look by itself, so a [first] there does nothing in
+-- game. Align modes only decide where the first [next] lands. Modes 0 and 1 are
 -- pure tick arithmetic - no take needed (only mode 2 and the instrument modes
 -- consult the tempo map / instrument tracks).
 
@@ -345,20 +346,17 @@ local function KfPositions(events, text)
     return out
 end
 
-Test.it('exactly one [first], always on start_ppq, always the earliest event', function()
+Test.it('no [first], only [next], every one after start_ppq', function()
     for _, align in ipairs({ 0, 1 }) do
         for _, start_ppq in ipairs({ 0, 700, 960, 2 * KF_PPQ }) do
-            local evs   = KfSpan(align, start_ppq, start_ppq + 16 * KF_PPQ, 2)
-            local firsts = KfPositions(evs, '[first]')
-            Test.expect(#firsts == 1,
-                ('align %d, start %d: expected 1 [first], got %d'):format(align, start_ppq, #firsts))
-            Test.expect(firsts[1] == start_ppq,
-                ('align %d: [first] at %d, expected the lighting event tick %d')
-                    :format(align, firsts[1], start_ppq))
-            Test.expect(evs[1].text == '[first]', 'the [first] must be emitted before any [next]')
-            for _, p in ipairs(KfPositions(evs, '[next]')) do
-                Test.expect(p > start_ppq,
-                    ('align %d: a [next] landed at %d, on or before [first]'):format(align, p))
+            local evs = KfSpan(align, start_ppq, start_ppq + 16 * KF_PPQ, 2)
+            Test.expect(#evs > 0, ('align %d, start %d: expected a [next] train'):format(align, start_ppq))
+            for _, ev in ipairs(evs) do
+                Test.expect(ev.text == '[next]',
+                    ('align %d, start %d: got %s'):format(align, start_ppq, ev.text))
+                Test.expect(ev.ppq > start_ppq,
+                    ('align %d: a [next] landed at %d, on or before the lighting event %d')
+                        :format(align, ev.ppq, start_ppq))
             end
         end
     end
@@ -374,26 +372,25 @@ Test.it('Keyframe rate only: no keyframe at the anchor, first [next] one rate on
     Test.expect(nexts[2] == 4 * KF_PPQ, 'the [next] train continues at the keyframe rate')
 end)
 
-Test.it('Closest beat: the snapped beat is now a [next], not the [first]', function()
+Test.it('Closest beat: the snapped beat after the event is the first [next]', function()
     -- start 700 -> nearest beat is 960, forward of the lighting event.
     local evs   = KfSpan(1, 700, 16 * KF_PPQ, 2)
     local nexts = KfPositions(evs, '[next]')
-    Test.expect(KfPositions(evs, '[first]')[1] == 700,
-        '[first] must stay on the lighting event, not move to the snapped beat')
+    Test.expect(#KfPositions(evs, '[first]') == 0, 'no [first]')
     Test.expect(nexts[1] == KF_PPQ,
         ('expected a [next] on the snapped beat %d, got %s'):format(KF_PPQ, tostring(nexts[1])))
     Test.expect(nexts[2] == 3 * KF_PPQ,
         'the train continues one rate past the beat anchor')
 end)
 
-Test.it('Closest beat: a beat-aligned lighting event gets no duplicate at its own tick', function()
+Test.it('Closest beat: a beat-aligned lighting event gets no keyframe at its own tick', function()
     local evs = KfSpan(1, KF_PPQ, 16 * KF_PPQ, 2)
     local at_start = 0
     for _, ev in ipairs(evs) do
         if ev.ppq == KF_PPQ then at_start = at_start + 1 end
     end
-    Test.expect(at_start == 1,
-        ('expected exactly 1 event on the lighting tick, got %d'):format(at_start))
+    Test.expect(at_start == 0,
+        ('expected nothing on the lighting tick, got %d'):format(at_start))
     Test.expect(KfPositions(evs, '[next]')[1] == 3 * KF_PPQ,
         'first [next] one rate past the beat anchor')
 end)
@@ -499,20 +496,13 @@ do
             'differing blendin values must put the two duplicates on different ticks')
     end)
 
-    Test.it('a blend duplicate is a bare lighting event - no [first] of its own', function()
+    Test.it('no [first] anywhere - not on a section start, not on a blend duplicate', function()
         local g = RunThemed(0, TwoSectionTheme('stomp', 'ProFilm_a.pp',
                                                'verse', 'ProFilm_b.pp', 1, 2, 2),
                             { 'versea', 'verseb' }, { 8, 24 })
-        local blend_ppq = SnapPpqToHalfBeat(g.starts[2] - 1 * g.ppq, g.ppq)
-        local firsts    = TicksOf(g.ctrl, '[first]')
-        local found = {}
-        for _, t in ipairs(firsts) do found[t] = true end
-        Test.expect(not found[blend_ppq],
-            'the duplicate restates a running preset - it must not restart the sequence')
-        Test.expect(found[g.starts[1]] and found[g.starts[2]],
-            'both sections should still have a [first] on their own start')
-        Test.expect(#firsts == 2,
-            'expected 2 [first]s (one per section), got ' .. #firsts)
+        Test.expect(#TicksOf(g.ctrl, '[first]') == 0,
+            'a preset starts on its first look by itself - got ' .. #TicksOf(g.ctrl, '[first]'))
+        Test.expect(#TicksOf(g.ctrl, '[next]') > 0, 'the [next] trains are still written')
     end)
 
     Test.it("the outgoing section's [next] train runs through the blend zone", function()
@@ -538,11 +528,7 @@ do
         local g = RunThemed(0, TwoSectionTheme('stomp', 'ProFilm_a.pp',
                                                'stomp', 'ProFilm_b.pp', 1, 2, 2),
                             { 'versea', 'verseb' }, { 8, 24 })
-        local found = {}
-        for _, t in ipairs(TicksOf(g.ctrl, '[first]')) do found[t] = true end
-        Test.expect(found[g.starts[1]], 'the first section still starts the sequence')
-        Test.expect(not found[g.starts[2]],
-            'a section restating the running preset must not restart the sequence')
+        Test.expect(#TicksOf(g.ctrl, '[first]') == 0, 'no [first] written')
         Test.expect(#TicksOf(g.lt, '[lighting (stomp)]') == 1,
             'only section 1s event should exist, got '
             .. #TicksOf(g.lt, '[lighting (stomp)]'))
@@ -602,7 +588,7 @@ do
         Test.expect(#g.pp == 1 and g.pp[1].tick == g.starts[1], 'same for postproc')
     end)
 
-    Test.it('zero blend-in: [first] on the section start, nothing else there', function()
+    Test.it('zero blend-in: no keyframe on the section start', function()
         local g = RunThemed(0, TwoSectionTheme('stomp', 'ProFilm_a.pp',
                                                'verse', 'ProFilm_b.pp', 0, 0, 2),
                             { 'versea', 'verseb' }, { 8, 24 })
@@ -610,27 +596,26 @@ do
         for _, ev in ipairs(g.ctrl) do
             if ev.tick == g.starts[2] then at_sec[#at_sec + 1] = ev.text end
         end
-        Test.expect(#at_sec == 1 and at_sec[1] == '[first]',
-            'expected exactly one [first] at the section start, got ' ..
-            table.concat(at_sec, ','))
+        Test.expect(#at_sec == 0,
+            'expected nothing at the section start, got ' .. table.concat(at_sec, ','))
         Test.expect(#TicksOf(g.lt, '[lighting (stomp)]') == 1, 'no duplicate without blendin')
     end)
 
-    Test.it('every [first] sits on a manual lighting event, never orphaned', function()
+    Test.it('every [next] lands after the manual lighting event it follows', function()
         local g = RunThemed(0, TwoSectionTheme('stomp', 'ProFilm_a.pp',
                                                'verse', 'ProFilm_b.pp', 1, 2, 2),
                             { 'versea', 'verseb' }, { 8, 24 })
         -- The callers half-beat-snap lighting events and insert keyframes unsnapped,
-        -- so this is the equality that decides whether they share a tick on the track.
+        -- so a [next] equal to a snapped lighting tick would share it on the track.
         local lt_ticks = {}
         for _, ev in ipairs(g.lt) do
             if MANUAL_LIGHTING_SET[ev.text] then
                 lt_ticks[SnapPpqToHalfBeat(ev.tick, g.ppq)] = true
             end
         end
-        for _, t in ipairs(TicksOf(g.ctrl, '[first]')) do
-            Test.expect(lt_ticks[t],
-                ('[first] at %d has no manual lighting event on that tick'):format(t))
+        for _, t in ipairs(TicksOf(g.ctrl, '[next]')) do
+            Test.expect(not lt_ticks[t],
+                ('[next] at %d sits on a manual lighting event tick'):format(t))
         end
     end)
 
@@ -642,7 +627,7 @@ do
             Test.expect(not (ev.text == '[next]' and ev.tick == g.starts[2]),
                 'instrument modes must not emit a [next] at the (note-less) section start')
         end
-        Test.expect(#TicksOf(g.ctrl, '[first]') >= 2, 'each lighting event still gets a [first]')
+        Test.expect(#TicksOf(g.ctrl, '[first]') == 0, 'no [first] in instrument modes either')
     end)
 end
 
