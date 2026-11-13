@@ -30,6 +30,13 @@
 --   Full history: CHANGELOG.md in the repo.
 --
 --   v0.9.64
+--     - Venue: the lighting keyframe trigger is now written [prev], not
+--       [previous]. [prev] is what the game, the RBN documentation and the
+--       official charts use; [previous] most likely did nothing in game.
+--       Manual gen inserts [prev], and Validate accepts it and lists any
+--       [previous] as "not a game event: the keyframe trigger is [prev]" -
+--       swap those by hand. Regenerate keyframes and Remove still find the
+--       old spelling, so they clean it up.
 --     - Animation > Beat no longer writes two downbeats in a row, which the
 --       game reports as an error. It could happen at a very short bar: a 1/4
 --       or 2/8 bar, or a 2/4, 3/8 or 4/8 bar in half time with the downbeat

@@ -66,11 +66,13 @@ function FindActiveVenuePresetsBefore(take, ppq_pos)
     return lt_text, lt_ppq, pp_text, pp_ppq
 end
 
--- Deletes only [first]/[next]/[previous] text events in range. Leaves camera, lighting,
--- postproc, and bonusfx untouched.
+-- Deletes only [first]/[next]/[prev] text events in range (and the misspelling
+-- [previous], VENUE_KEYFRAME_TYPO, so a regenerate cleans it up). Leaves camera,
+-- lighting, postproc, and bonusfx untouched.
 function ClearVenueKeyframesInRange(take, start_ppq, end_ppq)
     DeleteTextEventsInRange(take, start_ppq, end_ppq, function(msg)
-        return msg ~= '[first]' and msg ~= '[next]' and msg ~= '[previous]'
+        return msg ~= '[first]' and msg ~= '[next]' and msg ~= '[prev]'
+           and msg ~= VENUE_KEYFRAME_TYPO
     end)
 end
 

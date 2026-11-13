@@ -121,14 +121,14 @@ function DrawVenueManualTab()
 
     -- Special events list
     local _special_events = {
-        '[bonusfx]', '[bonusfx_optional]', '[first]', '[next]', '[previous]',
+        '[bonusfx]', '[bonusfx_optional]', '[first]', '[next]', '[prev]',
     }
     local _special_labels = {
         ['[bonusfx]']          = 'Bonus FX',
         ['[bonusfx_optional]'] = 'Bonus FX (optional)',
         ['[first]']            = '[first] keyframe',
         ['[next]']             = '[next] keyframe',
-        ['[previous]']         = '[previous] keyframe',
+        ['[prev]']             = '[prev] keyframe',
     }
 
     -- Every row's button starts at the same x (all combos are 230 wide), so size
@@ -449,7 +449,7 @@ function DrawVenueManualTab()
         'Removes all [coop_*] and [directed_*] camera events.',
         'Removes all [lighting (...)] events.',
         'Removes all post-process [*.pp] events.',
-        'Removes [bonusfx], [bonusfx_optional], [first], [next], and [previous] events.',
+        'Removes [bonusfx], [bonusfx_optional], [first], [next], and [prev] events.',
         'Removes all camera, lighting, post-process, and special events.',
     }
     Tooltip((_rm_tips[S.venue_mg_remove_type + 1] or '') ..

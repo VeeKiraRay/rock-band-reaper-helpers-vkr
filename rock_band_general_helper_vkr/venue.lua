@@ -226,7 +226,11 @@ function ListVenueEvents()
     else
         lines[#lines + 1] = ('Unrecognized events (%d unique):'):format(#unknown)
         for _, msg in ipairs(unknown) do
-            lines[#lines + 1] = '  ' .. msg
+            if msg == VENUE_KEYFRAME_TYPO then
+                lines[#lines + 1] = '  ' .. msg .. ' - not a game event: the keyframe trigger is [prev]'
+            else
+                lines[#lines + 1] = '  ' .. msg
+            end
         end
     end
     lines[#lines + 1] = ''

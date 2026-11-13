@@ -28,6 +28,26 @@ Test.it('ListVenueEvents: reads VENUE track and reports events', function()
     Test.expect(S.status ~= 'Ready.', 'ListVenueEvents did not update S.status')
 end)
 
+Test.it('ListVenueEvents: [prev] is valid, [previous] is flagged with the right name', function()
+    reset()
+    local base, n = LoadFixture('rb_venue_events.mid')
+    Test.expect(n > 0, 'rb_venue_events.mid created no tracks')
+    local track = FindTrackByName('VENUE')
+    local _, take = FindFirstMIDIItem(track)
+    Test.expect(take ~= nil, 'fixture has no VENUE take')
+    if take then
+        r.MIDI_InsertTextSysexEvt(take, false, false, 480, 1, '[prev]')
+        r.MIDI_InsertTextSysexEvt(take, false, false, 960, 1, '[previous]')
+    end
+    ListVenueEvents()
+    local res = S.last_result or ''
+    CleanupFixture(base)
+    Test.expect(res:find('[previous] - not a game event', 1, true) ~= nil,
+                '[previous] should be flagged with the [prev] hint')
+    Test.expect(not res:find('\n  [prev]\n', 1, true) and not res:find('\n  [prev]$', 1, true),
+                '[prev] must not be listed as unrecognized')
+end)
+
 Test.it('ListEventSections: reads [prc_*] markers from EVENTS track', function()
     reset()
     local base, n = LoadFixture('rb_venue_events.mid')

@@ -3,7 +3,11 @@
 
 ----------------------------------------------------------------------
 -- Valid VENUE text events (Rock Band Network specification)
+-- The lighting keyframe triggers are [first] / [next] / [prev]: the RBN doc's
+-- spelling, the only three the game's keyframe code knows, and what official
+-- charts use. [previous] is not a game event (VENUE_KEYFRAME_TYPO).
 ----------------------------------------------------------------------
+VENUE_KEYFRAME_TYPO = '[previous]'
 VENUE_VALID = {}
 do
     local _list = {
@@ -47,7 +51,7 @@ do
         '[film_contrast.pp]','[film_contrast_blue.pp]','[film_contrast_green.pp]',
         '[film_contrast_red.pp]','[film_sepia_ink.pp]','[film_silvertone.pp]',
         '[flicker_trails.pp]','[horror_movie_special.pp]',
-        '[lighting ()]','[first]','[previous]','[next]',
+        '[lighting ()]','[first]','[prev]','[next]',
         '[lighting (verse)]','[lighting (chorus)]',
         '[lighting (manual_cool)]','[lighting (manual_warm)]',
         '[lighting (dischord)]','[lighting (stomp)]',
@@ -530,14 +534,14 @@ TIPS = {
                       "[first] goes on the playhead, which must be the tick of a manual lighting\n" ..
                       "event ([lighting (verse|chorus|manual_cool|manual_warm|dischord|stomp)]) -\n" ..
                       "the whole row is blocked anywhere else.\n\n" ..
-                      "Clears any existing [first]/[next]/[previous] events in that range first.\n" ..
+                      "Clears any existing [first]/[next]/[prev] events in that range first.\n" ..
                       "Fully undoable.",
     venue_mg_target = "Where this tab reads and writes events.\n\n" ..
                       "VENUE: the VENUE track.\n" ..
                       "Subtracks: the Sub VENUE tracks made by Venue > Actions > Copy all to\n" ..
                       "subtracks. Each event goes to its own track - cameras to VENUE normal\n" ..
                       "camera / VENUE directed camera, lighting to VENUE lighting, [first] /\n" ..
-                      "[next] / [previous] and generated keyframes to VENUE keyevents, and so on.\n" ..
+                      "[next] / [prev] and generated keyframes to VENUE keyevents, and so on.\n" ..
                       "Blend and the [first] check read VENUE lighting / VENUE post proc.\n\n" ..
                       "The game, the Venue validators and Preview read only VENUE: run\n" ..
                       "Copy all to main track when you are done.\n\n" ..
@@ -673,7 +677,7 @@ TIPS = {
                        "then insert. Other families there stay.\n\n" ..
                        "Families: cameras (normal and directed together, so a camera stack\n" ..
                        "becomes the one new shot), lighting, post proc, bonus FX, and\n" ..
-                       "keyframes ([first] / [next] / [previous]).\n\n" ..
+                       "keyframes ([first] / [next] / [prev]).\n\n" ..
                        "Blend and keyframe generation are not affected. One undo step.",
 
     venue_kf_inst_subdiv = "Subdivision grid for instrument-aware keyframe alignment.\n\n" ..
@@ -770,7 +774,7 @@ TIPS = {
                           "that lighting event to the next lighting event of any kind.\n\n" ..
                           "[first] is placed on the lighting event's own tick; Keyframe align\n" ..
                           "decides where the first [next] lands.\n\n" ..
-                          "Only [first]/[next]/[previous] events are cleared and replaced -\n" ..
+                          "Only [first]/[next]/[prev] events are cleared and replaced -\n" ..
                           "camera, lighting, post-process, and bonus FX are untouched.\n\n" ..
                           "Respects an active time selection (only lighting events inside the\n" ..
                           "selection are regenerated); otherwise processes the whole song.\n\n" ..

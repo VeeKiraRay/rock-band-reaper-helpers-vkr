@@ -379,7 +379,7 @@ Shot-by-shot event insertion at the edit cursor.
 
 Two rows at the top set where and how events go in:
 
-- **Target** — **VENUE** (default) writes to the VENUE track. **Subtracks** writes each event to its own Sub VENUE track instead: cameras to *VENUE normal camera* / *VENUE directed camera*, lighting to *VENUE lighting*, `[first]` / `[next]` / `[previous]` and generated keyframes to *VENUE keyevents*, and so on. Create the subtracks first with [Copy all to subtracks](#venue-actions); a note appears if they're missing. The game, the Venue validators and Preview read only VENUE, so run **Copy all to main track** when you're done. The Keyframes sub-tab shares this setting.
+- **Target** — **VENUE** (default) writes to the VENUE track. **Subtracks** writes each event to its own Sub VENUE track instead: cameras to *VENUE normal camera* / *VENUE directed camera*, lighting to *VENUE lighting*, `[first]` / `[next]` / `[prev]` and generated keyframes to *VENUE keyevents*, and so on. Create the subtracks first with [Copy all to subtracks](#venue-actions); a note appears if they're missing. The game, the Venue validators and Preview read only VENUE, so run **Copy all to main track** when you're done. The Keyframes sub-tab shares this setting.
 - **Insert** — what **Add** does with events already at the playhead. **Add** (default) inserts next to them, so a stack builds up. **Replace** first removes the events of the same family on that spot, then inserts. The families are cameras (normal and directed together, so a camera stack becomes the one new shot), lighting, post proc, bonus FX, and keyframes. Other families on the spot stay.
 
 Then one row per event type:
@@ -389,7 +389,7 @@ Then one row per event type:
 - **Lighting** — pick any lighting preset; **Add** inserts `[lighting (name)]`. **Blend** copies the preset that is currently running to the playhead, so the game fades into the next preset instead of cutting to it: place it a beat or two before where the new preset goes (see [blending](#venue-actions)). Blend reads what is on the track, not the dropdown.
 - **Keyframe align** + **Add** — generates `[first]`/`[next]` from the playhead to the next lighting event, the time selection end, or the VENUE item end, clearing existing keyframe events in that range first. `[first]` must share the tick of the manual lighting event it drives, so the row is blocked unless the playhead is on a manual lighting event (`verse`, `chorus`, `manual_cool`, `manual_warm`, `dischord`, `stomp`); hover **(blocked)** for why. The align modes and **Subdivision** are the same as on the [Keyframes sub-tab](#keyframes-sub-tab); **Keyframe rate** is this tab's own.
 - **Post proc** — pick any `[*.pp]` effect; **Add** inserts it. **Blend** works as for lighting.
-- **Special** — `[bonusfx]`, `[bonusfx_optional]`, `[first]`, `[next]`, `[previous]`; **Add** inserts the chosen event.
+- **Special** — `[bonusfx]`, `[bonusfx_optional]`, `[first]`, `[next]`, `[prev]`; **Add** inserts the chosen event.
 - **Camera pacing** — shared camera pacing override (same state as the other gen tabs).
 - **Advance camera pacing** — moves the edit cursor forward by one jittered camera interval.
 - **Remove** — category dropdown (Camera / Lighting / Post proc / Special / All) + **Remove** button; removes matching events from the time selection (if active) or the full song. Fully undoable.

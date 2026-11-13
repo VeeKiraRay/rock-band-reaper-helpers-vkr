@@ -18,6 +18,9 @@
 --       files, which gained Animation > Beat's double-time downbeat option in
 --       General Helper v0.9.64; this window reads past it and behaves exactly
 --       as before. Bumped so its version keeps describing the code it runs.
+--     - The shared venue files it loads now spell the lighting keyframe
+--       trigger [prev] (General Helper v0.9.64). This window does not show
+--       keyframe events, so nothing here looks different.
 --   v0.7
 --     - No change to this window. The General Helper's instrument tabs moved
 --       to the new Instrument Helper (General Helper v0.9.63), and the track

@@ -24,7 +24,11 @@ VENUE_SUBTRACKS = {
 -- Classifies a type-1 VENUE text event string into one of VENUE_SUBTRACKS' keys.
 -- 'special' is the catch-all: bonusfx/bonusfx_optional plus anything unrecognized.
 function CategorizeVenueEvent(msg)
-    if msg == '[first]' or msg == '[next]' or msg == '[previous]' then return 'keyframe' end
+    -- [previous] is a common misspelling of [prev] (not a game event); it still goes with
+    -- the keyframes so it can be found, moved and removed with them.
+    if msg == '[first]' or msg == '[next]' or msg == '[prev]' or msg == VENUE_KEYFRAME_TYPO then
+        return 'keyframe'
+    end
     if msg:find('^%[coop_')     then return 'coop'     end
     if msg:find('^%[directed_') then return 'directed' end
     if msg:find('^%[lighting')  then return 'lighting' end
