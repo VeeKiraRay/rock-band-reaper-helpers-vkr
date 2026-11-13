@@ -8,7 +8,7 @@
 --     General    - stem import, audio alignment, count-in positioning, song fade out, settings,
 --                  buttons that open the other tools in this set
 --     Workflow   - per-project authoring workflow checklist
---     Animation  - Beat: write the BEAT track (normal or half time);
+--     Animation  - Beat: write the BEAT track (normal, half or double time);
 --                  Character: band member animation states per part;
 --                  Drums: the drummer's hand and kick animation notes
 --     Events     - list song sections, insert EVENTS track events at the
@@ -42,6 +42,18 @@
 --     - Both changes are listed in the result by measure, so you can check
 --       the bar - a very short bar may belong with its neighbour. Common
 --       time signatures (4/4, 3/4, 6/8, 5/8, 7/8 ...) are unchanged.
+--     - The Beat buttons are now "Normal", "Half" and "Double" under a
+--       "Generate beats" heading, so the row fits a narrower window.
+--     - New "Double": a BEAT note on every 8th. Official
+--       charts use it for slow songs whose tempo map runs at half the felt
+--       pulse (Snuff, The Only Exception) and for double-time sections
+--       (American Pie) - select the section to write only that part. Its
+--       downbeat goes every 4 beats in a bar (beats 1 and 3 in 4/4, as the
+--       slow songs do; the default) or on every bar.
+--     - Good to know, now in the Beat sub-tab: the BEAT track also sets how
+--       fast overdrive drains. A full meter lasts 32 BEAT notes, so it lasts
+--       twice as long in a half-time part and half as long in a double-time
+--       one.
 --
 --   v0.9.63
 --     - The instrument tools moved to a new script, the Rock Band Instrument

@@ -115,6 +115,68 @@ Test.it('3/4 with [end] on the bar line: beat 3 already holds a note', function(
 end)
 
 ----------------------------------------------------------------------
+Test.section('BeatPlan - double time')
+----------------------------------------------------------------------
+
+Test.it('4/4, every 4 beats (default): a note per 8th, downbeats on beats 1 and 3', function()
+    Expect(BeatPlan(Bars(Rep(4, 1)), { end_qn = 4, double = true }),
+           'D0 u0.5 u1 u1.5 D2 u2.5 u3 u3.5')
+end)
+
+Test.it('4/4, every bar: a downbeat on the bar line only', function()
+    Expect(BeatPlan(Bars(Rep(4, 1)), { end_qn = 4, double = true, double_style = 'bar' }),
+           'D0 u0.5 u1 u1.5 u2 u2.5 u3 u3.5')
+end)
+
+Test.it('3/4, every 4 beats: one downbeat a bar (only 2 8ths left after the 4th)', function()
+    Expect(BeatPlan(Bars(Rep(3, 2)), { end_qn = 6, double = true }),
+           'D0 u0.5 u1 u1.5 u2 u2.5 D3 u3.5 u4 u4.5 u5 u5.5')
+end)
+
+Test.it('6/8 every bar: 6 notes a bar (official 6/8 double time)', function()
+    Expect(BeatPlan(Bars(Rep(3, 1)), { end_qn = 3, double = true, double_style = 'bar' }),
+           'D0 u0.5 u1 u1.5 u2 u2.5')
+end)
+
+Test.it('6/4 every 4 beats: downbeats on 8ths 0, 4 and 8', function()
+    local notes = BeatPlan(Bars({ 6 }), { end_qn = 6, double = true })
+    local downs = {}
+    for _, n in ipairs(notes) do
+        if n.pitch == BEAT_PITCH_DOWN then downs[#downs + 1] = string.format('%g', n.qn) end
+    end
+    Test.expect(#notes == 12 and table.concat(downs, ',') == '0,2,4',
+                'got ' .. #notes .. ' notes, downbeats ' .. table.concat(downs, ','))
+end)
+
+Test.it('double overrides half when both are set', function()
+    Expect(BeatPlan(Bars(Rep(4, 1)), { end_qn = 2, double = true, half = true }), 'D0 u0.5 u1 u1.5')
+end)
+
+Test.it('double in a time selection: only that range', function()
+    Expect(BeatPlan(Bars(Rep(4, 2)), { end_qn = 8, double = true, range_s_qn = 4, range_e_qn = 6 }),
+           'D4 u4.5 u5 u5.5')
+end)
+
+Test.it('double time keeps the game\'s rules in every meter', function()
+    for _, unit in ipairs({ 0.25, 0.5 }) do
+        for num = 1, 16 do
+            for _, ds in ipairs({ 'four', 'bar' }) do
+                local b = Bars({ 4, num * unit, num * unit, 4 })
+                local notes = BeatPlan(b, { end_qn = b[#b].qn_e, double = true, double_style = ds })
+                local ok = true
+                for i = 2, #notes do
+                    if notes[i].qn - notes[i - 1].qn < 0.5 - EPS
+                       or (notes[i].pitch == BEAT_PITCH_DOWN and notes[i - 1].pitch == BEAT_PITCH_DOWN) then
+                        ok = false
+                    end
+                end
+                Test.expect(ok, string.format('%d/%d %s breaks a rule', num, unit == 0.25 and 16 or 8, ds))
+            end
+        end
+    end
+end)
+
+----------------------------------------------------------------------
 Test.section('BeatPlan - range (time selection)')
 ----------------------------------------------------------------------
 

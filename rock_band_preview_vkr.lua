@@ -1,6 +1,6 @@
 -- @description Rock Band Venue Preview
 -- @author VeeKiraRay
--- @version 0.7
+-- @version 0.8
 -- @about
 --   Standalone window for the Venue > Preview sub-tab of the Rock Band
 --   General Helper. Shows previous / current / next VENUE events (camera,
@@ -13,6 +13,11 @@
 --   This @about block keeps only the 5 most recent versions.
 --   Full history: CHANGELOG.md in the repo.
 --
+--   v0.8
+--     - No change to this window. It loads the General Helper's settings
+--       files, which gained Animation > Beat's double-time downbeat option in
+--       General Helper v0.9.64; this window reads past it and behaves exactly
+--       as before. Bumped so its version keeps describing the code it runs.
 --   v0.7
 --     - No change to this window. The General Helper's instrument tabs moved
 --       to the new Instrument Helper (General Helper v0.9.63), and the track
@@ -46,15 +51,6 @@
 --       the fade, or "hard cut to next" - which is a valid authoring choice,
 --       not an error. Camera cards have no such line; a camera cut never fades.
 --       Same change as the general helper's Venue > Preview sub-tab (v0.9.53).
---   v0.3
---     - Stacked camera shots at one tick now resolve by the game's own shot
---       priority - most specific wins, directed cuts beat normal shots, and a
---       single keys shot outranks any duo shot - instead of taking whichever
---       came last in MIDI order. Applies to the Previous and Next columns too.
---       When nothing stacked at a spot fits the selected Players combo, the
---       "No suitable event" card now explains what the game falls back to.
---       Same change as the general helper's Venue > Preview sub-tab (v0.9.51),
---       which this window shares its implementation with.
 
 r = reaper  -- global so all dofile'd modules can use it
 

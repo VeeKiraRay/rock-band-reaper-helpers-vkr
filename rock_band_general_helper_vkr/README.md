@@ -180,16 +180,22 @@ Every action respects the time selection (only that part of the song is rewritte
 
 Writes the **BEAT** track: a downbeat note on each bar's first beat and an upbeat note on every other beat, from measure 1 up to the `[end]` event. Needs a BEAT track and an `[end]` event on EVENTS; if BEAT has no MIDI item, one is created from measure 1 to `[end]`. Existing BEAT notes in the range are replaced.
 
-- **Generate beats** — one note per quarter note, counted from each bar line, in every time signature. A quarter note that starts inside a bar gets a note even when the bar ends half a beat later, so 7/8 gets `downbeat upbeat upbeat upbeat` and 6/8 gets three notes, as the official charts do.
-- **Generate half-time beats** — a note every two quarter notes, each bar restarting at its bar line. Use it for slow songs or sections where the band should move at half speed. Select a section first to halve only that part.
+The **Generate beats** buttons:
+
+- **Normal** — one note per quarter note, counted from each bar line, in every time signature. A quarter note that starts inside a bar gets a note even when the bar ends half a beat later, so 7/8 gets `downbeat upbeat upbeat upbeat` and 6/8 gets three notes, as the official charts do.
+- **Half** — a note every two quarter notes, each bar restarting at its bar line. Use it for slow songs or sections where the band should move at half speed. Select a section first to halve only that part.
+- **Double** — a note on every 8th note. Official charts use it for slow songs whose tempo map runs at half the felt pulse (Snuff, The Only Exception) and for double-time sections (American Pie). Select a section first to write only that part.
 - **Half-time downbeat** — **Every other bar** (default: what most halved official songs and CAT do) or **Every bar**.
+- **Double-time downbeat** — **Every 4 beats** (default: beats 1 and 3 in 4/4, as the official slow songs do) or **Every bar**.
+
+**The BEAT track also sets how fast overdrive drains.** A full overdrive meter lasts 32 BEAT notes — 8 bars of 4/4 with normal beats, 16 with half time, 4 with double time.
 
 Two rules come from testing with Magma rather than from the documentation:
 
 - **The beat just before `[end]` always gets a note**, half time included — Magma refuses a song without it. Half time steps one beat instead of two at the very end to make room.
 - **Bars without a downbeat compile fine.** The RBN documentation says every measure needs a downbeat and an upbeat, but all three modes compile in Magma with bars that have no downbeat, and most halved official songs leave every second bar without one.
 
-Bars too short for the chosen spacing (e.g. a 2/4 bar in half time) are written with the strict spacing, without a warning — fix them by hand if needed.
+The game's own BEAT rules are kept in every time signature: beats at least an 8th apart, and never two downbeats in a row. A very short bar (a 1/4 bar, or a 2/4 bar in half time with a downbeat on every bar) gives up its downbeat, and an x/16 bar such as 9/16 may lose its last beat. Each such change is listed in the result by measure, so you can check the bar — a very short bar may belong with its neighbour.
 
 ### Character sub-tab
 

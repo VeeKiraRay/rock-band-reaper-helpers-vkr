@@ -13,6 +13,12 @@
 --     so odd bars (3/4, 5/4, 6/8) leave the shorter gap before the next bar.
 --     'pair' puts the downbeat only on every other bar (CAT and most halved
 --     official songs); 'bar' keeps it on every bar.
+--   - Double time: a note on every 8th from each bar line. 'four' puts a
+--     downbeat on the bar line and on every 4th 8th after it while 4 or more
+--     remain in the bar (4/4: beats 1 and 3; 3/4: once), the style of the
+--     official slow songs whose tempo map runs at half the felt pulse; 'bar'
+--     puts it on the bar line only, as official double-time sections do.
+--     About 2% of official BEAT tracks are double time (song or section).
 --   - The beat just before [end] always gets a note, half time included:
 --     Magma refuses a song without one (4/4 with [end] on beat 3 needs beat 2).
 --   - The game's own BEAT rules hold in every meter (BeatCleanUp): beats an 8th
@@ -93,6 +99,8 @@ end
 --         range_e_qn  notes start before this (default: end_qn)
 --         half        true = a note every two quarters
 --         half_style  'pair' (default) or 'bar' - see the file header
+--         double      true = a note every 8th (overrides half)
+--         double_style 'four' (default) or 'bar' - see the file header
 -- Returns notes { { qn, pitch, bar }, ... } sorted by qn, where bar is the
 -- 1-based measure number, and the changes BeatCleanUp made to keep the game's
 -- BEAT rules (see above).
@@ -102,8 +110,10 @@ function BeatPlan(bars, opts)
     local end_qn  = opts.end_qn
     local range_s = opts.range_s_qn or bars[1].qn_s
     local range_e = math.min(opts.range_e_qn or end_qn, end_qn)
-    local step    = opts.half and 2 or 1
+    local double  = opts.double
+    local step    = double and 0.5 or (opts.half and 2 or 1)
     local style   = opts.half_style or 'pair'
+    local dstyle  = opts.double_style or 'four'
 
     -- Half-time parity counts from the bar holding the range start, so a
     -- selected section starts on a downbeat (as CAT's "Halve selected" does).
@@ -115,7 +125,7 @@ function BeatPlan(bars, opts)
     for i, b in ipairs(bars) do
         if b.qn_s >= range_e - EPS then break end
         local down
-        if opts.half and style == 'pair' then
+        if opts.half and not double and style == 'pair' then
             down = (i - anchor) % 2 == 0
         else
             down = true
@@ -124,7 +134,14 @@ function BeatPlan(bars, opts)
         while qn < b.qn_e - EPS and qn < range_e - EPS do
             if qn >= range_s - EPS then
                 local first = qn <= b.qn_s + EPS
-                local pitch = (first and down) and BEAT_PITCH_DOWN or BEAT_PITCH_UP
+                local is_down = first and down
+                if double and dstyle == 'four' and not first then
+                    -- Every 4th 8th from the bar line, while 4 or more 8ths remain
+                    -- in the bar: two downbeats in 4/4, one in 3/4.
+                    local k = math.floor((qn - b.qn_s) / 0.5 + 0.5)
+                    is_down = k % 4 == 0 and b.qn_e - qn >= 2 - EPS
+                end
+                local pitch = is_down and BEAT_PITCH_DOWN or BEAT_PITCH_UP
                 notes[#notes + 1] = { qn = qn, pitch = pitch, bar = i }
             end
             -- Magma needs a note on the beat just before [end]: in half time,
@@ -156,10 +173,14 @@ local function Fail(status, detail)
     S.last_result = detail
 end
 
--- The action behind both Beat buttons. half = true writes half-time beats in
--- the style picked in S.beat_half_style (0 = every other bar, 1 = every bar).
-function GenerateBeatTrack(half)
-    local what = half and 'Half-time beats' or 'Beats'
+-- The action behind the Beat buttons. mode: 'normal', 'half' or 'double' (true /
+-- false also work: half / normal). Half time uses the style in S.beat_half_style
+-- (0 = every other bar, 1 = every bar), double time S.beat_double_style
+-- (0 = every 4 beats, 1 = every bar).
+function GenerateBeatTrack(mode)
+    if mode == true then mode = 'half' elseif mode == false or mode == nil then mode = 'normal' end
+    local half, double = mode == 'half', mode == 'double'
+    local what = half and 'Half-time beats' or double and 'Double-time beats' or 'Beats'
 
     local track = FindTrackByName('BEAT')
     if not track then
@@ -197,10 +218,11 @@ function GenerateBeatTrack(half)
     local range_e_qn = r.TimeMap2_timeToQN(0, range_e_t)
 
     local bars  = ReadProjectBars(end_qn)
-    local style = (S.beat_half_style == 1) and 'bar' or 'pair'
+    local style  = (S.beat_half_style == 1) and 'bar' or 'pair'
+    local dstyle = (S.beat_double_style == 1) and 'bar' or 'four'
     local notes, changes = BeatPlan(bars, {
         end_qn = end_qn, range_s_qn = range_s_qn, range_e_qn = range_e_qn,
-        half = half, half_style = style,
+        half = half, half_style = style, double = double, double_style = dstyle,
     })
     if #notes == 0 then
         return Fail(what .. ': nothing to do.', 'No beat falls inside the time selection.')
@@ -286,6 +308,10 @@ function GenerateBeatTrack(half)
         lines[#lines + 1] = style == 'pair'
             and 'Half time: downbeat on every other bar.'
             or  'Half time: downbeat on every bar.'
+    elseif double then
+        lines[#lines + 1] = dstyle == 'four'
+            and 'Double time: downbeat every 4 beats in a bar (twice in 4/4).'
+            or  'Double time: downbeat on every bar.'
     end
     if removed > 0 then
         lines[#lines + 1] = string.format('Replaced %d existing BEAT notes.', removed)

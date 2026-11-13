@@ -1404,6 +1404,16 @@ harness in `dev/tests/dsp_algorithms.lua`.
 
 `rock_band_preview_vkr.lua`
 
+**v0.3**
+  - Stacked camera shots at one tick now resolve by the game's own shot
+    priority - most specific wins, directed cuts beat normal shots, and a
+    single keys shot outranks any duo shot - instead of taking whichever
+    came last in MIDI order. Applies to the Previous and Next columns too.
+    When nothing stacked at a spot fits the selected Players combo, the
+    "No suitable event" card now explains what the game falls back to.
+    Same change as the general helper's Venue > Preview sub-tab (v0.9.51),
+    which this window shares its implementation with.
+
 **v0.2**
   - Added the "Active players" row below the preview: a colored dot per
     instrument shows its state at the playhead - active (green), idle

@@ -190,6 +190,7 @@ S = {
     venue_subtrack_copy_pending = nil,
     -- Animation > Beat
     beat_half_style      = 0,    -- half-time downbeat: 0=every other bar 1=every bar (persisted: 'abhs')
+    beat_double_style    = 0,    -- double-time downbeat: 0=every 4 beats 1=every bar (persisted: 'abds')
     -- Animation > Character
     char_active = { drums = 0, guitar = 0, bass = 0, vocals = 0, keys = 0 },
                                  -- per group: 0=[play] 1=[mellow] 2=[intense] (persisted: 'acsd' 'acsg' 'acsb' 'acsv' 'acsk')
@@ -555,13 +556,37 @@ TIPS = {
                      "the bar line, as the official charts do: 6/8 gets three notes,\n" ..
                      "7/8 four.\n\n" ..
                      "Needs a BEAT track and an [end] event on EVENTS. Existing BEAT notes\n" ..
-                     "in the range are replaced. One undo step.",
+                     "in the range are replaced. One undo step.\n\n" ..
+                     "Overdrive drains per BEAT note: a full meter lasts 32 of them\n" ..
+                     "(8 bars of 4/4 here).",
     anim_beat_half = "Half-speed BEAT track, for animations: a note on every other quarter\n" ..
                      "note (beats 1 and 3 in 4/4). Each bar starts again on its first beat,\n" ..
                      "so in 3/4 or 6/8 the shorter gap comes before the next bar.\n" ..
                      "The beat just before [end] always gets a note (Magma needs it).\n\n" ..
                      "Select a section first to halve only that part.\n" ..
-                     "Range, checks and undo as Generate beats.",
+                     "Range, checks and undo as Normal.\n\n" ..
+                     "Overdrive lasts twice as long in a halved part (it drains per BEAT\n" ..
+                     "note: a full meter lasts 32 of them).",
+    anim_beat_double = "Double-speed BEAT track: a note on every 8th note, counted from\n" ..
+                       "each bar line.\n\n" ..
+                       "Official charts use it in about 2% of songs, two ways:\n" ..
+                       "  - slow songs whose tempo map runs at half the felt pulse, so the\n" ..
+                       "    beat follows what you hear: Snuff, Happy Xmas (War Is Over),\n" ..
+                       "    The Only Exception, Spoonman, Free Bird, King George;\n" ..
+                       "  - double-time sections inside a normal song: American Pie,\n" ..
+                       "    Phantom of the Opera, Voodoo Child (live). Select the section\n" ..
+                       "    first to write only that part.\n\n" ..
+                       "Overdrive drains twice as fast in a double-time part (it drains per\n" ..
+                       "BEAT note: a full meter lasts 32 of them).\n" ..
+                       "Range, checks and undo as Normal.",
+    anim_beat_double_style = "Where double-time beats put the downbeat note.\n\n" ..
+                             "Every 4 beats: on the bar line and every 4 notes after it, while\n" ..
+                             "4 or more are left in the bar - twice in a 4/4 bar, once in 3/4.\n" ..
+                             "The slow songs do this (Snuff, Happy Xmas, Spoonman): the BEAT\n" ..
+                             "track reads like the song at double tempo.\n" ..
+                             "Every bar: only on the bar line, 8 notes in a 4/4 bar. Official\n" ..
+                             "double-time sections do this (American Pie), and The Red in 6/8\n" ..
+                             "(6 notes a bar).",
     drum_anim_crash = "Which crash a green cymbal gem plays: crash 2 on the drummer's right\n" ..
                       "(next to the ride) or crash 1 on the left (next to the hi-hat).\n\n" ..
                       "Official charts choose per song: some use crash 1 for nearly every\n" ..

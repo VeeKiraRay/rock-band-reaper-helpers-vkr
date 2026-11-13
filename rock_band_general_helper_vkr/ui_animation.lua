@@ -2,7 +2,7 @@
 -- sub-tabs. Drums, Keys and Guitar sub-tabs are planned; each comes with its
 -- own feature.
 -- Requires globals: r, ctx, S, TIPS, Tooltip, SliderTooltip, Btn, BtnGroupWidth,
---                   BTN_H, WIDTH_STD, LabelColWidth, SectionHeader, RunAction,
+--                   BTN_H, WIDTH_STD, LabelColWidth, RadioGroupWidth, SectionHeader, RunAction,
 --                   MakeProjectPoll, FindTrackByName, FindFirstMIDIItem,
 --                   GenerateBeatTrack, CHAR_STATES, CHAR_ACTIVE_CHOICES, CHAR_GROUPS,
 --                   CHAR_PARTS, CHAR_STATE_SET, CHAR_RIDE_EVENTS, CHAR_RIDE_SET,
@@ -18,31 +18,55 @@ local function DrawAnimationBeatTab()
                              'beat, an upbeat note (13) on the others. Existing BEAT notes in ' ..
                              'that range are replaced.')
     r.ImGui_Spacing(ctx)
+    r.ImGui_TextWrapped(ctx, 'Good to know: besides the animations, the BEAT track sets how ' ..
+                             'fast overdrive drains. A full meter lasts 32 BEAT notes - 8 bars ' ..
+                             'of 4/4 with normal beats, 16 with half time, 4 with double time.')
+    r.ImGui_Spacing(ctx)
 
-    SectionHeader('Generate')
-    local labels = { 'Generate beats', 'Generate half-time beats' }
+    SectionHeader('Generate beats')
+    local labels = { 'Normal', 'Half', 'Double' }
     local bw = BtnGroupWidth(labels)
     if Btn(labels[1], BTN_H, bw) then
-        RunAction(function() GenerateBeatTrack(false) end)
+        RunAction(function() GenerateBeatTrack('normal') end)
     end
     Tooltip(TIPS.anim_beat_full)
     r.ImGui_SameLine(ctx)
     if Btn(labels[2], BTN_H, bw) then
-        RunAction(function() GenerateBeatTrack(true) end)
+        RunAction(function() GenerateBeatTrack('half') end)
     end
     Tooltip(TIPS.anim_beat_half)
+    r.ImGui_SameLine(ctx)
+    if Btn(labels[3], BTN_H, bw) then
+        RunAction(function() GenerateBeatTrack('double') end)
+    end
+    Tooltip(TIPS.anim_beat_double)
+
+    local lbl_col = LabelColWidth({ 'Half-time downbeat', 'Double-time downbeat' })
+    local radio_w = RadioGroupWidth({ 'Every other bar', 'Every 4 beats', 'Every bar' })
 
     r.ImGui_Text(ctx, 'Half-time downbeat')
-    r.ImGui_SameLine(ctx)
+    r.ImGui_SameLine(ctx, lbl_col)
     if r.ImGui_RadioButton(ctx, 'Every other bar##beat_hs', S.beat_half_style == 0) then
         S.beat_half_style = 0
     end
     Tooltip(TIPS.anim_beat_half_style)
-    r.ImGui_SameLine(ctx)
+    r.ImGui_SameLine(ctx, lbl_col + radio_w)
     if r.ImGui_RadioButton(ctx, 'Every bar##beat_hs', S.beat_half_style == 1) then
         S.beat_half_style = 1
     end
     Tooltip(TIPS.anim_beat_half_style)
+
+    r.ImGui_Text(ctx, 'Double-time downbeat')
+    r.ImGui_SameLine(ctx, lbl_col)
+    if r.ImGui_RadioButton(ctx, 'Every 4 beats##beat_ds', S.beat_double_style == 0) then
+        S.beat_double_style = 0
+    end
+    Tooltip(TIPS.anim_beat_double_style)
+    r.ImGui_SameLine(ctx, lbl_col + radio_w)
+    if r.ImGui_RadioButton(ctx, 'Every bar##beat_ds', S.beat_double_style == 1) then
+        S.beat_double_style = 1
+    end
+    Tooltip(TIPS.anim_beat_double_style)
 end
 
 -- Character sub-tab. Track presence / mute and the state at the playhead are

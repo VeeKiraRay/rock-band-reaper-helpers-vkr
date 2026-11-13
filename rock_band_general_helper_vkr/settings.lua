@@ -36,6 +36,7 @@ local function SerializeSettings()
         'vmgt='   .. S.venue_mg_target,
         'vmgr='   .. S.venue_mg_replace,
         'abhs='   .. S.beat_half_style,
+        'abds='   .. S.beat_double_style,
         'acsd='   .. S.char_active.drums,
         'acsg='   .. S.char_active.guitar,
         'acsb='   .. S.char_active.bass,
@@ -92,6 +93,7 @@ local function DeserializeSettings(str)
         elseif k == 'vmgt'   then S.venue_mg_target         = (v == '1') and 1 or 0
         elseif k == 'vmgr'   then S.venue_mg_replace        = (v == '1') and 1 or 0
         elseif k == 'abhs'   then S.beat_half_style         = (v == '1') and 1 or 0
+        elseif k == 'abds'   then S.beat_double_style       = (v == '1') and 1 or 0
         elseif k:match('^acs[dgbvk]$') then
             local group = ({ d = 'drums', g = 'guitar', b = 'bass', v = 'vocals', k = 'keys' })[k:sub(4)]
             local n = tonumber(v)
