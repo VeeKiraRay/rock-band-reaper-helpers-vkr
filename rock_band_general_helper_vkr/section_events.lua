@@ -1,17 +1,23 @@
 -- EVENTS-track event vocabulary for the Events > Manual gen sub-tab.
--- Derived from the community "Text Events List - Events" reference (ground
--- truth); dev/tests/venue_events.lua re-verifies every generatable string
--- against it when a local copy is present, and skips when it is not.
+-- Derived from the community "Text Events List - Events" reference, which
+-- matches the game's own practice-section names (its locale files, 2510 names)
+-- except one typo: it lists [prc_dj_intro] where the game has
+-- [prc_dj_intro_a]. The game accepts any prc_ text as a section; the list only
+-- decides the shown name - a listed one is translated per game language, an
+-- unlisted one shows as the event text itself, the same in every language. dev/tests/venue_events.lua re-verifies every generatable string
+-- against the community list when a local copy is present, and skips when it
+-- is not.
 -- No S/TIPS/REAPER dependencies - loadable standalone by the test runner.
 --
 -- Caps string per prc base: the character at position num+1 is the rule for
 -- number num (0 = the bare, unnumbered form):
 --   'a'..'z'  number valid, lettered variants valid up to this letter
+--   'A'..'Z'  as lower case, but ONLY the lettered variants exist - the plain
+--             form is never offered, even with letter suffix off
 --   '.'       number valid, but no lettered variants exist
 --   absent    number invalid (caps string shorter than num+1)
 -- e.g. verse = 'ffffdddddd': bare and _1.._3 letter up to f, _4.._9 up to d.
--- dj_intro is '.' because the list skips [prc_dj_intro_a] (has only _b.._d),
--- so the contiguous a->cap ladder cannot be used.
+-- dj_intro = 'D': [prc_dj_intro_a].._d, no [prc_dj_intro] (game list).
 --
 -- kind = 'prc'     -> [prc_<base>] with _N numbering and letter suffixes
 -- kind = 'generic' -> [prc_<base>] with N appended directly (no underscore,
@@ -45,7 +51,7 @@ SECTION_EVENT_GROUPS = {
           { base = 'organ_intro',     caps = 'd'  },
           { base = 'piano_intro',     caps = 'd'  },
           { base = 'keyboard_intro',  caps = 'd'  },
-          { base = 'dj_intro',        caps = '.'  },
+          { base = 'dj_intro',        caps = 'D'  },
           { base = 'drums_enter',     caps = '.'  },
           { base = 'bass_enters',     caps = '.'  },
           { base = 'gtr_enters',      caps = '.'  },
@@ -54,7 +60,10 @@ SECTION_EVENT_GROUPS = {
       } },
     { key = 'structure', label = 'Structure', kind = 'prc',
       tip = 'Standard song structure markers: verses, choruses, bridges\n' ..
-            'and their pre/post/alt variants.',
+            'and their pre/post/alt variants.\n\n' ..
+            'Numbered verses and choruses (verse_1, chorus_2, ...) get their own\n' ..
+            'background clips in the video venues; a bare [prc_verse] or\n' ..
+            '[prc_chorus] gets the venue\'s general clip pool.',
       bases = {
           { base = 'verse',            caps = 'ffffdddddd' },
           { base = 'alt_verse',        caps = 'd'          },

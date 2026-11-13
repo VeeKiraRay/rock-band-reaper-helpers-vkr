@@ -61,6 +61,19 @@
 --       fast overdrive drains. A full meter lasts 32 BEAT notes, so it lasts
 --       twice as long in a half-time part and half as long in a double-time
 --       one.
+--     - Events > Manual gen: dj_intro now inserts [prc_dj_intro_a] to _d, the
+--       names the game knows. With letter suffix off it still adds the
+--       letter: the row shows "(letter required)" and the result says why.
+--       The reverse case now says so too: names with no lettered form
+--       ([prc_bre], [prc_a1], ...) show "(no lettered form)" when letter
+--       suffix is on, and the result explains the plain insert.
+--       The bare [prc_dj_intro] it offered before (a typo in the community
+--       events list) still works as a practice section, but it is not in the
+--       game's section names, so it is not translated: every game language
+--       shows the event text "prc_dj_intro" instead of its own name for it.
+--       Rename any you have.
+--     - The Structure row's tooltip notes that numbered verses and choruses
+--       get their own background clips in the video venues.
 --
 --   v0.9.63
 --     - The instrument tools moved to a new script, the Rock Band Instrument

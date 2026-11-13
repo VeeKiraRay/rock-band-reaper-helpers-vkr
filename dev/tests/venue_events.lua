@@ -39,6 +39,13 @@ local function LoadEventList()
         if line ~= '' then set[line] = true end
     end
     f:close()
+    -- The community list's one known typo against the game's own section names
+    -- (its locale files): it has [prc_dj_intro], the game has [prc_dj_intro_a]
+    -- and no bare form. Correct it here so the check follows the game.
+    if set['[prc_dj_intro]'] then
+        set['[prc_dj_intro]'] = nil
+        set['[prc_dj_intro_a]'] = true
+    end
     return set
 end
 
@@ -207,6 +214,37 @@ Test.it('bare-only base ("." caps) falls back to plain even in letter mode', fun
     local scan = MakeScan({ { msg = '[prc_bre]', t = 1 } })
     local ev, err = NextSectionEvent(scan, 'bre', 0, B, false, true, 10, P(10))
     Test.expect(ev == nil and err:find('already exists', 1, true), 'got ' .. tostring(err))
+end)
+
+Test.it('letters-only base (upper-case cap): lettered forms in both modes, never plain', function()
+    local D = SECTION_EVENT_BASE.dj_intro.caps   -- 'D'
+    for _, use_letters in ipairs({ false, true }) do
+        Test.expect(NextSectionEvent(EMPTY, 'dj_intro', 0, D, false, use_letters, 10, P(10))
+                    == '[prc_dj_intro_a]', 'use_letters=' .. tostring(use_letters))
+        local scan = MakeScan({ { msg = '[prc_dj_intro_a]', t = 1 } })
+        Test.expect(NextSectionEvent(scan, 'dj_intro', 0, D, false, use_letters, 10, P(10))
+                    == '[prc_dj_intro_b]', 'use_letters=' .. tostring(use_letters))
+    end
+    -- capped at d
+    local scan = MakeScan({ { msg = '[prc_dj_intro_a]', t = 1 }, { msg = '[prc_dj_intro_b]', t = 2 },
+                            { msg = '[prc_dj_intro_c]', t = 3 }, { msg = '[prc_dj_intro_d]', t = 4 } })
+    local ev, err = NextSectionEvent(scan, 'dj_intro', 0, D, false, false, 10, P(10))
+    Test.expect(ev == nil and err:find('No more letters', 1, true), 'got ' .. tostring(err))
+    -- no numbered forms
+    ev, err = NextSectionEvent(EMPTY, 'dj_intro', 1, D, false, false, 10, P(10))
+    Test.expect(ev == nil and err:find('no _1 variant', 1, true), 'got ' .. tostring(err))
+    -- SectionLettersOnly drives the UI note and the result line
+    Test.expect(SectionLettersOnly(D, 0), 'dj_intro is letters-only')
+    Test.expect(not SectionLettersOnly(V, 0) and not SectionLettersOnly(B, 0)
+                and not SectionLettersOnly(nil, 0), 'verse / bre / generic are not')
+    -- ...and SectionNoLetters the reverse note
+    Test.expect(SectionNoLetters(B, 0, false) and SectionNoLetters(nil, 1, true),
+                'bre and generic have no lettered form')
+    Test.expect(SectionNoLetters(SECTION_EVENT_BASE.intro_slow.caps, 1, false)
+                and not SectionNoLetters(SECTION_EVENT_BASE.intro_slow.caps, 0, false),
+                'intro_slow: bare lettered, _1 not')
+    Test.expect(not SectionNoLetters(V, 0, false) and not SectionNoLetters(D, 0, false),
+                'verse / dj_intro have lettered forms')
 end)
 
 Test.it('same-spot refused; crowd events at the spot do not block', function()
@@ -778,6 +816,42 @@ else
             Test.expect(TextEvtCount(take) == before, 'nothing inserted on refusal')
             Test.expect(S.status:find('No more letters', 1, true),
                         'status: ' .. tostring(S.status))
+        end)
+    end)
+
+    Test.it('letters-only base with letter suffix off: lettered insert + result says why', function()
+        WithEventsFixture(true, function(take)
+            local D = SECTION_EVENT_BASE.dj_intro.caps
+            r.SetEditCurPos(2.0, false, false)
+            S.last_result = nil
+            AddSectionEvent('dj_intro', 0, D, false, false)
+            Test.expect(ReadTextEvents(take)['[prc_dj_intro_a]'], '[prc_dj_intro_a] inserted')
+            Test.expect(not ReadTextEvents(take)['[prc_dj_intro]'], 'no bare [prc_dj_intro]')
+            Test.expect(S.last_result and S.last_result:find('letter suffix is off', 1, true),
+                        'result explains: ' .. tostring(S.last_result))
+            -- letter suffix on: no explanation needed
+            r.SetEditCurPos(4.0, false, false)
+            S.last_result = nil
+            AddSectionEvent('dj_intro', 0, D, false, true)
+            Test.expect(ReadTextEvents(take)['[prc_dj_intro_b]'], '[prc_dj_intro_b] inserted')
+            Test.expect(S.last_result == nil, 'no note with letters on: ' .. tostring(S.last_result))
+        end)
+    end)
+
+    Test.it('no-letter base with letter suffix on: plain insert + result says why', function()
+        WithEventsFixture(true, function(take)
+            r.SetEditCurPos(2.0, false, false)
+            S.last_result = nil
+            AddSectionEvent('bre', 0, B, false, true)
+            Test.expect(ReadTextEvents(take)['[prc_bre]'], '[prc_bre] inserted')
+            Test.expect(S.last_result and S.last_result:find('letter suffix is on', 1, true),
+                        'result explains: ' .. tostring(S.last_result))
+            -- a lettered base with letters on gets no note
+            r.SetEditCurPos(4.0, false, false)
+            S.last_result = nil
+            AddSectionEvent('verse', 0, V, false, true)
+            Test.expect(ReadTextEvents(take)['[prc_verse_a]'], '[prc_verse_a] inserted')
+            Test.expect(S.last_result == nil, 'no note: ' .. tostring(S.last_result))
         end)
     end)
 

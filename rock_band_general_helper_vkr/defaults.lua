@@ -797,7 +797,9 @@ TIPS = {
                        "Off: Add only inserts the plain event, and refuses when it\n" ..
                        "already exists. Plain and lettered forms of the same event must\n" ..
                        "not be mixed. Events with no lettered variants (e.g. [prc_bre])\n" ..
-                       "always insert the plain form.",
+                       "always insert the plain form, and events with only lettered\n" ..
+                       "variants ([prc_dj_intro_a]..) always insert a lettered one - the\n" ..
+                       "row then says so next to the event.",
     venue_ev_next    = "The exact event the Add button will insert at the current playhead\n" ..
                        "position, based on the selection, number, letter mode, and the\n" ..
                        "events already on the EVENTS track.\n\n" ..
@@ -805,6 +807,17 @@ TIPS = {
                        "plain/lettered or bare/numbered forms, wrong order, or another\n" ..
                        "event on the same spot; crowd events are exempt) - hover it for\n" ..
                        "the reason, which is also reported in the result on Add.",
+    venue_ev_letters_only = "The game's section names list this one only with a letter\n" ..
+                       "(_a, _b, ...), so Add inserts the lettered event even with\n" ..
+                       "letter suffix off.\n\n" ..
+                       "A listed name is shown translated in each game language; an\n" ..
+                       "unlisted one is shown as the event text itself, the same in\n" ..
+                       "every language.",
+    venue_ev_no_letters = "The game's section names have no lettered form of this one,\n" ..
+                       "so Add inserts the plain event even with letter suffix on.\n\n" ..
+                       "A listed name is shown translated in each game language; an\n" ..
+                       "unlisted one is shown as the event text itself, the same in\n" ..
+                       "every language.",
     venue_ev_add     = "Insert the shown event at the exact playhead position on the\n" ..
                        "EVENTS track.\n\nFully undoable.",
     venue_ev_bookends = "Insert the minimal event set every song needs:\n" ..

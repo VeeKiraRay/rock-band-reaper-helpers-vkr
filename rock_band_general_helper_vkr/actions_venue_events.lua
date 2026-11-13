@@ -87,6 +87,19 @@ local function _spot_conflict(scan, ins_ppq)
     return nil
 end
 
+-- True when number num of a prc base exists only in lettered forms (upper-case
+-- cap in SECTION_EVENT_BASE, e.g. dj_intro): Add then inserts a lettered event
+-- even with letter suffix off, and the UI says why.
+function SectionLettersOnly(caps, num)
+    return caps ~= nil and caps:sub(num + 1, num + 1):find('%u') ~= nil
+end
+
+-- The reverse: number num has no lettered forms ('.' cap, or a generic base),
+-- so Add inserts the plain event even with letter suffix on.
+function SectionNoLetters(caps, num, is_generic)
+    return is_generic or (caps ~= nil and caps:sub(num + 1, num + 1) == '.')
+end
+
 -- Compute and validate the event the Add button would insert.
 -- scan:        result of ScanEventsTextEvents
 -- base:        bare base name, e.g. 'verse' or (generic) 'a'
@@ -97,7 +110,8 @@ end
 --              ([prc_verse_a], never [prc_verse]); when off, targets are the
 --              unlettered form only. Mixing the two within one (base, num)
 --              family is refused in both directions. Bases with no lettered
---              variants fall back to the unlettered form in either mode.
+--              variants fall back to the unlettered form in either mode;
+--              letters-only bases use the lettered forms in either mode.
 -- ins_t/ins_ppq: insert position (project time / rounded take PPQ)
 -- Returns the full event string to insert, or nil, reason.
 function NextSectionEvent(scan, base, num, caps, is_generic, use_letters, ins_t, ins_ppq)
@@ -135,11 +149,14 @@ function NextSectionEvent(scan, base, num, caps, is_generic, use_letters, ins_t,
     --    never the unlettered event); plain mode uses only the unlettered
     --    form. The two must not be mixed within one (base, num) family.
     --    Bases with no lettered variants ('.') fall back to the plain form
-    --    even in letter mode.
+    --    even in letter mode; letters-only bases (upper-case cap) use the
+    --    lettered forms even with letter mode off, since no plain form exists.
     local bare = _bare_form(base, num, is_generic)
     local cap_ch = is_generic and '.' or caps:sub(num + 1, num + 1)
+    local letters_only = not is_generic and SectionLettersOnly(caps, num)
+    if letters_only then cap_ch = cap_ch:lower() end
     local slots, target_i
-    if use_letters and not is_generic and cap_ch ~= '.' then
+    if (use_letters or letters_only) and not is_generic and cap_ch ~= '.' then
         local plain = scan.by_msg[bare]
         if plain then
             return nil, bare .. ' exists at ' .. plain.label .. ' - it must not be mixed ' ..
@@ -298,6 +315,17 @@ function AddSectionEvent(base, num, caps, is_generic, use_letters)
         return
     end
     _insert(track, item, take, text)
+    if not use_letters and not is_generic and SectionLettersOnly(caps, num) then
+        S.last_result = 'Inserted ' .. text .. ' with a letter although letter suffix is off.\n' ..
+                        'The game\'s section names list ' .. base .. ' only with a letter (_a, _b, ...).\n' ..
+                        'A listed name is shown translated in each game language; an unlisted\n' ..
+                        'one is shown as the event text itself, the same in every language.'
+    elseif use_letters and SectionNoLetters(caps, num, is_generic) then
+        S.last_result = 'Inserted ' .. text .. ' without a letter although letter suffix is on.\n' ..
+                        'The game\'s section names have no lettered form of it.\n' ..
+                        'A listed name is shown translated in each game language; an unlisted\n' ..
+                        'one is shown as the event text itself, the same in every language.'
+    end
 end
 
 -- ---------------------------------------------------------------------------

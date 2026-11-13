@@ -10,6 +10,7 @@
 --                   SECTION_EVENT_GROUPS, SECTION_EVENT_BASE, MakeProjectPoll,
 --                   FindEventsTake, ScanEventsTextEvents, NextSectionEvent,
 --                   ValidatePlainInsert, InsertEventsEvent, AddSectionEvent,
+--                   SectionLettersOnly, SectionNoLetters,
 --                   ClearAllEventsTexts, InsertEventsBookends
 
 -- Cached EVENTS take + scan, refreshed via MakeProjectPoll (at most every
@@ -72,7 +73,17 @@ local function _draw_prc_row(g, scan, cur_t, cur_ppq, no_take, use_letters, lbl_
                                            g.kind == 'generic', use_letters,
                                            cur_t, cur_ppq)
         r.ImGui_SameLine(ctx)
-        if text then
+        -- When the letter mode cannot be followed, say so next to the event,
+        -- not only on hover
+        local caps = (SECTION_EVENT_BASE[sel] or {}).caps
+        local is_generic = g.kind == 'generic'
+        if text and not use_letters and not is_generic and SectionLettersOnly(caps, num) then
+            r.ImGui_TextDisabled(ctx, '-> ' .. text .. ' (letter required)')
+            Tooltip(TIPS.venue_ev_letters_only)
+        elseif text and use_letters and SectionNoLetters(caps, num, is_generic) then
+            r.ImGui_TextDisabled(ctx, '-> ' .. text .. ' (no lettered form)')
+            Tooltip(TIPS.venue_ev_no_letters)
+        elseif text then
             r.ImGui_TextDisabled(ctx, '-> ' .. text)
             Tooltip(TIPS.venue_ev_next)
         else
