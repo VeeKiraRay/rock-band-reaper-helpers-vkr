@@ -9,6 +9,15 @@ over 5. See `CLAUDE.md` → "Changelog / `@about` trimming" for the rule.
 
 `rock_band_general_helper_vkr.lua`
 
+**v0.9.59**
+  - The window title now carries the script version - "Rock Band General
+    Helper v0.9.59". A bug report that quotes the title says which version
+    it came from, with nothing to look up. The version is read from this
+    file's own header when the script starts, so it can never disagree
+    with the version entries below.
+  - Your window size, position and dock state carry over unchanged, and
+    will survive every future version bump too.
+
 **v0.9.58**
   - General > Actions: new "Remove 2x kicks" button. When a song is charted
     with a double bass pedal, PART DRUMS_2X holds the complete drum chart -

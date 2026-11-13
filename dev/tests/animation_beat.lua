@@ -95,8 +95,9 @@ Test.it('3/4: beats 1 and 3, the short gap before the next bar', function()
            'D0 u2 D3 u5', 'bar style')
 end)
 
-Test.it('2/4: one note per bar (strict spacing), except the beat before [end]', function()
-    Expect(BeatPlan(Bars(Rep(2, 2)), { end_qn = 4, half = true, half_style = 'bar' }), 'D0 D2 u3')
+Test.it('2/4: one note per bar, except the beat before [end]; no two 12s in a row', function()
+    -- Was 'D0 D2 u3' before the game's BEAT rules were applied (two downbeats in a row).
+    Expect(BeatPlan(Bars(Rep(2, 2)), { end_qn = 4, half = true, half_style = 'bar' }), 'D0 u2 u3')
 end)
 
 Test.it('the beat just before [end] gets a note (Magma): [end] on beat 3', function()
@@ -135,6 +136,84 @@ end)
 Test.it('range starting mid-bar: that bar keeps its parity, no 12 mid-bar', function()
     Expect(BeatPlan(Bars(Rep(4, 3)), { end_qn = 12, half = true, range_s_qn = 5 }),
            'u6 u8 u10 u11')
+end)
+
+----------------------------------------------------------------------
+Test.section('BeatPlan - the game\'s BEAT rules (short and odd bars)')
+----------------------------------------------------------------------
+-- The game warns on two downbeats in a row and on beats under an 8th apart;
+-- official BEAT tracks break neither. Every change comes back in the second
+-- return value for the result text.
+
+-- True when no two 12s are adjacent and every gap is an 8th or more.
+local function GameSafe(notes)
+    for i = 2, #notes do
+        if notes[i].pitch == BEAT_PITCH_DOWN and notes[i - 1].pitch == BEAT_PITCH_DOWN then
+            return false
+        end
+        if notes[i].qn - notes[i - 1].qn < 0.5 - EPS then return false end
+    end
+    return true
+end
+
+Test.it('4/4 1/4 4/4: the 1/4 bar gives up its downbeat, the next bar keeps its own', function()
+    local notes, changes = BeatPlan(Bars({ 4, 1, 4 }), { end_qn = 9 })
+    Expect(notes, 'D0 u1 u2 u3 u4 D5 u6 u7 u8')
+    Test.expect(#changes == 1 and changes[1].kind == 'down_as_up' and changes[1].bar == 2
+                and changes[1].short, 'expected one down_as_up on bar 2 (short)')
+end)
+
+Test.it('half time, downbeat every bar, 4/4 2/4 4/4: the 2/4 bar becomes an upbeat', function()
+    local notes, changes = BeatPlan(Bars({ 4, 2, 4 }), { end_qn = 10, half = true, half_style = 'bar' })
+    Expect(notes, 'D0 u2 u4 D6 u8 u9')
+    Test.expect(#changes == 1 and changes[1].bar == 2, 'expected one change, on bar 2')
+end)
+
+Test.it('half time, downbeat every bar, a 2/4 song: every other bar (D u D u)', function()
+    local notes, changes = BeatPlan(Bars(Rep(2, 4)), { end_qn = 8, half = true, half_style = 'bar' })
+    Expect(notes, 'D0 u2 D4 u6 u7')
+    Test.expect(#changes == 2, 'expected 2 changes, got ' .. #changes)
+end)
+
+Test.it('9/16: the bar\'s tail beat goes (it sits a 16th before the next bar)', function()
+    local notes, changes = BeatPlan(Bars({ 4, 2.25, 4 }), { end_qn = 10.25 })
+    Expect(notes, 'D0 u1 u2 u3 D4 u5 D6.25 u7.25 u8.25 u9.25')
+    Test.expect(#changes == 1 and changes[1].kind == 'skipped' and math.abs(changes[1].qn - 6) < EPS,
+                'expected one skipped beat at QN 6')
+end)
+
+Test.it('5/16: tail beat skipped, then the lone downbeat gives way to the next bar', function()
+    local notes, changes = BeatPlan(Bars({ 4, 1.25, 4 }), { end_qn = 9.25 })
+    Expect(notes, 'D0 u1 u2 u3 u4 D5.25 u6.25 u7.25 u8.25')
+    Test.expect(#changes == 2, 'expected skipped + down_as_up, got ' .. #changes)
+end)
+
+Test.it('common meters are untouched: no changes', function()
+    for _, case in ipairs({
+        { lens = Rep(4, 4) }, { lens = Rep(3, 4) }, { lens = Rep(2.5, 4) },
+        { lens = Rep(3.5, 4) }, { lens = Rep(4.5, 4) }, { lens = { 4, 2, 4 } },
+        { lens = Rep(4, 4), half = true }, { lens = Rep(3, 4), half = true, half_style = 'bar' },
+    }) do
+        local b = Bars(case.lens)
+        local _, changes = BeatPlan(b, { end_qn = b[#b].qn_e, half = case.half,
+                                         half_style = case.half_style })
+        Test.expect(#changes == 0, 'unexpected change for bars ' .. table.concat(case.lens, ','))
+    end
+end)
+
+Test.it('every meter from 1/16 to 16/16 and 1/8 to 12/8 stays game-safe', function()
+    for _, unit in ipairs({ 0.25, 0.5 }) do
+        for num = 1, 16 do
+            for _, half in ipairs({ false, true }) do
+                for _, style in ipairs({ 'pair', 'bar' }) do
+                    local b = Bars({ 4, num * unit, num * unit, 4 })
+                    local notes = BeatPlan(b, { end_qn = b[#b].qn_e, half = half, half_style = style })
+                    Test.expect(GameSafe(notes), string.format('%d/%d half=%s %s breaks a rule',
+                                num, unit == 0.25 and 16 or 8, tostring(half), style))
+                end
+            end
+        end
+    end
 end)
 
 ----------------------------------------------------------------------

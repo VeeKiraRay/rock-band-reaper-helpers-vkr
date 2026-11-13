@@ -15,6 +15,9 @@
 --     official songs); 'bar' keeps it on every bar.
 --   - The beat just before [end] always gets a note, half time included:
 --     Magma refuses a song without one (4/4 with [end] on beat 3 needs beat 2).
+--   - The game's own BEAT rules hold in every meter (BeatCleanUp): beats an 8th
+--     apart or more, never two downbeats in a row. Each change is listed in the
+--     result so the author can check the bar.
 --
 -- BeatPlan is pure (no r); ReadProjectBars and GenerateBeatTrack touch REAPER.
 -- Requires globals: r, S, FindTrackByName, FindNamedTrackMIDI, FindEventTime,
@@ -26,6 +29,62 @@ BEAT_PITCH_UP   = 13
 local BEAT_VEL    = 100    -- what the official charts use
 local BEAT_LEN_QN = 0.25   -- a 16th, as CAT writes; length has no effect in game
 local EPS         = 1e-6   -- QN; float noise from the tempo map conversions
+local MIN_GAP_QN  = 0.5    -- an 8th: the game's minimum beat spacing (BeatCleanUp)
+
+-- The game's two BEAT rules (its own load-time warnings), applied after planning.
+-- Official BEAT tracks never break either (0 of 818 songs):
+--   1. beats at least an 8th (240 ticks at 480 PPQ) apart - "cannot be faster than
+--      double time". Only a short or odd bar breaks it: in x/16 meters such as 5/16,
+--      9/16 or 13/16 the bar's last quarter lands a 16th before the next bar line.
+--      The bar's tail beat goes, as in the official charts; a downbeat stays and the
+--      beat after it goes instead.
+--   2. never two downbeats in a row. A bar too short for an upbeat of its own (a
+--      1/4 or 2/8 bar; 2/4 or shorter in half time with a downbeat on every bar)
+--      would start with one; that downbeat becomes an upbeat.
+-- Returns the notes and a list of what changed, { { kind, qn, bar }, ... } with kind
+-- 'skipped' (rule 1) or 'down_as_up' (rule 2), for the result text.
+local function BeatCleanUp(notes)
+    local changes = {}
+    local kept = {}
+    local i = 1
+    while i <= #notes do
+        local n, nxt = notes[i], notes[i + 1]
+        if nxt and nxt.qn - n.qn < MIN_GAP_QN - EPS then
+            if n.pitch == BEAT_PITCH_DOWN then
+                kept[#kept + 1] = n
+                changes[#changes + 1] = { kind = 'skipped', qn = nxt.qn, bar = nxt.bar }
+                i = i + 2
+            else
+                changes[#changes + 1] = { kind = 'skipped', qn = n.qn, bar = n.bar }
+                i = i + 1
+            end
+        else
+            kept[#kept + 1] = n
+            i = i + 1
+        end
+    end
+    -- Two downbeats in a row: the earlier one sits alone in a short bar. A short bar
+    -- between two full bars gives up its downbeat (the full bar keeps its own); in a
+    -- run of short bars, or at the very start, the later one does (D u D u).
+    local per_bar = {}
+    for _, n in ipairs(kept) do per_bar[n.bar] = (per_bar[n.bar] or 0) + 1 end
+    for k = 2, #kept do
+        local prev, cur = kept[k - 1], kept[k]
+        if cur.pitch == BEAT_PITCH_DOWN and prev.pitch == BEAT_PITCH_DOWN then
+            local before = kept[k - 2]
+            local demote = cur
+            if (per_bar[cur.bar] or 0) > 1 and before and before.pitch ~= BEAT_PITCH_DOWN
+               and (per_bar[before.bar] or 0) > 1 then
+                demote = prev
+            end
+            demote.pitch = BEAT_PITCH_UP
+            changes[#changes + 1] = { kind = 'down_as_up', qn = demote.qn, bar = demote.bar,
+                                      short = demote == prev }
+        end
+    end
+    table.sort(changes, function(a, b) return a.qn < b.qn end)
+    return kept, changes
+end
 
 -- Plans the BEAT notes.
 --   bars: { { qn_s, qn_e }, ... } in order, bars[1] = measure 1
@@ -35,10 +94,11 @@ local EPS         = 1e-6   -- QN; float noise from the tempo map conversions
 --         half        true = a note every two quarters
 --         half_style  'pair' (default) or 'bar' - see the file header
 -- Returns notes { { qn, pitch, bar }, ... } sorted by qn, where bar is the
--- 1-based measure number.
+-- 1-based measure number, and the changes BeatCleanUp made to keep the game's
+-- BEAT rules (see above).
 function BeatPlan(bars, opts)
     local notes = {}
-    if #bars == 0 then return notes end
+    if #bars == 0 then return notes, {} end
     local end_qn  = opts.end_qn
     local range_s = opts.range_s_qn or bars[1].qn_s
     local range_e = math.min(opts.range_e_qn or end_qn, end_qn)
@@ -76,7 +136,7 @@ function BeatPlan(bars, opts)
             end
         end
     end
-    return notes
+    return BeatCleanUp(notes)
 end
 
 -- Every measure from measure 1 that starts before end_qn, as BeatPlan's bars
@@ -138,7 +198,7 @@ function GenerateBeatTrack(half)
 
     local bars  = ReadProjectBars(end_qn)
     local style = (S.beat_half_style == 1) and 'bar' or 'pair'
-    local notes = BeatPlan(bars, {
+    local notes, changes = BeatPlan(bars, {
         end_qn = end_qn, range_s_qn = range_s_qn, range_e_qn = range_e_qn,
         half = half, half_style = style,
     })
@@ -232,6 +292,29 @@ function GenerateBeatTrack(half)
     end
     if created then
         lines[#lines + 1] = 'BEAT had no MIDI item: created one from measure 1 to [end].'
+    end
+    if #changes > 0 then
+        lines[#lines + 1] = ''
+        lines[#lines + 1] = string.format('%d %s adjusted for the game\'s BEAT rules - check %s:',
+                                          #changes, #changes == 1 and 'beat' or 'beats',
+                                          #changes == 1 and 'the bar' or 'these bars')
+        for _, c in ipairs(changes) do
+            local b = bars[c.bar]
+            local where = string.format('m%d (%d/%d) at %s', c.bar, b.num, b.den,
+                                        FormatTime(r.TimeMap2_QNToTime(0, c.qn)))
+            if c.kind == 'skipped' then
+                lines[#lines + 1] = '- ' .. where .. ': beat left out - it would sit less ' ..
+                                    'than an 8th before the next one (the game needs an 8th).'
+            elseif c.short then
+                lines[#lines + 1] = '- ' .. where .. ': downbeat written as an upbeat - the ' ..
+                                    'bar is too short for a beat after its downbeat, so the ' ..
+                                    'next bar keeps the downbeat. It may belong with a neighbour.'
+            else
+                lines[#lines + 1] = '- ' .. where .. ': downbeat written as an upbeat - the ' ..
+                                    'previous bar is too short for a beat after its downbeat ' ..
+                                    '(the game allows no two downbeats in a row).'
+            end
+        end
     end
     S.last_result = table.concat(lines, '\n')
 end

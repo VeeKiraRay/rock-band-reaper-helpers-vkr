@@ -1,6 +1,6 @@
 -- @description Rock Band General Helper
 -- @author VeeKiraRay
--- @version 0.9.63
+-- @version 0.9.64
 -- @about
 --   Utility actions for Rock Band authoring in REAPER.
 --
@@ -28,6 +28,20 @@
 --
 --   This @about block keeps only the 5 most recent versions.
 --   Full history: CHANGELOG.md in the repo.
+--
+--   v0.9.64
+--     - Animation > Beat no longer writes two downbeats in a row, which the
+--       game reports as an error. It could happen at a very short bar: a 1/4
+--       or 2/8 bar, or a 2/4, 3/8 or 4/8 bar in half time with the downbeat
+--       on every bar. The short bar's downbeat is now written as an upbeat,
+--       so the full bar after it keeps its own; in a run of short bars every
+--       other one keeps the downbeat.
+--     - Beats are now always at least an 8th apart, as the game requires. In
+--       a 5/16, 9/16 or 13/16 bar the last beat used to land a 16th before
+--       the next bar line; it is now left out, as the official charts do.
+--     - Both changes are listed in the result by measure, so you can check
+--       the bar - a very short bar may belong with its neighbour. Common
+--       time signatures (4/4, 3/4, 6/8, 5/8, 7/8 ...) are unchanged.
 --
 --   v0.9.63
 --     - The instrument tools moved to a new script, the Rock Band Instrument
@@ -224,15 +238,6 @@
 --       of what an official charter would pick. Official charters are not
 --       consistent with themselves either, so treat the result as a starting
 --       point to adjust.
---
---   v0.9.59
---     - The window title now carries the script version - "Rock Band General
---       Helper v0.9.59". A bug report that quotes the title says which version
---       it came from, with nothing to look up. The version is read from this
---       file's own header when the script starts, so it can never disagree
---       with the version entries below.
---     - Your window size, position and dock state carry over unchanged, and
---       will survive every future version bump too.
 r = reaper  -- global so all dofile'd modules can use it
 
 if not r.ImGui_CreateContext then
