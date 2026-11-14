@@ -27,8 +27,11 @@ local _COMBO_ABSENT  = { [0]='k', [1]='g', [2]='b' }          -- instrument NOT 
 local _COMBO_LETTERS = { [0]={'b','g'}, [1]={'b','k'}, [2]={'g','k'} }  -- instruments IN this combo
 local _INST_NAMES    = { b='PART BASS', g='PART GUITAR', k='PART KEYS' }
 
-local _SHOW_CURRENT_ONLY = 0
+-- Saved values (settings key vpshwm), not the radio order: Current only H was
+-- added later as 2 so projects that saved 1 = Surrounding events keep it.
+local _SHOW_CURRENT_ONLY = 0   -- "Current only V": one category per row
 local _SHOW_SURROUNDING  = 1
+local _SHOW_CURRENT_H    = 2   -- "Current only H": the three categories side by side
 
 -- Amber, for the one transition line that reports live state ("blending now").
 -- Deliberately not the 0xFF4444FF red a lost directed cut uses - that red means
@@ -243,6 +246,33 @@ local function _draw_category_row(label, prev_grp, curr_grp, next_grp, category,
     end
 end
 
+-- "Current only H": the current event of each category side by side - Camera,
+-- Lighting, Post-Process - like Surrounding events lays out Previous / Current /
+-- Next. Each column's header names its category. curr = { camera, lighting,
+-- postproc } PPQ groups.
+local function _draw_current_row(curr, scale, muted, combo_name, playhead)
+    SectionHeader('Current')
+    r.ImGui_Separator(ctx)   -- outside the groups (see _draw_column)
+    local cols = {
+        { 'Camera',       curr.camera,   'Camera',   muted },
+        { 'Lighting',     curr.lighting, 'Lighting', nil },
+        { 'Post-Process', curr.postproc, 'PostProc', nil },
+    }
+    local any_marked = false
+    for i, c in ipairs(cols) do
+        if i > 1 then r.ImGui_SameLine(ctx) end
+        local ev, fallback = _resolve_group(c[2], c[4])
+        if fallback then any_marked = true end
+        _draw_column(c[1], ev, c[3], scale, fallback, combo_name, playhead)
+    end
+    if any_marked then
+        r.ImGui_Spacing(ctx)
+        r.ImGui_PushTextWrapPos(ctx, 0)
+        r.ImGui_TextDisabled(ctx, '* No stacked shot fits this band: hover the event for what the game does.')
+        r.ImGui_PopTextWrapPos(ctx)
+    end
+end
+
 function DrawVenuePreviewTab()
     if not _auto_refresh_paused and _poll() then
         _refresh_preview()
@@ -251,7 +281,7 @@ function DrawVenuePreviewTab()
     local lbl_col = LabelColWidth({ 'Players', 'Preview size', 'Sprites', 'Show' })
     local radio_w = RadioGroupWidth({
         'Bass + Guitar', 'Bass + Keys', 'Guitar + Keys', '1x', '2x',
-        'Animated', 'Still', 'Current only', 'Surrounding events',
+        'Animated', 'Still', 'Current only V', 'Current only H', 'Surrounding events',
     })
 
     r.ImGui_Text(ctx, 'Players')
@@ -313,11 +343,16 @@ function DrawVenuePreviewTab()
     r.ImGui_Text(ctx, 'Show')
     r.ImGui_SameLine(ctx, lbl_col)
     local _t_vpshw = TIPS.venue_preview_show_mode
-    if r.ImGui_RadioButton(ctx, 'Current only##vpshw', S.venue_preview_show_mode == _SHOW_CURRENT_ONLY) then
+    if r.ImGui_RadioButton(ctx, 'Current only V##vpshw', S.venue_preview_show_mode == _SHOW_CURRENT_ONLY) then
         S.venue_preview_show_mode = _SHOW_CURRENT_ONLY
     end
     Tooltip(_t_vpshw)
     r.ImGui_SameLine(ctx, lbl_col + radio_w)
+    if r.ImGui_RadioButton(ctx, 'Current only H##vpshw', S.venue_preview_show_mode == _SHOW_CURRENT_H) then
+        S.venue_preview_show_mode = _SHOW_CURRENT_H
+    end
+    Tooltip(_t_vpshw)
+    r.ImGui_SameLine(ctx, lbl_col + 2 * radio_w)
     if r.ImGui_RadioButton(ctx, 'Surrounding events##vpshw', S.venue_preview_show_mode == _SHOW_SURROUNDING) then
         S.venue_preview_show_mode = _SHOW_SURROUNDING
     end
@@ -358,6 +393,12 @@ function DrawVenuePreviewTab()
 
     local muted      = _combo_muted(S.venue_preview_combo)
     local combo_name = _COMBO_NAMES[S.venue_preview_combo]
+
+    if S.venue_preview_show_mode == _SHOW_CURRENT_H then
+        _draw_current_row({ camera = cam_c, lighting = lt_c, postproc = pp_c },
+                          scale, muted, combo_name, playhead)
+        return
+    end
 
     _draw_category_row('Camera',       cam_p, cam_c, cam_n, 'Camera',   scale,
                        muted, combo_name, playhead)

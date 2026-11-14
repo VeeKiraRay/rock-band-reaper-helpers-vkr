@@ -122,6 +122,9 @@
 --       random); hover for which. A directed cut that cannot play is red
 --       (ignored, the previous shot stays). Replaces the red "No suitable
 --       event" card.
+--     - Venue > Preview: Show has a new Current only H option - the current
+--       camera, lighting and post-process event side by side on one row.
+--       The old Current only is now Current only V.
 --     - The Structure row's tooltip notes that numbered verses and choruses
 --       get their own background clips in the video venues.
 --

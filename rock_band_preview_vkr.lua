@@ -21,6 +21,9 @@
 --       random); hover the name for which. A directed cut that cannot play is
 --       red: directed cuts have no fallback, so the game ignores it and keeps
 --       the previous shot. Replaces the red "No suitable event" card.
+--     - Show has a new Current only H option: the current camera, lighting
+--       and post-process event side by side on one row. The old Current only
+--       is now Current only V; a saved Show choice is kept.
 --     - It loads the General Helper's settings files, which gained Animation >
 --       Beat's double-time downbeat option in General Helper v0.9.64; this
 --       window reads past it and behaves as before.

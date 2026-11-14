@@ -170,7 +170,7 @@ S = {
     venue_preview_animate   = true, -- tooltip sprite animation: false = show middle frame only
     venue_preview_tab_scale = 1,    -- Preview sub-tab inline sprite scale (independent of tooltip scale)
     venue_preview_combo     = 0,    -- 0=Bass+Guitar, 1=Bass+Keys, 2=Guitar+Keys
-    venue_preview_show_mode = 0,    -- 0=current only, 1=surrounding events
+    venue_preview_show_mode = 0,    -- 0=current only V, 1=surrounding events, 2=current only H
     -- Manual gen (not persisted - session state only)
     venue_mg_coop        = '',   -- full event e.g. '[coop_all_behind]'
     venue_mg_directed    = '',   -- bare name e.g. 'directed_all'
@@ -1062,10 +1062,14 @@ TIPS = {
     venue_preview_fb_directed = "This directed cut cannot play with the %s band.\n" ..
                            "Directed cuts have no fallback: the game ignores it and the camera\n" ..
                            "keeps the previous shot. Stack a normal shot here to choose one.",
-    venue_preview_show_mode = "How many events to display per category.\n\n" ..
-                           "Current only       -  one column showing the active event (started at or\n" ..
-                           "                      before the playhead and not yet superseded).\n" ..
-                           "Surrounding events -  three columns: the previous, current, and next event.",
+    venue_preview_show_mode = "Which events to display, and how.\n\n" ..
+                           "Current only V     -  the active event of each category (started at or\n" ..
+                           "                      before the playhead and not yet superseded), one\n" ..
+                           "                      category per row.\n" ..
+                           "Current only H     -  the same active events side by side on one row:\n" ..
+                           "                      camera, lighting, then post-process.\n" ..
+                           "Surrounding events -  three columns per category: the previous, current,\n" ..
+                           "                      and next event.",
     venue_preview_blend  = "How this lighting / post proc preset hands over to the next one.\n\n" ..
                            "A blend is authored by re-stating the running preset a beat or two\n" ..
                            "before the change, so the game fades between them instead of cutting.\n" ..
