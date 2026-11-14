@@ -183,6 +183,14 @@ S = {
     venue_mg_replace     = 0,    -- 0=Add 1=Replace same family at the playhead (persisted: 'vmgr')
     -- Keyframes tab (not persisted - session state only)
     venue_kf_rate        = 2,    -- keyframe rate in beats (1-8), independent of venue_mg_kf_rate
+    -- Directed Moves window (not persisted - session state only)
+    venue_cs_mode        = 1,    -- 1 = search by camera event, 2 = by keyword
+    venue_cs_event       = '',   -- bare camera event, e.g. 'directed_guitar'
+    venue_cs_text        = '',   -- keyword search text
+    venue_cs_style       = '',   -- '' any, or 'R' / 'D' / 'B' / 'S'
+    venue_cs_gender      = '',   -- '' any, or 'M' / 'F'
+    venue_cs_kind        = '',   -- '' any venue, or a venue kind ('arena', ...)
+    venue_cs_lineup      = '',   -- '' all five, or 'no_keys' / 'no_guitar' / 'no_bass'
     -- Events tab (not persisted - session state only)
     venue_ev_sel         = {},   -- per-group selected base/event ('' = none), keyed by group key
     venue_ev_num         = {},   -- per-group number 0-9 (0 = bare form), keyed by group key
@@ -431,14 +439,16 @@ TIPS = {
                       "  - shots that win under no lineup: they need an instrument that\n" ..
                       "    is never on stage, or a stacked sibling outranks them\n" ..
                       "    everywhere they would fit\n" ..
-                      "  - spots where a lineup has no valid camera shot, so the game\n" ..
-                      "    picks for you (a generic full band shot, or a single shot of\n" ..
-                      "    the remaining member for a lone duo cut)\n" ..
+                      "  - directed cuts a lineup cannot play: directed cuts have no\n" ..
+                      "    fallback, so the game ignores them and the camera keeps the\n" ..
+                      "    shot it is on\n" ..
                       "  - the same shot written twice on one tick\n" ..
                       "  - shots a few ticks apart that were meant to be stacked: the\n" ..
                       "    game reads those as two cuts, so the second replaces the first\n\n" ..
-                      "Letting the game fall back is a valid choice, so those spots are\n" ..
-                      "only issues where you wanted to control the shot.\n\n" ..
+                      "Also listed, but not counted as issues: fallback spots, where a\n" ..
+                      "lineup has no valid normal shot and the game picks one for you (a\n" ..
+                      "generic full band shot, or a single shot of the remaining member\n" ..
+                      "for a lone duo cut). Letting the game fall back is fine.\n\n" ..
                       "Always reads the whole track; with a time selection active, only\n" ..
                       "issues inside it are reported.",
     venue_sections  = "Read [prc_*] section markers from the EVENTS track and list the\n" ..
@@ -574,6 +584,35 @@ TIPS = {
                     "sequence of looks there.\n\n" ..
                     "Only verse, chorus, manual_cool, manual_warm, dischord and stomp\n" ..
                     "react to it.",
+    venue_cs_mode_event = "Pick one camera event and see every move it has.",
+    venue_cs_mode_keyword = "Type words to find moves by name (e.g. kiss, jump, mic stand) or camera\n" ..
+                            "events by name (e.g. guitar). Every word must match. Shows up to 10\n" ..
+                            "camera events, each with the moves that matched.",
+    venue_cs_style = "The song's animation style, set by its genre (Metadata > Genre >\n" ..
+                     "Animation style). Most directed cuts have moves for only some styles.",
+    venue_cs_gender = "The gender of the band member the cut focuses on. Some moves exist for\n" ..
+                      "only one gender. The player's characters decide this, not the song.",
+    venue_cs_kind = "The kind of venue. The player's venue decides this, not the song.\n" ..
+                    "Each venue has its own set of camera shots.",
+    venue_cs_lineup = "Which band members are on stage. With guitar, bass and keys all charted,\n" ..
+                      "only two of the three fit on stage, so one is left out. The game then\n" ..
+                      "drops or replaces the cuts of the member who is left out.",
+    venue_cs_partial = "Only some venues of this kind have this move.",    venue_cs_col_1 = "What the shot shows: the move, the moves of several members, the part\n" ..
+                     "of the crowd it frames, or band close-ups. A long name ends in ...\n" ..
+                     "when the window is narrow: hover it to read it whole.\n" ..
+                     "Click a move to see what competes with it.",
+    venue_cs_row_click = "Click: show this camera event with the filters this move needs.\n" ..
+                         "The moves left undimmed are the ones competing with it.",
+    venue_cs_col_2 = "Who moves: a band member, several members, the crowd, or the band in\n" ..
+                     "close-up. Several members by letter: V+G+B = vocals, guitar, bass\n" ..
+                     "(D drums, K keys); hover one to read it whole.",
+    venue_cs_col_3 = "The song styles this move is for. Any = every style.",
+    venue_cs_col_4 = "The focus member's gender this move is for. Both = either.",
+    venue_cs_col_5 = "The venue kinds that have this move. All = every venue; * = only some venues of that kind.",
+    venue_cs_col_6 = "How many shots of this move one venue has. The game rotates through them:\n" ..
+                     "each use of the event takes the next one.",
+    venue_cs_col_7 = "How early the move starts before its event (the event marks the moment\n" ..
+                     "the move lands).",
     venue_mg_target = "Where this tab reads and writes events.\n\n" ..
                       "VENUE: the VENUE track.\n" ..
                       "Subtracks: the Sub VENUE tracks made by Venue > Actions > Copy all to\n" ..
@@ -1010,9 +1049,19 @@ TIPS = {
                            "Bass + Guitar  -  no Keys player; Keys camera shots are filtered.\n" ..
                            "Bass + Keys    -  no Guitar player; Guitar camera shots are filtered.\n" ..
                            "Guitar + Keys  -  no Bass player; Bass camera shots are filtered.\n\n" ..
-                           "Camera events that require the absent instrument are replaced by an\n" ..
-                           "alternative event at the same position, if one exists. Only the Camera\n" ..
-                           "row is affected; Lighting and Post-Process are unchanged.",
+                           "A camera event that requires the absent instrument gives way to a shot\n" ..
+                           "stacked at the same position that fits. If none fits, the event stays\n" ..
+                           "with a * - hover it for what the game does instead. Only the Camera row\n" ..
+                           "is affected; Lighting and Post-Process are unchanged.",
+    venue_preview_fb_generic = "No stacked camera shot fits the %s band.\n" ..
+                           "In game this falls back to a generic full band shot, picked at random.\n" ..
+                           "The picture shows one of them, %s.",
+    venue_preview_fb_duo  = "No stacked camera shot fits the %s band.\n" ..
+                           "In game this duo shot becomes a single shot of %s.\n" ..
+                           "The picture shows that shot, %s.",
+    venue_preview_fb_directed = "This directed cut cannot play with the %s band.\n" ..
+                           "Directed cuts have no fallback: the game ignores it and the camera\n" ..
+                           "keeps the previous shot. Stack a normal shot here to choose one.",
     venue_preview_show_mode = "How many events to display per category.\n\n" ..
                            "Current only       -  one column showing the active event (started at or\n" ..
                            "                      before the playhead and not yet superseded).\n" ..

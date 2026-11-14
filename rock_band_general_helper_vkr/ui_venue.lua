@@ -226,6 +226,17 @@ function DrawVenueTab(ctx)
             end
             Tooltip(TIPS.venue_subtrack_copy_from_one)
 
+            -- Companion windows to keep open beside the Venue tabs: the same
+            -- launcher rows as General > Other tools (lib/reaper_script_links.lua).
+            r.ImGui_Separator(ctx)
+            SectionHeader('Standalone windows')
+            local _sw = { ScriptLinkEntry('rock_band_preview_vkr.lua'),
+                          ScriptLinkEntry('rock_band_directed_moves_vkr.lua') }
+            local _sw_labels = {}
+            for _, e in ipairs(_sw) do _sw_labels[#_sw_labels + 1] = e.label end
+            local _sw_bw = BtnGroupWidth(_sw_labels)
+            for _, e in ipairs(_sw) do DrawScriptLinkEntry(e, _sw_bw) end
+
             r.ImGui_EndTabItem(ctx)
         end
 

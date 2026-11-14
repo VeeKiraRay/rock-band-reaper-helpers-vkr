@@ -104,6 +104,24 @@
 --       two looks, so [next] and [prev] land on the same one; verse and
 --       chorus have four in arenas, big clubs and festivals. [first] always
 --       goes to the first look, whichever look is showing.
+--     - New Directed Moves window (its own script, rock_band_directed_moves_vkr.lua):
+--       what the game can show for each directed camera cut, read from the
+--       game's own venue files (all 44 venues) - a companion to Manual gen
+--       and Preview. Open it from General > Other tools or from the new
+--       "Standalone windows" section of Venue > Actions, which also opens the
+--       Venue Preview window.
+--     - Validate camera stacks: a directed cut that a band lineup cannot play
+--       is now an issue of its own - directed cuts have no fallback, so the
+--       game ignores them and the camera keeps its shot (it used to say a
+--       band shot plays). Spots where a normal shot falls back for a lineup
+--       are listed as advice, no longer counted as issues.
+--     - Venue > Preview: when no stacked camera shot fits the chosen Players
+--       lineup, the event's name turns amber with a * and the picture shows
+--       what the game plays instead - the remaining member's shot for a duo,
+--       All (near) for a one-member shot (one of the band shots it picks at
+--       random); hover for which. A directed cut that cannot play is red
+--       (ignored, the previous shot stays). Replaces the red "No suitable
+--       event" card.
 --     - The Structure row's tooltip notes that numbered verses and choruses
 --       get their own background clips in the video venues.
 --

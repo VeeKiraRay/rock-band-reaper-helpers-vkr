@@ -14,10 +14,16 @@
 --   Full history: CHANGELOG.md in the repo.
 --
 --   v0.8
---     - No change to this window. It loads the General Helper's settings
---       files, which gained Animation > Beat's double-time downbeat option in
---       General Helper v0.9.64; this window reads past it and behaves exactly
---       as before. Bumped so its version keeps describing the code it runs.
+--     - Camera row: when no stacked shot fits the chosen Players lineup, the
+--       event's name turns amber with a * and the picture shows what the
+--       game plays instead - the remaining member's single shot for a duo,
+--       All (near) for a one-member shot (one of the band shots it picks at
+--       random); hover the name for which. A directed cut that cannot play is
+--       red: directed cuts have no fallback, so the game ignores it and keeps
+--       the previous shot. Replaces the red "No suitable event" card.
+--     - It loads the General Helper's settings files, which gained Animation >
+--       Beat's double-time downbeat option in General Helper v0.9.64; this
+--       window reads past it and behaves as before.
 --     - The shared venue files it loads now spell the lighting keyframe
 --       trigger [prev] (General Helper v0.9.64). This window does not show
 --       keyframe events, so nothing here looks different.
@@ -25,7 +31,8 @@
 --       options, soft crash and soft snare (General Helper v0.9.64). This
 --       window has no drum options and saves them as it found them. The
 --       defaults file also gained the Metadata > Genre texts and new Venue
---       keyframe tooltips, all unused here.
+--       keyframe, Directed moves and camera validation tooltips, all unused
+--       here.
 --   v0.7
 --     - No change to this window. The General Helper's instrument tabs moved
 --       to the new Instrument Helper (General Helper v0.9.63), and the track

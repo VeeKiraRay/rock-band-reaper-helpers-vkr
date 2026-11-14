@@ -26,18 +26,20 @@
 --   this only for normal (coop) two-character shots - the directed cuts
 --   section makes no equivalent claim for [directed_duo_*].
 --
--- Both are game-side substitutions with more than one possible outcome, so
--- PickPriorityCameraEvent just returns nil when nothing fits and lets the
--- caller say so. The Venue Preview keeps showing the authored event and
--- explains the fallbacks in an alert rather than inventing a substitute
--- that is not on the timeline.
+--   Directed cuts have no fallback: the game's own lineup tables drop them,
+--   so the camera keeps the shot it is on.
 --
--- Requires: GetCoopRequiredInstruments, GetDirectedRequiredInstruments
---           (venue_awareness.lua) - called at use time, so load order
---           between the two files does not matter.
+-- Both are game-side substitutions with more than one possible outcome, so
+-- PickPriorityCameraEvent just returns nil when nothing fits; CameraFallback
+-- says which case it is. The Venue Preview keeps showing the authored event,
+-- marked, rather than inventing a substitute that is not on the timeline.
+--
+-- Requires: GetCoopRequiredInstruments, GetDirectedRequiredInstruments,
+--           INST_LETTER_NAMES (venue_awareness.lua) - used at call time, so
+--           load order between the two files does not matter.
 -- Pure: no r, ctx or S.
 -- Globals exported: CAM_PRIORITY_TIERS, CAM_PRIORITY, CAM_GENERIC_FALLBACK,
---   CameraShotPriority, CameraShotFitsBand, PickPriorityCameraEvent
+--   CameraShotPriority, CameraShotFitsBand, PickPriorityCameraEvent, CameraFallback
 
 -- Tier grouping and within-tier order are verbatim from the documentation,
 -- including its own headings, so this table reads as the reference. The
@@ -188,6 +190,63 @@ function CameraShotFitsBand(msg, muted)
         if muted[ltr] then return false end
     end
     return true
+end
+
+-- The coop two-character shots: the only shots with the duo-to-single fallback.
+local COOP_DUO = {}
+for _, tier in ipairs(CAM_PRIORITY_TIERS) do
+    if tier.key == 'coop_duo' then
+        for _, name in ipairs(tier.events) do COOP_DUO['[' .. name .. ']'] = true end
+    end
+end
+
+-- What the game does at a spot where no stacked shot fits the lineup - the one
+-- classification Validate camera stacks and the Venue Preview share.
+-- Returns nil when a shot fits (PickPriorityCameraEvent's case). Otherwise
+-- { ev =, kind =, note = }:
+--   'generic'       a normal shot is in the stack: the game shows a generic full
+--                   band shot. ev = the highest-ranked normal shot.
+--   'duo_single'    a lone coop duo cut (the doc's "no other stacked flags"): a
+--                   single shot of the member still on stage, named in note.
+--   'directed_lost' only directed cuts: they have no fallback, the game ignores
+--                   them and the camera keeps the shot it is on. ev = the
+--                   highest-ranked directed cut.
+-- play = the shot to picture for a normal-shot fallback (nil for directed_lost):
+-- the partner's single shot for a duo, else [coop_all_near] ([coop_all_behind]
+-- for a behind shot) - one of the generic shots the game picks from at random.
+-- Needs INST_LETTER_NAMES (venue_awareness.lua) at use time.
+function CameraFallback(group, muted)
+    if not group or #group == 0 or PickPriorityCameraEvent(group, muted) then return nil end
+    local best_coop, best_dir
+    local function better(cur, ev)
+        return not cur or (CameraShotPriority(ev.msg) or 0) >= (CameraShotPriority(cur.msg) or 0)
+    end
+    for _, ev in ipairs(group) do
+        if ev.msg:find('^%[coop_') then
+            if better(best_coop, ev) then best_coop = ev end
+        elseif ev.msg:find('^%[directed_') then
+            if better(best_dir, ev) then best_dir = ev end
+        end
+    end
+    if not best_coop then
+        return { ev = best_dir or group[#group], kind = 'directed_lost' }
+    end
+    local behind = best_coop.msg:find('_behind%]$') ~= nil
+    if #group == 1 and COOP_DUO[best_coop.msg] then
+        local names, letters = {}, {}
+        for _, ltr in ipairs(GetCoopRequiredInstruments(best_coop.msg)) do
+            if not (muted and muted[ltr]) then
+                names[#names + 1] = INST_LETTER_NAMES[ltr]
+                letters[#letters + 1] = ltr
+            end
+        end
+        if #letters > 0 then
+            return { ev = best_coop, kind = 'duo_single', note = table.concat(names, ' + '),
+                     play = ('[coop_%s_%s]'):format(letters[1], behind and 'behind' or 'near') }
+        end
+    end
+    return { ev = best_coop, kind = 'generic',
+             play = behind and '[coop_all_behind]' or '[coop_all_near]' }
 end
 
 -- Given the camera events stacked on one tick (array of { msg = ... }, in

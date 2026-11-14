@@ -42,7 +42,7 @@ Each window shows that version in its title bar, so a bug report carries it with
 
 The returned string ends in `###<name>`, and that suffix is load-bearing rather than cosmetic: ImGui derives a window's identity from its `Begin` label, so without a stable id after `###` every version bump would read as a brand-new window and reset the user's saved size, position and dock state. The id is the bare window name — exactly what the label used to be, so existing windows keep their geometry. **Never change an existing window's `###` id.** `ImGui_CreateContext` labels stay version-free for the same reason: ReaImGui keys per-context saved state off that name.
 
-**Bumping a helper means checking its standalones.** Three windows ship as their own entry points but own almost no code: `rock_band_preview_vkr.lua` draws modules out of `rock_band_general_helper_vkr/`, `rock_band_midi_pattern_vkr.lua` out of `rock_band_instrument_helper_vkr/`, and `rock_band_pitch_tuner_vkr.lua` out of `rock_band_vocal_helper_vkr/`. All three also load shared `lib/` files, so a change to one of those (`lib/reaper_helper_common.lua`, `lib/reaper_helper_ui.lua`, ...) counts too. A fix in one of those shared modules changes what the standalone does **without touching the standalone's own file**, so its `@version` silently stops describing the code it runs.
+**Bumping a helper means checking its standalones.** Four windows ship as their own entry points but own almost no code: `rock_band_preview_vkr.lua` and `rock_band_directed_moves_vkr.lua` draw modules out of `rock_band_general_helper_vkr/`, `rock_band_midi_pattern_vkr.lua` out of `rock_band_instrument_helper_vkr/`, and `rock_band_pitch_tuner_vkr.lua` out of `rock_band_vocal_helper_vkr/`. All four also load shared `lib/` files, so a change to one of those (`lib/reaper_helper_common.lua`, `lib/reaper_helper_ui.lua`, ...) counts too. A fix in one of those shared modules changes what the standalone does **without touching the standalone's own file**, so its `@version` silently stops describing the code it runs.
 
 So whenever you bump a helper's `@version` and write its `@about` entry, finish the job:
 
@@ -104,7 +104,7 @@ Items 1 and 2 are covered by `dev/tests/script_links.lua`, which checks the regi
 | `lib/reaper_midi_helpers.lua` | `FindMIDIItem`, `FindFirstMIDIItem`, `ReadAllMIDINotesOnTrack`, `ClearNotesAtPitchesInRange`, `InsertNotes`, `ReplaceNotesBulk` (one `MIDI_GetAllEvts` / `MIDI_SetAllEvts` round trip: Difficulty > Generate, Animation > Drums), … |
 | `lib/reaper_guitar_theory.lua` | `GuitarShapeToPitches`, `GuitarNormalizeIntervals`, `GuitarClassifyChordType`, `GuitarSuggestRBMapping`, `GuitarAnalyzeShape`, `GuitarParseFretInput`, `GuitarAnalyzeShapeAllTunings` — pure, no `r`/`ctx`/`S` |
 | `lib/reaper_music_notation.lua` | Staff notation model: `NOTATION_CLEFS`, `KEY_SIGNATURES`, `NotationStepToNatural`, `NotationStepToPitch`, `NotationNoteName`, `NotationKeySigAlteration(s)`, `NotationSoundingStep`, `NotationKeySigSlots`, `RBPitchName`, `PianoKeyLayout` — pure, no `r`/`ctx`/`S` |
-| `lib/reaper_script_links.lua` | `SCRIPT_LINK_GROUPS`, `ScriptLinkBasename`, `IsRunningScriptLink`, `FilterScriptLinkGroups`, `LaunchReaScript`, `DrawGeneralLinksTab` — the General > Other tools sub-tab, shared by the general, instrument and vocal helpers |
+| `lib/reaper_script_links.lua` | `SCRIPT_LINK_GROUPS`, `ScriptLinkBasename`, `IsRunningScriptLink`, `FilterScriptLinkGroups`, `LaunchReaScript`, `DrawGeneralLinksTab`, `DrawScriptLinkEntry`, `ScriptLinkEntry` — the General > Other tools sub-tab, shared by the general, instrument and vocal helpers; `DrawScriptLinkEntry` draws one launcher row for other views (the General Helper's Venue > Actions > Standalone windows) |
 | `lib/reaper_karplus_strong.lua` | `KarplusStrongVoice`, `SynthesizeChordSamples`, `SYNTH_TONES`, `SYNTH_TONE_ORDER`, `SynthToneOpts`, `SynthTonesInFamily` — struck/plucked-string synthesis and its per-instrument tone presets, for chord audition |
 | `lib/reaper_difficulty_score.lua` | `ScoreChart`, `SCORE_FACTOR_KEYS`, `NormalizeSpans`, `EventsInSegments`, `DeriveSpansFromEvents`, `ProRemapEvents`, `Percentile`, `TotalSpanSeconds`, `SpanOverlapSeconds`, `DIFFICULTY_PRIMITIVES` — chart difficulty factors for guitar/bass/drums/keys/Pro Keys. Pure, no `r`/`ctx`/`S`. `DIFFICULTY_PRIMITIVES` exports four per-event building blocks (`PitchSetChanged`, `ShapeKey`, `MotionKey`, `ConditionalEntropy`) for the general helper's Overdrive tab, which scores single bars. Exported rather than copied, so the models stay tied to one implementation |
 | `lib/reaper_difficulty_score_vocals.lua` | `ScoreVocalChart`, `NormalizeVocalPhrases`, `VocalClassifyLyric`, `VocalPitchClassDistance`, `VocalNoteIsPitched`, `VocalSubtractPercussion` — the vocal factor set. Pure. **Load after `reaper_difficulty_score.lua`**: it uses that file's span helpers and appends its columns to `SCORE_FACTOR_KEYS` |
@@ -120,6 +120,8 @@ Items 1 and 2 are covered by `dev/tests/script_links.lua`, which checks the regi
 | `lib/reaper_chord_detect.lua` | `ChordFrameAnalyse`, `ChordFrameChroma`, `ChordPassage`, `ChordSumNew`, `ChordSumAdd`, `ChordRank`, `ChordKeyMask`, `ChordConfidence`, `ChordName`, `ChordNotes`, `ChordNameOverBass`, `ChordUpperTriad`, `ChordTemplateForMask`, `ChordBassPc`, `ChordBassVote`, `CHORD_SR`, `CHORD_FRAME_N`, `CHORD_HOP_S`, `CHORD_ATTACK_S`, `CHORD_SPAN_MAX`, `CHORD_READ_FRAMES`, `CHORD_PLAY_FRAMES`, `CHORD_BASS_N`, `CHORD_BASS_STEP_S`, `CHORD_PASS_HOP_S`, `CHORD_PASS_FRAMES` - chord names from a keys recording: harmonic-sum chroma from C3 up, templates with key / bass priors and "prefer plain chords" (7th and sus4 penalties); plus `ChordPassage`, a single-notes-or-chords verdict over ~4 s found from the audio alone (flux-peak onsets, template score + struck-note ratio against frozen dev statistics). Pure; needs `lib/reaper_spectrum.lua` and `lib/reaper_dsp.lua` loaded first. For the Instrument Helper's Keys > Tuner. **Must stay identical to the measured method**: `dev/tools/chord_detect_parity_offline.lua` compares it with `dev/tools/chord_core.lua` frame by frame (`all` also re-measures the core's accuracy against the chart) |
 | `lib/reaper_harmony_style.lua` | `HarmonyPairStats`, `HarmonyClassify`, `HarmonyIntervalName`, `HarmonyBestFixedOffset` — harmony style between a lead line and one harmony line, as three axes: rhythm (homophonic / partial / decorative / counter / alone), spacing (unison / octave / close / open / cluster) and parallel motion (exact or by scale step). Pure. Measured offline over the official HARM1-3 charts; not loaded by a shipped script yet |
 | `lib/reaper_wav_writer.lua` | `WriteMonoWAV16` |
+| `lib/reaper_venue_shots.lua` | **Generated, frozen** — `RB_VENUE_SHOTS`, `RB_VENUE_SHOTS_SCHEMA`: the directed camera cuts of all 44 RB3 venues as derived information - per cut its moves (our labels, focus member, gender, styles, venue kinds, variants, lead-in), length range, free-cut flag and lineup remaps; plus `coop_remap` (normal shots: lineup remaps only). Read once from the game's venue files; never hand-edit (see "Probes vs tools": frozen data) |
+| `lib/reaper_venue_shots_query.lua` | `VenueShotEvents`, `VenueShotEvent`, `VenueShotRowMatches`, `VenueShotRemap`, `VenueShotSearch`, `VenueShotKindsText`, `VenueShotRowFilter`, `VenueShotWhoShort`, `VENUE_SHOT_KIND_LABELS`, `VENUE_SHOT_LINEUP_LABELS` — queries for the Directed Moves window, following the game's shot filter (style / gender / lineup). Pure; load after `reaper_venue_shots.lua` |
 
 The `reaper_difficulty_*` scoring modules are shared with the calibration harness in
 `dev/calibration/` rather than with a second shipped script — the one case where `lib/`
@@ -528,6 +530,8 @@ Before that isolation, two runners went unnoticed missing a library for months.
     reaper_harmony_style.lua                 ← harmony style vs the lead (dev probe for now)
     reaper_chord_detect.lua                  ← chord names from a keys recording (Keys > Tuner)
     reaper_wav_writer.lua
+    reaper_venue_shots.lua                   ← GENERATED once, frozen (camera shots of the venues)
+    reaper_venue_shots_query.lua             ← queries for the Directed Moves window
 
   rock_band_vocal_helper_vkr.lua             ← entry point (only file users run)
   rock_band_vocal_helper_vkr/
@@ -587,6 +591,12 @@ Before that isolation, two runners went unnoticed missing a library for months.
                                                reuses rock_band_general_helper_vkr/
                                                modules; documented exception to
                                                the folder-naming rule)
+
+  rock_band_directed_moves_vkr.lua           ← standalone Directed Moves window
+                                               (same exception — reuses
+                                               rock_band_general_helper_vkr/
+                                               ui_venue_camera_shots.lua + the
+                                               lib/reaper_venue_shots*.lua data)
 
   rock_band_pitch_tuner_vkr.lua              ← standalone Pitch Tuner window
                                                (same exception — reuses
@@ -664,6 +674,13 @@ checks a shipped `lib/` port against them. When a probe's method ships, move the
 into a core the probe loads - a committed tool may never `dofile` a probe. Committed files
 name `dev/tools/` files freely and never a probe; describe the measurement instead
 ("measured over the official HARM1-3 charts").
+
+**Frozen data is the exception.** A generated `lib/` file whose inputs can never ship
+(files extracted from the game itself) and whose input set is complete (the game's venues)
+is written once by a probe, not by a committed fitter: a committed fitter would not run on
+a clone either, and there is nothing new to fit. Its header says so - "generated once from
+..., frozen, never hand-edit" - and describes the source without naming the probe.
+`lib/reaper_venue_shots.lua` is the one case so far.
 
 ### Quick actions (`quick_actions/`)
 

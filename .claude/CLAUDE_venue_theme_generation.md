@@ -477,9 +477,15 @@ shows the shot the game would play. **Venue > Actions > Validate camera stacks**
 and reports stacks that went wrong — shots that win under no lineup, and lineups left with no
 valid camera shot. See "Feature: VENUE validation" in `.claude/CLAUDE_general.md`.
 
-**Two engine fallbacks nothing in this repo performs.** Both are game-side substitutions with
-more than one possible outcome, so the generator does not emit them and the Venue Preview does
-not draw them — it keeps showing the authored event and explains these in an alert instead:
+**Two engine fallbacks the generator does not emit.** Both are game-side substitutions with
+more than one possible outcome. The Venue Preview keeps the authored event's text, marked ` *`,
+and pictures the fallback - the partner's shot for a duo, All (near) standing in for the random
+generic pick (`CameraFallback`'s `play`, `venue_camera_priority.lua`, which Validate camera
+stacks shares).
+The game's own lineup tables (`COOP_*_REMAP` in its `macros.dta`) agree in shape with the doc
+below: a single-member shot goes to a band shot (they list All far / All near / Front near, or
+All behind / Front behind for behind shots), a duo to the partner's single shot, and **directed
+cuts are dropped** - no fallback, the camera keeps the shot it is on:
 
 - **Generic shot fallback.** If no stacked shot can be matched, the game uses one of
   `[coop_all_behind]`, `[coop_all_far]` or `[coop_all_near]` (`CAM_GENERIC_FALLBACK`). A

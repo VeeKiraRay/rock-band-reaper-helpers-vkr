@@ -336,6 +336,8 @@ The whole track is always read — deciding whether an event is a change, and wh
 - The **Subtrack** dropdown plus **Copy to** / **Copy from** buttons work on one category at a time. Copy to clears just that subtrack and copies the matching events from VENUE into it, creating the subtrack if needed. Copy from clears only that category's events from VENUE (not everything) before copying the subtrack's contents in, but — unlike Copy to — won't create a missing subtrack. For Special, both directions also carry VENUE's MIDI notes along with its text events.
 - All of the above always process the whole song. Fully undoable.
 
+**Standalone windows** opens companion windows to keep beside the Venue tabs: the [Venue Preview](#standalone-venue-preview) and [Directed Moves](#standalone-directed-moves). They are the same buttons as General > Other tools.
+
 ### Themes gen sub-tab
 
 ![Themes gen sub-tab](../assets/g_venue_themes_gen.jpg)
@@ -397,6 +399,16 @@ Then one row per event type:
 
 Every Add, Blend and Remove is one undo step. Target and Insert are saved with the project's settings.
 
+#### Band lineups and fallbacks
+
+Only four band members fit on stage, so a song that charts guitar, bass and keys is played by one of three lineups, each leaving one of them out. A camera shot for a member who is off stage does not play as written. If another shot stacked on the same spot fits the lineup, that one plays. If none fits, the game falls back:
+
+- **Normal shot of one member** (e.g. Guitar (Near), a close-up): a generic full band shot, picked at random - All (far), All (near) or Front (near). A *behind* shot falls back to All (behind) or Front (behind).
+- **Normal shot of two members** (e.g. Bass + Keys): the single shot of the member who is still on stage.
+- **Directed cut**: no fallback. The game ignores the cut and the camera keeps the shot it is on.
+
+Letting the game fall back is fine for normal shots - stack a shot for a lineup only where you want to choose it yourself. A directed cut that some lineup cannot play is lost for that lineup. These are the game's own lineup tables, read from its files; the RBN documentation lists All (behind), All (far) and All (near) as the generic shots.
+
 ### Keyframes sub-tab
 
 ![Keyframes sub-tab](../assets/g_venue_keyframes.jpg)
@@ -415,7 +427,7 @@ Bulk-regenerates the `[next]` keyframes for every manual lighting event already 
 
 Live readout of current, previous, and next venue events relative to the playhead (or edit cursor when stopped). Updates automatically when the VENUE track changes.
 
-- **Players** — select which two instruments are in the lineup (Bass + Guitar, Bass + Keys, Guitar + Keys). Camera shots requiring the absent instrument are shown with an alternative event, or highlighted in red if no alternative exists at that position.
+- **Players** — select which two instruments are in the lineup (Bass + Guitar, Bass + Keys, Guitar + Keys). A camera shot requiring the absent instrument gives way to a shot stacked at the same position that fits. If none fits, the authored event's name stays, in amber and marked with `*` (not an error, but worth checking the fallback is fine there), and the picture shows what the game plays instead: the remaining member's single shot for a duo, or All (near) for a one-member shot - one of the generic band shots the game picks from at random (see [Band lineups and fallbacks](#band-lineups-and-fallbacks)). Hover the name for which case it is. A directed cut that cannot play is shown in red with its own picture: the game ignores it and the camera keeps the previous shot.
 - **Preview size** — inline sprite display scale: 1× (213×120 px) or 2× (426×240 px).
 - **Sprites** — Animated (plays through all frames) or Still (single middle frame).
 - **Show** — Current only (one column) or Surrounding events (Previous / Current / Next columns).
@@ -450,6 +462,26 @@ Hover a dot for the exact state and how long it's held.
 ### Standalone Venue Preview
 
 `rock_band_preview_vkr.lua` (repo root) is a separate script that opens just the Preview sub-tab and Active players row in their own window — load it the same way as the main scripts (**Actions → Show action list → Load ReaScript**). Handy for keeping the preview visible in its own window next to the generation tabs instead of switching tabs back and forth. Same underlying behavior as Venue → Preview above.
+
+<a id="standalone-directed-moves"></a>
+
+### Standalone Directed Moves
+
+`rock_band_directed_moves_vkr.lua` (repo root) opens in its own window: a read-only reference to keep beside [Manual gen](#venue-manual-gen) or the Preview while you pick directed cuts. Open it from **General > Other tools**, from **Venue > Actions > Standalone windows**, or load it like the main scripts (**Actions > Show action list > Load ReaScript**).
+
+It lists what the game can actually show for each directed camera cut, read from the game's own venue files (all 44 venues). Nothing here touches your project. Normal camera shots are not listed: they have no moves of their own, always play and exist in every venue. What happens to a shot when its band member is off stage is in [Band lineups and fallbacks](#band-lineups-and-fallbacks).
+
+- **Search** — **Camera event** picks one event and lists all its moves; **Keyword** finds moves by name ("kiss", "jump", "mic stand") or events by name ("guitar") across all events, up to 10 at a time. Every word you type must match.
+- **Song style** — the animation style your song's genre gives it (see [Metadata > Genre](#genre-sub-tab)). Most directed cuts have moves for only some styles.
+- **Focus member** — the gender of the band member the cut focuses on. The player's characters decide this, not the song.
+- **Venue** — the kind of venue. The player's venue decides this, not the song; every venue has its own set of shots.
+- **Band** — which members are on stage. With guitar, bass and keys all charted, only two of the three fit on stage; the game then drops the left-out member's directed cuts and turns their normal shots into group or partner shots. Each section says what its event becomes.
+
+Each event shows how long its move runs after the event and how early it starts, then its moves: who moves (several members by letter, `V+G+B` = vocals, guitar, bass), for which styles and gender, in which kinds of venue (`All` = every venue, `*` = only some venues of that kind), how many variants one venue rotates through, and the lead-in. Moves that would not play for your choices are dimmed. If none of an event's moves plays, the game keeps the camera on the previous shot.
+
+**Click a move** to see what competes with it: the window switches to that camera event and sets each filter the move allows only one value for (e.g. Dramatic, Female, Arena). The moves left undimmed are the ones the game picks from for that band. Your keyword stays in the Keyword box.
+
+The move names are ours, made from the game's animation names; they describe the move, not an official title. Names such as "Big rock ending: jump" or "Solo start" only say which animation the move reuses: nothing in the game ties a directed cut's moves to a song section, a solo or the Big Rock Ending, so such a move can play anywhere in the song.
 
 ### Validated event categories
 

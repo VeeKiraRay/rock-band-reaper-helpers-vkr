@@ -38,7 +38,7 @@ local results = { vocal = nil, general = nil, instrument = nil,
                   general_stem_import = nil,
                   dsp_algo = nil, vocal_algo = nil, general_algo = nil,
                   instrument_algo = nil, midi_length_rules = nil,
-                  quick_actions = nil, spritesheet = nil, venue_events = nil,
+                  quick_actions = nil, spritesheet = nil, venue_events = nil, venue_shots = nil,
                   venue_subtracks = nil, venue_phrase_pacing = nil,
                   venue_labels = nil, workflow = nil, animation_beat = nil,
                   animation_character = nil, animation_drums = nil,
@@ -385,6 +385,14 @@ function Loop()
         end
         r.ImGui_SameLine(ctx)
         draw_status(results.venue_events)
+
+        r.ImGui_Spacing(ctx)
+
+        if r.ImGui_Button(ctx, 'Directed Moves Tests', 155, 24) then
+            run('run_venue_shots.lua', 'venue_shots')
+        end
+        r.ImGui_SameLine(ctx)
+        draw_status(results.venue_shots)
 
         r.ImGui_Spacing(ctx)
 

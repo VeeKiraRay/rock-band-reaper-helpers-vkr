@@ -1,8 +1,7 @@
 -- VENUE camera stack validation: which stacked shots can actually play.
 -- Read-only - never writes to the track, never opens an undo block.
 -- Requires: FindNamedTrackMIDI, GetTakePPQPerQN, GetMutedInstruments,
---           GetCoopRequiredInstruments, CAM_PRIORITY_TIERS, CAM_GENERIC_FALLBACK,
---           PickPriorityCameraEvent, CameraShotFitsBand, INST_LETTER_NAMES,
+--           PickPriorityCameraEvent, CameraShotFitsBand, CameraFallback, INST_LETTER_NAMES,
 --           FormatTime, GetTimeSelection, r, S (globals)
 --
 -- Only 4 band members fit on stage, and keys physically replaces a guitarist or
@@ -17,11 +16,14 @@
 --   needs an instrument this project never puts on stage, or because a sibling
 --   outranks it everywhere it would otherwise fit;
 --
---   a lineup with NO VALID CAMERA SHOT - the author has handed that spot back to
---   the game, which substitutes a generic full band shot (or, for a lone coop duo
---   cut, a single shot of the remaining member). Note this is about the camera
---   having no shot to cut to, not about a player having nothing to perform - an
---   instrument with nothing to play is an [idle] play state, handled elsewhere.
+--   a lineup with NO VALID CAMERA SHOT. With a normal (coop) shot in the stack the
+--   author has handed that spot back to the game, which substitutes a generic full
+--   band shot (or, for a lone coop duo cut, a single shot of the remaining member) -
+--   a legitimate choice, reported as an advisory. With only directed cuts there is
+--   no fallback: the game's lineup tables drop the cut, so the camera keeps the shot
+--   it is on - reported as an issue. Note this is about the camera having no shot to
+--   cut to, not about a player having nothing to perform - an instrument with
+--   nothing to play is an [idle] play state, handled elsewhere.
 --
 -- Plus two mechanical mistakes that break stacking outright: the same shot written
 -- twice on one tick, and two shots a few ticks apart that were meant to be stacked
@@ -37,15 +39,6 @@ local NEAR_STACK_QN = 0.125
 -- every spot, which is one finding per cut for the whole song. The count is always
 -- reported in full; only the listing is capped, so the panel stays readable.
 local UNCOVERED_LIST_MAX = 40
-
--- The coop two-character shots, read off the priority tiers rather than re-listed
--- here - they are the only shots with the documented duo-to-single fallback.
-local COOP_DUO_SET = {}
-for _, tier in ipairs(CAM_PRIORITY_TIERS) do
-    if tier.key == 'coop_duo' then
-        for _, name in ipairs(tier.events) do COOP_DUO_SET['[' .. name .. ']'] = true end
-    end
-end
 
 -- The lineups this project can put on stage, as { label, muted } pairs that
 -- CameraShotFitsBand understands.
@@ -101,11 +94,16 @@ function ValidateVenueCameraStacks(camera, lineups, near_ppq)
     local out = {
         duplicates  = {},   -- { ppq=, msg=, count= }
         near_stacks = {},   -- { ppq=, msg=, prev_ppq=, prev_msg=, delta= }
-        unreachable = {},   -- { ppq=, msg=, fits_any=, beaten_by= }
+        unreachable = {},   -- { ppq=, msg=, fits_any=, beaten_by={ {msg=, lineups={labels}} } }
         -- One entry per SPOT, not per lineup: a track authored without companions
         -- leaves two lineups uncovered at nearly every spot, and listing those
         -- separately buries the report in near-identical lines.
-        uncovered   = {},   -- { ppq=, shots={}, lineups={ {label=,kind=,note=} } }
+        -- fallbacks: a normal shot is in the stack, the game picks a fallback
+        -- (advisory); kind 'duo_single' (note = the remaining member) or 'generic'.
+        fallbacks     = {},   -- { ppq=, shots={}, lineups={ {label=,kind=,note=} } }
+        -- directed_lost: only directed cuts in the stack, none fits - the game
+        -- ignores them and the camera keeps the shot it is on (an issue).
+        directed_lost = {},   -- { ppq=, shots={}, lineups={ {label=} } }
         spots       = 0,    -- camera ticks
         stacked     = 0,    -- of those, ticks carrying more than one distinct shot
         events      = #camera,
@@ -152,50 +150,55 @@ function ValidateVenueCameraStacks(camera, lineups, near_ppq)
         end
 
         ---- Replay the game's pick for every possible lineup ----
-        local won, blind = {}, {}
+        -- Check 3: a lineup with no valid shot. CameraFallback (venue_camera_priority.lua)
+        -- says what the game does - the Venue Preview reads the same function.
+        local won, blind, lost = {}, {}, {}
         for _, lineup in ipairs(lineups) do
             local chosen = PickPriorityCameraEvent(group, lineup.muted)
             if chosen then
                 won[chosen.msg] = true
             else
-                ---- Check 3: a lineup with no valid camera shot ----
-                -- The documented duo-to-single fallback needs a lone coop duo cut
-                -- ("no other stacked flags"); anything else drops to a generic shot.
-                local kind, note = 'generic', nil
-                if #group == 1 and COOP_DUO_SET[group[1].msg] then
-                    local remaining = {}
-                    for _, ltr in ipairs(GetCoopRequiredInstruments(group[1].msg)) do
-                        if not lineup.muted[ltr] then
-                            remaining[#remaining + 1] = INST_LETTER_NAMES[ltr]
-                        end
-                    end
-                    if #remaining > 0 then
-                        kind = 'duo_single'
-                        note = table.concat(remaining, ' + ')
-                    end
+                local fb = CameraFallback(group, lineup.muted)
+                if fb.kind == 'directed_lost' then
+                    lost[#lost + 1] = { label = lineup.label }          -- 3a: an issue
+                else
+                    blind[#blind + 1] = { label = lineup.label, kind = fb.kind, note = fb.note }
                 end
-                blind[#blind + 1] = { label = lineup.label, kind = kind, note = note }
             end
         end
-        if #blind > 0 then
+        if #blind > 0 or #lost > 0 then
             local shots = {}
             for _, ev in ipairs(group) do shots[#shots + 1] = ev.msg end
-            out.uncovered[#out.uncovered + 1] =
-                { ppq = ppq, shots = shots, lineups = blind }
+            if #blind > 0 then
+                out.fallbacks[#out.fallbacks + 1] = { ppq = ppq, shots = shots, lineups = blind }
+            end
+            if #lost > 0 then
+                out.directed_lost[#out.directed_lost + 1] = { ppq = ppq, shots = shots, lineups = lost }
+            end
         end
 
         ---- Check 4: a shot that wins under no lineup ----
-        -- A lone shot that fits nothing is already reported by check 3 as an
-        -- uncovered spot, so only genuinely shadowed siblings are listed here.
+        -- A lone shot that fits nothing is already reported by check 3 (fallback
+        -- or lost directed cut), so only genuinely shadowed siblings are listed here.
         if #group > 1 then
             for _, ev in ipairs(group) do
                 if not won[ev.msg] then
-                    local fits_any, beaten_by = false, nil
+                    -- Every lineup it fits has its own winner: one shot can lose to a
+                    -- different sibling per lineup, so all of them are named.
+                    local fits_any, beaten_by, seen_by = false, {}, {}
                     for _, lineup in ipairs(lineups) do
                         if CameraShotFitsBand(ev.msg, lineup.muted) then
                             fits_any = true
                             local winner = PickPriorityCameraEvent(group, lineup.muted)
-                            if winner then beaten_by = winner.msg end
+                            if winner then
+                                local b = seen_by[winner.msg]
+                                if not b then
+                                    b = { msg = winner.msg, lineups = {} }
+                                    seen_by[winner.msg] = b
+                                    beaten_by[#beaten_by + 1] = b
+                                end
+                                b.lineups[#b.lineups + 1] = lineup.label
+                            end
                         end
                     end
                     out.unreachable[#out.unreachable + 1] = {
@@ -271,19 +274,25 @@ function ValidateVenueCamera()
         end
         f.duplicates  = Keep(f.duplicates)
         f.near_stacks = Keep(f.near_stacks)
-        f.unreachable = Keep(f.unreachable)
-        f.uncovered   = Keep(f.uncovered)
+        f.unreachable   = Keep(f.unreachable)
+        f.fallbacks     = Keep(f.fallbacks)
+        f.directed_lost = Keep(f.directed_lost)
     end
 
     local function At(ppq) return FormatTime(r.MIDI_GetProjTimeFromPPQPos(take, ppq)) end
 
-    local total = #f.duplicates + #f.near_stacks + #f.unreachable + #f.uncovered
+    -- Fallback spots are advisories: letting the game pick a normal shot is a valid
+    -- choice, so they are listed but never counted as issues.
+    local total = #f.duplicates + #f.near_stacks + #f.unreachable + #f.directed_lost
+    local nfall = #f.fallbacks
+    local fall_txt = nfall > 0
+        and (', %d fallback spot%s'):format(nfall, nfall == 1 and '' or 's') or ''
 
     local lines = {}
     lines[#lines + 1] = total == 0
-        and ('VENUE camera validation - no issues  (%s)'):format(scope_label)
-        or  ('VENUE camera validation - %d issue%s  (%s)')
-            :format(total, total == 1 and '' or 's', scope_label)
+        and ('VENUE camera validation - no issues%s  (%s)'):format(fall_txt, scope_label)
+        or  ('VENUE camera validation - %d issue%s%s  (%s)')
+            :format(total, total == 1 and '' or 's', fall_txt, scope_label)
     lines[#lines + 1] = ''
 
     ---- Lineups ----
@@ -335,48 +344,74 @@ function ValidateVenueCamera()
                 lines[#lines + 1] = '           - needs an instrument no lineup puts on stage'
                 lines[#lines + 1] = '           - delete it, or chart the instrument it wants'
             else
+                -- Every winner is named (one per lineup it fits can differ), since
+                -- removing just one of them will not free it.
+                local parts = {}
+                for _, b in ipairs(u.beaten_by) do parts[#parts + 1] = b.msg end
                 lines[#lines + 1] = ('           - outranked by %s wherever it fits')
-                                    :format(tostring(u.beaten_by))
-                lines[#lines + 1] = '           - delete it, or remove the shot that outranks it'
+                                    :format(table.concat(parts, ' and '))
+                lines[#lines + 1] = #u.beaten_by == 1
+                    and '           - delete it, or remove the shot that outranks it'
+                    or  '           - delete it, or remove the shots that outrank it'
             end
         end
     end
     lines[#lines + 1] = ''
 
-    ---- Uncovered ----
+    ---- Directed cuts a lineup cannot play (issue) ----
     -- "No valid camera shot", never "nothing to play": an instrument with nothing
     -- to play is an [idle] play state, a different thing entirely, and the Venue
     -- tab reports on that too.
-    if #f.uncovered == 0 then
-        lines[#lines + 1] = 'Spots with no valid camera shot for some lineup: none.'
+    if #f.directed_lost == 0 then
+        lines[#lines + 1] = 'Directed cuts some lineup cannot play: none.'
     else
-        lines[#lines + 1] = ('Spots with no valid camera shot for some lineup (%d):')
-                            :format(#f.uncovered)
-        for i, c in ipairs(f.uncovered) do
+        lines[#lines + 1] = ('Directed cuts some lineup cannot play (%d):'):format(#f.directed_lost)
+        for i, c in ipairs(f.directed_lost) do
             if i > UNCOVERED_LIST_MAX then
                 lines[#lines + 1] = ('  ... and %d more spots. Narrow the time selection to see them.')
-                                    :format(#f.uncovered - UNCOVERED_LIST_MAX)
+                                    :format(#f.directed_lost - UNCOVERED_LIST_MAX)
+                break
+            end
+            local names = {}
+            for _, lu in ipairs(c.lineups) do names[#names + 1] = lu.label end
+            lines[#lines + 1] = ('  %s   %s'):format(At(c.ppq), table.concat(c.shots, ', '))
+            lines[#lines + 1] = ('           - ignored for the %s lineup%s: the camera keeps the shot it is on')
+                                :format(table.concat(names, ' and '), #names == 1 and '' or 's')
+            lines[#lines + 1] = #names == 1
+                and '           - stack a normal shot for that lineup, or pick a directed cut it can play'
+                or  '           - stack a normal shot for those lineups, or pick a directed cut they can play'
+        end
+        lines[#lines + 1] = '  Directed cuts have no fallback shot.'
+    end
+    lines[#lines + 1] = ''
+
+    ---- Fallback spots (advisory) ----
+    -- Handing a spot to the game is a legitimate choice, not a mistake - this list
+    -- is "where the game decides", not "where the track is wrong".
+    if nfall == 0 then
+        lines[#lines + 1] = 'Fallback spots (the game picks the shot for some lineup): none.'
+    else
+        lines[#lines + 1] = ('Fallback spots - the game picks the shot for some lineup (%d, not counted as issues):')
+                            :format(nfall)
+        for i, c in ipairs(f.fallbacks) do
+            if i > UNCOVERED_LIST_MAX then
+                lines[#lines + 1] = ('  ... and %d more spots. Narrow the time selection to see them.')
+                                    :format(nfall - UNCOVERED_LIST_MAX)
                 break
             end
             lines[#lines + 1] = ('  %s   %s'):format(At(c.ppq), table.concat(c.shots, ', '))
-            lines[#lines + 1] = '           no valid camera shot for:'
             for _, lu in ipairs(c.lineups) do
                 if lu.kind == 'duo_single' then
-                    lines[#lines + 1] = ('             - %s lineup  ->  the game converts this duo cut to a single shot of %s')
+                    lines[#lines + 1] = ('             - %s lineup  ->  a single shot of %s')
                                         :format(lu.label, lu.note)
                 else
-                    lines[#lines + 1] = ('             - %s lineup  ->  the game shows a generic full band shot')
+                    lines[#lines + 1] = ('             - %s lineup  ->  a generic full band shot')
                                         :format(lu.label)
                 end
             end
-            lines[#lines + 1] = '           - stack a shot for those lineups to choose it yourself'
         end
-        lines[#lines + 1] = ('  The generic shots are %s.')
-                            :format(table.concat(CAM_GENERIC_FALLBACK, ', '))
-        -- Handing a spot to the game is a legitimate choice, not a mistake - this
-        -- list is "where the game decides", not "where the track is wrong".
-        lines[#lines + 1] = '  Letting the game fall back is valid - only act on the spots you'
-        lines[#lines + 1] = '  wanted to control.'
+        lines[#lines + 1] = '  Letting the game fall back is fine - stack a shot for a lineup only'
+        lines[#lines + 1] = '  where you want to choose it yourself.'
     end
     lines[#lines + 1] = ''
 
@@ -391,7 +426,7 @@ function ValidateVenueCamera()
                         :format(#lineups, #lineups == 1 and '' or 's')
 
     S.status = total == 0
-        and 'VENUE camera: no issues found.'
-        or  ('VENUE camera: %d issue%s found.'):format(total, total == 1 and '' or 's')
+        and ('VENUE camera: no issues found%s.'):format(fall_txt)
+        or  ('VENUE camera: %d issue%s found%s.'):format(total, total == 1 and '' or 's', fall_txt)
     S.last_result = table.concat(lines, '\n')
 end

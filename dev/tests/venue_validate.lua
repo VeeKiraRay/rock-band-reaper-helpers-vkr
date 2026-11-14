@@ -280,7 +280,7 @@ Test.section('Camera stacks - clean tracks')
 
 Test.it('a shot needing nobody is fine for every lineup', function()
     local f = RunCam(Cam(4, '[coop_all_near]'))
-    Test.expect(#f.uncovered == 0, 'no uncovered lineups')
+    Test.expect(#f.fallbacks == 0 and #f.directed_lost == 0, 'no uncovered lineups')
     Test.expect(#f.unreachable == 0, 'nothing unreachable')
     Test.expect(f.spots == 1 and f.stacked == 0, 'one spot, not stacked')
 end)
@@ -288,7 +288,7 @@ end)
 Test.it('primary + companion covers all three lineups', function()
     -- What the generator emits for a keys/guitar/bass swap band.
     local f = RunCam(Cam(4, '[coop_bg_near]', '[coop_k_near]'))
-    Test.expect(#f.uncovered == 0, 'every lineup has a shot')
+    Test.expect(#f.fallbacks == 0 and #f.directed_lost == 0, 'every lineup has a shot')
     Test.expect(#f.unreachable == 0, 'both shots win somewhere')
     Test.expect(f.stacked == 1, 'the spot counts as stacked')
 end)
@@ -296,10 +296,10 @@ end)
 Test.it('an empty track produces no findings', function()
     local f = RunCam({})
     Test.expect(f.events == 0 and f.spots == 0, 'nothing counted')
-    Test.expect(#f.uncovered == 0 and #f.unreachable == 0, 'nothing reported')
+    Test.expect(#f.fallbacks == 0 and #f.directed_lost == 0 and #f.unreachable == 0, 'nothing reported')
 end)
 
-Test.section('Camera stacks - uncovered lineups')
+Test.section('Camera stacks - fallbacks and lost directed cuts')
 
 -- Findings are one per SPOT, carrying the lineups that spot leaves blind.
 local function Blind(c)
@@ -314,39 +314,87 @@ Test.it('a lone coop duo cut reports the duo-to-single fallback', function()
     -- Documented Note 2: a duo flag with no other stacked flags degrades to a
     -- single shot of whoever is left, so this is named, not called generic.
     local f = RunCam(Cam(4, '[coop_bg_near]'))
-    Test.expect(#f.uncovered == 1, 'one spot; got ' .. #f.uncovered)
-    Test.expect(Blind(f.uncovered[1]) ==
+    Test.expect(#f.fallbacks == 1, 'one spot; got ' .. #f.fallbacks)
+    Test.expect(Blind(f.fallbacks[1]) ==
         'Bass + Keys=duo_single:Bass | Guitar + Keys=duo_single:Guitar',
-        'got ' .. Blind(f.uncovered[1]))
+        'got ' .. Blind(f.fallbacks[1]))
+    Test.expect(#f.directed_lost == 0, 'a normal shot is never a lost directed cut')
 end)
 
-Test.it('a lone directed duo cut falls back to a generic shot', function()
-    -- The directed cuts section documents no duo-to-single equivalent, so this
-    -- degrades to a generic shot where a coop duo would name the remaining member.
-    -- A keys/bass duo needs BOTH, so only Bass + Keys can play it.
+Test.it('a lone directed cut a lineup cannot play is lost, not a fallback', function()
+    -- Directed cuts have no fallback: the game's lineup tables drop them and the
+    -- camera keeps its shot. A keys/bass duo needs BOTH, so only Bass + Keys plays it.
     local f = RunCam(Cam(4, '[directed_duo_kb]'))
-    Test.expect(#f.uncovered == 1, 'one spot; got ' .. #f.uncovered)
-    Test.expect(Blind(f.uncovered[1]) == 'Bass + Guitar=generic | Guitar + Keys=generic',
-        'got ' .. Blind(f.uncovered[1]))
+    Test.expect(#f.fallbacks == 0, 'no fallback; got ' .. #f.fallbacks)
+    Test.expect(#f.directed_lost == 1, 'one spot; got ' .. #f.directed_lost)
+    local names = {}
+    for _, lu in ipairs(f.directed_lost[1].lineups) do names[#names + 1] = lu.label end
+    Test.expect(table.concat(names, ' | ') == 'Bass + Guitar | Guitar + Keys', 'got ' .. table.concat(names, ' | '))
+end)
+
+Test.it('a directed cut stacked with a normal shot falls back, it is not lost', function()
+    -- Without keys the directed keys cut cannot play; the stacked keys shot cannot
+    -- either, so the normal shot falls back - the camera still cuts.
+    local f = RunCam(Cam(4, '[directed_keys]', '[coop_k_near]'))
+    Test.expect(#f.directed_lost == 0, 'not lost; got ' .. #f.directed_lost)
+    Test.expect(#f.fallbacks == 1 and Blind(f.fallbacks[1]) == 'Bass + Guitar=generic',
+        'got ' .. (f.fallbacks[1] and Blind(f.fallbacks[1]) or 'none'))
+end)
+
+Test.it('a directed cut with a normal companion every lineup can play is clean', function()
+    local f = RunCam(Cam(4, '[directed_keys]', '[coop_all_near]'))
+    Test.expect(#f.directed_lost == 0 and #f.fallbacks == 0, 'covered')
 end)
 
 Test.it('a stack where nothing fits is generic, not duo-to-single', function()
     -- Two stacked flags, so the "no other stacked flags" condition fails.
     local f = RunCam(Cam(4, '[coop_bk_near]', '[coop_gk_near]'))
-    Test.expect(#f.uncovered == 1, 'one spot; got ' .. #f.uncovered)
-    Test.expect(Blind(f.uncovered[1]) == 'Bass + Guitar=generic', 'got ' .. Blind(f.uncovered[1]))
-    Test.expect(#f.uncovered[1].shots == 2, 'the report names both authored shots')
+    Test.expect(#f.fallbacks == 1, 'one spot; got ' .. #f.fallbacks)
+    Test.expect(Blind(f.fallbacks[1]) == 'Bass + Guitar=generic', 'got ' .. Blind(f.fallbacks[1]))
+    Test.expect(#f.fallbacks[1].shots == 2, 'the report names both authored shots')
 end)
 
 Test.it('a spot every lineup can play produces no entry at all', function()
     local f = RunCam(Cam(4, '[coop_bg_near]', '[coop_k_near]'))
-    Test.expect(#f.uncovered == 0, 'got ' .. #f.uncovered)
+    Test.expect(#f.fallbacks == 0, 'got ' .. #f.fallbacks)
 end)
 
 Test.it('a four-piece project needs no companion to be covered', function()
     local f = RunCam(Cam(4, '[coop_bg_near]'), NO_KEYS)
-    Test.expect(#f.uncovered == 0, 'the only lineup can play it')
+    Test.expect(#f.fallbacks == 0, 'the only lineup can play it')
     Test.expect(#f.unreachable == 0, 'nothing unreachable')
+end)
+
+Test.section('CameraFallback (shared with the Venue Preview)')
+
+local NO_GUITAR = { g = true }
+
+Test.it('a stack with a shot that fits has no fallback', function()
+    Test.expect(CameraFallback(Cam(4, '[coop_g_near]', '[coop_all_near]'), NO_GUITAR) == nil, 'fits')
+end)
+
+Test.it('a lone duo falls back to the partner, a single to a generic band shot', function()
+    local d = CameraFallback(Cam(4, '[coop_bg_near]'), NO_GUITAR)
+    Test.expect(d.kind == 'duo_single' and d.note == 'Bass' and d.ev.msg == '[coop_bg_near]',
+        'duo: ' .. tostring(d.kind) .. ' ' .. tostring(d.note))
+    Test.expect(d.play == '[coop_b_near]', 'duo pictures the partner: ' .. tostring(d.play))
+    local s = CameraFallback(Cam(4, '[coop_g_near]'), NO_GUITAR)
+    Test.expect(s.kind == 'generic' and s.ev.msg == '[coop_g_near]', 'single: ' .. tostring(s.kind))
+    Test.expect(s.play == '[coop_all_near]', 'single pictures All (near): ' .. tostring(s.play))
+    local b = CameraFallback(Cam(4, '[coop_bg_behind]'), NO_GUITAR)
+    Test.expect(b.play == '[coop_b_behind]', 'behind duo stays behind: ' .. tostring(b.play))
+    local gb = CameraFallback(Cam(4, '[coop_g_behind]'), NO_GUITAR)
+    Test.expect(gb.play == '[coop_all_behind]', 'behind single: ' .. tostring(gb.play))
+    local l = CameraFallback(Cam(4, '[directed_guitar]'), NO_GUITAR)
+    Test.expect(l.play == nil, 'a lost directed cut has no fallback picture')
+end)
+
+Test.it('only directed cuts that cannot play are lost; with a normal shot it falls back', function()
+    local l = CameraFallback(Cam(4, '[directed_guitar]'), NO_GUITAR)
+    Test.expect(l.kind == 'directed_lost' and l.ev.msg == '[directed_guitar]', 'lost: ' .. tostring(l.kind))
+    local m = CameraFallback(Cam(4, '[directed_guitar]', '[coop_g_near]'), NO_GUITAR)
+    Test.expect(m.kind == 'generic' and m.ev.msg == '[coop_g_near]',
+        'mixed shows the normal shot: ' .. tostring(m.kind) .. ' ' .. tostring(m.ev and m.ev.msg))
 end)
 
 Test.section('Camera stacks - shots that never play')
@@ -356,8 +404,22 @@ Test.it('a generic shot stacked under an always-valid specific one never plays',
     Test.expect(#f.unreachable == 1, 'expected 1, got ' .. #f.unreachable)
     Test.expect(f.unreachable[1].msg == '[coop_all_near]', 'got ' .. f.unreachable[1].msg)
     Test.expect(f.unreachable[1].fits_any, 'it fits the lineup, it is just outranked')
-    Test.expect(f.unreachable[1].beaten_by == '[coop_gv_near]',
-        'got ' .. tostring(f.unreachable[1].beaten_by))
+    local b = f.unreachable[1].beaten_by
+    Test.expect(#b == 1 and b[1].msg == '[coop_gv_near]', 'got ' .. tostring(b[1] and b[1].msg))
+end)
+
+Test.it('a shot outranked by a different sibling per lineup names all of them', function()
+    -- Bass + Guitar plays the guitar shot, Bass + Keys the keys shot (the keys
+    -- exception), Guitar + Keys has no bass - so the bass shot never plays, and it
+    -- takes removing both siblings to free it.
+    local f = RunCam(Cam(4, '[coop_b_near]', '[coop_g_near]', '[coop_k_near]'))
+    local u
+    for _, it in ipairs(f.unreachable) do if it.msg == '[coop_b_near]' then u = it end end
+    Test.expect(u ~= nil, 'coop_b_near is unreachable')
+    local got = {}
+    for _, b in ipairs(u.beaten_by) do got[#got + 1] = b.msg .. '=' .. table.concat(b.lineups, ',') end
+    Test.expect(table.concat(got, ' | ') == '[coop_g_near]=Bass + Guitar | [coop_k_near]=Bass + Keys',
+        'got ' .. table.concat(got, ' | '))
 end)
 
 Test.it('a shot needing an uncharted instrument never plays', function()
@@ -373,10 +435,10 @@ Test.it('a shot that wins under one lineup is not reported', function()
     Test.expect(#f.unreachable == 0, 'got ' .. Msgs(f.unreachable))
 end)
 
-Test.it('a lone unplayable shot is an uncovered spot, not an unreachable shot', function()
+Test.it('a lone unplayable shot is a fallback spot, not an unreachable shot', function()
     local f = RunCam(Cam(4, '[coop_k_near]'), NO_KEYS)
     Test.expect(#f.unreachable == 0, 'not double-reported; got ' .. Msgs(f.unreachable))
-    Test.expect(#f.uncovered == 1, 'reported once, as an uncovered spot')
+    Test.expect(#f.fallbacks == 1, 'reported once, as a fallback spot')
 end)
 
 Test.section('Camera stacks - mechanical mistakes')

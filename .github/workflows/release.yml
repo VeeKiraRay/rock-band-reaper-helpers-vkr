@@ -59,6 +59,7 @@ jobs:
             rock_band_vocal_helper_vkr.lua \
             rock_band_music_theory_helper_vkr.lua \
             rock_band_preview_vkr.lua \
+            rock_band_directed_moves_vkr.lua \
             rock_band_pitch_tuner_vkr.lua \
             rock_band_midi_pattern_vkr.lua \
             lib/ \

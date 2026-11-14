@@ -65,12 +65,18 @@ end)
 ------------------------------------------------------------------
 Test.section('Script Links: registry shape')
 
-Test.it('has the two expected groups, 4 + 3 entries', function()
+Test.it('has the two expected groups, 4 + 4 entries', function()
     Test.expect(#SCRIPT_LINK_GROUPS == 2, 'expected 2 groups, got ' .. #SCRIPT_LINK_GROUPS)
     Test.expect(#SCRIPT_LINK_GROUPS[1].entries == 4,
         'group 1 has ' .. #SCRIPT_LINK_GROUPS[1].entries .. ' entries')
-    Test.expect(#SCRIPT_LINK_GROUPS[2].entries == 3,
+    Test.expect(#SCRIPT_LINK_GROUPS[2].entries == 4,
         'group 2 has ' .. #SCRIPT_LINK_GROUPS[2].entries .. ' entries')
+end)
+
+Test.it('ScriptLinkEntry finds an entry by basename', function()
+    local e = ScriptLinkEntry('rock_band_directed_moves_vkr.lua')
+    Test.expect(e and e.label == 'Directed Moves', 'got ' .. tostring(e and e.label))
+    Test.expect(ScriptLinkEntry('nope.lua') == nil, 'unknown file')
 end)
 
 Test.it('every group has a non-empty title', function()
@@ -213,10 +219,13 @@ end)
 ------------------------------------------------------------------
 Test.section('Script Links: self-hide filter')
 
-Test.it('running script is dropped, the other six remain', function()
+-- Registry size: every count below is this or one fewer (the running script hidden).
+local TOTAL = 8
+
+Test.it('running script is dropped, the others remain', function()
     for _, e in ipairs(AllEntries(SCRIPT_LINK_GROUPS)) do
         local kept = AllEntries(FilterScriptLinkGroups(SCRIPT_LINK_GROUPS, 'C:\\x\\' .. e.file))
-        Test.expect(#kept == 6, e.file .. ': expected 6 entries, got ' .. #kept)
+        Test.expect(#kept == TOTAL - 1, e.file .. ': expected ' .. (TOTAL - 1) .. ' entries, got ' .. #kept)
         for _, k in ipairs(kept) do
             Test.expect(k.file ~= e.file, e.file .. ' was not dropped')
         end
@@ -226,13 +235,13 @@ end)
 Test.it('matches case-insensitively (Windows paths)', function()
     local path = 'C:\\X\\ROCK_BAND_GENERAL_HELPER_VKR.LUA'
     local kept = AllEntries(FilterScriptLinkGroups(SCRIPT_LINK_GROUPS, path))
-    Test.expect(#kept == 6, 'expected 6, got ' .. #kept)
+    Test.expect(#kept == TOTAL - 1, 'expected ' .. (TOTAL - 1) .. ', got ' .. #kept)
 end)
 
 Test.it('matches a bare basename with no directory', function()
     local kept = AllEntries(FilterScriptLinkGroups(SCRIPT_LINK_GROUPS,
         'rock_band_pitch_tuner_vkr.lua'))
-    Test.expect(#kept == 6, 'expected 6, got ' .. #kept)
+    Test.expect(#kept == TOTAL - 1, 'expected ' .. (TOTAL - 1) .. ', got ' .. #kept)
 end)
 
 -- Whole-basename equality, not a substring search: these three all contain a
@@ -245,19 +254,19 @@ Test.it('a neighbouring filename hides nothing', function()
     }
     for _, path in ipairs(cases) do
         local kept = AllEntries(FilterScriptLinkGroups(SCRIPT_LINK_GROUPS, path))
-        Test.expect(#kept == 7, path .. ': expected 7, got ' .. #kept)
+        Test.expect(#kept == TOTAL, path .. ': expected ' .. TOTAL .. ', got ' .. #kept)
     end
 end)
 
 Test.it('nil and empty paths hide nothing', function()
-    Test.expect(#AllEntries(FilterScriptLinkGroups(SCRIPT_LINK_GROUPS, nil)) == 7, 'nil')
-    Test.expect(#AllEntries(FilterScriptLinkGroups(SCRIPT_LINK_GROUPS, '')) == 7, 'empty')
+    Test.expect(#AllEntries(FilterScriptLinkGroups(SCRIPT_LINK_GROUPS, nil)) == TOTAL, 'nil')
+    Test.expect(#AllEntries(FilterScriptLinkGroups(SCRIPT_LINK_GROUPS, '')) == TOTAL, 'empty')
 end)
 
 Test.it('leaves the source registry untouched', function()
     FilterScriptLinkGroups(SCRIPT_LINK_GROUPS, 'C:\\x\\rock_band_pitch_tuner_vkr.lua')
     Test.expect(#SCRIPT_LINK_GROUPS == 2, 'group count changed')
-    Test.expect(#AllEntries(SCRIPT_LINK_GROUPS) == 7, 'entry count changed')
+    Test.expect(#AllEntries(SCRIPT_LINK_GROUPS) == TOTAL, 'entry count changed')
 end)
 
 ------------------------------------------------------------------

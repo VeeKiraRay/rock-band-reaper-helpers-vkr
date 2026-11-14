@@ -35,6 +35,7 @@ copy /Y  "%SRC%rock_band_vocal_helper_vkr.lua"          "%DST%\rock_band_vocal_h
 copy /Y  "%SRC%rock_band_general_helper_vkr.lua"        "%DST%\rock_band_general_helper_vkr.lua"      >nul
 copy /Y  "%SRC%rock_band_instrument_helper_vkr.lua"     "%DST%\rock_band_instrument_helper_vkr.lua"   >nul
 copy /Y  "%SRC%rock_band_preview_vkr.lua"               "%DST%\rock_band_preview_vkr.lua"             >nul
+copy /Y  "%SRC%rock_band_directed_moves_vkr.lua"        "%DST%\rock_band_directed_moves_vkr.lua"      >nul
 copy /Y  "%SRC%rock_band_pitch_tuner_vkr.lua"           "%DST%\rock_band_pitch_tuner_vkr.lua"         >nul
 copy /Y  "%SRC%rock_band_midi_pattern_vkr.lua"          "%DST%\rock_band_midi_pattern_vkr.lua"        >nul
 copy /Y  "%SRC%rock_band_music_theory_helper_vkr.lua"   "%DST%\rock_band_music_theory_helper_vkr.lua" >nul

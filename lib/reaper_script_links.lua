@@ -82,6 +82,12 @@ SCRIPT_LINK_GROUPS = {
               short = 'Venue preview in its own window',
               desc  = "The General Helper's Venue > Preview sub-tab in its own\n" ..
                       'window, so it can sit beside the generation tabs.' },
+            { file  = 'rock_band_directed_moves_vkr.lua',
+              label = 'Directed Moves',
+              short = 'What each directed cut shows',
+              desc  = 'What the game can show for each directed camera cut, read from\n' ..
+                      'its venue files: the moves, for which style, gender and venue.\n' ..
+                      'A companion to Venue > Manual gen and Preview.' },
             { file  = 'rock_band_pitch_tuner_vkr.lua',
               label = 'Pitch Tuner',
               short = 'Live pitch readout in its own window',
@@ -226,8 +232,7 @@ local COL_LINK_WARNING = 0xFFAA00FF  -- warning amber, matches ui_workflow.lua /
 -- Body only: the caller owns BeginTabItem / EndTabItem, the same contract as
 -- DrawGeneralWorkflowTab.
 function DrawGeneralLinksTab()
-    RefreshScriptLinkExistence()
-    local root, self_path = ScriptLinkPaths()
+    local _, self_path = ScriptLinkPaths()
     local groups = FilterScriptLinkGroups(SCRIPT_LINK_GROUPS, self_path)
 
     r.ImGui_TextWrapped(ctx,
@@ -247,36 +252,54 @@ function DrawGeneralLinksTab()
     for gi, g in ipairs(groups) do
         if gi > 1 then r.ImGui_Separator(ctx) end
         SectionHeader(g.title)
-        for _, e in ipairs(g.entries) do
-            local present = _exists[e.file]   -- snapshot: drives the disabled pair
-            if not present then r.ImGui_BeginDisabled(ctx) end
-            local clicked = Btn(e.label, BTN_H, bw)
-            if not present then r.ImGui_EndDisabled(ctx) end
-            Tooltip(e.desc .. '\n\n' .. e.file)
-            r.ImGui_SameLine(ctx)
-            r.ImGui_TextDisabled(ctx, e.short)
-            -- A disabled widget reports no hover, so the tooltip above is
-            -- unreachable while the button is greyed out - which is why the
-            -- reason is visible text. On its own line and wrapped, since it
-            -- names a filename and would clip beside the button.
-            if not present then
-                r.ImGui_PushTextWrapPos(ctx, 0)
-                r.ImGui_TextColored(ctx, COL_LINK_WARNING,
-                    '! Not installed: ' .. e.file .. ' is not in the same folder as this script.')
-                r.ImGui_PopTextWrapPos(ctx)
-            end
-            if clicked then
-                local ok, err, already = LaunchReaScript(root .. e.file)
-                S.last_result = nil
-                if ok and already then
-                    S.status = e.label .. ' is already open.'
-                elseif ok then
-                    S.status = 'Opened ' .. e.label .. '.'
-                else
-                    S.status      = 'Could not open ' .. e.label .. '.'
-                    S.last_result = err .. '\n\n' .. root .. e.file
-                end
-            end
+        for _, e in ipairs(g.entries) do DrawScriptLinkEntry(e, bw) end
+    end
+end
+
+-- One launcher row: the button, its short text, the "not installed" note, and
+-- the launch with its status line. Shared by the Other tools tab and any view
+-- that offers a few of the same windows (the General Helper's Venue > Actions),
+-- so both look and behave alike. bw = button width (nil = sized to the label).
+function DrawScriptLinkEntry(e, bw)
+    RefreshScriptLinkExistence()
+    local root = ScriptLinkPaths()
+    local present = _exists[e.file]   -- snapshot: drives the disabled pair
+    if not present then r.ImGui_BeginDisabled(ctx) end
+    local clicked = Btn(e.label, BTN_H, bw)
+    if not present then r.ImGui_EndDisabled(ctx) end
+    Tooltip(e.desc .. '\n\n' .. e.file)
+    r.ImGui_SameLine(ctx)
+    r.ImGui_TextDisabled(ctx, e.short)
+    -- A disabled widget reports no hover, so the tooltip above is
+    -- unreachable while the button is greyed out - which is why the
+    -- reason is visible text. On its own line and wrapped, since it
+    -- names a filename and would clip beside the button.
+    if not present then
+        r.ImGui_PushTextWrapPos(ctx, 0)
+        r.ImGui_TextColored(ctx, COL_LINK_WARNING,
+            '! Not installed: ' .. e.file .. ' is not in the same folder as this script.')
+        r.ImGui_PopTextWrapPos(ctx)
+    end
+    if clicked then
+        local ok, err, already = LaunchReaScript(root .. e.file)
+        S.last_result = nil
+        if ok and already then
+            S.status = e.label .. ' is already open.'
+        elseif ok then
+            S.status = 'Opened ' .. e.label .. '.'
+        else
+            S.status      = 'Could not open ' .. e.label .. '.'
+            S.last_result = err .. '\n\n' .. root .. e.file
         end
     end
+end
+
+-- The registry entry for a basename, or nil.
+function ScriptLinkEntry(file)
+    for _, g in ipairs(SCRIPT_LINK_GROUPS) do
+        for _, e in ipairs(g.entries) do
+            if e.file == file then return e end
+        end
+    end
+    return nil
 end

@@ -2,7 +2,8 @@
 -- Shows previous / current / next venue events relative to the playhead
 -- for each category (Camera, Lighting, Post-Process) with sprite animations.
 -- Requires globals: r, ctx, S, GetVenueEventsForPreview, DrawVenueInlineSprite, MakeProjectPoll,
---                   VenueSpriteFoldersFound, SectionHeader, PickPriorityCameraEvent
+--                   VenueSpriteFoldersFound, SectionHeader, PickPriorityCameraEvent,
+--                   CameraFallback, Tooltip, TIPS
 
 local _preview_cache       = nil   -- { camera, lighting, postproc } or nil
 local _preview_error       = nil   -- error string or nil
@@ -21,7 +22,7 @@ local _SPRITE_H = 120
 local _COMBO_BG      = 0
 local _COMBO_BK      = 1
 local _COMBO_GK      = 2
-local _COMBO_NAMES   = { [0]='Bass - Guitar', [1]='Bass - Keys', [2]='Guitar - Keys' }
+local _COMBO_NAMES   = { [0]='Bass + Guitar', [1]='Bass + Keys', [2]='Guitar + Keys' }
 local _COMBO_ABSENT  = { [0]='k', [1]='g', [2]='b' }          -- instrument NOT in this combo
 local _COMBO_LETTERS = { [0]={'b','g'}, [1]={'b','k'}, [2]={'g','k'} }  -- instruments IN this combo
 local _INST_NAMES    = { b='PART BASS', g='PART GUITAR', k='PART KEYS' }
@@ -30,21 +31,20 @@ local _SHOW_CURRENT_ONLY = 0
 local _SHOW_SURROUNDING  = 1
 
 -- Amber, for the one transition line that reports live state ("blending now").
--- Deliberately not the 0xFF4444FF red the filtered camera card uses - that red
--- means "nothing here can play", which a blend in progress is the opposite of.
+-- Deliberately not the 0xFF4444FF red a lost directed cut uses - that red means
+-- "nothing here can play", which a blend in progress is the opposite of.
 local _BLEND_ACTIVE_COL = 0xFFCC66FF
+local _LOST_COL         = 0xFF4444FF
+-- The same amber for a camera event the game swaps for a fallback: not an error,
+-- but worth a look - is the fallback shot fine here? Red stays for "cannot play".
+local _FALLBACK_COL     = 0xFFCC66FF
 
--- Shown under the Camera row only while a column has no shot that fits the
--- selected lineup. The preview deliberately keeps showing the authored event
--- instead of substituting one of these, so the wording stays on what the
--- GAME does - both fallbacks have more than one possible outcome, and a
--- sprite that is not on the timeline would read as a preview bug.
--- Body text rather than a tooltip, so it lives here and not in TIPS.
-local _FALLBACK_NOTE =
-    'No stacked camera shot matches the current band. In game, the camera system falls back '
- .. 'to a generic full band camera shot - [coop_all_behind], [coop_all_far] or [coop_all_near]. '
- .. 'A normal (coop) duo shot is converted to a single shot of the remaining band member when '
- .. 'possible by the game. Directed cuts have no documented duo-to-single fallback.'
+-- When no stacked shot fits the selected lineup the column keeps the authored
+-- event's text, marked with " *", and pictures what the game plays instead
+-- (CameraFallback's `play`, venue_camera_priority.lua): the partner's single
+-- shot for a duo, All (near) for a generic fallback - one of the shots the game
+-- picks from at random. A lost directed cut keeps its own picture. The hover
+-- says which case it is.
 
 local _muted_cache = nil  -- GetMutedInstruments() result; mute toggles bump
                           -- the project state count, so refreshes catch them
@@ -120,18 +120,30 @@ local function _combo_muted(combo)
 end
 
 -- Pick the event to display for one PPQ group.
--- Returns: display_ev, is_filtered
---   is_filtered=false → display_ev is what the game would play here
---   is_filtered=true  → nothing in the group fits the lineup; display_ev is the
---                       group's last event, shown in red with _FALLBACK_NOTE
+-- Returns: display_ev, fallback
+--   fallback=nil → display_ev is what the game would play here
+--   fallback set → nothing in the group fits the lineup; CameraFallback's
+--                  { ev, kind, note } - display_ev is the authored event the
+--                  fallback comes from, shown with " *"
 -- Camera groups resolve by the documented shot priority (venue_camera_priority.lua);
 -- lighting and post-process have no priority order, so their last event wins.
 local function _resolve_group(group, muted)
-    if not group or #group == 0 then return nil, false end
-    if not muted then return group[#group], false end
+    if not group or #group == 0 then return nil, nil end
+    if not muted then return group[#group], nil end
     local chosen = PickPriorityCameraEvent(group, muted)
-    if chosen then return chosen, false end
-    return group[#group], true
+    if chosen then return chosen, nil end
+    local fb = CameraFallback(group, muted)
+    return fb.ev, fb
+end
+
+-- Hover text for a marked camera event: what the game does for this lineup.
+local function _fallback_tip(fb, combo_name)
+    if fb.kind == 'directed_lost' then
+        return TIPS.venue_preview_fb_directed:format(combo_name)
+    elseif fb.kind == 'duo_single' then
+        return TIPS.venue_preview_fb_duo:format(combo_name, fb.note, fb.play)
+    end
+    return TIPS.venue_preview_fb_generic:format(combo_name, fb.play)
 end
 
 -- How the event in a column hands over to whatever follows it, as one line under
@@ -162,7 +174,7 @@ end
 -- separator once outside all groups (in _draw_category_row).
 -- Dummy reserves the sprite footprint so all columns stay the same width
 -- even when there is no event or no spritesheet installed.
-local function _draw_column(header, ev, category, scale, is_filtered, combo_name, playhead)
+local function _draw_column(header, ev, category, scale, fallback, combo_name, playhead)
     local sw = _SPRITE_W * scale
     local sh = _SPRITE_H * scale
     r.ImGui_BeginGroup(ctx)
@@ -172,8 +184,12 @@ local function _draw_column(header, ev, category, scale, is_filtered, combo_name
         r.ImGui_TextDisabled(ctx, 'No event found')
         r.ImGui_Dummy(ctx, sw, sh)
     else
-        if is_filtered then
-            r.ImGui_TextColored(ctx, 0xFF4444FF, ev.msg)
+        if fallback then
+            -- Red for a directed cut that is lost; amber for a normal shot, which
+            -- still cuts - to a fallback the author may want to check.
+            r.ImGui_TextColored(ctx, fallback.kind == 'directed_lost' and _LOST_COL or _FALLBACK_COL,
+                                ev.msg .. ' *')
+            Tooltip(_fallback_tip(fallback, combo_name))
         else
             r.ImGui_Text(ctx, ev.msg)
         end
@@ -187,18 +203,13 @@ local function _draw_column(header, ev, category, scale, is_filtered, combo_name
             r.ImGui_TextDisabled(ctx, tline)
         end
         if tline ~= ' ' then Tooltip(TIPS.venue_preview_blend) end
-        if is_filtered then
-            local cx, cy = r.ImGui_GetCursorPos(ctx)
-            r.ImGui_Dummy(ctx, sw, sh)           -- reserve space first (sets group height)
-            r.ImGui_SetCursorPos(ctx, cx, cy)    -- step back into that space
-            r.ImGui_TextDisabled(ctx, ('No suitable event\nfor %s'):format(combo_name))
-        else
-            local bare    = _get_bare_name(ev, category)
-            local slot_id = category .. '_' .. header
-            if not DrawVenueInlineSprite(category, bare, scale, not _preview_animate, slot_id) then
-                r.ImGui_TextDisabled(ctx, '(no preview image)')
-                r.ImGui_Dummy(ctx, sw, sh)
-            end
+        -- A normal-shot fallback pictures the shot the game plays instead.
+        local pic = (fallback and fallback.play) and { msg = fallback.play } or ev
+        local bare    = _get_bare_name(pic, category)
+        local slot_id = category .. '_' .. header
+        if not DrawVenueInlineSprite(category, bare, scale, not _preview_animate, slot_id) then
+            r.ImGui_TextDisabled(ctx, '(no preview image)')
+            r.ImGui_Dummy(ctx, sw, sh)
         end
     end
     r.ImGui_EndGroup(ctx)
@@ -209,11 +220,11 @@ local function _draw_category_row(label, prev_grp, curr_grp, next_grp, category,
                                   muted, combo_name, playhead)
     SectionHeader(label)
     r.ImGui_Separator(ctx)  -- full-width separator drawn outside groups (safe here)
-    local any_filtered = false
+    local any_marked = false
     local function col(header, group)
-        local ev, filtered = _resolve_group(group, muted)
-        if filtered then any_filtered = true end
-        _draw_column(header, ev, category, scale, filtered, combo_name, playhead)
+        local ev, fallback = _resolve_group(group, muted)
+        if fallback then any_marked = true end
+        _draw_column(header, ev, category, scale, fallback, combo_name, playhead)
     end
     if S.venue_preview_show_mode == _SHOW_CURRENT_ONLY then
         col('Current', curr_grp)
@@ -224,9 +235,11 @@ local function _draw_category_row(label, prev_grp, curr_grp, next_grp, category,
         r.ImGui_SameLine(ctx)
         col('Next',     next_grp)
     end
-    if any_filtered then
+    if any_marked then
         r.ImGui_Spacing(ctx)
-        r.ImGui_TextWrapped(ctx, _FALLBACK_NOTE)
+        r.ImGui_PushTextWrapPos(ctx, 0)
+        r.ImGui_TextDisabled(ctx, '* No stacked shot fits this band: hover the event for what the game does.')
+        r.ImGui_PopTextWrapPos(ctx)
     end
 end
 
