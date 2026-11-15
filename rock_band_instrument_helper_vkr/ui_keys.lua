@@ -50,11 +50,11 @@ function DrawKeysTab(ctx)
         ctx, 'Split pitch', S.mc_keys_split_pitch, 21, 108, '%d')
     SliderTooltip(TIPS.mc_keys_split_pitch)
     r.ImGui_SameLine(ctx)
-    r.ImGui_TextDisabled(ctx, PitchName(S.mc_keys_split_pitch))
+    TextDim(PitchName(S.mc_keys_split_pitch))
     if split_disabled then r.ImGui_EndDisabled(ctx) end
 
     SectionHeader('Convert to Pro Keys')
-    r.ImGui_TextDisabled(ctx, 'Source: same as Hand Split above.')
+    TextDim('Source: same as Hand Split above.')
 
     r.ImGui_Text(ctx, 'Pro Keys target')
     r.ImGui_SameLine(ctx)
@@ -83,7 +83,7 @@ function DrawKeysTab(ctx)
     S.mc_keys_pk_src_idx = TrackCombo('##mc_keys_pk_src', S.mc_keys_pk_src_idx, midi_tracks)
     Tooltip(TIPS.mc_keys_pk_src)
 
-    r.ImGui_TextDisabled(ctx, 'RH / LH targets: see Hand Split above.')
+    TextDim('RH / LH targets: see Hand Split above.')
 
     r.ImGui_Spacing(ctx)
     if Btn('Generate Animation', BTN_H) then
@@ -92,7 +92,7 @@ function DrawKeysTab(ctx)
     Tooltip(TIPS.gen_animation)
 
     SectionHeader('5-Lane Keys')
-    r.ImGui_TextDisabled(ctx, 'Source: same as Hand Split above.')
+    TextDim('Source: same as Hand Split above.')
 
     r.ImGui_Text(ctx, 'Target track  ')
     r.ImGui_SameLine(ctx)

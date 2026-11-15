@@ -9,8 +9,11 @@
 local KEY_MODE_LABELS = {
     off = 'Off', vocals = 'From charted vocals', prokeys = 'From charted Pro Keys', manual = 'Manual',
 }
-local CONF_COLOR = { clear = 0x88FF88FF, likely = 0xFFFFFFFF, maybe = 0xFFC04CFF, unsure = 0xFF8040FF }
-local DIM = 0xAAAAAAFF
+-- Confidence is a graded scale read against itself, so it stays one table; its steps use
+-- the shared text colours (lib/reaper_imgui_helpers.lua) where one fits. Orange for
+-- "unsure" is a step beyond amber and has no shared meaning.
+local CONF_COLOR = { clear = COL_OK, likely = COL_TEXT, maybe = COL_WARN, unsure = 0xFF8040FF }
+local DIM = COL_DIM
 
 local function Colored(col, text)
     r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Text(), col)
@@ -88,11 +91,11 @@ local function DrawSettings()
     -- The key in use, or why the chosen source gave none.
     r.ImGui_SetCursorPosX(ctx, lbl_col)
     if S.ct_key_mode == 'off' then
-        r.ImGui_TextDisabled(ctx, 'No key used.')
+        TextDim('No key used.')
     elseif S.ct_key then
-        r.ImGui_TextDisabled(ctx, 'Using ' .. S.ct_key.name .. '.')
+        TextDim('Using ' .. S.ct_key.name .. '.')
     else
-        r.ImGui_TextDisabled(ctx, 'No key: ' .. (S.ct_key_why or 'not found') .. '.')
+        TextDim('No key: ' .. (S.ct_key_why or 'not found') .. '.')
     end
 
     r.ImGui_Text(ctx, 'Read length')
@@ -125,7 +128,7 @@ local function DrawSettings()
 end
 
 local READOUT_LABELS = { 'Charted:', 'Single:', 'Chord:', 'Top 3:', 'Chords:', 'Notes:' }
-local PRIMARY = 0xFFFFFFFF
+local PRIMARY = COL_TEXT
 
 -- One readout row: a label in the shared column, then the value; each in its own colour.
 local function Row(lbl_col, label, label_col, col, text)
@@ -154,7 +157,7 @@ local function DrawReadout(lbl_col)
         return
     end
     if not res.top then
-        if res.busy then r.ImGui_TextDisabled(ctx, 'Reading...')
+        if res.busy then TextDim('Reading...')
         else r.ImGui_TextWrapped(ctx, 'Quiet - nothing to read here.') end
         return
     end
@@ -187,11 +190,11 @@ local function DrawReadout(lbl_col)
     if p then
         r.ImGui_SameLine(ctx)
         if p.busy then
-            r.ImGui_TextDisabled(ctx, '(passage: reading the next 4 s...)')
+            TextDim('(passage: reading the next 4 s...)')
         elseif p.single == nil then
-            r.ImGui_TextDisabled(ctx, '(passage: no key presses found)')
+            TextDim('(passage: no key presses found)')
         elseif p.single then
-            Colored(0x66CCFFFF, '(passage: looks like single notes)')
+            Colored(COL_INFO, '(passage: looks like single notes)')
         else
             Colored(DIM, '(passage: looks like chords)')
         end
@@ -240,7 +243,7 @@ function DrawKeysTunerTab()
     end
     Tooltip(TIPS.ct_toggle)
     r.ImGui_SameLine(ctx)
-    Colored(active and 0x88FF88FF or 0x888888FF, active and 'Tuner: Active' or 'Tuner: Stopped')
+    Colored(active and COL_OK or COL_DIM, active and 'Tuner: Active' or 'Tuner: Stopped')
 
     r.ImGui_Separator(ctx)
     local lbl_col = LabelColWidth(READOUT_LABELS)

@@ -155,7 +155,7 @@ local function DrawSection(cat, rows, filter)
     r.ImGui_Text(ctx, EventLabel(cat))
     if r.ImGui_IsItemHovered(ctx) then EventTooltip(cat) end
     r.ImGui_SameLine(ctx)
-    r.ImGui_TextDisabled(ctx, '[' .. cat .. ']')
+    TextDim('[' .. cat .. ']')
 
     -- One summary line: when the move runs, free cut, what the lineup does to it.
     local facts = {}
@@ -173,7 +173,7 @@ local function DrawSection(cat, rows, filter)
         facts[#facts + 1] = VENUE_SHOT_LINEUP_LABELS[filter.lineup] .. ': becomes ' .. table.concat(names, ' / ')
     end
     r.ImGui_PushTextWrapPos(ctx, 0)
-    r.ImGui_TextDisabled(ctx, table.concat(facts, '; ') .. '.')
+    TextDim(table.concat(facts, '; ') .. '.')
     r.ImGui_PopTextWrapPos(ctx)
 
     if not rows or #rows == 0 then rows = ev.moves or {} end
@@ -193,10 +193,10 @@ local function DrawSection(cat, rows, filter)
     local x0 = r.ImGui_GetCursorPosX(ctx)
     for i, h in ipairs(COLS) do
         if i > 1 then r.ImGui_SameLine(ctx, x0 + xs[i]) end
-        r.ImGui_TextDisabled(ctx, h)
+        TextDim(h)
         Tooltip(TIPS['venue_cs_col_' .. i])
     end
-    local dim_col = r.ImGui_GetStyleColor(ctx, r.ImGui_Col_TextDisabled())
+    local dim_col = COL_DIM
     for ri, row in ipairs(rows) do
         local on = VenueShotRowMatches(row, filter, ev) and remap ~= 'dropped'
         for i, cell in ipairs(RowCells(row)) do
@@ -212,7 +212,7 @@ local function DrawSection(cat, rows, filter)
                     r.ImGui_SetTooltip(ctx, (cut and cell .. '\n\n' or '') .. TIPS.venue_cs_row_click)
                 end
             else
-                if on then r.ImGui_Text(ctx, cell) else r.ImGui_TextDisabled(ctx, cell) end
+                if on then r.ImGui_Text(ctx, cell) else TextDim(cell) end
                 if r.ImGui_IsItemHovered(ctx) then
                     if i == 2 and cell ~= row.who then r.ImGui_SetTooltip(ctx, row.who)
                     elseif i == 5 and cell:find('*', 1, true) then r.ImGui_SetTooltip(ctx, TIPS.venue_cs_partial) end
@@ -229,7 +229,7 @@ function DrawVenueCameraShotsTab()
         .. 'from the game\'s venue files. Pick an event or type a word; the filters dim the '
         .. 'moves that would not play for that song style, focus member and band.')
     r.ImGui_PushTextWrapPos(ctx, 0)
-    r.ImGui_TextDisabled(ctx, 'Normal (coop) camera shots are not listed: they only place the '
+    TextDimWrapped('Normal (coop) camera shots are not listed: they only place the '
         .. 'camera and do not make the band move.')
     r.ImGui_PopTextWrapPos(ctx)
     r.ImGui_Spacing(ctx)

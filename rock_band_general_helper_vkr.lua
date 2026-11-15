@@ -162,6 +162,12 @@
 --       results (Difficulty, Song key, Score), track selections and settings
 --       stayed on screen. Only switching project tabs reset the window. Both
 --       now do.
+--     - Secondary text (hints, empty states, "not set", minor headings) is a
+--       lighter grey that is easier to read. The same grey is used everywhere.
+--     - One colour per meaning in every window: Venue > Preview's "blending
+--       now" line and its fallback camera name use the same amber as every
+--       other warning (they were a lighter amber); the Venue Players row's
+--       idle blue is a brighter sky blue, the blue used everywhere now.
 --
 --   v0.9.63
 --     - The instrument tools moved to a new script, the Rock Band Instrument

@@ -227,8 +227,6 @@ end
 ------------------------------------------------------------------
 -- General > Other tools sub-tab
 ------------------------------------------------------------------
-local COL_LINK_WARNING = 0xFFAA00FF  -- warning amber, matches ui_workflow.lua / ui_midi.lua
-
 -- Body only: the caller owns BeginTabItem / EndTabItem, the same contract as
 -- DrawGeneralWorkflowTab.
 function DrawGeneralLinksTab()
@@ -269,14 +267,14 @@ function DrawScriptLinkEntry(e, bw)
     if not present then r.ImGui_EndDisabled(ctx) end
     Tooltip(e.desc .. '\n\n' .. e.file)
     r.ImGui_SameLine(ctx)
-    r.ImGui_TextDisabled(ctx, e.short)
+    TextDim(e.short)
     -- A disabled widget reports no hover, so the tooltip above is
     -- unreachable while the button is greyed out - which is why the
     -- reason is visible text. On its own line and wrapped, since it
     -- names a filename and would clip beside the button.
     if not present then
         r.ImGui_PushTextWrapPos(ctx, 0)
-        r.ImGui_TextColored(ctx, COL_LINK_WARNING,
+        r.ImGui_TextColored(ctx, COL_WARN,
             '! Not installed: ' .. e.file .. ' is not in the same folder as this script.')
         r.ImGui_PopTextWrapPos(ctx)
     end

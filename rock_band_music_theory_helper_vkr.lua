@@ -1,6 +1,6 @@
 -- @description Rock Band Music Theory Helper
 -- @author VeeKiraRay
--- @version 0.7
+-- @version 0.8
 -- @about
 --   In-DAW reference guide for Rock Band custom charters.
 --   Covers drum notation, RB lane mappings, common patterns, a Guitar
@@ -19,6 +19,9 @@
 --   This @about block keeps only the 5 most recent versions.
 --   Full history: CHANGELOG.md in the repo.
 --
+--   v0.8: Secondary text ("(no input)", "(no note heads placed)", the
+--         playback hint) is a lighter grey that is easier to read, the same
+--         grey every other helper uses now.
 --   v0.7: Fixed: the tabs' scroll areas used a call only ReaImGui 0.9 has,
 --         so on ReaImGui 0.7 and 0.8 the window stopped with an error.
 --   v0.6: The window title now carries the script version -- "RB Music Theory

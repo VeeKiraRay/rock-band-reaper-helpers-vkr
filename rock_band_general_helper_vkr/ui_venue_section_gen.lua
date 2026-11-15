@@ -55,7 +55,7 @@ function DrawVenueSectionGenTab()
 
     local _sg_no_sections = not S.venue_sections or #S.venue_sections == 0
     if _sg_no_sections then
-        r.ImGui_TextDisabled(ctx, 'No [prc_*] sections found - add markers to the EVENTS track')
+        TextDimWrapped('No [prc_*] sections found - add markers to the EVENTS track')
     end
 
     r.ImGui_Spacing(ctx)
@@ -256,7 +256,7 @@ function DrawVenueSectionGenTab()
         r.ImGui_Spacing(ctx)
         local _tmpl_no_themes = #S.venue_themes == 0
         if _tmpl_no_themes then
-            r.ImGui_TextDisabled(ctx, 'No themes found - add .rbtheme files to the resources/themes/ folder')
+            TextDimWrapped('No themes found - add .rbtheme files to the resources/themes/ folder')
             r.ImGui_BeginDisabled(ctx)
         end
         r.ImGui_Text(ctx, 'Theme')
@@ -291,27 +291,27 @@ function DrawVenueSectionGenTab()
                     table.concat(_preset.allowed_postprocs, ', ') or '-'
                 r.ImGui_Text(ctx, 'Lighting')
                 r.ImGui_SameLine(ctx, lbl_col)
-                r.ImGui_TextDisabled(ctx, _lt_val)
+                TextDim(_lt_val)
                 r.ImGui_Text(ctx, 'Post-process')
                 r.ImGui_SameLine(ctx, lbl_col)
-                r.ImGui_TextDisabled(ctx, _pp_val)
+                TextDim(_pp_val)
                 r.ImGui_Text(ctx, 'Keyframe rate')
                 r.ImGui_SameLine(ctx, lbl_col)
-                r.ImGui_TextDisabled(ctx, _preset.keyframe_rate and tostring(_preset.keyframe_rate) or '-')
+                TextDim(_preset.keyframe_rate and tostring(_preset.keyframe_rate) or '-')
                 r.ImGui_Text(ctx, 'Light blendin')
                 r.ImGui_SameLine(ctx, lbl_col)
-                r.ImGui_TextDisabled(ctx, _preset.lightpreset_blendin and tostring(_preset.lightpreset_blendin) or '-')
+                TextDim(_preset.lightpreset_blendin and tostring(_preset.lightpreset_blendin) or '-')
                 r.ImGui_Text(ctx, 'PP blendin')
                 r.ImGui_SameLine(ctx, lbl_col)
-                r.ImGui_TextDisabled(ctx, _preset.postproc_blendin and tostring(_preset.postproc_blendin) or '-')
+                TextDim(_preset.postproc_blendin and tostring(_preset.postproc_blendin) or '-')
                 r.ImGui_Text(ctx, 'Directed cut')
                 r.ImGui_SameLine(ctx, lbl_col)
-                r.ImGui_TextDisabled(ctx, _preset.dircut_at_start or '-')
+                TextDim(_preset.dircut_at_start or '-')
                 r.ImGui_Text(ctx, 'Bonus FX')
                 r.ImGui_SameLine(ctx, lbl_col)
-                r.ImGui_TextDisabled(ctx, _preset.bonusfx_at_start and 'yes' or 'no')
+                TextDim(_preset.bonusfx_at_start and 'yes' or 'no')
             else
-                r.ImGui_TextDisabled(ctx, 'No preset for this section type in the selected theme')
+                TextDim('No preset for this section type in the selected theme')
             end
         end
         if _tmpl_no_themes then r.ImGui_EndDisabled(ctx) end

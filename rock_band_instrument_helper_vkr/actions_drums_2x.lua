@@ -726,7 +726,7 @@ function Remove2XKicks()
     local expected = #src_kicks - #second_foot
     lines[#lines + 1] = ''
     if left == expected then
-        lines[#lines + 1] = ('%s now has %d kick(s), which is %s\'s %d less the %d\nsecond-foot kicks - consistent.')
+        lines[#lines + 1] = ('%s now has %d kick(s), which is %s\'s %d less the %d second-foot kicks - consistent.')
             :format(TRACK_1X, left, TRACK_2X, #src_kicks, #second_foot)
     else
         lines[#lines + 1] = ('%s now has %d kick(s); %s implies %d.')

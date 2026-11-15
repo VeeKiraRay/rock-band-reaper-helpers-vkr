@@ -163,7 +163,7 @@ local function DrawDrumsTab()
             r.ImGui_DrawList_AddRect(dl, note_x, iy, note_x + curr_nw, iy + ih, COL_HIGHLIGHT_BORDER, 0, 0, 2.0)
         end
     else
-        r.ImGui_TextDisabled(ctx, '(notation image not found - place drum.png in the resources/img/ folder next to the script)')
+        TextDimWrapped('(notation image not found - place drum.png in the resources/img/ folder next to the script)')
     end
 
     r.ImGui_Spacing(ctx)
@@ -236,7 +236,7 @@ local function DrawGuitarTab()
             end
         end
     else
-        r.ImGui_TextDisabled(ctx, '(no input)')
+        TextDim('(no input)')
     end
 
     r.ImGui_Spacing(ctx)

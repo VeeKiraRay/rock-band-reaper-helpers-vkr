@@ -150,7 +150,7 @@ local function Loop()
                         Tooltip(_t_vpan)
                         if not VenueSpriteFoldersFound() then
                             r.ImGui_Spacing(ctx)
-                            r.ImGui_TextDisabled(ctx,
+                            TextDimWrapped(
                                 'Venue spritesheets not found - check readme for installation instructions')
                         end
 

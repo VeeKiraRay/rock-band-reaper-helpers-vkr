@@ -55,6 +55,15 @@
 --       recent projects) was not noticed, so the previous song's track
 --       selections, captured MIDI patterns, Overdrive overview and settings
 --       stayed. Only switching project tabs reset the window. Both now do.
+--     - Secondary text (hints, empty states, "not set", minor headings) is a
+--       lighter grey that is easier to read. The same grey is used everywhere.
+--     - Overdrive > Validate and Generate colour the "Overdrive in play"
+--       lines as Metadata > Score does: a part's OD boost line in gold when
+--       gold is reached, red when short, and the "?" advice in amber.
+--     - Keys > Tuner: a "maybe" reading uses the same amber as every other
+--       warning (it was a lighter amber). "Tuner: Active" and a "clear"
+--       reading are a deeper green, "looks like single notes" a deeper blue -
+--       the green and blue every window uses now.
 --
 --   v0.1
 --     - First version. The Difficulty, Overdrive, Tab Input and MIDI tabs,

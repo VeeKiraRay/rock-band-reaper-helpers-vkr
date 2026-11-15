@@ -41,7 +41,7 @@ function DrawMIDIPatternTab()
         if _tr then
             local _, _trname = r.GetTrackName(_tr)
             local _lo, _hi = GetPatternPitchRange(_trname, S.mr_diff_idx)
-            r.ImGui_TextDisabled(ctx, ('Pitch range: %d-%d'):format(_lo, _hi))
+            TextDim(('Pitch range: %d-%d'):format(_lo, _hi))
         end
     end
 
@@ -100,14 +100,14 @@ function DrawMIDIPatternTab()
     if S.mr_search_notes then
         r.ImGui_Text(ctx, S.mr_search_label)
     else
-        r.ImGui_TextDisabled(ctx, 'not set')
+        TextDim('not set')
     end
     r.ImGui_Text(ctx, 'Replace:')
     r.ImGui_SameLine(ctx)
     if S.mr_replace_notes then
         r.ImGui_Text(ctx, S.mr_replace_label)
     else
-        r.ImGui_TextDisabled(ctx, 'not set')
+        TextDim('not set')
     end
 end
 

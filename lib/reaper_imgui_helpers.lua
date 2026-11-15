@@ -11,6 +11,20 @@ local LABEL_PAD = 16   -- gap after a row label before its aligned input begins
 WIDTH_STD   = 200   -- standard slider/combo width
 WIDTH_SHORT = 80    -- short selector width (e.g. note-name combo)
 BTN_H       = 24    -- standard button height
+
+-- Text colours (0xRRGGBBAA), one per meaning, shared by every window. Colour a line
+-- by what it means with these - never a hex literal, and never a near-copy shade.
+-- One style: saturated colours (little white mixed in) at a similar brightness, so
+-- none of them reads as pastel or jumps out next to the others (CLAUDE.md, "Text
+-- colours"). Drawing colours (plates, gems, keys, strips) are not text and stay local.
+COL_TEXT  = 0xFFFFFFFF   -- plain white: text that must stay white
+COL_DIM   = 0xAAAAAAFF   -- secondary text: hints, empty states, less important values
+COL_WARN  = 0xFFAA00FF   -- amber: warning, advisory, worth a look
+COL_ERROR = 0xFF4444FF   -- red: an error, something to fix
+COL_GOLD  = 0xFFD24AFF   -- gold: gold stars reached
+COL_OK    = 0x44DD44FF   -- green: running / active / good
+COL_INFO  = 0x22BBFFFF   -- blue: neutral highlight, a state worth telling apart
+
 local RADIO_PAD_FALLBACK = 28   -- used only if ImGui_GetFrameHeight is unavailable
 local RADIO_CUSHION      = 16   -- extra just-in-case margin on top of the real style values
 local HAS_FRAME_HEIGHT   = type(r.ImGui_GetFrameHeight) == 'function'
@@ -29,6 +43,25 @@ function Tooltip(text)
     if r.ImGui_IsItemHovered(ctx) then
         r.ImGui_SetTooltip(ctx, text)
     end
+end
+
+-- Wrapped text in a shared colour (COL_*), for anything long enough to need it;
+-- a single short line uses r.ImGui_TextColored(ctx, COL_*, text).
+function TextColoredWrapped(col, text)
+    r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Text(), col)
+    r.ImGui_TextWrapped(ctx, text)
+    r.ImGui_PopStyleColor(ctx)
+end
+
+-- Secondary text in COL_DIM. Used instead of ImGui's TextDisabled, whose grey
+-- (0x808080 in ReaImGui's default style) is too faint to read comfortably and has
+-- no wrapping variant. A disabled widget is dimmed by BeginDisabled, not by this.
+function TextDim(text)
+    r.ImGui_TextColored(ctx, COL_DIM, text)
+end
+
+function TextDimWrapped(text)
+    TextColoredWrapped(COL_DIM, text)
 end
 
 function SliderTooltip(text)
@@ -166,7 +199,7 @@ end
 -- has something above it to separate from.
 function ComboGroupHeader(name)
     r.ImGui_Separator(ctx)
-    r.ImGui_TextDisabled(ctx, name)
+    TextDim(name)
 end
 
 function GetTrackList()

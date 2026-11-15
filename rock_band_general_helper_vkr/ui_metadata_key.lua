@@ -39,8 +39,6 @@
 --                   KeyName, KeyRelation, KeyScaleText, KeyTrackReport, KEY_TONIC_NAMES,
 --                   KEY_MIN_NOTES, KEY_FEW_NOTES (lib/reaper_key_detect.lua)
 
-local COL_WARN = 0xFFAA00FF
-local COL_DIM  = 0x9A9A9AFF
 
 -- Bars listed per note outside the key before the rest are summarized as "+N more".
 local MAX_BARS = 8
@@ -49,11 +47,6 @@ local MAX_BARS = 8
 -- amber: past it, the key itself is more likely wrong than right (see TIPS.key_share_out).
 local SHARE_OUT_WARN = 0.15
 
-local function DimWrapped(text)
-    r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Text(), COL_DIM)
-    r.ImGui_TextWrapped(ctx, text)
-    r.ImGui_PopStyleColor(ctx)
-end
 
 local function WarnWrapped(text)
     r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Text(), COL_WARN)
@@ -161,7 +154,7 @@ end
 -- One key row: label, key name (tooltip: its notes), and a Check button that loads it
 -- into Check a key - switching to MIDI mode first when pressed from audio.
 local function KeyRow(row_x, lbl_col, label, key, extra, tip, id, from_audio)
-    r.ImGui_TextDisabled(ctx, label)
+    TextDim(label)
     r.ImGui_SameLine(ctx, row_x + lbl_col)
     r.ImGui_Text(ctx, KeyName(key.tonic, key.minor))
     Tooltip('Key notes: ' .. KeyScaleText(key.tonic, key.minor) .. (tip and ('\n\n' .. tip) or ''))
@@ -176,7 +169,7 @@ local function KeyRow(row_x, lbl_col, label, key, extra, tip, id, from_audio)
     Tooltip(from_audio and TIPS.key_check_button_audio or TIPS.key_check_button)
     if extra then
         r.ImGui_SameLine(ctx)
-        r.ImGui_TextDisabled(ctx, extra)
+        TextDim(extra)
     end
 end
 
@@ -185,12 +178,12 @@ local function DrawSuggestion(x, id, lbl_col, unavailable, from_audio)
     r.ImGui_Indent(ctx)
 
     if not x.ranked then
-        DimWrapped((unavailable[x.why] or 'Not available.'):format(KEY_MIN_NOTES))
+        TextDimWrapped((unavailable[x.why] or 'Not available.'):format(KEY_MIN_NOTES))
         r.ImGui_Unindent(ctx)
         return
     end
     local note = x.set and SET_NOTE_TIP[x.set.key]
-    if note then DimWrapped(TIPS[note]) end
+    if note then TextDimWrapped(TIPS[note]) end
 
     local top, second = x.ranked[1], x.ranked[2]
     local row_x = r.ImGui_GetCursorPosX(ctx)   -- includes the indent
@@ -204,7 +197,7 @@ local function DrawSuggestion(x, id, lbl_col, unavailable, from_audio)
     if x.confidence == 'close' then
         WarnWrapped(CONFIDENCE_TEXT.close)
     else
-        DimWrapped(CONFIDENCE_TEXT[x.confidence])
+        TextDimWrapped(CONFIDENCE_TEXT[x.confidence])
     end
 
     r.ImGui_Unindent(ctx)
@@ -232,7 +225,7 @@ local function DrawVocalsNote(parts)
         WarnWrapped(('PART VOCALS has only %d pitched notes - too few to suggest a key ' ..
                      'from.'):format(v.notes))
     elseif v.unpitched > 0 then
-        DimWrapped(('%d unpitched PART VOCALS notes (#) were left out.'):format(v.unpitched))
+        TextDimWrapped(('%d unpitched PART VOCALS notes (#) were left out.'):format(v.unpitched))
     end
 end
 
@@ -258,9 +251,9 @@ local function DrawTrackCheck(t, rep)
     r.ImGui_Text(ctx, t.label)
     r.ImGui_Indent(ctx)
     if not t.found then
-        DimWrapped('No track.')
+        TextDimWrapped('No track.')
     elseif rep.total == 0 then
-        DimWrapped(t.unpitched > 0
+        TextDimWrapped(t.unpitched > 0
             and ('No pitched notes (%d unpitched).'):format(t.unpitched)
             or 'No notes.')
     else
@@ -268,7 +261,7 @@ local function DrawTrackCheck(t, rep)
         local pct = rep.share_out < 0.005 and 'Under 1%' or ('%.0f%%'):format(100 * rep.share_out)
         local line = ('%s of %d notes outside the key.'):format(pct, rep.total)
         if #rep.outside == 0 then
-            DimWrapped(('No notes outside the key (%d notes).'):format(rep.total))
+            TextDimWrapped(('No notes outside the key (%d notes).'):format(rep.total))
         elseif rep.share_out >= SHARE_OUT_WARN then
             WarnWrapped(line)
             Tooltip(TIPS.key_share_out)
@@ -277,7 +270,7 @@ local function DrawTrackCheck(t, rep)
             Tooltip(TIPS.key_share_out)
         end
         if rep.used <= KEY_FEW_NOTES then
-            DimWrapped(('Uses only %d of the key\'s notes, so many keys fit this track.'):format(rep.used))
+            TextDimWrapped(('Uses only %d of the key\'s notes, so many keys fit this track.'):format(rep.used))
         end
         for _, o in ipairs(rep.outside) do
             r.ImGui_TextWrapped(ctx, OutsideLine(o))
@@ -357,7 +350,7 @@ local function DrawMidiMode()
     end
 
     r.ImGui_Spacing(ctx)
-    DimWrapped('The results can disagree, and none of them is the final word. The ' ..
+    TextDimWrapped('The results can disagree, and none of them is the final word. The ' ..
                'usual mix-ups are the relative key (C major and A minor share every note) ' ..
                'and the parallel key (C major and C minor share the home note) - if a ' ..
                'suggestion sounds wrong, try those first. Re-run after editing the chart.')
@@ -437,11 +430,11 @@ local function DrawAudioMode()
     res.label = res.label or 'Audio stems'
     DrawSuggestion(res, 'a', LabelColWidth({ 'Suggested', 'Runner-up' }), AUDIO_UNAVAILABLE_TEXT, true)
     for _, l in ipairs({ TrackLine('Vocal', res.vocal), TrackLine('Bass', res.bass) }) do
-        if l then DimWrapped(l) end
+        if l then TextDimWrapped(l) end
     end
 
     r.ImGui_Spacing(ctx)
-    DimWrapped('Verify it by ear, and against the chart once there is one: Check loads a ' ..
+    TextDimWrapped('Verify it by ear, and against the chart once there is one: Check loads a ' ..
                'key into the charted MIDI mode to show which charted notes fall outside it.')
 end
 

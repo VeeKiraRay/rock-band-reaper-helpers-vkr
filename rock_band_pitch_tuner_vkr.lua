@@ -20,6 +20,11 @@
 --       list is read again and the new project's settings load, as they
 --       already did when switching project tabs. (Shipped with Vocal Helper
 --       v1.22.)
+--     - Secondary text (hints, empty states, "not set", minor headings) is a
+--       lighter grey that is easier to read. The same grey is used everywhere.
+--     - A shaky reading and a doubtful harmony line use the same amber as
+--       every other warning (they were a lighter amber). "Tuner: Active" is
+--       a deeper green. (With Vocal Helper v1.22.)
 --   v0.3
 --     - New Harmony readout (experimental): tick it and pick the lead chart
 --       (HARM1, or PART VOCALS) to see, below the usual note and history, the

@@ -5,7 +5,8 @@
 -- r.defer(Loop) that would spawn that helper's whole window.
 --
 -- Requires globals: r, ctx, S, Btn, BtnWidth, Tooltip, BTN_H, FormatTime,
---                   GetTimeSelection (lib/reaper_imgui_helpers.lua - load first).
+--                   GetTimeSelection, TextDim, COL_* (lib/reaper_imgui_helpers.lua -
+--                   load first).
 
 -- Track dropdown: stores and matches by REAPER track index (t.idx, from
 -- RefreshTrackLists), so a selection survives the filtered lists being rebuilt.
@@ -50,7 +51,7 @@ function MidiEditorTrackWarning(track_idx)
     local ed_take = ed and r.MIDIEditor_GetTake(ed)
     local ed_tr   = ed_take and r.GetMediaItemTake_Track(ed_take)
     if ed_tr and ed_tr ~= r.GetTrack(0, track_idx) then
-        r.ImGui_TextColored(ctx, 0xFFAA00FF, '! Source track not open in the MIDI editor.')
+        r.ImGui_TextColored(ctx, COL_WARN, '! Source track not open in the MIDI editor.')
     end
 end
 
@@ -79,10 +80,34 @@ end
 
 local TIP_COPY    = 'Copy the status line and the result panel to the clipboard.'
 
+-- Result line colour tags. A line in S.last_result may start with one of these,
+-- e.g. '{gold}Guitar OD boost\t+52,476 ... reached': the panel draws the line in
+-- that shared colour (for a two-column line, only the value after the tab) and
+-- does not show the tag; Copy result leaves it out. Names, not colours, so this
+-- table needs nothing loaded; the colours are read at draw time.
+local RESULT_TAGS = { gold = 'COL_GOLD', error = 'COL_ERROR', warn = 'COL_WARN',
+                      dim = 'COL_DIM', ok = 'COL_OK', info = 'COL_INFO' }
+
+-- Pure: a result line -> its tag name (or nil) and the line without the tag.
+-- An unknown {word} is left in the text, so a line that happens to start with
+-- braces is never eaten.
+function ResultLineTag(line)
+    local tag, rest = line:match('^{(%a+)}(.*)$')
+    if tag and RESULT_TAGS[tag] then return tag, rest end
+    return nil, line
+end
+
 -- Pure (no r / ctx / S): the text Copy result puts on the clipboard, or nil
--- when there is nothing beyond the status line worth copying.
+-- when there is nothing beyond the status line worth copying. Colour tags are
+-- dropped.
 function HelperCopyText(status, result)
     if not result or result == '' then return nil end
+    local lines = {}
+    for line in (result .. '\n'):gmatch('([^\n]*)\n') do
+        local _, text = ResultLineTag(line)
+        lines[#lines + 1] = text
+    end
+    result = table.concat(lines, '\n')
     if status and status ~= '' then return status .. '\n\n' .. result end
     return result
 end
@@ -119,13 +144,19 @@ function DrawResultPanel()
     r.ImGui_PushTextWrapPos(ctx, 0)
     for line in (S.last_result .. '\n'):gmatch('([^\n]*)\n') do
         if line ~= '' then
+            local tag
+            tag, line = ResultLineTag(line)
+            local col = tag and _G[RESULT_TAGS[tag]]
+            local function Draw(text)
+                if col then r.ImGui_TextColored(ctx, col, text) else r.ImGui_Text(ctx, text) end
+            end
             local left, right = line:match('^([^\t]*)\t(.*)$')
             if left then
                 r.ImGui_Text(ctx, left)
                 r.ImGui_SameLine(ctx, 190)
-                r.ImGui_Text(ctx, right)
+                Draw(right)
             else
-                r.ImGui_Text(ctx, line)
+                Draw(line)
             end
         else
             r.ImGui_Spacing(ctx)
@@ -143,7 +174,7 @@ function DrawHelperFooter(opts)
         if sel_s then
             r.ImGui_Text(ctx, ('Time selection: %s - %s'):format(FormatTime(sel_s), FormatTime(sel_e)))
         else
-            r.ImGui_TextDisabled(ctx, 'No time selection')
+            TextDim('No time selection')
         end
         r.ImGui_Text(ctx, S.status or '')
     end

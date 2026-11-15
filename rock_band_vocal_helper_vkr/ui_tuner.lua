@@ -12,8 +12,8 @@
 --                   RB3_MIN_PITCH, RB3_MAX_PITCH, TrackCombo, ResetTunerHarmony,
 --                   HARM_NOTE_NAMES, TUNER_KEY_OFF, TUNER_KEY_LEAD
 
-local COL_DIM   = 0xAAAAAAFF
-local COL_AMBER = 0xFFC04CFF
+-- Text colours are the shared COL_* (lib/reaper_imgui_helpers.lua). The pitch arrows
+-- keep their own green / red: they show direction, not a state or an error.
 
 -- Key snap combo entries: Off, From charted lead, then the 12 key notes.
 local function KeySnapLabel(mode)
@@ -81,7 +81,7 @@ end
 local function DrawHarmonyReadout()
     local h = S.tuner_harm or {}
     r.ImGui_Spacing(ctx)
-    r.ImGui_TextDisabled(ctx, 'Harmony readout (experimental)')
+    TextDim('Harmony readout (experimental)')
 
     if not S.tuner_active and not h.mode then
         Dim('Start the tuner to read the voices.')
@@ -107,18 +107,18 @@ local function DrawHarmonyReadout()
     r.ImGui_Text(ctx, 'HARM1: ' .. NoteHz(h.chart))
     r.ImGui_SameLine(ctx)
     if h.lead_conf then
-        r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Text(), h.lead_conf >= 0.75 and COL_DIM or COL_AMBER)
+        r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Text(), h.lead_conf >= 0.75 and COL_DIM or COL_WARN)
         r.ImGui_Text(ctx, ('(%.0f%% conf)'):format(h.lead_conf * 100))
         r.ImGui_PopStyleColor(ctx)
         Tooltip(TIPS.tuner_harm_lead)
         if h.lead and h.lead ~= h.chart and h.lead_conf >= 0.75 then
             r.ImGui_SameLine(ctx)
-            r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Text(), COL_AMBER)
+            r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Text(), COL_WARN)
             r.ImGui_Text(ctx, '- sung as ' .. PitchName(h.lead))
             r.ImGui_PopStyleColor(ctx)
         end
     else
-        r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Text(), COL_AMBER)
+        r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Text(), COL_WARN)
         r.ImGui_Text(ctx, '(not clear in the audio)')
         r.ImGui_PopStyleColor(ctx)
         Tooltip(TIPS.tuner_harm_lead)
@@ -131,12 +131,12 @@ local function DrawHarmonyReadout()
     elseif h.harm then
         r.ImGui_Text(ctx, 'HARM2: ' .. NoteHz(h.harm))
         r.ImGui_SameLine(ctx)
-        r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Text(), (h.agree or 0) >= 0.8 and COL_DIM or COL_AMBER)
+        r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Text(), (h.agree or 0) >= 0.8 and COL_DIM or COL_WARN)
         r.ImGui_Text(ctx, ('(%.0f%% agree)'):format((h.agree or 0) * 100))
         r.ImGui_PopStyleColor(ctx)
         Tooltip(TIPS.tuner_harm_agree)
         r.ImGui_SameLine(ctx)
-        r.ImGui_TextDisabled(ctx, '- ' .. where)
+        TextDim('- ' .. where)
     elseif h.single then
         Dim(h.doubled and 'HARM2: -  (only one voice found; left and right differ - maybe a doubled lead)'
                       or  'HARM2: -  (only one voice found)')
@@ -238,7 +238,7 @@ function DrawTunerTab()
     Tooltip(TIPS.tuner_toggle)
 
     r.ImGui_Spacing(ctx)
-    local state_color = S.tuner_active and 0x88FF88FF or 0x888888FF
+    local state_color = S.tuner_active and COL_OK or COL_DIM
     local state_label = S.tuner_active and 'Tuner: Active' or 'Tuner: Stopped'
     r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Text(), state_color)
     r.ImGui_Text(ctx, state_label)
@@ -258,14 +258,14 @@ function DrawTunerTab()
 
     -- Current pitch display (highlighted)
     local arrow       = ''
-    local arrow_color = 0x888888FF
+    local arrow_color = COL_DIM
     if S.tuner_pitch and S.tuner_prev_pitch then
         if     S.tuner_pitch > S.tuner_prev_pitch then arrow = '\xe2\x96\xb2'; arrow_color = 0x55FF55FF
         elseif S.tuner_pitch < S.tuner_prev_pitch then arrow = '\xe2\x96\xbc'; arrow_color = 0xFF5555FF
-        else                                           arrow = '=';             arrow_color = 0x888888FF
+        else                                           arrow = '=';             arrow_color = COL_DIM
         end
     end
-    r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Text(), 0xFFFFFFFF)
+    r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Text(), COL_TEXT)
     r.ImGui_Text(ctx, S.tuner_pitch_name or '-')
     r.ImGui_PopStyleColor(ctx)
     if arrow ~= '' then
@@ -283,7 +283,7 @@ function DrawTunerTab()
     -- Confidence: amber below 0.75 so a shaky reading looks shaky.
     if S.tuner_confidence then
         r.ImGui_SameLine(ctx)
-        local conf_col = S.tuner_confidence >= 0.75 and 0xAAAAAAFF or 0xFFC04CFF
+        local conf_col = S.tuner_confidence >= 0.75 and COL_DIM or COL_WARN
         r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Text(), conf_col)
         r.ImGui_Text(ctx, ('(%.0f%% conf)'):format(S.tuner_confidence * 100))
         r.ImGui_PopStyleColor(ctx)
@@ -292,7 +292,7 @@ function DrawTunerTab()
     -- History strip (dimmed, newest on left)
     if #S.tuner_history > 0 then
         r.ImGui_Spacing(ctx)
-        r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Text(), 0xAAAAAAFF)
+        r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Text(), COL_DIM)
         r.ImGui_Text(ctx, table.concat(S.tuner_history, '  '))
         r.ImGui_PopStyleColor(ctx)
     end

@@ -22,11 +22,14 @@ local _last_lookup_time = 0
 
 local _ROW_ORDER = { 'b', 'g', 'd', 'k', 'v' }
 
+-- Shared text colours (lib/reaper_imgui_helpers.lua, loaded first by every window
+-- that draws this row). Idle is blue: it pops against active-green, where yellow
+-- read too close.
 local _COLORS = {
-    active = 0x44DD44FF,
-    idle   = 0x4499FFFF,  -- blue: pops against active-green (yellow read too close)
-    muted  = 0xFF4444FF,
-    nodata = 0xFFAA00FF,  -- warning amber, matches ui_midi.lua
+    active = COL_OK,
+    idle   = COL_INFO,
+    muted  = COL_ERROR,
+    nodata = COL_WARN,
 }
 
 local function _rescan()

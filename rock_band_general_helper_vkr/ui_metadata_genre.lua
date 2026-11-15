@@ -29,13 +29,6 @@
 --                   GENRE_FAMILY_ORDER, GENRE_FAMILIES (metadata_genres_ext.lua),
 --                   GenresInFamily, ResolveExtendedGenre (metadata_genres_lookup.lua)
 
--- Secondary text that still has to wrap. ImGui's TextDisabled has no wrapping variant,
--- so the colour is pushed by hand around a TextWrapped.
-local function DimWrapped(text)
-    r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Text(), 0x9A9A9AFF)
-    r.ImGui_TextWrapped(ctx, text)
-    r.ImGui_PopStyleColor(ctx)
-end
 
 -- Clamp an index into a list that may have changed length. Always returns >= 1 so the
 -- combos below can index without a nil guard.
@@ -49,9 +42,9 @@ end
 -- The optional documentation for one supported subgenre. Most subgenres carry none of
 -- this, so every line is conditional and the block can render as nothing at all.
 local function DrawSubgenreDoc(sub)
-    if sub.elements then DimWrapped('Typical elements: ' .. sub.elements) end
-    if sub.artists  then DimWrapped('Example artists: '  .. sub.artists)  end
-    if sub.albums   then DimWrapped('Example albums: '   .. sub.albums)   end
+    if sub.elements then TextDimWrapped('Typical elements: ' .. sub.elements) end
+    if sub.artists  then TextDimWrapped('Example artists: '  .. sub.artists)  end
+    if sub.albums   then TextDimWrapped('Example albums: '   .. sub.albums)   end
 end
 
 ----------------------------------------------------------------------
@@ -130,7 +123,7 @@ local function DrawForward(lbl_col)
         r.ImGui_Text(ctx, 'Animation style: ' .. GenreAnimStyle(c.genre_key).label)
         r.ImGui_TextWrapped(ctx, c.why)
         if c.sub.blurb and c.sub.blurb ~= '' then
-            DimWrapped('Described as: ' .. c.sub.blurb)
+            TextDimWrapped('Described as: ' .. c.sub.blurb)
         end
         DrawSubgenreDoc(c.sub)
         r.ImGui_Unindent(ctx)
@@ -145,7 +138,7 @@ local function DrawForward(lbl_col)
         r.ImGui_Separator(ctx)
         r.ImGui_Spacing(ctx)
         for _, sa in ipairs(res.see_also) do
-            DimWrapped(('If %s, see "%s" instead.'):format(sa.when, sa.label))
+            TextDimWrapped(('If %s, see "%s" instead.'):format(sa.when, sa.label))
         end
         Tooltip(TIPS.genre_see_also)
     end
@@ -162,7 +155,7 @@ local function DrawAnimStyles()
         'available, since some cuts exist only for one style. A genre the game does not ' ..
         'know gets Rocker.')
     r.ImGui_Spacing(ctx)
-    DimWrapped(
+    TextDimWrapped(
         'Official songs have set the style per song inside their own game files, and many ' ..
         'differ from this table. A custom song built with Magma has no such setting, so ' ..
         'its genre decides the style - unless the built song is edited afterwards with a ' ..
@@ -243,7 +236,7 @@ function DrawMetadataGenreTab(ctx)
     -- mechanism. The second is about the supported list itself, which says the same of
     -- its own contents. Metadata > Difficulty carries only the first kind, because its
     -- inputs are measurements rather than somebody's opinion.
-    DimWrapped(
+    TextDimWrapped(
         'Where a style belongs is a judgment call, and some genres genuinely map more ' ..
         'than one way. If a suggestion looks plainly wrong to you, it is worth saying ' ..
         'so - these mappings are meant to be corrected.')

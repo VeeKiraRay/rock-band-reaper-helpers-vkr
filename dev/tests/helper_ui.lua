@@ -3,7 +3,7 @@
 -- DrawResultPanel, HelperFooterHeight) needs an ImGui context and is checked in
 -- REAPER by hand.
 --
--- Requires globals: Test, HelperCopyText, MakeProjectPoll, MakeProjectSwitchCheck, r
+-- Requires globals: Test, HelperCopyText, ResultLineTag, MakeProjectPoll, MakeProjectSwitchCheck, r
 --                   (run_helper_ui.lua).
 
 ------------------------------------------------------------------
@@ -27,6 +27,28 @@ end)
 Test.it('tab-column result lines are copied as they are', function()
     local t = HelperCopyText('OK', 'Notes\t12')
     Test.expect(t == 'OK\n\nNotes\t12', 'got ' .. tostring(t))
+end)
+
+Test.it('colour tags are left out of the copied text', function()
+    local t = HelperCopyText('OK', '{gold}Guitar\t+100, reached\nplain\n{warn}? advice')
+    Test.expect(t == 'OK\n\nGuitar\t+100, reached\nplain\n? advice', 'got ' .. tostring(t))
+end)
+
+------------------------------------------------------------------
+Test.section('Result line colour tags')
+
+Test.it('a known tag is split off the line', function()
+    local tag, rest = ResultLineTag('{error}Bass OD boost\tshort by 1,200')
+    Test.expect(tag == 'error' and rest == 'Bass OD boost\tshort by 1,200', tostring(tag) .. ' / ' .. tostring(rest))
+end)
+
+Test.it('no tag, an unknown tag, or a tag mid-line leave the text alone', function()
+    local tag, rest = ResultLineTag('Plain line')
+    Test.expect(tag == nil and rest == 'Plain line', 'plain')
+    tag, rest = ResultLineTag('{chorus} starts here')
+    Test.expect(tag == nil and rest == '{chorus} starts here', 'unknown tag kept')
+    tag, rest = ResultLineTag('x {gold}')
+    Test.expect(tag == nil and rest == 'x {gold}', 'mid-line')
 end)
 
 ------------------------------------------------------------------

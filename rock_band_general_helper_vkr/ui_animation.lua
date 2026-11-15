@@ -92,7 +92,7 @@ local function StateTooltip(msg, group, vocal)
     end
     r.ImGui_Text(ctx, CharStateDesc(msg, vocal))
     r.ImGui_Separator(ctx)
-    r.ImGui_TextDisabled(ctx, msg)
+    TextDim(msg)
     EndVenueTooltip()
 end
 
@@ -166,7 +166,7 @@ local function DrawCharacterGenerate(lbl_col)
         if v then S.char_active[g.key] = v end
         if reason then
             r.ImGui_SameLine(ctx)
-            r.ImGui_TextDisabled(ctx, '(' .. reason .. ')')
+            TextDim('(' .. reason .. ')')
             r.ImGui_EndDisabled(ctx)
         end
     end
@@ -261,14 +261,14 @@ local function DrawCharacterManual(lbl_col)
     r.ImGui_Text(ctx, 'At playhead')
     r.ImGui_SameLine(ctx, lbl_col)
     if not _readout then
-        r.ImGui_TextDisabled(ctx, '(no MIDI item)')
+        TextDim('(no MIDI item)')
     elseif _readout.none then
-        r.ImGui_TextDisabled(ctx, '(no state yet)')
+        TextDim('(no state yet)')
     else
         r.ImGui_Text(ctx, CharStateLabel(_readout.msg))
         StateTooltip(_readout.msg, p.group, p.vocal)
         r.ImGui_SameLine(ctx)
-        r.ImGui_TextDisabled(ctx, _readout.where)
+        TextDim(_readout.where)
         Tooltip(TIPS.char_readout)
     end
 end

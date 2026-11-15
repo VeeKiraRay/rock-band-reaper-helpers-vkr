@@ -249,12 +249,12 @@ function DrawVenueTab(ctx)
 
             local _no_themes = #S.venue_themes == 0
             if _no_themes then
-                r.ImGui_TextDisabled(ctx, 'No themes found - add .rbtheme files to the resources/themes/ folder')
+                TextDimWrapped('No themes found - add .rbtheme files to the resources/themes/ folder')
                 r.ImGui_BeginDisabled(ctx)
             end
             local _no_sections = not S.venue_sections or #S.venue_sections == 0
             if _no_sections then
-                r.ImGui_TextDisabled(ctx, 'Add [prc_*] markers to the EVENTS track for section-based generation')
+                TextDimWrapped('Add [prc_*] markers to the EVENTS track for section-based generation')
                 r.ImGui_Spacing(ctx)
             end
 

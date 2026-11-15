@@ -316,7 +316,7 @@ function DrawVenueManualTab()
         -- reports hover, so a tooltip drawn inside it could never explain the block.
         r.ImGui_EndDisabled(ctx)
         r.ImGui_SameLine(ctx)
-        r.ImGui_TextDisabled(ctx, '(blocked)')
+        TextDim('(blocked)')
         Tooltip(NO_LIGHTING_AT_PLAYHEAD_MSG)
         r.ImGui_BeginDisabled(ctx)
     end
@@ -429,7 +429,7 @@ function DrawVenueManualTab()
                                              _kf_ctx.lighting, _kf_ctx.keys, _lt_tol)
         if _kind then
             r.ImGui_SameLine(ctx)
-            r.ImGui_TextDisabled(ctx, '(does nothing here)')
+            TextDim('(does nothing here)')
             Tooltip(KeyframeNoEffectReason(_kind, S.venue_mg_special, _klt))
         end
     end

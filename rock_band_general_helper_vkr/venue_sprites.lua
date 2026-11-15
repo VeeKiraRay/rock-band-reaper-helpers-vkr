@@ -229,7 +229,7 @@ end
 --   opts.intro  text drawn above the description whether or not anything is selected
 --               (Section gen's combos explain themselves even when empty)
 --   opts.label  display label to head the description with ("Label:\ntip")
--- Text is drawn with Text/TextDisabled, never TextWrapped: BeginVenueTooltip pins the
+-- Text is drawn with Text/TextDim, never TextWrapped: BeginVenueTooltip pins the
 -- wrap position to the sprite width, and TextWrapped would override it with the window
 -- width, widening every tooltip.
 function VenueEventTooltip(category, bare, tip, opts)
@@ -245,7 +245,7 @@ function VenueEventTooltip(category, bare, tip, opts)
     local raw = RawVenueEventText(category, bare)
     if raw then
         r.ImGui_Separator(ctx)
-        r.ImGui_TextDisabled(ctx, raw)
+        TextDim(raw)
     end
     EndVenueTooltip()
 end

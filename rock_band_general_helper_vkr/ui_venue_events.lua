@@ -78,17 +78,17 @@ local function _draw_prc_row(g, scan, cur_t, cur_ppq, no_take, use_letters, lbl_
         local caps = (SECTION_EVENT_BASE[sel] or {}).caps
         local is_generic = g.kind == 'generic'
         if text and not use_letters and not is_generic and SectionLettersOnly(caps, num) then
-            r.ImGui_TextDisabled(ctx, '-> ' .. text .. ' (letter required)')
+            TextDim('-> ' .. text .. ' (letter required)')
             Tooltip(TIPS.venue_ev_letters_only)
         elseif text and use_letters and SectionNoLetters(caps, num, is_generic) then
-            r.ImGui_TextDisabled(ctx, '-> ' .. text .. ' (no lettered form)')
+            TextDim('-> ' .. text .. ' (no lettered form)')
             Tooltip(TIPS.venue_ev_no_letters)
         elseif text then
-            r.ImGui_TextDisabled(ctx, '-> ' .. text)
+            TextDim('-> ' .. text)
             Tooltip(TIPS.venue_ev_next)
         else
             -- full reason on hover and in the result section after Add
-            r.ImGui_TextDisabled(ctx, '-> (blocked)')
+            TextDim('-> (blocked)')
             Tooltip(err)
         end
     end
@@ -133,7 +133,7 @@ local function _draw_plain_row(g, scan, cur_ppq, no_take, lbl_col, combo_w)
         local ok, err = ValidatePlainInsert(scan, sel, cur_ppq)
         if not ok then
             r.ImGui_SameLine(ctx)
-            r.ImGui_TextDisabled(ctx, '(blocked)')
+            TextDim('(blocked)')
             Tooltip(err)
         end
     end
@@ -185,7 +185,7 @@ function DrawVenueEventsTab()
     end
 
     if no_take then
-        r.ImGui_TextDisabled(ctx, ev_track
+        TextDimWrapped(ev_track
             and 'No MIDI item on EVENTS track - add one to enable Add'
             or  'No EVENTS track found - create it to enable Add')
     end

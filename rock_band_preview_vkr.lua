@@ -39,6 +39,12 @@
 --     - Fixed: opening another project in the same project tab (File > Open,
 --       recent projects) kept the previous project's saved preview settings.
 --       They now load, as they already did when switching project tabs.
+--     - Secondary text (hints, empty states, "not set", minor headings) is a
+--       lighter grey that is easier to read. The same grey is used everywhere.
+--     - The "blending now" line and a fallback camera's name use the same
+--       amber as the General Helper's other warnings (they were a lighter
+--       amber). The Players row's idle blue is a brighter sky blue, the blue
+--       the General Helper uses everywhere now.
 --   v0.7
 --     - No change to this window. The General Helper's instrument tabs moved
 --       to the new Instrument Helper (General Helper v0.9.63), and the track

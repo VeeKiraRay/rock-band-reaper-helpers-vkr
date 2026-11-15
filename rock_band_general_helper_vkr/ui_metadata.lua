@@ -18,7 +18,6 @@
 --                   DrawMetadataScoreTab (ui_metadata_score.lua)
 
 -- Amber for advisory notes, matching the inline warnings elsewhere in this script.
-local COL_WARN = 0xFFAA00FF
 
 ----------------------------------------------------------------------
 -- The difficulty dots
@@ -195,7 +194,7 @@ local function DrawCard(rec, lbl_col)
         -- An expected part that cannot be scored still gets a row. Dropping it silently
         -- looks identical to the tool not having noticed the instrument, and the reason
         -- ("PART KEYS not found" vs "PART KEYS is muted") is usually the whole answer.
-        r.ImGui_TextDisabled(ctx, rec.reason or 'No chart')
+        TextDim(rec.reason or 'No chart')
         r.ImGui_Unindent(ctx)
         return
     end
@@ -218,7 +217,7 @@ local function DrawCard(rec, lbl_col)
         -- longest one. Reading the cursor first also keeps this correct if the card ever
         -- gains or loses an indent level.
         local row_x = r.ImGui_GetCursorPosX(ctx)
-        r.ImGui_TextDisabled(ctx, rec.ruler.lo_label)
+        TextDim(rec.ruler.lo_label)
         r.ImGui_SameLine(ctx, row_x + lbl_col)
         DrawTierRuler(rec.ruler)
         -- The prose that used to be a line of its own. Same words, no longer competing
@@ -226,7 +225,7 @@ local function DrawCard(rec, lbl_col)
         Tooltip(rec.position_text and (TIPS.diff_ruler .. '\n\n' .. 'This one is '
                 .. rec.position_text .. '.') or TIPS.diff_ruler)
         r.ImGui_SameLine(ctx)
-        r.ImGui_TextDisabled(ctx, rec.ruler.hi_label)
+        TextDim(rec.ruler.hi_label)
     end
 
     for _, w in ipairs(rec.warnings or {}) do
@@ -249,7 +248,7 @@ local function DrawCard(rec, lbl_col)
             if e.tip then Tooltip(e.tip) end
         end
     else
-        r.ImGui_TextDisabled(ctx, 'Nothing about this chart stands out from the reference songs.')
+        TextDimWrapped('Nothing about this chart stands out from the reference songs.')
     end
 
     -- The raw measurements are the development view: useful when comparing against the
@@ -267,10 +266,10 @@ local function DrawCard(rec, lbl_col)
             -- it would read as the real answer; in the development view it is exactly what
             -- someone comparing against the corpus wants to see.
             if rec.clamped and rec.raw_rank then
-                r.ImGui_TextDisabled(ctx,
+                TextDim(
                     ('Uncapped score: %.0f (shown as %d)'):format(rec.raw_rank, rec.rank))
             end
-            r.ImGui_TextDisabled(ctx, 'Measured value, and how unusual it is:')
+            TextDim('Measured value, and how unusual it is:')
             Tooltip(TIPS.diff_suggest_why)
             for _, row in ipairs(rec.factor_rows or {}) do
                 r.ImGui_Text(ctx, row.label)

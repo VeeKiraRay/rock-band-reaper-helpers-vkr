@@ -16,12 +16,9 @@
 --                   ScoreReadSong, ScoreSimulatePart, ScoreFindings, ScoreCoverageText,
 --                   ScoreBarOf, SCORE_PARTS
 
-local COL_WARN  = 0xFFAA00FF
-local COL_GOLD  = 0xFFD24AFF
--- Red, not amber, for "short of gold": something to fix or at least look at, and amber
--- sits too close to the gold used all over this tab to stand out. The same red the Venue
--- Preview uses for a directed cut that cannot play (ui_venue_preview.lua, _LOST_COL).
-local COL_ERROR = 0xFF4444FF
+-- Colours are the shared COL_* (lib/reaper_imgui_helpers.lua). "Short of gold" is
+-- COL_ERROR, not COL_WARN: something to fix or at least look at, and amber sits too
+-- close to the gold used all over this tab to stand out.
 
 -- 123456 -> "123,456".
 local function Num(n)
@@ -81,7 +78,7 @@ end
 -- Rows in reading order: what each star needs, the full combo without overdrive, the
 -- score with it. Coverage and findings follow in DrawCard.
 local function DrawRun(res, bars)
-    if res.label then r.ImGui_TextDisabled(ctx, res.label) end
+    if res.label then TextDim(res.label) end
 
     local parts = {}
     for i = 1, 5 do parts[i] = ('%s %s'):format(STAR_NAMES[i], Num(res.stars[i])) end
@@ -95,7 +92,7 @@ local function DrawRun(res, bars)
         Num(res.base_streak + res.base_bonus)))
     if res.base_bonus > 0 then
         r.ImGui_SameLine(ctx)
-        r.ImGui_TextDisabled(ctx, ('(%s of it bonus)'):format(Num(res.base_bonus)))
+        TextDim(('(%s of it bonus)'):format(Num(res.base_bonus)))
     end
 
     local got = ('FC with OD: %s (%s)'):format(Num(res.total),
@@ -112,7 +109,7 @@ local function DrawRun(res, bars)
     -- often each lane is hit), so its share is named: the total assumes the most.
     if res.bre_points and res.bre_points > 0 then
         r.ImGui_SameLine(ctx)
-        r.ImGui_TextDisabled(ctx, ('(up to %s of it from the Big Rock Ending)'):format(
+        TextDim(('(up to %s of it from the Big Rock Ending)'):format(
             Num(res.bre_points)))
         Tooltip(TIPS.score_bre)
     end
@@ -125,7 +122,7 @@ local function DrawCard(card, bars)
     if card.kind == 'vocals' and card.runs then Tooltip(TIPS.score_vocals) end
     r.ImGui_Indent(ctx)
     if not card.runs then
-        r.ImGui_TextDisabled(ctx, card.reason or 'No chart')
+        TextDim(card.reason or 'No chart')
         r.ImGui_Unindent(ctx)
         return
     end
@@ -148,7 +145,7 @@ local function DrawCard(card, bars)
         else
             -- Grey = the theme's own disabled-text colour, so no new hex value.
             r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Text(), f.level == 'advice' and COL_WARN
-                or r.ImGui_GetStyleColor(ctx, r.ImGui_Col_TextDisabled()))
+                or COL_DIM)
             r.ImGui_TextWrapped(ctx, f.text)
             r.ImGui_PopStyleColor(ctx)
         end

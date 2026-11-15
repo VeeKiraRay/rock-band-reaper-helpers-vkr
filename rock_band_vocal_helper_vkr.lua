@@ -18,6 +18,11 @@
 --       recent projects) was not noticed, so the previous song's track
 --       selections, lyrics file and result stayed, and its settings were not
 --       loaded. Only switching project tabs reset the window. Both now do.
+--     - Secondary text (hints, empty states, "not set", minor headings) is a
+--       lighter grey that is easier to read. The same grey is used everywhere.
+--     - Pitch > Tuner: a shaky reading and a doubtful harmony line use the
+--       same amber as every other warning (they were a lighter amber).
+--       "Tuner: Active" is a deeper green, the green every window uses now.
 --   v1.21
 --     - The Tuner and Pitch slide tabs are now sub-tabs of the Pitch tab,
 --       which reads Tuner, Snap, Slide, Placement - Built-in, Placement -

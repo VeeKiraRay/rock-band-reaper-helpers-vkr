@@ -97,9 +97,9 @@ Items 1 and 2 are covered by `dev/tests/script_links.lua`, which checks the regi
 
 | File | Contents |
 |---|---|
-| `lib/reaper_imgui_helpers.lua` | `PitchName`, `Tooltip`, `SliderTooltip`, `ScriptWindowTitle`, `Btn`, `BtnWidth`, `BtnGroupWidth`, `LabelColWidth`, `RadioGroupWidth`, `SectionHeader`, `SortedByLabel`, `ComboGroupHeader`, `GetTrackList`, `FormatTime`, `GetTimeSelection`, `BeginScrollBody` (BeginChild for both the 0.9 and the 0.7/0.8 signature) |
+| `lib/reaper_imgui_helpers.lua` | The text colours `COL_TEXT`, `COL_DIM`, `COL_WARN`, `COL_ERROR`, `COL_GOLD`, `COL_OK`, `COL_INFO` (see "Text colours"); `TextDim`, `TextDimWrapped`, `TextColoredWrapped`; `PitchName`, `Tooltip`, `SliderTooltip`, `ScriptWindowTitle`, `Btn`, `BtnWidth`, `BtnGroupWidth`, `LabelColWidth`, `RadioGroupWidth`, `SectionHeader`, `SortedByLabel`, `ComboGroupHeader`, `GetTrackList`, `FormatTime`, `GetTimeSelection`, `BeginScrollBody` (BeginChild for both the 0.9 and the 0.7/0.8 signature) |
 | `lib/reaper_helper_common.lua` | `FindTrackByName`, `TrackAtIndex`, `GetTakePPQPerQN`, `GetTempoContextBefore`, `TrackHasAudio`, `TrackHasMIDI`, `RefreshTrackLists`, `RunAction`, `MakeProjectPoll`, `MakeProjectSwitchCheck` — track and action helpers the General, Instrument and Vocal helpers share. Writes the caller's `S` (`*_track_list`, `status`, `last_result`), so each script declares those fields. `RunAction` calls the script's optional global `RunActionErrorCleanup()` after a failed action (the vocal helper closes its open YIN context there) |
-| `lib/reaper_helper_ui.lua` | `TrackCombo`, `MidiEditorTrackWarning`, `DrawResultPanel`, `HelperFooterHeight`, `DrawHelperFooter`, `HelperCopyText` — UI every window draws (see "Window footer" below). `TrackCombo` matches by REAPER track index and offers `(none)` (`-1`): an optional input left unset, or a required one not picked yet — actions resolve indices through `TrackAtIndex` and ask for a track when it returns nil. `DrawResultPanel()` draws the last result (a line with a tab renders as two columns) |
+| `lib/reaper_helper_ui.lua` | `TrackCombo`, `MidiEditorTrackWarning`, `DrawResultPanel`, `HelperFooterHeight`, `DrawHelperFooter`, `HelperCopyText`, `ResultLineTag` — UI every window draws (see "Window footer" below). `TrackCombo` matches by REAPER track index and offers `(none)` (`-1`): an optional input left unset, or a required one not picked yet — actions resolve indices through `TrackAtIndex` and ask for a track when it returns nil. `DrawResultPanel()` draws the last result (a line with a tab renders as two columns) |
 | `lib/reaper_dsp.lua` | `ComputeRMSContour`, `OpenYINContext`, `YINWindowSize`, `ReadMonoWindow`, `QuickRMS`, `ComputeCMND`, `SearchYINTau`, `MedianVote`, `DetectPitchYIN`, `SampleYINAt`, `GateAndSplit`, `ApplyMinOffset` |
 | `lib/reaper_midi_helpers.lua` | `FindMIDIItem`, `FindFirstMIDIItem`, `ReadAllMIDINotesOnTrack`, `ClearNotesAtPitchesInRange`, `InsertNotes`, `ReplaceNotesBulk` (one `MIDI_GetAllEvts` / `MIDI_SetAllEvts` round trip: Difficulty > Generate, Animation > Drums), … |
 | `lib/reaper_guitar_theory.lua` | `GuitarShapeToPitches`, `GuitarNormalizeIntervals`, `GuitarClassifyChordType`, `GuitarSuggestRBMapping`, `GuitarAnalyzeShape`, `GuitarParseFretInput`, `GuitarAnalyzeShapeAllTunings` — pure, no `r`/`ctx`/`S` |
@@ -257,7 +257,7 @@ the cursor before drawing the label and offset from there, which also survives
 the block gaining or losing an indent level:
 ```lua
 local row_x = r.ImGui_GetCursorPosX(ctx)   -- includes the current indent
-r.ImGui_TextDisabled(ctx, label)
+TextDim(label)
 r.ImGui_SameLine(ctx, row_x + lbl_col)
 ```
 `rock_band_general_helper_vkr/ui_metadata.lua` is currently the only file that
@@ -313,13 +313,58 @@ a camera-pacing column) that isn't the shared convention.
 ### Wrapped text for descriptions and alerts
 Any newly-added description, warning, or status text long enough to
 plausibly exceed one line at a normal window width — a tab/section intro
-sentence, a `TextDisabled` empty-state message, an inline warning — should
-use `r.ImGui_TextWrapped` instead of `r.ImGui_Text` / `r.ImGui_TextDisabled`
-from the start, so it flows to a new line instead of clipping when the
+sentence, a dimmed empty-state message, an inline warning — should
+use `r.ImGui_TextWrapped` / `TextDimWrapped` / `TextColoredWrapped` instead of
+`r.ImGui_Text` / `TextDim` / `r.ImGui_TextColored` from the start, so it flows to a new line instead of clipping when the
 window is narrow (the same treatment the result panel already gets via
 `PushTextWrapPos`/`PopTextWrapPos` in both `ui.lua` files). Reserve plain
-`Text`/`TextDisabled` for short labels (section titles, single words, widget
+`Text`/`TextDim` for short labels (section titles, single words, widget
 labels) that aren't at risk of overflowing.
+
+### Text colours
+Text is coloured by **meaning**, with the shared constants in
+`lib/reaper_imgui_helpers.lua` — never a hex literal, and never a shade close to
+one of them ("a slightly lighter amber for this one" is how three ambers and seven
+greys built up before):
+
+| Constant | Meaning |
+|---|---|
+| `COL_TEXT` `0xFFFFFFFF` | white that must stay white (the main value of a live readout) |
+| `COL_DIM` `0xAAAAAAFF` | secondary text: hints, empty states, headers of minor groups, less important values |
+| `COL_WARN` `0xFFAA00FF` | amber: a warning, an advisory, worth a look |
+| `COL_ERROR` `0xFF4444FF` | red: an error, something to fix |
+| `COL_GOLD` `0xFFD24AFF` | gold stars reached |
+| `COL_OK` `0x44DD44FF` | green: running, active, good |
+| `COL_INFO` `0x22BBFFFF` | blue: a neutral highlight, a state worth telling apart |
+
+**One style: saturated, at a similar brightness.** The colours carry little white
+(under about 30% in the darkest channel) and sit close together in perceived
+lightness on the dark window background: green, blue and amber at L* 72-78, gold a
+little brighter (it has to read as gold, not amber), red darker (a red pushed up to
+the others' brightness turns pink). A pastel set (more white) and a deeper set were
+compared side by side and rejected: pastel weakened the error red, and green and
+blue at full brightness stood out from the rest. Amber and gold are only 5 degrees
+apart in hue, so they are told apart by brightness - do not move either toward the
+other. A new colour, and the drawing colours when they get their own pass, follow
+the same style: pick a hue, keep the white mix low, match the band's brightness.
+
+- **Dim text uses `TextDim(text)` / `TextDimWrapped(text)`, never
+  `r.ImGui_TextDisabled`.** ImGui's disabled grey (`0x808080` in ReaImGui's default
+  style) is too faint to read and has no wrapping variant. A widget that is
+  actually disabled is dimmed by `BeginDisabled`, which is independent of this.
+- **The result panel** (`DrawResultPanel`) colours a line that starts with a tag:
+  `{gold}`, `{error}`, `{warn}`, `{dim}`, `{ok}`, `{info}`. On a two-column line
+  (`label\tvalue`) only the value is coloured. The tag is not drawn, and Copy result
+  leaves it out (`ResultLineTag`, `HelperCopyText`).
+- **A module that builds a colour table at load time** (`ui_venue_players.lua`,
+  `ui_keys_tuner.lua`) needs the lib loaded before it — every entry point loads it
+  first; a test runner must too.
+- **Drawing colours are not text colours.** Plates, gems, piano keys, strip ticks,
+  difficulty dots, the pitch arrows' direction green / red and graded scales such as
+  the Keys tuner's confidence keep their own local values; they are tuned against
+  what they are drawn on. A shared text colour used for a graded step (the Keys
+  tuner's `likely` / `maybe` / `clear`) is fine. They have not had a pass of their
+  own yet; when they do, they follow the style above.
 
 ### `BeginDisabled` / `EndDisabled` balance
 Snapshot any state flag that drives a `BeginDisabled` guard once before widget calls — a button click mid-frame can change `S.busy`, breaking the paired `EndDisabled`:

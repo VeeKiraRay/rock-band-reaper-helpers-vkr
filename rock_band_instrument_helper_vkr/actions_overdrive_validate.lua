@@ -469,18 +469,20 @@ local function PlayReport(rep)
             out[#out + 1] = ('%s in OD\t%s'):format(spec.label,
                 cov and (cov:gsub(' in OD', '', 1)) or 'never deployed')
             if fc > 0 then
-                local verdict = res.total >= res.stars[6] and 'reached'
-                    or ('short by %s'):format(Num(res.gold_short))
-                out[#out + 1] = ('%s OD boost\t+%s: x%.2f of the %sFC - gold needs x%.2f, %s')
-                    :format(spec.label, Num(res.total - fc), res.total / fc,
-                            drums and 'Pro drums ' or '', res.stars[6] / fc, verdict)
+                -- Gold when reached, red when short - the Metadata > Score colours
+                -- (result line tags, lib/reaper_helper_ui.lua).
+                local gold = res.total >= res.stars[6]
+                local verdict = gold and 'reached' or ('short by %s'):format(Num(res.gold_short))
+                out[#out + 1] = ('%s%s OD boost\t+%s: x%.2f of the %sFC - gold needs x%.2f, %s')
+                    :format(gold and '{gold}' or '{error}', spec.label, Num(res.total - fc),
+                            res.total / fc, drums and 'Pro drums ' or '', res.stars[6] / fc, verdict)
             end
             for _, f in ipairs(ScoreFindings(res, song.bars, spec.kind)) do
                 if f.level == 'warn' then
                     rep.n_warnings = rep.n_warnings + 1
                     out[#out + 1] = '! ' .. f.text
                 elseif f.level == 'advice' then
-                    out[#out + 1] = '? ' .. f.text
+                    out[#out + 1] = '{warn}? ' .. f.text   -- amber, as Metadata > Score
                 end
             end
         end

@@ -43,10 +43,10 @@ function DrawPitchSlideTab(ctx)
     local min_slidable_ms = S.slide_skip_ms * 2 + S.slide_min_seg_ms * 2
     if min_slidable_ms > S.slide_min_note_ms then
         r.ImGui_Spacing(ctx)
-        r.ImGui_TextColored(ctx, 0xFFAA00FF,
+        r.ImGui_TextColored(ctx, COL_WARN,
             ('! Min segment \xc3\x972 + Edge skip \xc3\x972 = %dms exceeds Min note length (%dms).')
                 :format(min_slidable_ms, S.slide_min_note_ms))
-        r.ImGui_TextColored(ctx, 0xFFAA00FF,
+        r.ImGui_TextColored(ctx, COL_WARN,
             '  No slides can be detected with these settings.')
     end
     r.ImGui_Separator(ctx)

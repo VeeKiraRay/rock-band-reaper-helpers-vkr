@@ -4,7 +4,6 @@
 --           ComputeWorkflowStats), lib/reaper_imgui_helpers.lua
 --           (Tooltip, SectionHeader, WIDTH_STD), r, ctx, S, TIPS (globals)
 
-local COL_WARNING = 0xFFAA00FF  -- warning amber, matches ui_midi.lua / ui_venue_players.lua
 
 function DrawGeneralWorkflowTab()
     if S.workflow_files == nil then
@@ -34,7 +33,7 @@ function DrawGeneralWorkflowTab()
     end
 
     if #S.workflow_files == 0 then
-        r.ImGui_TextDisabled(ctx, 'No workflow templates found - add .txt files to the resources/workflow/ folder')
+        TextDimWrapped('No workflow templates found - add .txt files to the resources/workflow/ folder')
         return
     end
 
@@ -64,7 +63,7 @@ function DrawGeneralWorkflowTab()
 
     if S.workflow_file_idx == 0 then
         r.ImGui_Spacing(ctx)
-        r.ImGui_TextDisabled(ctx, 'Select a workflow template above.')
+        TextDim('Select a workflow template above.')
         return
     end
 
@@ -77,7 +76,7 @@ function DrawGeneralWorkflowTab()
     if #wf.errors > 0 then
         r.ImGui_Spacing(ctx)
         for _, msg in ipairs(wf.errors) do
-            r.ImGui_TextColored(ctx, COL_WARNING, '! ' .. msg)
+            r.ImGui_TextColored(ctx, COL_WARN, '! ' .. msg)
         end
     end
 
@@ -125,7 +124,7 @@ function DrawGeneralWorkflowTab()
                 if e.tooltip then Tooltip(e.tooltip) end
 
                 if S.workflow_show_ts and checked and st and st.ts then
-                    r.ImGui_TextDisabled(ctx, '    Completed on ' .. os.date('%d.%m.%Y at %H:%M', st.ts))
+                    TextDim('    Completed on ' .. os.date('%d.%m.%Y at %H:%M', st.ts))
                 end
 
                 if changed then
@@ -137,6 +136,6 @@ function DrawGeneralWorkflowTab()
 
     if S.workflow_hide_done and not any_rendered then
         r.ImGui_Spacing(ctx)
-        r.ImGui_TextDisabled(ctx, 'Everything checked off!')
+        TextDim('Everything checked off!')
     end
 end

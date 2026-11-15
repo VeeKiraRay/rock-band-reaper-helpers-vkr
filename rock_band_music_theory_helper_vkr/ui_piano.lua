@@ -420,7 +420,7 @@ function DrawPianoTab()
 
     if not AUDIO_CF_AVAILABLE then
         r.ImGui_SameLine(ctx)
-        r.ImGui_TextDisabled(ctx, '(install the SWS extension to hear playback)')
+        TextDim('(install the SWS extension to hear playback)')
     end
 
     r.ImGui_Spacing(ctx)
@@ -429,7 +429,7 @@ function DrawPianoTab()
     SectionHeader('Keys to Press')
     r.ImGui_Spacing(ctx)
     if #notes == 0 then
-        r.ImGui_TextDisabled(ctx, '(no note heads placed)')
+        TextDim('(no note heads placed)')
     else
         local parts = {}
         for _, note in ipairs(notes) do

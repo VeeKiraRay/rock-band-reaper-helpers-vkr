@@ -33,14 +33,11 @@ local _SHOW_CURRENT_ONLY = 0   -- "Current only V": one category per row
 local _SHOW_SURROUNDING  = 1
 local _SHOW_CURRENT_H    = 2   -- "Current only H": the three categories side by side
 
--- Amber, for the one transition line that reports live state ("blending now").
--- Deliberately not the 0xFF4444FF red a lost directed cut uses - that red means
--- "nothing here can play", which a blend in progress is the opposite of.
-local _BLEND_ACTIVE_COL = 0xFFCC66FF
-local _LOST_COL         = 0xFF4444FF
--- The same amber for a camera event the game swaps for a fallback: not an error,
--- but worth a look - is the fallback shot fine here? Red stays for "cannot play".
-local _FALLBACK_COL     = 0xFFCC66FF
+-- Colours (COL_*, lib/reaper_imgui_helpers.lua): COL_WARN for the one transition
+-- line that reports live state ("blending now") and for a camera event the game
+-- swaps for a fallback (not an error, but worth a look - is the fallback shot fine
+-- here?). COL_ERROR only for a lost directed cut: "nothing here can play", which a
+-- blend in progress or a fallback is the opposite of.
 
 -- When no stacked shot fits the selected lineup the column keeps the authored
 -- event's text, marked with " *", and pictures what the game plays instead
@@ -150,7 +147,7 @@ local function _fallback_tip(fb, combo_name)
 end
 
 -- How the event in a column hands over to whatever follows it, as one line under
--- the timestamp. Returns text, color (nil color = TextDisabled).
+-- the timestamp. Returns text, color (nil color = COL_DIM).
 --
 -- Lighting and post proc arrive from AnnotateVenueBlends (venue.lua) already
 -- collapsed - a blend anchor restates a preset that is already running, so it is
@@ -164,7 +161,7 @@ local function _transition_line(ev, playhead)
     if not ev or not ev.next_t then return ' ' end
     if ev.blend_out_t then
         if playhead >= ev.blend_out_t and playhead < ev.next_t then
-            return '-> blending now', _BLEND_ACTIVE_COL
+            return '-> blending now', COL_WARN
         end
         return '-> blends into next'
     end
@@ -181,29 +178,29 @@ local function _draw_column(header, ev, category, scale, fallback, combo_name, p
     local sw = _SPRITE_W * scale
     local sh = _SPRITE_H * scale
     r.ImGui_BeginGroup(ctx)
-    r.ImGui_TextDisabled(ctx, header)
+    TextDim(header)
     r.ImGui_Spacing(ctx)
     if not ev then
-        r.ImGui_TextDisabled(ctx, 'No event found')
+        TextDim('No event found')
         r.ImGui_Dummy(ctx, sw, sh)
     else
         if fallback then
             -- Red for a directed cut that is lost; amber for a normal shot, which
             -- still cuts - to a fallback the author may want to check.
-            r.ImGui_TextColored(ctx, fallback.kind == 'directed_lost' and _LOST_COL or _FALLBACK_COL,
+            r.ImGui_TextColored(ctx, fallback.kind == 'directed_lost' and COL_ERROR or COL_WARN,
                                 ev.msg .. ' *')
             Tooltip(_fallback_tip(fallback, combo_name))
         else
             r.ImGui_Text(ctx, ev.msg)
         end
-        r.ImGui_TextDisabled(ctx, _fmt_event_time(ev.t))
+        TextDim(_fmt_event_time(ev.t))
         -- Always drawn, blank when there is nothing to say: a column one text line
         -- shorter than its neighbours would push its sprite out of alignment.
         local tline, tcol = _transition_line(ev, playhead)
         if tcol then
             r.ImGui_TextColored(ctx, tcol, tline)
         else
-            r.ImGui_TextDisabled(ctx, tline)
+            TextDim(tline)
         end
         if tline ~= ' ' then Tooltip(TIPS.venue_preview_blend) end
         -- A normal-shot fallback pictures the shot the game plays instead.
@@ -211,7 +208,7 @@ local function _draw_column(header, ev, category, scale, fallback, combo_name, p
         local bare    = _get_bare_name(pic, category)
         local slot_id = category .. '_' .. header
         if not DrawVenueInlineSprite(category, bare, scale, not _preview_animate, slot_id) then
-            r.ImGui_TextDisabled(ctx, '(no preview image)')
+            TextDim('(no preview image)')
             r.ImGui_Dummy(ctx, sw, sh)
         end
     end
@@ -240,9 +237,7 @@ local function _draw_category_row(label, prev_grp, curr_grp, next_grp, category,
     end
     if any_marked then
         r.ImGui_Spacing(ctx)
-        r.ImGui_PushTextWrapPos(ctx, 0)
-        r.ImGui_TextDisabled(ctx, '* No stacked shot fits this band: hover the event for what the game does.')
-        r.ImGui_PopTextWrapPos(ctx)
+        TextDimWrapped('* No stacked shot fits this band: hover the event for what the game does.')
     end
 end
 
@@ -267,9 +262,7 @@ local function _draw_current_row(curr, scale, muted, combo_name, playhead)
     end
     if any_marked then
         r.ImGui_Spacing(ctx)
-        r.ImGui_PushTextWrapPos(ctx, 0)
-        r.ImGui_TextDisabled(ctx, '* No stacked shot fits this band: hover the event for what the game does.')
-        r.ImGui_PopTextWrapPos(ctx)
+        TextDimWrapped('* No stacked shot fits this band: hover the event for what the game does.')
     end
 end
 
@@ -308,9 +301,9 @@ function DrawVenuePreviewTab()
             if muted_real[ltr] then warn[#warn + 1] = _INST_NAMES[ltr] end
         end
         if #warn == 2 then
-            r.ImGui_TextDisabled(ctx, 'Both instruments are muted')
+            TextDim('Both instruments are muted')
         elseif #warn == 1 then
-            r.ImGui_TextDisabled(ctx, warn[1] .. ' muted')
+            TextDim(warn[1] .. ' muted')
         end
     end
 
@@ -359,7 +352,7 @@ function DrawVenuePreviewTab()
     Tooltip(_t_vpshw)
 
     if not VenueSpriteFoldersFound() then
-        r.ImGui_TextDisabled(ctx, '- no spritesheets installed')
+        TextDim('- no spritesheets installed')
     end
 
     if _auto_refresh_paused then
@@ -374,11 +367,11 @@ function DrawVenuePreviewTab()
     r.ImGui_Spacing(ctx)
 
     if _preview_error then
-        r.ImGui_TextDisabled(ctx, _preview_error)
+        TextDimWrapped(_preview_error)
         return
     end
     if not _preview_cache then
-        r.ImGui_TextDisabled(ctx, 'No data - reading\xe2\x80\xa6')
+        TextDim('No data - reading\xe2\x80\xa6')
         return
     end
 

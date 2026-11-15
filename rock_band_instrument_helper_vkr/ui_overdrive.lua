@@ -104,7 +104,7 @@ function DrawOverdriveTab(ctx)
     Tooltip(TIPS.od_group)
     if choice.desc then
         r.ImGui_SameLine(ctx)
-        r.ImGui_TextDisabled(ctx, choice.desc)
+        TextDimWrapped(choice.desc)
     end
 
     local is_all      = choice.all == true
@@ -124,7 +124,7 @@ function DrawOverdriveTab(ctx)
     _, S.od_beats_per_phrase = r.ImGui_SliderInt(ctx, '##od_bpp', S.od_beats_per_phrase, 20, 80)
     SliderTooltip(TIPS.od_beats_per_phrase)
     r.ImGui_SameLine(ctx)
-    r.ImGui_TextDisabled(ctx, ('(~%d measures in 4/4)'):format(math.floor(S.od_beats_per_phrase / 4 + 0.5)))
+    TextDim(('(~%d measures in 4/4)'):format(math.floor(S.od_beats_per_phrase / 4 + 0.5)))
 
     local lock_share = not is_all
     if lock_share and do_phrases then r.ImGui_BeginDisabled(ctx) end
@@ -230,9 +230,9 @@ function DrawOverdriveTab(ctx)
     if S.od_overview then
         r.ImGui_Spacing(ctx)
         DrawOverview(S.od_overview)
-        r.ImGui_TextDisabled(ctx, 'White: phrase   Gold: unison   Blue: fill   Red: end keep-out')
+        TextDimWrapped('White: phrase   Gold: unison   Blue: fill   Red: end keep-out')
     else
-        r.ImGui_TextDisabled(ctx, 'Validate or Generate to show an overview of the song.')
+        TextDim('Validate or Generate to show an overview of the song.')
     end
 
     -- Replace confirmation, set by GenerateOverdrive when a target already has notes.
