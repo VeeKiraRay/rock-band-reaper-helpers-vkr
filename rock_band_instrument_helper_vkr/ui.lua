@@ -8,7 +8,7 @@
 --           dofile this file (its last line is a bare r.defer(Loop)).
 -- Note: r.defer(Loop) is called at the end of this file.
 
-local _active_proj = r.EnumProjects(-1, '')
+local _project_switched = MakeProjectSwitchCheck()   -- pointer + file path
 local _active_tab  = ''
 
 -- Track lists rebuild themselves after a project edit (at most once a second,
@@ -19,9 +19,7 @@ local _track_poll = MakeProjectPoll(1.0, 5.0)
 local FOOTER = {}
 
 local function Loop()
-    local proj = r.EnumProjects(-1, '')
-    if proj ~= _active_proj then
-        _active_proj = proj
+    if _project_switched() then
         S.last_result      = nil
         S.all_track_list   = nil
         S.audio_track_list = nil

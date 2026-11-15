@@ -51,6 +51,10 @@
 --       starting less than a beat apart (Keys and Pro Keys count as one;
 --       vocals never). The same model gives the full score and gold-star check
 --       in the General Helper's Metadata > Score.
+--     - Fixed: opening another project in the same project tab (File > Open,
+--       recent projects) was not noticed, so the previous song's track
+--       selections, captured MIDI patterns, Overdrive overview and settings
+--       stayed. Only switching project tabs reset the window. Both now do.
 --
 --   v0.1
 --     - First version. The Difficulty, Overdrive, Tab Input and MIDI tabs,

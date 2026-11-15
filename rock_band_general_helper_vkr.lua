@@ -157,6 +157,11 @@
 --       The old Current only is now Current only V.
 --     - The Structure row's tooltip notes that numbered verses and choruses
 --       get their own background clips in the video venues.
+--     - Fixed: opening another project in the same project tab (File > Open,
+--       recent projects) was not noticed, so the previous song's Metadata
+--       results (Difficulty, Song key, Score), track selections and settings
+--       stayed on screen. Only switching project tabs reset the window. Both
+--       now do.
 --
 --   v0.9.63
 --     - The instrument tools moved to a new script, the Rock Band Instrument

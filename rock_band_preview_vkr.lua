@@ -36,6 +36,9 @@
 --       defaults file also gained the Metadata > Genre texts and new Venue
 --       keyframe, Directed moves and camera validation tooltips, all unused
 --       here.
+--     - Fixed: opening another project in the same project tab (File > Open,
+--       recent projects) kept the previous project's saved preview settings.
+--       They now load, as they already did when switching project tabs.
 --   v0.7
 --     - No change to this window. The General Helper's instrument tabs moved
 --       to the new Instrument Helper (General Helper v0.9.63), and the track
@@ -143,14 +146,12 @@ local _title = ScriptWindowTitle('Rock Band Venue Preview', _script)
 -- tab; this window never writes settings.
 LoadSettings()
 
-local _active_proj = r.EnumProjects(-1, '')
+local _project_switched = MakeProjectSwitchCheck()   -- pointer + file path
 
 local function Loop()
     -- Project switch: reload that project's saved settings. Event data
     -- refreshes itself via GetProjectStateChangeCount inside the preview.
-    local proj = r.EnumProjects(-1, '')
-    if proj ~= _active_proj then
-        _active_proj = proj
+    if _project_switched() then
         LoadSettings()
     end
 

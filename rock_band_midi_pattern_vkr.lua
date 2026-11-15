@@ -1,6 +1,6 @@
 -- @description Rock Band MIDI Pattern
 -- @author VeeKiraRay
--- @version 0.4
+-- @version 0.5
 -- @about
 --   Standalone window for the MIDI > Pattern sub-tab of the Rock Band
 --   Instrument Helper. Capture a note pattern from a time selection, then
@@ -12,6 +12,12 @@
 --
 --   Built with Claude (Anthropic) - https://claude.ai
 --
+--   v0.5
+--     - Fixed: opening another project in the same project tab (File > Open,
+--       recent projects) was not noticed, so the captured pattern and the
+--       track list of the previous song stayed - a Replace All could then act
+--       on the wrong material. Both now clear, as they already did when
+--       switching project tabs.
 --   v0.4
 --     - No change to what this window does. The MIDI tab moved from the
 --       General Helper to the new Instrument Helper (v0.1, with General
@@ -118,7 +124,7 @@ local FOOTER = {}
 -- are marked session-only in defaults.lua, and settings.lua has no key for
 -- them), and no SetDefault* function assigns its source track. Nothing to load.
 
-local _active_proj = r.EnumProjects(-1, '')
+local _project_switched = MakeProjectSwitchCheck()   -- pointer + file path
 
 -- Track lists rebuild themselves after a project edit (at most once a second,
 -- 5 s safety re-read) - lib/reaper_helper_common.lua, MakeProjectPoll.
@@ -129,9 +135,7 @@ local function Loop()
     -- The patterns are take-relative PPQ offsets labelled with the previous
     -- project's measure numbers, so a Replace All after a switch would act on
     -- the wrong material. The general helper resets the same way.
-    local proj = r.EnumProjects(-1, '')
-    if proj ~= _active_proj then
-        _active_proj      = proj
+    if _project_switched() then
         S.all_track_list  = nil
         S.midi_track_list = nil
         S.last_result     = nil

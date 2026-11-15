@@ -1,6 +1,6 @@
 -- @description Rock Band Vocal Helper
 -- @author VeeKiraRay
--- @version 1.21
+-- @version 1.22
 -- @about
 --   Analyses a vocal audio track and appends MIDI notes to an existing MIDI
 --   item on a destination track, one note per detected syllable or phrase.
@@ -13,6 +13,11 @@
 --   This @about block keeps only the 5 most recent versions.
 --   Full history: CHANGELOG.md in the repo.
 --
+--   v1.22
+--     - Fixed: opening another project in the same project tab (File > Open,
+--       recent projects) was not noticed, so the previous song's track
+--       selections, lyrics file and result stayed, and its settings were not
+--       loaded. Only switching project tabs reset the window. Both now do.
 --   v1.21
 --     - The Tuner and Pitch slide tabs are now sub-tabs of the Pitch tab,
 --       which reads Tuner, Snap, Slide, Placement - Built-in, Placement -
@@ -100,17 +105,6 @@
 --       the install folder - both directions, so a renamed script fails a test
 --       instead of shipping a dead button, and a newly added tool fails until
 --       it is listed.
---   v1.17
---     - The Tuner tab is now also available as a standalone script,
---       rock_band_pitch_tuner_vkr.lua, so the live readout can stay visible in
---       its own window while you work in another tab or in the MIDI editor.
---       That window adds its own audio source track selector and Refresh
---       tracks button, and never stops on tab navigation (it has no tabs); the
---       60-second idle auto-stop still applies. It reads the same per-project
---       settings but never writes them - saving stays in the General tab. The
---       tab is unchanged; both load the same module files.
---     - Fixed: closing either window with the tuner running left its audio
---       accessor open, holding the source audio file until REAPER exited.
 --
 --   Workflow:
 --     1. Pick the audio source track and the MIDI destination track.

@@ -98,7 +98,7 @@ Items 1 and 2 are covered by `dev/tests/script_links.lua`, which checks the regi
 | File | Contents |
 |---|---|
 | `lib/reaper_imgui_helpers.lua` | `PitchName`, `Tooltip`, `SliderTooltip`, `ScriptWindowTitle`, `Btn`, `BtnWidth`, `BtnGroupWidth`, `LabelColWidth`, `RadioGroupWidth`, `SectionHeader`, `SortedByLabel`, `ComboGroupHeader`, `GetTrackList`, `FormatTime`, `GetTimeSelection`, `BeginScrollBody` (BeginChild for both the 0.9 and the 0.7/0.8 signature) |
-| `lib/reaper_helper_common.lua` | `FindTrackByName`, `TrackAtIndex`, `GetTakePPQPerQN`, `GetTempoContextBefore`, `TrackHasAudio`, `TrackHasMIDI`, `RefreshTrackLists`, `RunAction`, `MakeProjectPoll` — track and action helpers the General, Instrument and Vocal helpers share. Writes the caller's `S` (`*_track_list`, `status`, `last_result`), so each script declares those fields. `RunAction` calls the script's optional global `RunActionErrorCleanup()` after a failed action (the vocal helper closes its open YIN context there) |
+| `lib/reaper_helper_common.lua` | `FindTrackByName`, `TrackAtIndex`, `GetTakePPQPerQN`, `GetTempoContextBefore`, `TrackHasAudio`, `TrackHasMIDI`, `RefreshTrackLists`, `RunAction`, `MakeProjectPoll`, `MakeProjectSwitchCheck` — track and action helpers the General, Instrument and Vocal helpers share. Writes the caller's `S` (`*_track_list`, `status`, `last_result`), so each script declares those fields. `RunAction` calls the script's optional global `RunActionErrorCleanup()` after a failed action (the vocal helper closes its open YIN context there) |
 | `lib/reaper_helper_ui.lua` | `TrackCombo`, `MidiEditorTrackWarning`, `DrawResultPanel`, `HelperFooterHeight`, `DrawHelperFooter`, `HelperCopyText` — UI every window draws (see "Window footer" below). `TrackCombo` matches by REAPER track index and offers `(none)` (`-1`): an optional input left unset, or a required one not picked yet — actions resolve indices through `TrackAtIndex` and ask for a track when it returns nil. `DrawResultPanel()` draws the last result (a line with a tab renders as two columns) |
 | `lib/reaper_dsp.lua` | `ComputeRMSContour`, `OpenYINContext`, `YINWindowSize`, `ReadMonoWindow`, `QuickRMS`, `ComputeCMND`, `SearchYINTau`, `MedianVote`, `DetectPitchYIN`, `SampleYINAt`, `GateAndSplit`, `ApplyMinOffset` |
 | `lib/reaper_midi_helpers.lua` | `FindMIDIItem`, `FindFirstMIDIItem`, `ReadAllMIDINotesOnTrack`, `ClearNotesAtPitchesInRange`, `InsertNotes`, `ReplaceNotesBulk` (one `MIDI_GetAllEvts` / `MIDI_SetAllEvts` round trip: Difficulty > Generate, Animation > Drums), … |
@@ -404,7 +404,19 @@ Actions respect time selection when active; fall back to whole-item or whole-tra
 Each script implements `SetDefaultTracks` (or equivalent): runs at startup and on project switch, matches tracks by name, verifies track content (audio vs MIDI), falls back to index 0 if nothing matches.
 
 ### Project-switch detection
-`Loop` caches the current project pointer and checks `r.EnumProjects(-1, '')` each frame. On mismatch: reset track indices, call `LoadSettings`, re-run smart defaults, update `S.status`. Ensures no state from the previous project leaks.
+Every window's `Loop` asks a shared check, made once at file level:
+
+```lua
+local _project_switched = MakeProjectSwitchCheck()   -- lib/reaper_helper_common.lua
+-- in Loop:
+if _project_switched() then
+    -- reset track indices and cached results, LoadSettings, smart defaults, S.status
+end
+```
+
+On a switch: reset track indices, clear results that describe the old song, call `LoadSettings`, re-run smart defaults, update `S.status`. Ensures no state from the previous project leaks.
+
+**The project pointer alone is not enough**, so never compare `r.EnumProjects(-1, '')` by hand: opening another project in the *same* project tab (File > Open, recent projects) keeps REAPER's pointer, and a pointer check left the previous song's results and settings on screen. The check compares the project file path too. A path appearing where there was none (the first save of a new project) is not a switch; Save As to a new name is, which only reloads the same settings.
 
 ### Settings save/load
 `SetProjExtState` / `GetProjExtState` under a script-specific section key. Format: semicolon-separated `key=value`. `DeserializeSettings` parses each field independently — missing fields keep their current value. Track indices are **not** saved (positional, brittle across sessions).

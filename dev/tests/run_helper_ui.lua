@@ -3,7 +3,8 @@
 -- @about
 --   Tests for the pure half of lib/reaper_helper_ui.lua, the window footer
 --   every helper and standalone window draws (the Copy result text), and the
---   MakeProjectPoll timing behind the automatic track-list refresh. Run from
+--   MakeProjectPoll timing behind the automatic track-list refresh, and the
+--   project-switch check every window runs (MakeProjectSwitchCheck). Run from
 --   the REAPER Actions list for a fully isolated Lua context, or via the
 --   test_rock_band_helpers_vkr launcher. Results appear in the REAPER console.
 --
@@ -32,7 +33,7 @@ r.ShowConsoleMsg('======  Helper UI - tests  ======\n')
 dofile(_tdir .. 'framework.lua')
 dofile(_root .. 'lib/reaper_imgui_helpers.lua')   -- BeginScrollBody etc. (loaded first, as in every window)
 dofile(_root .. 'lib/reaper_helper_ui.lua')       -- code under test
-dofile(_root .. 'lib/reaper_helper_common.lua')   -- MakeProjectPoll (code under test)
+dofile(_root .. 'lib/reaper_helper_common.lua')   -- MakeProjectPoll, MakeProjectSwitchCheck (code under test)
 
 dofile(_tdir .. 'helper_ui.lua')
 Test.report()

@@ -3,7 +3,8 @@
 -- DrawResultPanel, HelperFooterHeight) needs an ImGui context and is checked in
 -- REAPER by hand.
 --
--- Requires globals: Test, HelperCopyText, MakeProjectPoll, r (run_helper_ui.lua).
+-- Requires globals: Test, HelperCopyText, MakeProjectPoll, MakeProjectSwitchCheck, r
+--                   (run_helper_ui.lua).
 
 ------------------------------------------------------------------
 Test.section('Helper footer: Copy result text')
@@ -76,5 +77,60 @@ Test.it('fallback re-reads with no edit, force always fires', function()
         Test.expect(poll() == true, 'fallback_secs elapsed')
         Test.expect(poll(true) == true, 'forced')
         Test.expect(poll() == false, 'quiet right after force')
+    end)
+end)
+
+------------------------------------------------------------------
+Test.section('MakeProjectSwitchCheck (stubbed EnumProjects)')
+
+-- Every window's Loop resets through MakeProjectSwitchCheck. Opening another
+-- file in the same project tab keeps REAPER's project pointer, so the check
+-- compares the project path too. A stub stands in for EnumProjects:
+-- set(pointer, path) changes what it returns.
+local function WithProject(fn)
+    local real = r.EnumProjects
+    local cur = { 'proj1', '' }
+    r.EnumProjects = function() return cur[1], cur[2] end
+    local ok, err = pcall(fn, function(p, f) cur = { p, f } end)
+    r.EnumProjects = real
+    if not ok then error(err, 0) end
+end
+
+Test.it('nothing changed -> no switch', function()
+    WithProject(function(set)
+        set('proj1', 'C:/songs/a.rpp')
+        local switched = MakeProjectSwitchCheck()
+        Test.expect(switched() == false, 'first frame')
+        Test.expect(switched() == false, 'second frame')
+    end)
+end)
+
+Test.it('first save of a new project is not a switch', function()
+    WithProject(function(set)
+        set('proj1', '')
+        local switched = MakeProjectSwitchCheck()
+        set('proj1', 'C:/songs/new.rpp')
+        Test.expect(switched() == false, 'empty path -> a path')
+    end)
+end)
+
+Test.it('another file in the same tab is a switch, reported once', function()
+    WithProject(function(set)
+        set('proj1', 'C:/songs/a.rpp')
+        local switched = MakeProjectSwitchCheck()
+        set('proj1', 'C:/songs/b.rpp')
+        Test.expect(switched() == true, 'same pointer, other file')
+        Test.expect(switched() == false, 'only on the first frame')
+    end)
+end)
+
+Test.it('another tab, or File > New in the same tab, is a switch', function()
+    WithProject(function(set)
+        set('proj1', 'C:/songs/a.rpp')
+        local switched = MakeProjectSwitchCheck()
+        set('proj2', 'C:/songs/a.rpp')
+        Test.expect(switched() == true, 'other pointer')
+        set('proj2', '')
+        Test.expect(switched() == true, 'path -> empty (File > New)')
     end)
 end)

@@ -1198,6 +1198,19 @@ over 5. See `CLAUDE.md` → "Changelog / `@about` trimming" for the rule.
 
 `rock_band_vocal_helper_vkr.lua`
 
+**v1.17**
+
+- The Tuner tab is now also available as a standalone script,
+  rock_band_pitch_tuner_vkr.lua, so the live readout can stay visible in
+  its own window while you work in another tab or in the MIDI editor.
+  That window adds its own audio source track selector and Refresh
+  tracks button, and never stops on tab navigation (it has no tabs); the
+  60-second idle auto-stop still applies. It reads the same per-project
+  settings but never writes them - saving stays in the General tab. The
+  tab is unchanged; both load the same module files.
+- Fixed: closing either window with the tuner running left its audio
+  accessor open, holding the source audio file until REAPER exited.
+
 **v1.16**
 
 - Harmonies: each destination's two dropdowns are now labelled Target

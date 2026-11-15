@@ -138,3 +138,23 @@ function MakeProjectPoll(min_secs, fallback_secs)
         return false
     end
 end
+
+-- Project-switch check for every window's Loop. Returns a function that is true on
+-- the first frame after the active project changed.
+--
+-- THE POINTER ALONE IS NOT ENOUGH. Opening another project in the same project tab
+-- (File > Open, recent projects) keeps REAPER's project pointer, so a pointer check
+-- left the previous song's results, track indices and settings on screen. The
+-- project file path is compared too. A path appearing where there was none is the
+-- first save of a new project, not a switch, so it does not count.
+function MakeProjectSwitchCheck()
+    local proj, path = r.EnumProjects(-1, '')
+    path = path or ''
+    return function()
+        local p, f = r.EnumProjects(-1, '')
+        f = f or ''
+        local switched = p ~= proj or (f ~= path and path ~= '')
+        proj, path = p, f
+        return switched
+    end
+end

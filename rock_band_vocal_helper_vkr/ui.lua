@@ -1,7 +1,7 @@
 ﻿-- Main UI render loop
 
 local _browse_tooltip_suppressed = false
-local _active_proj = r.EnumProjects(-1, '')
+local _project_switched = MakeProjectSwitchCheck()   -- pointer + file path
 local _active_tab  = ''
 
 -- Track lists rebuild themselves after a project edit (at most once a second,
@@ -16,10 +16,9 @@ local FOOTER = {}
 -- footer (DrawResultPanel, DrawHelperFooter) in lib/reaper_helper_ui.lua.
 
 function Loop()
-    -- Detect project switch (tabs). Reinitialize if the active project changed.
-    local proj = r.EnumProjects(-1, '')
-    if proj ~= _active_proj then
-        _active_proj  = proj
+    -- Detect project switch (another tab, or another file opened in this tab).
+    -- Reinitialize if the active project changed.
+    if _project_switched() then
         S.audio_idx         = 0
         S.midi_idx          = 0
         S.ref_idx           = 0

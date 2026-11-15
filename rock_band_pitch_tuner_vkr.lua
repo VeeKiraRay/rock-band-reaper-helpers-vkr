@@ -1,6 +1,6 @@
 -- @description Rock Band Pitch Tuner
 -- @author VeeKiraRay
--- @version 0.3
+-- @version 0.4
 -- @about
 --   Standalone window for the Pitch > Tuner sub-tab of the Rock Band Vocal
 --   Helper. Reads audio from the selected source track at the playhead and
@@ -13,6 +13,13 @@
 --
 --   Built with Claude (Anthropic) - https://claude.ai
 --
+--   v0.4
+--     - Fixed: opening another project in the same project tab (File > Open,
+--       recent projects) was not noticed, so the tuner kept reading the old
+--       song's track and its settings stayed. Now the tuner stops, the track
+--       list is read again and the new project's settings load, as they
+--       already did when switching project tabs. (Shipped with Vocal Helper
+--       v1.22.)
 --   v0.3
 --     - New Harmony readout (experimental): tick it and pick the lead chart
 --       (HARM1, or PART VOCALS) to see, below the usual note and history, the
@@ -135,7 +142,7 @@ local FOOTER = { undo = false }
 LoadSettings()
 SetDefaultTracks()
 
-local _active_proj = r.EnumProjects(-1, '')
+local _project_switched = MakeProjectSwitchCheck()   -- pointer + file path
 
 -- Track lists rebuild themselves after a project edit (at most once a second,
 -- 5 s safety re-read) - lib/reaper_helper_common.lua, MakeProjectPoll.
@@ -145,9 +152,7 @@ local function Loop()
     -- Project switch: reset the track selection and reload that project's
     -- saved settings. The tuner's audio accessor belongs to the old project's
     -- take, so it has to be closed here.
-    local proj = r.EnumProjects(-1, '')
-    if proj ~= _active_proj then
-        _active_proj       = proj
+    if _project_switched() then
         S.audio_idx        = 0
         S.all_track_list   = nil
         S.midi_track_list  = nil
