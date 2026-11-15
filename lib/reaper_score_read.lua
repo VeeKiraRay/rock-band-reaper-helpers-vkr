@@ -438,3 +438,62 @@ function ScoreFindings(res, bars, kind)
     end
     return out
 end
+
+-- 123456 -> "123,456". The score number format both helpers show.
+function ScoreNum(n)
+    local t = tostring(math.floor(n + 0.5))
+    return (t:reverse():gsub('(%d%d%d)', '%1,'):reverse():gsub('^,', ''))
+end
+
+-- Metadata > Score's cards as plain text, for Copy result: per part the card in reading
+-- order (stars, full combo without and with overdrive, coverage), then its findings with
+-- their level as a prefix - '!' warning, '?' advice, '-' about the simulated path.
+-- result = S.score_result ({ cards, bars, no_beat }). Pure.
+local SCORE_FINDING_MARK = { warn = '!', advice = '?', info = '-' }
+
+function ScoreReportText(result)
+    local lines = { 'Score and stars - a full combo (FC), overdrive (OD) deployed as soon as possible' }
+    local I = '    '
+    if result.no_beat then
+        lines[#lines + 1] = ''
+        lines[#lines + 1] = '! No BEAT track: overdrive drain is estimated at one beat per quarter note.'
+    end
+    for _, card in ipairs(result.cards) do
+        lines[#lines + 1] = ''
+        lines[#lines + 1] = card.label
+        if not card.runs then
+            lines[#lines + 1] = I .. (card.reason or 'No chart')
+        else
+            for _, res in ipairs(card.runs) do
+                local ind = I
+                if res.label then
+                    lines[#lines + 1] = I .. res.label
+                    ind = I .. I
+                end
+                local stars = {}
+                for i = 1, 5 do stars[i] = ('%d* %s'):format(i, ScoreNum(res.stars[i])) end
+                lines[#lines + 1] = ('%sStars: %s  Gold %s'):format(ind, table.concat(stars, '  '),
+                                                                   ScoreNum(res.stars[6]))
+                local fc = ('%sFC without OD: %s'):format(ind, ScoreNum(res.base_streak + res.base_bonus))
+                if res.base_bonus > 0 then fc = fc .. (' (%s of it bonus)'):format(ScoreNum(res.base_bonus)) end
+                lines[#lines + 1] = fc
+                local got = ('%sFC with OD: %s (%s)'):format(ind, ScoreNum(res.total),
+                    res.stars_reached == 6 and 'gold' or (res.stars_reached .. '*'))
+                if res.gold_qn then
+                    got = got .. (' - gold from bar %d'):format(ScoreBarOf(result.bars, res.gold_qn))
+                else
+                    got = got .. (' - short of gold by %s'):format(ScoreNum(res.gold_short))
+                end
+                if res.bre_points and res.bre_points > 0 then
+                    got = got .. (' (up to %s of it from the Big Rock Ending)'):format(ScoreNum(res.bre_points))
+                end
+                lines[#lines + 1] = got
+            end
+            lines[#lines + 1] = I .. (ScoreCoverageText(card.runs[1]) or 'Never in OD.')
+            for _, f in ipairs(card.findings or {}) do
+                lines[#lines + 1] = ('%s%s %s'):format(I, SCORE_FINDING_MARK[f.level] or '-', f.text)
+            end
+        end
+    end
+    return table.concat(lines, '\n')
+end

@@ -72,13 +72,27 @@ end
 -- drawn and takes no height, so HelperFooterHeight and DrawHelperFooter must be
 -- given the same opts:
 --   status  - time selection + status line          (reads S.status)
---   copy    - Copy result button                    (reads S.status / S.last_result)
+--   copy    - Copy result button                    (reads S.status / S.last_result,
+--                                                     and the view's SetCopyView text)
 --   undo    - right-aligned Undo button
 -- Each part defaults to on; a window passes false for what it does not need.
 -- Tooltip strings live here, not in a script's TIPS (CLAUDE.md, Tooltips).
 ------------------------------------------------------------------
 
-local TIP_COPY    = 'Copy the status line and the result panel to the clipboard.'
+local TIP_COPY    = 'Copy the results to the clipboard: the ones shown in this view, or the ' ..
+                    'status line and the result panel.'
+
+-- A view that draws its own results (cards, rulers, dots) instead of the result
+-- panel calls SetCopyView(fn) while it draws them; fn returns those results as
+-- plain text. Copy result then includes it. Registered every frame by whichever
+-- view is on screen and dropped after the footer, so the copy always follows
+-- what is visible - a sub-tab switched away from stops being copied at once.
+-- fn runs only when the button is pressed, never per frame.
+local _copy_view = nil
+
+function SetCopyView(fn)
+    _copy_view = fn
+end
 
 -- Result line colour tags. A line in S.last_result may start with one of these,
 -- e.g. '{gold}Guitar OD boost\t+52,476 ... reached': the panel draws the line in
@@ -97,19 +111,38 @@ function ResultLineTag(line)
     return nil, line
 end
 
--- Pure (no r / ctx / S): the text Copy result puts on the clipboard, or nil
--- when there is nothing beyond the status line worth copying. Colour tags are
+-- What the footer puts on the status line after a copy. Never copied itself: a second
+-- press would otherwise start the clipboard text with it.
+local COPIED_STATUS = 'Result copied to the clipboard.'
+
+-- Pure (no r / ctx / S): the text Copy result puts on the clipboard, in screen order,
+-- or nil when there is nothing beyond the status line worth copying. Colour tags are
 -- dropped.
-function HelperCopyText(status, result)
-    if not result or result == '' then return nil end
-    local lines = {}
-    for line in (result .. '\n'):gmatch('([^\n]*)\n') do
-        local _, text = ResultLineTag(line)
-        lines[#lines + 1] = text
+--   status - the status line. Left out when a view gives its own results (view): those
+--            are self-describing, and the status there only says the action ran - or,
+--            after a copy, that it was copied. Left out too when it is the footer's own
+--            "copied" message.
+--   view   - the view's own results (SetCopyView), before the result panel.
+--   result - the result panel (S.last_result).
+function HelperCopyText(status, result, view)
+    local parts = {}
+    local has_view = view and view ~= ''
+    if status and status ~= '' and status ~= COPIED_STATUS and not has_view then
+        parts[#parts + 1] = status
     end
-    result = table.concat(lines, '\n')
-    if status and status ~= '' then return status .. '\n\n' .. result end
-    return result
+    local body = false
+    if has_view then parts[#parts + 1] = view; body = true end
+    if result and result ~= '' then
+        local lines = {}
+        for line in (result .. '\n'):gmatch('([^\n]*)\n') do
+            local _, text = ResultLineTag(line)
+            lines[#lines + 1] = text
+        end
+        parts[#parts + 1] = table.concat(lines, '\n')
+        body = true
+    end
+    if not body then return nil end
+    return table.concat(parts, '\n\n')
 end
 
 local function On(opts, name)
@@ -188,15 +221,21 @@ function DrawHelperFooter(opts)
 
     if On(opts, 'copy') then
         Next()
-        local text = HelperCopyText(S.status, S.last_result)   -- snapshot: drives the disabled pair
-        if not text then r.ImGui_BeginDisabled(ctx) end
+        -- Snapshot: drives the disabled pair. The view's text is built only on a press.
+        local view_fn = _copy_view
+        local has = view_fn ~= nil or HelperCopyText(S.status, S.last_result) ~= nil
+        if not has then r.ImGui_BeginDisabled(ctx) end
         if Btn('Copy result', BTN_H) then
-            r.ImGui_SetClipboardText(ctx, text)
-            S.status = 'Result copied to the clipboard.'
+            local text = HelperCopyText(S.status, S.last_result, view_fn and view_fn())
+            if text then
+                r.ImGui_SetClipboardText(ctx, text)
+                S.status = COPIED_STATUS
+            end
         end
-        if not text then r.ImGui_EndDisabled(ctx) end
+        if not has then r.ImGui_EndDisabled(ctx) end
         Tooltip(TIP_COPY)
     end
+    _copy_view = nil   -- the next frame's view registers again
 
     if On(opts, 'undo') then
         Next()

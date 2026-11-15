@@ -32,7 +32,8 @@
 -- any main-tab change. The mode and the checked key are session-only too.
 --
 -- Requires globals: r, ctx, S, TIPS, Btn, BTN_H, WIDTH_SHORT, WIDTH_STD, Tooltip,
---                   SectionHeader, LabelColWidth, RunAction, TrackCombo
+--                   SectionHeader, LabelColWidth, RunAction, TrackCombo, SetCopyView,
+--                   TextColoredWrapped, TextDimWrapped
 --                   (lib/reaper_helper_ui.lua), SuggestProjectSongKey (song_key.lua),
 --                   SongKeyAudioStart, SongKeyAudioStep, SongKeyAudioBusy,
 --                   SongKeyAudioCancel (song_key_audio.lua),
@@ -49,9 +50,18 @@ local SHARE_OUT_WARN = 0.15
 
 
 local function WarnWrapped(text)
-    r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Text(), COL_WARN)
-    r.ImGui_TextWrapped(ctx, text)
-    r.ImGui_PopStyleColor(ctx)
+    TextColoredWrapped(COL_WARN, text)
+end
+
+-- Lines that are both drawn and copied (Copy result) come from one function each, as
+-- { text, kind } with kind 'warn' / 'dim' / nil (plain), so the two cannot drift.
+local function DrawLines(lines)
+    for _, l in ipairs(lines) do
+        if l.kind == 'warn' then WarnWrapped(l.text)
+        elseif l.kind == 'dim' then TextDimWrapped(l.text)
+        else r.ImGui_TextWrapped(ctx, l.text) end
+        if l.tip then Tooltip(l.tip) end
+    end
 end
 
 local RELATION_TEXT = {
@@ -209,24 +219,26 @@ end
 
 -- Lines about PART VOCALS itself, above the results: a missing or all-unpitched part
 -- explains why the vocal results are unavailable, which a bare "unavailable" would not.
-local function DrawVocalsNote(parts)
+local function VocalsNoteLines(parts)
     local v = parts.vocals
     if not v.found then
-        WarnWrapped('No PART VOCALS track in this project. Chart the vocals first, or try ' ..
-                    'the audio stems mode.')
+        return { { kind = 'warn', text = 'No PART VOCALS track in this project. Chart the ' ..
+                   'vocals first, or try the audio stems mode.' } }
     elseif v.notes == 0 and v.unpitched > 0 then
-        WarnWrapped(('Every PART VOCALS note is marked unpitched (#), %d in all. A part with ' ..
-                     'no sung pitches gives no key to suggest, and may not need one. If ' ..
-                     'it does, use a Pro Keys result below or your ear.'):format(v.unpitched))
+        return { { kind = 'warn', text = ('Every PART VOCALS note is marked unpitched (#), %d ' ..
+                   'in all. A part with no sung pitches gives no key to suggest, and may not ' ..
+                   'need one. If it does, use a Pro Keys result below or your ear.'):format(v.unpitched) } }
     elseif v.notes == 0 then
-        WarnWrapped('PART VOCALS has no notes yet. Chart the vocals first, or try the audio ' ..
-                    'stems mode.')
+        return { { kind = 'warn', text = 'PART VOCALS has no notes yet. Chart the vocals ' ..
+                   'first, or try the audio stems mode.' } }
     elseif v.notes < KEY_MIN_NOTES then
-        WarnWrapped(('PART VOCALS has only %d pitched notes - too few to suggest a key ' ..
-                     'from.'):format(v.notes))
+        return { { kind = 'warn', text = ('PART VOCALS has only %d pitched notes - too few to ' ..
+                   'suggest a key from.'):format(v.notes) } }
     elseif v.unpitched > 0 then
-        TextDimWrapped(('%d unpitched PART VOCALS notes (#) were left out.'):format(v.unpitched))
+        return { { kind = 'dim', text = ('%d unpitched PART VOCALS notes (#) were left out.')
+                   :format(v.unpitched) } }
     end
+    return {}
 end
 
 -- "G#: 14 notes, bars 12, 20, 44, +3 more".
@@ -247,35 +259,35 @@ local function CheckReports(res, tonic, minor)
     return _check.reports
 end
 
+-- One track's lines under its label in Check a key.
+local function TrackCheckLines(t, rep)
+    if not t.found then return { { kind = 'dim', text = 'No track.' } } end
+    if rep.total == 0 then
+        return { { kind = 'dim', text = t.unpitched > 0
+            and ('No pitched notes (%d unpitched).'):format(t.unpitched) or 'No notes.' } }
+    end
+    local out = {}
+    -- "Under 1%" rather than a rounded "0%" above a list of notes.
+    local pct = rep.share_out < 0.005 and 'Under 1%' or ('%.0f%%'):format(100 * rep.share_out)
+    if #rep.outside == 0 then
+        out[#out + 1] = { kind = 'dim', text = ('No notes outside the key (%d notes).'):format(rep.total) }
+    else
+        out[#out + 1] = { kind = rep.share_out >= SHARE_OUT_WARN and 'warn' or nil,
+                          text = ('%s of %d notes outside the key.'):format(pct, rep.total),
+                          tip = TIPS.key_share_out }
+    end
+    if rep.used <= KEY_FEW_NOTES then
+        out[#out + 1] = { kind = 'dim', text = ('Uses only %d of the key\'s notes, so many keys ' ..
+                          'fit this track.'):format(rep.used) }
+    end
+    for _, o in ipairs(rep.outside) do out[#out + 1] = { text = OutsideLine(o) } end
+    return out
+end
+
 local function DrawTrackCheck(t, rep)
     r.ImGui_Text(ctx, t.label)
     r.ImGui_Indent(ctx)
-    if not t.found then
-        TextDimWrapped('No track.')
-    elseif rep.total == 0 then
-        TextDimWrapped(t.unpitched > 0
-            and ('No pitched notes (%d unpitched).'):format(t.unpitched)
-            or 'No notes.')
-    else
-        -- "Under 1%" rather than a rounded "0%" above a list of notes.
-        local pct = rep.share_out < 0.005 and 'Under 1%' or ('%.0f%%'):format(100 * rep.share_out)
-        local line = ('%s of %d notes outside the key.'):format(pct, rep.total)
-        if #rep.outside == 0 then
-            TextDimWrapped(('No notes outside the key (%d notes).'):format(rep.total))
-        elseif rep.share_out >= SHARE_OUT_WARN then
-            WarnWrapped(line)
-            Tooltip(TIPS.key_share_out)
-        else
-            r.ImGui_TextWrapped(ctx, line)
-            Tooltip(TIPS.key_share_out)
-        end
-        if rep.used <= KEY_FEW_NOTES then
-            TextDimWrapped(('Uses only %d of the key\'s notes, so many keys fit this track.'):format(rep.used))
-        end
-        for _, o in ipairs(rep.outside) do
-            r.ImGui_TextWrapped(ctx, OutsideLine(o))
-        end
-    end
+    DrawLines(TrackCheckLines(t, rep))
     r.ImGui_Unindent(ctx)
 end
 
@@ -321,6 +333,53 @@ local function DrawKeyCheck(res)
     end
 end
 
+----------------------------------------------------------------------
+-- Copy result: the results on screen as plain text
+----------------------------------------------------------------------
+
+local I = '    '
+
+-- DrawSuggestion as text. The key notes, a tooltip on screen, are written out.
+local function SuggestionText(out, x, unavailable)
+    out[#out + 1] = x.label
+    if not x.ranked then
+        out[#out + 1] = I .. (unavailable[x.why] or 'Not available.'):format(KEY_MIN_NOTES)
+        return
+    end
+    local note = x.set and SET_NOTE_TIP[x.set.key]
+    if note then out[#out + 1] = I .. TIPS[note] end
+    local top, second = x.ranked[1], x.ranked[2]
+    out[#out + 1] = ('%sSuggested: %s (%s)'):format(I, KeyName(top.tonic, top.minor),
+                                                    KeyScaleText(top.tonic, top.minor))
+    local rel = KeyRelation(top.tonic, top.minor, second.tonic, second.minor)
+    out[#out + 1] = ('%sRunner-up: %s (%s)%s'):format(I, KeyName(second.tonic, second.minor),
+        KeyScaleText(second.tonic, second.minor),
+        rel and (', ' .. RELATION_TEXT[rel]:format(second.minor and 'minor' or 'major')) or '')
+    out[#out + 1] = I .. CONFIDENCE_TEXT[x.confidence]
+end
+
+local function LinesText(out, lines, indent)
+    for _, l in ipairs(lines) do out[#out + 1] = (indent or '') .. l.text end
+end
+
+local function MidiCopyText(res)
+    local out = { 'Song key - charted MIDI' }
+    LinesText(out, VocalsNoteLines(res.parts))
+    for _, x in ipairs(res.sets) do
+        out[#out + 1] = ''
+        SuggestionText(out, x, UNAVAILABLE_TEXT)
+    end
+    local tonic, minor = S.key_check_tonic or 0, S.key_check_minor and true or false
+    out[#out + 1] = ''
+    out[#out + 1] = ('Check a key: %s (%s)'):format(KeyName(tonic, minor), KeyScaleText(tonic, minor))
+    local reports = CheckReports(res, tonic, minor)
+    for i, t in ipairs(res.tracks) do
+        out[#out + 1] = t.label
+        LinesText(out, TrackCheckLines(t, reports[i]), I)
+    end
+    return table.concat(out, '\n')
+end
+
 local function DrawMidiMode()
     r.ImGui_TextWrapped(ctx,
         'Reads PART VOCALS, HARM1-3 and Pro Keys (PART REAL_KEYS_X). It can only be as ' ..
@@ -342,7 +401,9 @@ local function DrawMidiMode()
         return
     end
 
-    DrawVocalsNote(res.parts)
+    -- Copy result copies the results below as text (MidiCopyText, the same order).
+    SetCopyView(function() return MidiCopyText(res) end)
+    DrawLines(VocalsNoteLines(res.parts))
     local lbl_col = LabelColWidth({ 'Suggested', 'Runner-up' })
     for i, x in ipairs(res.sets) do
         r.ImGui_Spacing(ctx)
@@ -371,6 +432,15 @@ local function TrackLine(label, t)
     if t.items == 0 then return ('%s: %s, no audio on it'):format(label, t.name or '?') end
     return ('%s: %s, %d:%02d read, %d notes'):format(label, t.name or '?',
         math.floor(t.seconds / 60), math.floor(t.seconds % 60), t.notes)
+end
+
+local function AudioCopyText(res)
+    local out = { 'Song key - audio stems' }
+    SuggestionText(out, res, AUDIO_UNAVAILABLE_TEXT)
+    for _, l in ipairs({ TrackLine('Vocal', res.vocal), TrackLine('Bass', res.bass) }) do
+        if l then out[#out + 1] = I .. l end
+    end
+    return table.concat(out, '\n')
 end
 
 local function DrawAudioMode()
@@ -428,6 +498,7 @@ local function DrawAudioMode()
     end
 
     res.label = res.label or 'Audio stems'
+    SetCopyView(function() return AudioCopyText(res) end)
     DrawSuggestion(res, 'a', LabelColWidth({ 'Suggested', 'Runner-up' }), AUDIO_UNAVAILABLE_TEXT, true)
     for _, l in ipairs({ TrackLine('Vocal', res.vocal), TrackLine('Bass', res.bass) }) do
         if l then TextDimWrapped(l) end

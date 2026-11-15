@@ -14,9 +14,15 @@
 -- markdown table reads correctly only where something renders it, and degrades into
 -- pipe-and-dash noise everywhere else.
 --
--- IT ALWAYS INCLUDES THE FULL FACTOR TABLE, whether or not the UI is currently showing it.
--- Producing those numbers for someone else to read is the entire purpose; a report that
--- honoured the on-screen toggle would silently copy less than the author expected.
+-- WHAT IS ON SCREEN. The footer's Copy result copies the cards as they are drawn, so the
+-- factor table and the model line (calibration details) go in only while the WIP
+-- "Show measured values" view is on: opts.factors = false leaves them out. With them in,
+-- each block names its model and the artifact schema, so a report pasted into a
+-- discussion stays identifiable after the models change.
+--
+-- The drawn parts become words: the five dots as "3 of 5 dots" ("5 of 5 dots, red" for
+-- Impossible, as the game shows it), the ruler as its band and the position text its
+-- tooltip carries.
 
 local WRAP_AT = 78          -- warnings and notes are full sentences; keep lines readable
 local INDENT  = '    '
@@ -58,12 +64,14 @@ end
 
 -- recs: the list SuggestProjectDifficulties returned, already annotated.
 -- opts.project: optional project name for the header.
+-- opts.factors: false leaves out the model line and the factor table (default: included).
 --
 -- Always returns a string. An empty list produces a header and a "nothing scored" line
 -- rather than nil, so the caller never has to decide whether there was anything to copy.
 function DifficultyReportText(recs, opts)
     recs = recs or {}
     opts = opts or {}
+    local factors = opts.factors ~= false
 
     local lines = {}
     local function Emit(s)
@@ -139,22 +147,34 @@ function DifficultyReportText(recs, opts)
             -- rank_shown is floored, not rounded, and the card uses the same value: a
             -- rounded integer can name a tier threshold the tier itself has not reached.
             -- See difficulty_suggester.lua.
-            Emit(('%s - %s (rank %d)'):format(
-                rec.label or rec.instrument or '?', rec.tier_name or '?',
-                rec.rank_shown or math.floor(rec.rank or 0)))
+            -- The dots as the card draws them: tier 0-5 fills that many, tier 6
+            -- (Impossible) is all five in red.
+            local dots = rec.tier and (rec.tier >= 6 and '5 of 5 dots, red'
+                                       or ('%d of 5 dots'):format(rec.tier))
+            Emit(('%s%s - %s (rank %d)%s'):format(
+                rec.label or rec.instrument or '?',
+                rec.badge and (' [' .. rec.badge .. ']') or '',
+                rec.tier_name or '?',
+                rec.rank_shown or math.floor(rec.rank or 0),
+                dots and (', ' .. dots) or ''))
 
-            local m = rec.model or {}
-            local n_factors = 0
-            for _, k in ipairs(m.keys or {}) do
-                if not k:match('^is_') then n_factors = n_factors + 1 end
+            if factors then
+                local m = rec.model or {}
+                local n_factors = 0
+                for _, k in ipairs(m.keys or {}) do
+                    if not k:match('^is_') then n_factors = n_factors + 1 end
+                end
+                Emit(('%smodel    : %s / %s  (%d factors, %s)'):format(
+                    INDENT, tostring(m.candidate), tostring(m.scale), n_factors,
+                    tostring(rec.status or 'unknown')))
             end
-            Emit(('%smodel    : %s / %s  (%d factors, %s)'):format(
-                INDENT, tostring(m.candidate), tostring(m.scale), n_factors,
-                tostring(rec.status or 'unknown')))
 
             if rec.ruler then
                 Emit(('%sband     : %s ... %s'):format(
                     INDENT, rec.ruler.lo_label, rec.ruler.hi_label))
+            end
+            if rec.position_text then
+                Emit(('%sposition : %s'):format(INDENT, rec.position_text))
             end
 
             -- The uncapped score, included ONLY here and only when the clamp moved the
@@ -162,7 +182,7 @@ function DifficultyReportText(recs, opts)
             -- so one extreme input can produce a value that is not a rank at all - but in a
             -- report being pasted for analysis it is exactly what a reader needs, and the
             -- caveat travels with it.
-            if rec.clamped and rec.raw_rank then
+            if factors and rec.clamped and rec.raw_rank then
                 Emit(('%suncapped : %.0f - past the end of the scale, so the rank is pinned')
                     :format(INDENT, rec.raw_rank))
             end
@@ -177,9 +197,12 @@ function DifficultyReportText(recs, opts)
                 for _, e in ipairs(rec.explanations) do
                     Emit(INDENT .. '. ' .. e.text)
                 end
+            else
+                Emit('')
+                Emit(INDENT .. 'Nothing about this chart stands out from the reference songs.')
             end
 
-            if #(rec.factor_rows or {}) > 0 then
+            if factors and #(rec.factor_rows or {}) > 0 then
                 Emit('')
                 Emit(('%s%s%s  how unusual'):format(
                     INDENT, Pad('measurement', label_w), Pad('value', val_w)))

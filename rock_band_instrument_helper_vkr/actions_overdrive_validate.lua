@@ -439,11 +439,9 @@ local function HasOverdrive(part)
     return false
 end
 
--- 123456 -> "123,456".
-local function Num(n)
-    local t = tostring(math.floor(n + 0.5))
-    return (t:reverse():gsub('(%d%d%d)', '%1,'):reverse():gsub('^,', ''))
-end
+-- 123456 -> "123,456" (lib/reaper_score_read.lua; looked up at call time, so load order
+-- does not matter).
+local function Num(n) return ScoreNum(n) end
 
 -- "Overdrive in play": every part with overdrive run through the game's meter (perfect
 -- run, deploy as soon as possible - lib/reaper_score_sim.lua, the same model as the

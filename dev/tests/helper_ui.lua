@@ -34,6 +34,23 @@ Test.it('colour tags are left out of the copied text', function()
     Test.expect(t == 'OK\n\nGuitar\t+100, reached\nplain\n? advice', 'got ' .. tostring(t))
 end)
 
+Test.it('a view\'s own results come before the result panel, without the status', function()
+    -- The view's text is self-describing; the status only says the action ran.
+    local t = HelperCopyText('Score: 6 of 7 parts calculated.', 'panel line', 'Guitar\n    Stars: ...')
+    Test.expect(t == 'Guitar\n    Stars: ...\n\npanel line', 'got ' .. tostring(t))
+end)
+
+Test.it('a view\'s results alone are enough to copy', function()
+    local t = HelperCopyText('Done.', nil, 'view text')
+    Test.expect(t == 'view text', 'got ' .. tostring(t))
+    Test.expect(HelperCopyText('Done.', nil, '') == nil, 'an empty view text is nothing to copy')
+end)
+
+Test.it('copying twice does not copy the "copied" message', function()
+    local t = HelperCopyText('Result copied to the clipboard.', 'line 1')
+    Test.expect(t == 'line 1', 'got ' .. tostring(t))
+end)
+
 ------------------------------------------------------------------
 Test.section('Result line colour tags')
 

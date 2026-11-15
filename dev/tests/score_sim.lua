@@ -420,3 +420,33 @@ Test.it('no gap long enough: overdrive is never spent', function()
     Test.expect(#res.deploys == 0, 'no deploy')
     Test.expect(res.waste[1] and res.waste[1].kind == 'unspent' and res.waste[1].ready)
 end)
+
+------------------------------------------------------------------
+Test.section('Copy result text (ScoreReportText)')
+
+Test.it('numbers get thousands separators', function()
+    Test.expect(ScoreNum(1234567) == '1,234,567' and ScoreNum(999) == '999' and ScoreNum(1000.4) == '1,000',
+        ScoreNum(1234567) .. ' / ' .. ScoreNum(999) .. ' / ' .. ScoreNum(1000.4))
+end)
+
+Test.it('a card reads in the tab\'s order, with finding marks', function()
+    local res = { stars = { 1, 2, 3, 4, 5, 1500 }, base_streak = 1000, base_bonus = 200,
+                  total = 1400, stars_reached = 5, gold_short = 100, deploys = {},
+                  bre_points = 0 }
+    local text = ScoreReportText({ bars = {}, no_beat = true, cards = {
+        { label = 'Guitar', kind = 'guitar', runs = { res },
+          findings = { { level = 'warn', text = 'Lost.' }, { level = 'advice', text = 'Late.' },
+                       { level = 'info', text = 'Held.' } } },
+        { label = 'Keys', kind = 'keys', reason = 'PART KEYS is muted' } } })
+    local want = {
+        'No BEAT track', 'Guitar', 'Stars: 1* 1  2* 2  3* 3  4* 4  5* 5  Gold 1,500',
+        'FC without OD: 1,200 (200 of it bonus)', 'FC with OD: 1,400 (5*) - short of gold by 100',
+        'Never in OD.', '! Lost.', '? Late.', '- Held.', 'Keys', 'PART KEYS is muted' }
+    local at = 0
+    for _, w in ipairs(want) do
+        local i = text:find(w, at + 1, true)
+        Test.expect(i ~= nil, ('"%s" missing or out of order in:\n%s'):format(w, text))
+        if not i then return end
+        at = i
+    end
+end)

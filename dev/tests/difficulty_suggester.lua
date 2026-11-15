@@ -1055,6 +1055,28 @@ Test.it('reports the uncapped score only when the rank was pinned', function()
         'an unclamped rank has no uncapped score to report')
 end)
 
+Test.it('the on-screen copy (factors = false) leaves the measurements out', function()
+    -- Copy result copies the cards as they are drawn: the factor table and the model line
+    -- are the WIP calibration view, included only when that view is on screen.
+    local rec = ReportRec({ clamped = true, raw_rank = 50, rank = 60 })
+    local full  = DifficultyReportText({ rec })
+    local cards = DifficultyReportText({ rec }, { factors = false })
+    Test.expect(full:find('how unusual', 1, true) ~= nil, 'the full report keeps the factor table')
+    Test.expect(cards:find('how unusual', 1, true) == nil, 'the card copy has no factor table')
+    Test.expect(cards:find('model    :', 1, true) == nil, 'the card copy has no model line')
+    Test.expect(cards:find('uncapped', 1, true) == nil, 'the uncapped score is a calibration detail')
+    Test.expect(cards:find('rank ', 1, true) ~= nil, 'the rank is still there')
+end)
+
+Test.it('the drawn dots become words', function()
+    local rec = ReportRec({})
+    rec.tier = 3
+    Test.expect(DifficultyReportText({ rec }):find('3 of 5 dots', 1, true) ~= nil, 'tier 3 -> 3 of 5 dots')
+    rec.tier = 6
+    Test.expect(DifficultyReportText({ rec }):find('5 of 5 dots, red', 1, true) ~= nil,
+        'Impossible is five red dots, as in the game')
+end)
+
 Test.it('keeps a block for a part that could not be scored', function()
     local text = DifficultyReportText({
         { instrument = 'keys', label = 'Keys', ok = false, reason = 'PART KEYS is muted' } })

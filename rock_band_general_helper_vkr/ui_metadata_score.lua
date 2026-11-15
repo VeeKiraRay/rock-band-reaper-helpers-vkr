@@ -13,19 +13,16 @@
 -- there and unmuted (SCORE_PARTS' `optional`).
 --
 -- Requires globals: r, ctx, S, TIPS, Btn, BTN_H, Tooltip, SectionHeader, RunAction,
---                   ScoreReadSong, ScoreSimulatePart, ScoreFindings, ScoreCoverageText,
---                   ScoreBarOf, SCORE_PARTS
+--                   SetCopyView, ScoreReadSong, ScoreSimulatePart, ScoreFindings,
+--                   ScoreCoverageText, ScoreBarOf, ScoreNum, ScoreReportText, SCORE_PARTS
 
 -- Colours are the shared COL_* (lib/reaper_imgui_helpers.lua). "Short of gold" is
 -- COL_ERROR, not COL_WARN: something to fix or at least look at, and amber sits too
 -- close to the gold used all over this tab to stand out.
 
--- 123456 -> "123,456".
-local function Num(n)
-    local s = tostring(math.floor(n + 0.5))
-    local out = s:reverse():gsub('(%d%d%d)', '%1,'):reverse()
-    return (out:gsub('^,', ''))
-end
+-- 123456 -> "123,456" (lib/reaper_score_read.lua; looked up at call time, so load order
+-- does not matter).
+local function Num(n) return ScoreNum(n) end
 
 -- ASCII '*' for a star, as the game's own star_ratings symbols ('*' .. '*****'): the
 -- default font has no star glyph we can rely on.
@@ -180,6 +177,8 @@ function DrawMetadataScoreTab(ctx)
         r.ImGui_TextWrapped(ctx, 'Nothing calculated yet. Press Calculate to score this project.')
         return
     end
+    -- Copy result copies these cards as text (ScoreReportText, the same order).
+    SetCopyView(function() return ScoreReportText(result) end)
     if result.no_beat then
         r.ImGui_Spacing(ctx)
         r.ImGui_TextColored(ctx, COL_WARN, '!')

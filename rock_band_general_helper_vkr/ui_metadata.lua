@@ -12,7 +12,7 @@
 -- "apply this rank" control: the suggestion is advisory, the author's judgment is final,
 -- and a one-click apply would quietly turn an estimate into the answer.
 --
--- Requires globals: r, ctx, S, TIPS, Btn, BTN_H, Tooltip, SectionHeader, LabelColWidth,
+-- Requires globals: r, ctx, S, TIPS, Btn, BTN_H, Tooltip, SectionHeader, LabelColWidth, SetCopyView,
 --                   RunAction, SuggestProjectDifficulties, HasAnyChartTrack
 --                   (difficulty_suggester.lua), DrawMetadataKeyTab (ui_metadata_key.lua),
 --                   DrawMetadataScoreTab (ui_metadata_score.lua)
@@ -146,27 +146,17 @@ local function RefreshSuggestions()
     S.status = ('Difficulty: %d of %d parts scored.'):format(scored, #recs)
 end
 
--- Copy every scored part to the clipboard as plain text.
---
--- The formatting is difficulty_report.lua's job so it can be tested without a UI; this is
--- only the acquisition of the two things that need REAPER - the project name and the
--- clipboard - plus the confirmation, because a clipboard write is otherwise completely
--- invisible and an author cannot tell a working button from a dead one.
-local function CopySuggestionDetails()
-    local recs = S.diff_suggestions
-    if not recs then return end
-
+-- The cards as plain text, for the footer's Copy result (SetCopyView). The formatting is
+-- difficulty_report.lua's job so it can be tested without a UI; this only adds what needs
+-- REAPER - the project name for the header. The measurements go in only while they are
+-- on screen.
+local function SuggestionsCopyText(recs, show_factors)
     -- GetProjectName's signature has changed across REAPER versions, and the report is
     -- perfectly readable without it, so a failure here drops the header line rather than
     -- the whole copy.
     local ok, name = pcall(function() return r.GetProjectName(0, '') end)
     if not ok or type(name) ~= 'string' then name = nil end
-
-    local text = DifficultyReportText(recs, { project = name })
-    r.ImGui_SetClipboardText(ctx, text)
-
-    local n = select(2, text:gsub('\n', '\n')) + 1
-    S.status = ('Copied %d lines to the clipboard.'):format(n)
+    return DifficultyReportText(recs, { project = name, factors = show_factors })
 end
 
 ----------------------------------------------------------------------
@@ -320,39 +310,23 @@ function DrawMetadataTab(ctx)
                 'scored - a time selection does not change the result.')
             r.ImGui_Spacing(ctx)
 
-            -- BOTH DEVELOPER CONTROLS SIT BEHIND General > Other > work-in-progress.
+            -- THE DEVELOPER CONTROL SITS BEHIND General > Other > work-in-progress.
             --
             -- The first release is being shown to authors to find out whether the
-            -- suggestion itself reads correctly, and the two of them answer a different
-            -- question: the raw factor table is a calibration view, and Copy details
-            -- exists to move those same numbers into a discussion. Neither helps an author
-            -- decide a rank, and on the default panel they invite the reader to treat the
-            -- measurements as the point. They stay one checkbox away rather than removed,
-            -- because they are exactly what is wanted the moment a suggestion is disputed.
+            -- suggestion itself reads correctly, and the raw factor table answers a
+            -- different question: it is a calibration view. It does not help an author
+            -- decide a rank, and on the default panel it invites the reader to treat the
+            -- measurements as the point. It stays one checkbox away rather than removed,
+            -- because it is exactly what is wanted the moment a suggestion is disputed;
+            -- while it is on, the footer's Copy result copies the measurements too.
             local dev_tools = S.show_wip_tabs
 
-            -- One width for the group, so the row reads as a group rather than as buttons
-            -- that happen to be adjacent. Measured over every label that can appear, so
-            -- Refresh does not change width when the WIP flag is toggled.
-            local bw = BtnGroupWidth({ 'Refresh suggestions', 'Copy details' })
-
-            if Btn('Refresh suggestions', BTN_H, bw) then
+            if Btn('Refresh suggestions', BTN_H) then
                 RunAction(RefreshSuggestions)
             end
             Tooltip(TIPS.diff_suggest_refresh)
 
             if dev_tools then
-                r.ImGui_SameLine(ctx)
-                -- Snapshotted once: the Refresh above can populate S.diff_suggestions
-                -- mid-frame, which would leave BeginDisabled without its EndDisabled.
-                local no_recs = (S.diff_suggestions == nil)
-                if no_recs then r.ImGui_BeginDisabled(ctx) end
-                if Btn('Copy details', BTN_H, bw) then
-                    RunAction(CopySuggestionDetails)
-                end
-                Tooltip(TIPS.diff_copy)
-                if no_recs then r.ImGui_EndDisabled(ctx) end
-
                 r.ImGui_SameLine(ctx)
                 _, S.diff_show_factors =
                     r.ImGui_Checkbox(ctx, 'Show measured values', S.diff_show_factors)
@@ -377,6 +351,11 @@ function DrawMetadataTab(ctx)
                     if rec.ruler then edge_labels[#edge_labels + 1] = rec.ruler.lo_label end
                 end
                 local lbl_col = LabelColWidth(edge_labels)
+
+                -- Copy result copies these cards as text, with the measurements only
+                -- when they are on screen.
+                local show_factors = (S.show_wip_tabs and S.diff_show_factors) and true or false
+                SetCopyView(function() return SuggestionsCopyText(recs, show_factors) end)
 
                 -- SONG-LEVEL notes, above the cards and drawn once. A Big Rock Ending is a
                 -- property of the project - there is exactly one [coda] per song - so

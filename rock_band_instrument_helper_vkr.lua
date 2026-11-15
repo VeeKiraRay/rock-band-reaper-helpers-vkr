@@ -64,6 +64,9 @@
 --       warning (it was a lighter amber). "Tuner: Active" and a "clear"
 --       reading are a deeper green, "looks like single notes" a deeper blue -
 --       the green and blue every window uses now.
+--     - Copy result's tooltip now says it also copies results a view draws
+--       itself (the General Helper's Metadata tabs use that). Nothing in this
+--       window draws its results that way, so what it copies is unchanged.
 --
 --   v0.1
 --     - First version. The Difficulty, Overdrive, Tab Input and MIDI tabs,

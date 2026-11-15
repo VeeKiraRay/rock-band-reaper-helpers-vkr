@@ -20,6 +20,9 @@
 --       switching project tabs.
 --     - Secondary text (hints, empty states, "not set", minor headings) is a
 --       lighter grey that is easier to read. The same grey is used everywhere.
+--     - Copy result's tooltip now says it also copies results a view draws
+--       itself (the General Helper's Metadata tabs use that). Nothing in this
+--       window draws its results that way, so what it copies is unchanged.
 --   v0.4
 --     - No change to what this window does. The MIDI tab moved from the
 --       General Helper to the new Instrument Helper (v0.1, with General

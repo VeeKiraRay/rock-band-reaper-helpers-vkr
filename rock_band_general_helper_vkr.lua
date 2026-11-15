@@ -168,6 +168,16 @@
 --       now" line and its fallback camera name use the same amber as every
 --       other warning (they were a lighter amber); the Venue Players row's
 --       idle blue is a brighter sky blue, the blue used everywhere now.
+--     - Copy result (the footer) now also copies results a tab draws itself:
+--       Metadata > Difficulty, Song key and Score. It copies what is on
+--       screen, in the same order, as plain text - the difficulty dots as
+--       "3 of 5 dots", the ruler as its band and position, a key's notes
+--       (a tooltip on screen) written out, and Score's findings marked "!"
+--       (warning), "?" (advice) or "-" (a note). Difficulty's measured
+--       values are included only while they are shown, which replaces the
+--       work-in-progress "Copy details" button (removed). A copy no longer
+--       includes the status line's "Result copied to the clipboard." when
+--       pressed twice.
 --
 --   v0.9.63
 --     - The instrument tools moved to a new script, the Rock Band Instrument

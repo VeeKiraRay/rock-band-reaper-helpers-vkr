@@ -339,13 +339,6 @@ TIPS = {
         "Filled dots are how far up the scale the part sits: none for Warmup,\n" ..
         "two for Solid, five for Nightmare. Impossible fills all five in red.\n\n" ..
         "Two tiers share five filled dots because that is how the game displays them.",
-    diff_copy =
-        "Copy every scored part to the clipboard as plain\n" ..
-        "text, ready to paste into a post or a message.\n\n" ..
-        "The full measured values are always included,\n" ..
-        "whether or not they are shown on screen.\n\n" ..
-        "Which model produced each number is included too, so\n" ..
-        "a copy stays readable after the models are updated.",
     diff_ruler =
         "Where this chart landed between the tier it earned and the next one up.\n\n" ..
         "A tier is a threshold, so a chart sitting near either end could reasonably\n" ..
@@ -419,6 +412,8 @@ TIPS = {
         "This is a development view - useful for comparing a chart\n" ..
         "against the reference songs, and not needed to read the result.\n" ..
         "The bullet points above each card say the same thing in words.\n\n" ..
+        "While shown, Copy result copies them too, with the model behind\n" ..
+        "each number.\n\n" ..
         "Not saved: it starts off again next time the script is opened.",
     diff_suggest_why =
         "The chart properties on which this part is unusual,\n" ..

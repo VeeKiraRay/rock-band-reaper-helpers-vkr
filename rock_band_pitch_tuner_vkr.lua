@@ -25,6 +25,9 @@
 --     - A shaky reading and a doubtful harmony line use the same amber as
 --       every other warning (they were a lighter amber). "Tuner: Active" is
 --       a deeper green. (With Vocal Helper v1.22.)
+--     - Copy result's tooltip now says it also copies results a view draws
+--       itself (the General Helper's Metadata tabs use that). Nothing in this
+--       window draws its results that way, so what it copies is unchanged.
 --   v0.3
 --     - New Harmony readout (experimental): tick it and pick the lead chart
 --       (HARM1, or PART VOCALS) to see, below the usual note and history, the
