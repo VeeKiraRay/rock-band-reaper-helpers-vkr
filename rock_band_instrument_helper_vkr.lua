@@ -1,6 +1,6 @@
 -- @description Rock Band Instrument Helper
 -- @author VeeKiraRay
--- @version 0.1
+-- @version 0.2
 -- @about
 --   Instrument part authoring for Rock Band in REAPER: Guitar, Bass, Drums,
 --   Keys and Pro Keys.
@@ -24,6 +24,33 @@
 --
 --   These tabs were part of the Rock Band General Helper up to v0.9.62; their
 --   earlier history is under that script in CHANGELOG.md in the repo.
+--
+--   v0.2
+--     - Overdrive > Validate has a new "Overdrive in play" section at the end:
+--       each part's overdrive played through the game's meter, a full combo
+--       deploying as soon as it can. Per part: how much of it is played in
+--       overdrive, and what overdrive adds - for example "+52,476: x1.38 of
+--       the full combo (FC) - gold needs x1.15, reached" (or how far short). Under
+--       it, warnings where authored overdrive is lost (earned into a full
+--       meter, or a drum fill that probably cannot appear because it starts
+--       too soon after the drummer has overdrive ready) and a note when the
+--       last overdrive phrase is too close to the end to be spent.
+--     - Overdrive > Validate: the gap between a part's phrases and the first
+--       half / second half balance now count only the measures the part
+--       plays, so a long rest (keys silent for a verse) no longer reads as a
+--       gap needing overdrive. The result has section headings (Markers,
+--       Errors, Warnings, Overdrive in play) with more space before each.
+--       Markers lists what is in the chart only; the phrase-count and gap
+--       warnings say they compare with the current Generate settings.
+--     - Overdrive > Generate's result now ends with the same report as
+--       Validate, read back from what it just wrote, under its own "Generated"
+--       lines - so you see right away whether every part still reaches gold,
+--       and can change the settings and generate again. The status line adds
+--       the check's error and warning counts. Pro Keys gets its own line.
+--       Unisons follow the game's rule: phrases on two different instruments
+--       starting less than a beat apart (Keys and Pro Keys count as one;
+--       vocals never). The same model gives the full score and gold-star check
+--       in the General Helper's Metadata > Score.
 --
 --   v0.1
 --     - First version. The Difficulty, Overdrive, Tab Input and MIDI tabs,
@@ -401,6 +428,10 @@ local _files = {
     _dir  .. 'lib/reaper_difficulty_score_vocals.lua',
     _dir  .. 'lib/reaper_difficulty_tiers.lua',
     _dir  .. 'lib/reaper_difficulty_read.lua',
+    -- Overdrive > Validate's "in play" lines: the score simulator and its reader (uses
+    -- reaper_difficulty_read.lua's readers at call time).
+    _dir  .. 'lib/reaper_score_sim.lua',
+    _dir  .. 'lib/reaper_score_read.lua',
     -- Keys > Tuner: the chord reader (spectrum and dsp first: it reads their constants at
     -- load time) and the song key for its key prior.
     _dir  .. 'lib/reaper_dsp.lua',

@@ -17,7 +17,8 @@
 --     Metadata   - genre converter (real-world genre to the supported major genre
 --                  and subgenre), suggested difficulty rank and tier per
 --                  instrument (Beta) from measurements of the finished Expert
---                  charts, and suggested song key (Beta). Read-only.
+--                  charts, suggested song key (Beta), and each part's score,
+--                  star cut-offs and gold-star check. Read-only.
 --   Work-in-progress tab (General > Settings > Show WIPs?):
 --     Tempo Map  - audio-driven tempo map generation from drum stems
 --
@@ -30,6 +31,35 @@
 --   Full history: CHANGELOG.md in the repo.
 --
 --   v0.9.64
+--     - New Metadata > Score: for each Expert part (Guitar, Bass,
+--       Drums, Keys, Pro Keys, Vocals) the full-combo score without overdrive, the
+--       points needed for each star, and the score with overdrive deployed as
+--       soon as it can be - with the bar where gold stars are reached, or how
+--       far short it falls. Uses the game's own scoring rules; compared with
+--       autoplay recordings of a few songs, it lands within a few percent
+--       (autoplay deploys overdrive at other moments). Drums show Pro and non-Pro scores,
+--       and PART DRUMS_2X gets its own card when the project has it unmuted.
+--       A missing or muted part is listed with the reason. A Big Rock Ending
+--       counts at up to 500 points a second, what keeping all five lanes going
+--       earns (the stars count it at 100), and the card says how much of the
+--       total that is. Unisons follow the game's rule: phrases on two different
+--       instruments starting less than a beat apart (vocals never).
+--       Overdrive is deployed as soon as possible, except at the end: when
+--       that would leave the last overdrive unusable, an earlier deploy is held
+--       so it is used too, and the card says where. Also how much of each part
+--       is played in overdrive, warnings where authored overdrive is lost
+--       (earned into a full meter, or a drum fill that probably cannot appear
+--       because it starts too soon after the drummer has overdrive ready), and
+--       an amber note when the last overdrive phrase is too close to the end
+--       for its overdrive to be spent.
+--       Harmonies get their own card when the song has HARM1 and HARM2: scored
+--       at HARM1's phrase ends, each extra part singing a phrase adds 10%, and
+--       the stars need the same as solo vocals, so gold comes easier.
+--       Vocals deploy in the game's freestyle sections (gaps of 0.6 s or more
+--       between sung notes, half a second of noise to deploy). Read-only; press
+--       Calculate after changing the
+--       charts - it is meant to sit beside the Instrument Helper's Overdrive
+--       tab.
 --     - Venue: the lighting keyframe trigger is now written [prev], not
 --       [previous]. [prev] is what the game, the RBN documentation and the
 --       official charts use; [previous] most likely did nothing in game.
@@ -373,6 +403,8 @@ for _, _f in ipairs({
     _dir  .. 'lib/reaper_key_detect.lua',
     _dir  .. 'lib/reaper_key_profiles.lua',
     _dir  .. 'lib/reaper_key_audio.lua',
+    _dir  .. 'lib/reaper_score_sim.lua',
+    _dir  .. 'lib/reaper_score_read.lua',
     _mdir .. 'defaults.lua',
     _mdir .. 'settings.lua',
     _mdir .. 'helpers.lua',
@@ -421,6 +453,7 @@ for _, _f in ipairs({
     _mdir .. 'ui_animation.lua',
     _mdir .. 'ui_metadata_genre.lua',
     _mdir .. 'ui_metadata_key.lua',
+    _mdir .. 'ui_metadata_score.lua',
     _mdir .. 'ui_metadata.lua',
     _mdir .. 'ui.lua',
 }) do
@@ -448,6 +481,8 @@ dofile(_dir  .. 'lib/reaper_difficulty_read.lua')
 dofile(_dir  .. 'lib/reaper_key_detect.lua')
 dofile(_dir  .. 'lib/reaper_key_profiles.lua')   -- generated; read by song_key.lua
 dofile(_dir  .. 'lib/reaper_key_audio.lua')      -- uses reaper_dsp.lua's YIN core
+dofile(_dir  .. 'lib/reaper_score_sim.lua')      -- Metadata > Score (pure)
+dofile(_dir  .. 'lib/reaper_score_read.lua')     -- uses reaper_difficulty_read.lua's readers
 
 -- Window title with this script's own @version, read from the header above.
 -- ui.lua passes it to ImGui_Begin; the "###" id inside keeps saved window
@@ -505,6 +540,7 @@ dofile(_mdir .. 'ui_workflow.lua')
 dofile(_mdir .. 'ui_animation.lua')
 dofile(_mdir .. 'ui_metadata_genre.lua')
 dofile(_mdir .. 'ui_metadata_key.lua')
+dofile(_mdir .. 'ui_metadata_score.lua')
 dofile(_mdir .. 'ui_metadata.lua')
 dofile(_mdir .. 'ui.lua')  -- also calls r.defer(Loop) at end
 

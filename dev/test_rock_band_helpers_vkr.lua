@@ -47,7 +47,7 @@ local results = { vocal = nil, general = nil, instrument = nil,
                   script_links = nil, window_title = nil, helper_ui = nil,
                   difficulty_score = nil,
                   difficulty_bpm = nil, difficulty_suggester = nil,
-                  metadata_genres = nil, key_detect = nil, harmony_style = nil,
+                  metadata_genres = nil, key_detect = nil, score_sim = nil, harmony_style = nil,
                   harmony_detect = nil, chord_detect = nil }
 
 local COL_OK  = 0x55DD55FF
@@ -335,6 +335,14 @@ function Loop()
         end
         r.ImGui_SameLine(ctx)
         draw_status(results.key_detect)
+
+        r.ImGui_Spacing(ctx)
+
+        if r.ImGui_Button(ctx, 'Score Sim Tests', 155, 24) then
+            run('run_score_sim.lua', 'score_sim')
+        end
+        r.ImGui_SameLine(ctx)
+        draw_status(results.score_sim)
 
         r.ImGui_Spacing(ctx)
 

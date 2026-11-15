@@ -122,6 +122,10 @@ S = {
     -- and no way to tell which of the two flags put it there. Starting from off every
     -- session means the panel's visibility always has exactly one explanation.
     diff_show_factors     = false,
+    -- Metadata > Score: the last ScoreProjectParts() result (nil = not calculated).
+    -- Session-only and cleared on project switch, like diff_suggestions above and for
+    -- the same reason.
+    score_result          = nil,
     -- Metadata > Song key: the last SuggestProjectSongKey() result. Session-only and
     -- cleared on project switch, like diff_suggestions above and for the same reason.
     key_suggestion        = nil,
@@ -275,6 +279,54 @@ TIPS = {
         "Grunge for a song that really belongs to the early 90s wave.\n\n" ..
         "Shown separately from the numbered suggestions because it answers a different\n" ..
         "question: those are where your genre goes, this is whether you picked it.",
+
+    -- Metadata > Score
+    score_calculate =
+        "Work out each Expert part's full-combo score: without overdrive (what the\n" ..
+        "stars are measured against), the star cut-offs, and with overdrive deployed\n" ..
+        "as soon as possible - and so whether gold stars can be reached.\n\n" ..
+        "Read-only, nothing is written. Results are not kept up to date: press again\n" ..
+        "after changing the charts (for example the overdrive in the Instrument Helper).",
+    score_stars =
+        "Points needed for each star (1* to 5*, then gold), from the game's own tables:\n" ..
+        "5 stars is below the full combo without overdrive; gold is above it and needs\n" ..
+        "overdrive. Bonus points (solos, Big Rock Ending) count towards the stars at\n" ..
+        "their own rate.",
+    score_od =
+        "A full combo with overdrive deployed as soon as it can be: guitar, bass, keys\n" ..
+        "and Pro Keys the moment the meter is half full, drums at the first fill the game\n" ..
+        "shows, vocals in the first freestyle section. Whammy on every overdrive sustain.\n\n" ..
+        "One exception, at the end: when that would leave the last overdrive unusable,\n" ..
+        "one of the last three deploys is held - started later, just early enough to\n" ..
+        "still be running when the next phrase comes in - so the last one is used too.\n" ..
+        "The card says where.\n\n" ..
+        "Not the best possible run - saving overdrive for a busier part can score\n" ..
+        "more - so 'short of gold' means 'short with this simple plan'.",
+    score_coverage =
+        "How much of the part is played in overdrive with the plan above: the total\n" ..
+        "length in bars, and the share of the part from its first note to its last.",
+    score_pro =
+        "Pro drums: kick, snare and cymbals earn 5 more per note, toms do not. The stars\n" ..
+        "are measured as if every note earned it, so toms make gold a little harder.",
+    score_vocals =
+        "Vocals deploy in a freestyle section: a gap of more than 0.6 s between sung\n" ..
+        "notes (not in the middle of a word), less a short margin at each end. Deploying\n" ..
+        "takes half a second of unbroken noise into the mic (0.4 s in a short section),\n" ..
+        "so a section has to be long enough for that after overdrive is ready.\n\n" ..
+        "A phrase's points build up as its notes are sung, by sung time (each note's\n" ..
+        "first 150 ms count a little less); overdrive doubles what is sung while it is on.\n\n" ..
+        "Harmonies score at HARM1's phrase ends: the best-sung part gets the full\n" ..
+        "phrase value, each other part singing in it 10% more. Only HARM1's overdrive\n" ..
+        "counts, and any part's own freestyle section can deploy it. The stars are\n" ..
+        "measured on HARM1's phrases like solo vocals, so the extra parts are pure\n" ..
+        "gain - gold comes easier.",
+    score_bre =
+        "The Big Rock Ending pays for how you play it: every hit on a lane earns points\n" ..
+        "for the time since that lane's last hit (up to 1.5 s), about 500 a second at\n" ..
+        "most with all five lanes kept going. Paid at the end, only if you hit the final\n" ..
+        "note, and never doubled by overdrive. The total here assumes that most.\n\n" ..
+        "The star cut-offs count the BRE at only 100 a second, so a well-played BRE\n" ..
+        "brings gold closer.",
 
     -- Metadata > Difficulty
     diff_suggest_refresh =

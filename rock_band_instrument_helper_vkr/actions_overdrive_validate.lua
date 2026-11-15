@@ -13,6 +13,8 @@
 -- OdValidateModel is pure over the model from OdBuildModel.
 -- Requires (globals): r, S, OD_* and Od* (overdrive_read.lua), OdUnisonGroups
 -- (actions_overdrive.lua), OdActivationQN / OdSplitEarlyFills (actions_overdrive_fills.lua)
+--   ScoreReadSong / ScoreSimulatePart / ScoreFindings / ScoreCoverageText / SCORE_PARTS
+--   (lib/reaper_score_read.lua, lib/reaper_score_sim.lua) for the "in play" lines
 
 local LIST_MAX = 12   -- per category; a broken chart must not dump hundreds of lines
 
@@ -101,7 +103,7 @@ function OdValidateModel(model, opts)
     ------------------------------------------------------------------
     -- Per instrument
     ------------------------------------------------------------------
-    local counts, under_vocal = {}, 0
+    local under_vocal = 0
     for _, g in ipairs(OD_INST_GROUPS) do
         local inst = model.inst[g.key]
         if inst.present then
@@ -109,14 +111,21 @@ function OdValidateModel(model, opts)
             local beats = PlayingBeats(model, inst, nb - ko_od)
             local target = beats > 0
                 and math.max(1, math.floor(beats / opts.beats_per_phrase + 0.5)) or 0
-            counts[#counts + 1] = target
+            -- Gaps and the half-and-half balance count the part's own PLAYING measures
+            -- (a note starts or a sustain still rings), as the generator does: a long
+            -- rest - keys silent for a verse - is not a gap overdrive could have filled.
+            -- cum[b] = playing measures up to and including b.
             local n_un, gap_max, gap_at = 0, 0, nil
-            local playing_bars = 0
-            for b = 1, nb do if inst.playing[b] then playing_bars = playing_bars + 1 end end
+            local cum, playing_bars = {}, 0
+            for b = 1, nb do
+                if inst.playing[b] then playing_bars = playing_bars + 1 end
+                cum[b] = playing_bars
+            end
+            cum[0] = 0
             for i, sp in ipairs(list) do
                 if InUnison(sp) then n_un = n_un + 1 end
                 if i > 1 then
-                    local gb = (OdBarAt(bars, sp.s) or nb) - (OdBarAt(bars, list[i - 1].s) or 1)
+                    local gb = cum[OdBarAt(bars, sp.s) or nb] - cum[OdBarAt(bars, list[i - 1].s) or 1]
                     if gb > gap_max then gap_max, gap_at = gb, list[i - 1].e end
                 end
                 local len = (sp.e - sp.s) / BarLenAt(model, sp.s)
@@ -137,32 +146,37 @@ function OdValidateModel(model, opts)
                 -- generator avoids it by choice, so it is worth knowing, not flagging.
                 if OdAnyOverlap(v.od, sp.s, sp.e) then under_vocal = under_vocal + 1 end
             end
-            rep.summary[#rep.summary + 1] = ('%s\t%d phrases (target ~%d), %d in unisons%s'):format(
-                g.label, #list, target, n_un,
-                #list > 1 and (', largest gap %d measures'):format(gap_max) or '')
+            -- Markers carry facts only. Targets come from the current Generate settings,
+            -- which need not be what the chart was made with (hand-placed overdrive,
+            -- older settings), so only the warnings below use them - and say so.
+            rep.summary[#rep.summary + 1] = ('%s\t%d phrases, %d in unisons%s'):format(
+                g.label, #list, n_un,
+                #list > 1 and (', largest gap %d playing measures'):format(gap_max) or '')
             if #list == 0 then
-                if target > 0 then Warn('count', ('%s: no overdrive phrases (about %d expected).'):format(g.label, target)) end
+                if target > 0 then Warn('count', ('%s: no overdrive phrases (the current Generate settings would place ~%d).'):format(g.label, target)) end
             elseif #list < target * 0.6 then
-                Warn('count', ('%s: %d phrases, well under the ~%d the 1-per-%d-beats rule suggests.'):format(
+                Warn('count', ('%s: %d phrases, well under the ~%d the current Generate settings would place (1 per %d counted beats).'):format(
                     g.label, #list, target, opts.beats_per_phrase))
             elseif #list > target * 1.5 then
-                Warn('count', ('%s: %d phrases, well over the ~%d the 1-per-%d-beats rule suggests.'):format(
+                Warn('count', ('%s: %d phrases, well over the ~%d the current Generate settings would place (1 per %d counted beats).'):format(
                     g.label, #list, target, opts.beats_per_phrase))
             end
             if target > 0 and #list >= 2 then
                 local spacing = playing_bars / target
                 if gap_max > spacing * 2.5 and gap_at then
-                    Warn('gap', ('%s: %d measures without overdrive after %s (spacing should be even).'):format(
-                        g.label, gap_max, OdWhere(gap_at)))
+                    Warn('gap', ('%s: %d playing measures without overdrive after %s (the current Generate settings space phrases about %d apart; spacing should be even).'):format(
+                        g.label, gap_max, OdWhere(gap_at), math.floor(spacing + 0.5)))
                 end
             end
-            if #list >= 4 then
-                local mid = bars[math.max(1, (nb + 1) // 2)].qn_s
+            if #list >= 4 and playing_bars > 0 then
+                -- Halves of the part's playing measures, not of the song.
                 local h1 = 0
-                for _, sp in ipairs(list) do if sp.s < mid then h1 = h1 + 1 end end
+                for _, sp in ipairs(list) do
+                    if cum[OdBarAt(bars, sp.s) or nb] <= playing_bars / 2 then h1 = h1 + 1 end
+                end
                 local h2 = #list - h1
                 if math.min(h1, h2) < #list / 4 then
-                    Warn('balance', ('%s: %d phrases in the first half of the song and %d in the second - the doc asks for even spacing.'):format(
+                    Warn('balance', ('%s: %d phrases in the first half of its playing and %d in the second - the doc asks for even spacing.'):format(
                         g.label, h1, h2))
                 end
             end
@@ -222,19 +236,14 @@ function OdValidateModel(model, opts)
     end
     if band_first and first_od then
         local fb = OdBarAt(bars, first_od) or 1
-        rep.summary[#rep.summary + 1] = ('First OD\t%s, %d measure%s of playing before it (start keep-out %d)'):format(
-            OdWhere(first_od), fb - band_first, fb - band_first == 1 and '' or 's', opts.keepout_start or 0)
+        rep.summary[#rep.summary + 1] = ('First OD\t%s, %d measure%s of playing before it'):format(
+            OdWhere(first_od), fb - band_first, fb - band_first == 1 and '' or 's')
     end
     if under_vocal > 0 then
         rep.summary[#rep.summary + 1] = ('Under vocal OD\t%d instrument phrase%s overlap vocal overdrive'):format(
             under_vocal, under_vocal == 1 and '' or 's')
     end
-    local expect_un = math.floor((opts.unison_share or 0.5) * (function()
-        table.sort(counts)
-        if #counts == 0 then return 0 end
-        return (counts[math.floor((#counts + 1) / 2)] + counts[math.ceil((#counts + 1) / 2)]) / 2
-    end)() + 0.5)
-    rep.summary[#rep.summary + 1] = ('Unisons\t%d (about %d expected)'):format(#unison_groups, expect_un)
+    rep.summary[#rep.summary + 1] = ('Unisons\t%d'):format(#unison_groups)
 
     ------------------------------------------------------------------
     -- Drums and fills
@@ -415,13 +424,84 @@ end
 -- The Validate action
 ----------------------------------------------------------------------
 
-function ValidateOverdrive()
-    local model, err = OdBuildModel()
-    if not model then
-        S.status = 'Error'
-        S.last_result = err
-        return
+-- Overdrive in play: each part's authored overdrive run through the game's meter with a
+-- full combo that deploys as soon as it can (lib/reaper_score_sim.lua, the same model as
+-- the General Helper's Metadata > Score). Adds one coverage line per part to the summary
+-- and a warning wherever overdrive goes to waste: earned into a full meter, never
+-- deployed before the part ends, or a drum fill that cannot appear because it starts too
+-- soon after the drummer becomes ready.
+local function HasOverdrive(part)
+    if not part then return false end
+    if #(part.od or {}) > 0 then return true end
+    for _, ph in ipairs(part.phrases or {}) do
+        if ph.od then return true end
     end
+    return false
+end
+
+-- 123456 -> "123,456".
+local function Num(n)
+    local t = tostring(math.floor(n + 0.5))
+    return (t:reverse():gsub('(%d%d%d)', '%1,'):reverse():gsub('^,', ''))
+end
+
+-- "Overdrive in play": every part with overdrive run through the game's meter (perfect
+-- run, deploy as soon as possible - lib/reaper_score_sim.lua, the same model as the
+-- General Helper's Metadata > Score). Per part: time in overdrive, what overdrive adds
+-- against the full combo and what gold needs, then the chart's real losses ("!", counted
+-- as warnings) and the last-phrase advice ("?"). Notes about the simulated path itself
+-- (where it holds overdrive) are left out: a player with a better path uses it all.
+-- Returns the section's lines; adds its warnings to rep.n_warnings.
+local function PlayReport(rep)
+    local song = ScoreReadSong()
+    local out = {}
+    for _, spec in ipairs(SCORE_PARTS) do
+        local part = song.parts[spec.key]
+        -- PART DRUMS_2X and harmonies (optional) carry PART DRUMS' / PART VOCALS'
+        -- overdrive: one entry for each.
+        if not spec.optional and HasOverdrive(part) then
+            local drums = spec.kind == 'drums'
+            local res = ScoreSimulatePart(part, drums and { pro = true } or {})
+            local fc = res.base_streak + res.base_bonus
+            out[#out + 1] = ''
+            -- "in OD" is the label already, so the coverage text drops its own.
+            local cov = ScoreCoverageText(res)
+            out[#out + 1] = ('%s in OD\t%s'):format(spec.label,
+                cov and (cov:gsub(' in OD', '', 1)) or 'never deployed')
+            if fc > 0 then
+                local verdict = res.total >= res.stars[6] and 'reached'
+                    or ('short by %s'):format(Num(res.gold_short))
+                out[#out + 1] = ('%s OD boost\t+%s: x%.2f of the %sFC - gold needs x%.2f, %s')
+                    :format(spec.label, Num(res.total - fc), res.total / fc,
+                            drums and 'Pro drums ' or '', res.stars[6] / fc, verdict)
+            end
+            for _, f in ipairs(ScoreFindings(res, song.bars, spec.kind)) do
+                if f.level == 'warn' then
+                    rep.n_warnings = rep.n_warnings + 1
+                    out[#out + 1] = '! ' .. f.text
+                elseif f.level == 'advice' then
+                    out[#out + 1] = '? ' .. f.text
+                end
+            end
+        end
+    end
+    if #out == 0 then return out end
+    if song.no_beat then
+        out[#out + 1] = ''
+        out[#out + 1] = 'No BEAT track: overdrive drain is estimated at one beat per quarter note.'
+    end
+    table.insert(out, 1, 'Overdrive in play')
+    table.insert(out, 2, 'A full combo (FC), overdrive (OD) deployed as soon as possible. The full scores '
+        .. 'are in the General Helper, Metadata > Score.')
+    return out
+end
+
+-- The check report Validate shows, and Generate shows under its own lines: Markers,
+-- Errors, Warnings, Overdrive in play - read from the project as it is now. Returns
+-- { lines, n_errors, n_warnings, model }, or nil, error.
+function OdCheckReport()
+    local model, err = OdBuildModel()
+    if not model then return nil, err end
     local rep = OdValidateModel(model, {
         beats_per_phrase = S.od_beats_per_phrase,
         unison_share = S.od_unison_share / 100,
@@ -429,26 +509,51 @@ function ValidateOverdrive()
         keepout_unison = S.od_keepout_unison,
         keepout_start = S.od_keepout_start,
     })
-    local n_e, n_w = rep.n_errors, rep.n_warnings
-    local lines = {}
+    local play = PlayReport(rep)
+    -- Section headings with two blank lines before them (each draws as spacing), so a
+    -- heading stands out from the line above it.
+    local lines = { 'Markers' }
+    local function Heading(text)
+        lines[#lines + 1] = ''
+        lines[#lines + 1] = ''
+        lines[#lines + 1] = text
+    end
     for _, l in ipairs(rep.summary) do lines[#lines + 1] = l end
     if #rep.errors > 0 then
-        lines[#lines + 1] = ''
-        lines[#lines + 1] = 'Errors'
+        Heading('Errors')
         for _, l in ipairs(rep.errors) do lines[#lines + 1] = l end
     end
     if #rep.warnings > 0 then
-        lines[#lines + 1] = ''
-        lines[#lines + 1] = 'Warnings'
+        Heading('Warnings')
         for _, l in ipairs(rep.warnings) do lines[#lines + 1] = l end
     end
     if not model.has_end_event then
         lines[#lines + 1] = ''
         lines[#lines + 1] = 'No [end] event on EVENTS: the song end was taken from the last note, so the end-of-song checks are approximate.'
     end
-    S.last_result = table.concat(lines, '\n')
-    S.status = (n_e == 0 and n_w == 0) and 'Overdrive check: no issues.'
-        or ('Overdrive check: %d error%s, %d warning%s.'):format(n_e, n_e == 1 and '' or 's',
-                                                               n_w, n_w == 1 and '' or 's')
-    S.od_overview = OdBuildOverview(model, S.od_keepout_od)
+    if #play > 0 then
+        Heading(play[1])
+        for i = 2, #play do lines[#lines + 1] = play[i] end
+    end
+    return { lines = lines, n_errors = rep.n_errors, n_warnings = rep.n_warnings, model = model }
+end
+
+-- "0 errors, 2 warnings" / "no issues".
+function OdCheckCounts(rep)
+    local n_e, n_w = rep.n_errors, rep.n_warnings
+    if n_e == 0 and n_w == 0 then return 'no issues' end
+    return ('%d error%s, %d warning%s'):format(n_e, n_e == 1 and '' or 's',
+                                              n_w, n_w == 1 and '' or 's')
+end
+
+function ValidateOverdrive()
+    local rep, err = OdCheckReport()
+    if not rep then
+        S.status = 'Error'
+        S.last_result = err
+        return
+    end
+    S.last_result = table.concat(rep.lines, '\n')
+    S.status = 'Overdrive check: ' .. OdCheckCounts(rep) .. '.'
+    S.od_overview = OdBuildOverview(rep.model, S.od_keepout_od)
 end

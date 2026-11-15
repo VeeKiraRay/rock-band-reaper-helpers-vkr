@@ -34,6 +34,7 @@ local function Loop()
         -- them on screen after a switch would attribute one song's ranks to another.
         S.diff_suggestions   = nil
         S.key_suggestion     = nil   -- Metadata > Song key, same reason
+        S.score_result       = nil   -- Metadata > Score, same reason
         S.key_audio          = nil
         SongKeyAudioCancel()          -- a running audio read belongs to the old project
         S.key_check_tonic    = nil

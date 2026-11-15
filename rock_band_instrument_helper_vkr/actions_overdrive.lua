@@ -842,75 +842,85 @@ function GenerateOverdrive(mode)
     r.PreventUIRefresh(-1)
     r.UpdateArrange()
 
-    -- Report.
-    local lines = { 'Generated for the whole song - one undo step reverts all of it.', '' }
+    -- Report. Only what Validate cannot know - where it was written, the settings behind
+    -- the numbers, and what got in the way. The counts (phrases, unisons, fills, vocal
+    -- phrases) are in the check report's Markers section below, read from the tracks.
+    -- Generate's own lines first, then the same check report Validate gives.
+    local lines = { 'Generated', 'For the whole song - one undo step reverts all of it.' }
+    local written_to = {}
+    if iplan then
+        for _, g in ipairs(OD_INST_GROUPS) do
+            if jobs.inst[g.key] and iplan.phrases[g.key] then
+                local names = {}
+                for _, tr in ipairs(GroupTracks(model.inst[g.key])) do names[#names + 1] = TrackName(tr) end
+                written_to[#written_to + 1] = table.concat(names, ' + ')
+            end
+        end
+    end
+    if fplan and not (iplan and jobs.inst.drums) then
+        local names = {}
+        for _, tr in ipairs(GroupTracks(model.inst.drums)) do names[#names + 1] = TrackName(tr) end
+        written_to[#written_to + 1] = table.concat(names, ' + ') .. ' (fills)'
+    end
     if vplan then
-        local where = model.vocal.harm_present and 'PART VOCALS + HARM1' or 'PART VOCALS'
-        lines[#lines + 1] = ('Vocals\t%d phrases on %s (1 per %d of %d phrases)'):format(
-            #vplan.phrases, where, S.od_vocal_every, vplan.candidates)
+        written_to[#written_to + 1] = model.vocal.harm_present and 'PART VOCALS + HARM1' or 'PART VOCALS'
+    end
+    if #written_to > 0 then
+        lines[#lines + 1] = 'Written to: ' .. table.concat(written_to, ', ')
+    end
+    if fplan then
+        local how = OD_FILL_PACINGS[pacing].label
+        if S.od_fill_pacing == 0 then how = how .. (', auto from %.0f BPM'):format(bpm or 120) end
+        lines[#lines + 1] = 'Fills: ' .. how
+    end
+    if vplan then
+        lines[#lines + 1] = ('Vocals: 1 per %d phrases'):format(S.od_vocal_every)
+    end
+
+    -- What got in the way.
+    local issues = {}
+    if vplan then
         for _, ph in ipairs(vplan.unplaced) do
-            lines[#lines + 1] = ('  OD would have been generated starting at %s, but PART VOCALS and ' ..
+            issues[#issues + 1] = ('Vocals: OD would have been generated starting at %s, but PART VOCALS and ' ..
                 'HARM1 have different phrase markers there. Rock Band 3 has a visual bug in ' ..
                 'harmonies if the parts differ.'):format(OdWhere(ph.s))
         end
     end
     if iplan then
-        for _, g in ipairs(OD_INST_GROUPS) do
-            local list = jobs.inst[g.key] and iplan.phrases[g.key]
-            if list then
-                local n_un = 0
-                for _, sp in ipairs(list) do if sp.unison then n_un = n_un + 1 end end
-                local names = {}
-                for _, tr in ipairs(GroupTracks(model.inst[g.key])) do names[#names + 1] = TrackName(tr) end
-                lines[#lines + 1] = ('%s\t%d phrases (target %d), %d in unisons - %s'):format(
-                    g.label, #list, iplan.targets[g.key] or 0, n_un, table.concat(names, ' + '))
-            end
-        end
-        if iplan.unison_mode == 'fresh' then
-            lines[#lines + 1] = ('Unisons\t%d'):format(#iplan.unison_bars)
-        elseif iplan.unison_mode == 'joined' then
-            lines[#lines + 1] = ('Unisons\tjoined %d the other parts already had'):format(
-                #iplan.unison_bars)
-        end
         for _, u in ipairs(iplan.unplaced) do
             local g = u.key and OdInstGroup(u.key)
             local at = u.bar and model.bars[u.bar] and (' near ' .. OdWhere(model.bars[u.bar].qn_s)) or ''
             if u.kind == 'unison' then
-                lines[#lines + 1] = ('  No bar where the whole band plays freely for a unison%s.'):format(at)
+                issues[#issues + 1] = ('No bar where the whole band plays freely for a unison%s.'):format(at)
             else
-                lines[#lines + 1] = ('  %s: %d phrase%s could not be placed%s - the bars there are taken by ' ..
+                issues[#issues + 1] = ('%s: %d phrase%s could not be placed%s - the bars there are taken by ' ..
                     'vocal overdrive, fills, other phrases, or the part is resting.'):format(
                     g and g.label or '?', u.count, u.count == 1 and '' or 's', at)
             end
         end
         if iplan.solo_trimmed > 0 then
-            lines[#lines + 1] = ('  Drums: %d phrase%s dropped to keep drum solos within the cap.'):format(
+            issues[#issues + 1] = ('Drums: %d phrase%s dropped to keep drum solos within the cap.'):format(
                 iplan.solo_trimmed, iplan.solo_trimmed == 1 and '' or 's')
         end
     end
     if fplan then
-        local names = {}
-        for _, tr in ipairs(GroupTracks(model.inst.drums)) do names[#names + 1] = TrackName(tr) end
-        local how = OD_FILL_PACINGS[pacing].label
-        if S.od_fill_pacing == 0 then how = how .. (', auto from %.0f BPM'):format(bpm or 120) end
-        lines[#lines + 1] = ('Fills\t%d on %s (%s)'):format(#fplan.fills, table.concat(names, ' + '), how)
         local skipped = {}
         for reason, n in pairs(fplan.skipped) do skipped[#skipped + 1] = ('%d %s'):format(n, reason) end
         table.sort(skipped)
         if #skipped > 0 then
-            lines[#lines + 1] = '  Skipped slots: ' .. table.concat(skipped, ', ')
+            issues[#issues + 1] = 'Fills: skipped slots - ' .. table.concat(skipped, ', ')
         end
         if iplan and #iplan.yielded > 0 then
-            lines[#lines + 1] = ('  %d fill%s gave way to a unison on the measure before a section.'):format(
-                #iplan.yielded, #iplan.yielded == 1 and '' or 's')
+            issues[#issues + 1] = ('Fills: %d gave way to a unison on the measure before a section.'):format(
+                #iplan.yielded)
         end
         if fplan.no_activation then
-            lines[#lines + 1] = ('  No fills written: the drums never collect enough overdrive to activate ' ..
+            issues[#issues + 1] = ('Fills: none written - the drums never collect enough overdrive to activate ' ..
                 '(2 phrases, or 1 unison). Generate drum overdrive too, or untick "Skip fills ' ..
                 'before overdrive can be activated".')
         elseif #early_fills > 0 then
-            lines[#lines + 1] = ('  Left out %d fill%s before drum overdrive can first be activated (%s).'):format(
-                #early_fills, #early_fills == 1 and '' or 's', OdWhere(early_fills[1].s))
+            issues[#issues + 1] = ('Fills: left out %d before drum overdrive can first be activated (%s).'):format(
+                #early_fills, OdWhere(early_fills[1].s))
         end
         -- A fill followed a section start the drums do not mark: the section event may
         -- be a measure off, and moving it moves the fill with it.
@@ -918,12 +928,16 @@ function GenerateOverdrive(mode)
         for _, sec in ipairs(model.sections) do if sec.bar then sec_name[sec.bar] = sec.name end end
         for _, f in ipairs(fplan.fills) do
             if f.crash_near then
-                lines[#lines + 1] = ('  Fill ends at the [prc_%s] start at %s, but the drums crash at %s ' ..
+                issues[#issues + 1] = ('Fill ends at the [prc_%s] start at %s, but the drums crash at %s ' ..
                     'instead - that section event may be a measure off. Move it and generate again ' ..
                     'to move the fill.'):format(sec_name[f.bar] or '?', OdWhere(f.e),
                     OdWhere(model.bars[f.crash_near].qn_s))
             end
         end
+    end
+    if #issues > 0 then
+        lines[#lines + 1] = ''
+        for _, l in ipairs(issues) do lines[#lines + 1] = l end
     end
     if model.coda_qn then
         lines[#lines + 1] = ''
@@ -933,9 +947,14 @@ function GenerateOverdrive(mode)
         lines[#lines + 1] = ''
         for _, n in ipairs(notes_out) do lines[#lines + 1] = n end
     end
+    local check = OdCheckReport()
+    if check then
+        lines[#lines + 1] = ''
+        lines[#lines + 1] = ''
+        for _, l in ipairs(check.lines) do lines[#lines + 1] = l end
+    end
     S.last_result = table.concat(lines, '\n')
     S.status = ('Overdrive generated (%d notes).'):format(written)
-
-    local fresh = OdBuildModel()
-    S.od_overview = fresh and OdBuildOverview(fresh, S.od_keepout_od) or nil
+        .. (check and (' Check: ' .. OdCheckCounts(check) .. '.') or '')
+    S.od_overview = check and OdBuildOverview(check.model, S.od_keepout_od) or nil
 end

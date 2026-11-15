@@ -39,6 +39,8 @@ dofile(_root .. 'lib/reaper_difficulty_score_vocals.lua')
 dofile(_gdir .. 'defaults.lua')                          -- S
 dofile(_root .. 'lib/reaper_helper_common.lua')          -- GetTempoContextBefore
 dofile(_root .. 'lib/reaper_difficulty_read.lua')        -- FindTrackExact, ReadGemEvents
+dofile(_root .. 'lib/reaper_score_sim.lua')             -- Validate's "in play" lines
+dofile(_root .. 'lib/reaper_score_read.lua')
 dofile(_gdir .. 'overdrive_read.lua')
 dofile(_gdir .. 'overdrive_interest.lua')
 dofile(_gdir .. 'actions_overdrive_fills.lua')
