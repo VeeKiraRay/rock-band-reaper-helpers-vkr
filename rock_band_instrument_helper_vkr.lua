@@ -83,7 +83,9 @@
 --       * PART VOCALS and HARM1 overdrive that differ is now a warning (Magma
 --         and the game accept it; harmonies show a visual bug), not an error.
 --         HARM1 with no overdrive at all is not warned about: harmonies then
---         earn it on PART VOCALS' phrases, and Markers says so.
+--         earn it on PART VOCALS' phrases, and Markers says so. Neither is
+--         HARM1 overdrive where PART VOCALS has no phrase at all (a part only
+--         the harmonies sing): PART VOCALS cannot differ from it there.
 --       * A phrase with no notes in it on some difficulty is warned about: it
 --         can never be earned there.
 --

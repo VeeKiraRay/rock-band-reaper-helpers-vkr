@@ -417,6 +417,7 @@ function OdValidateModel(model, opts)
                 Warn('late', ('Vocals: overdrive at %s is in the last %d measures.'):format(OdWhere(od.s), ko_od))
             end
         end
+        local harm_extra = 0
         if v.harm_present then
             -- HARM1's overdrive is what harmonies play, checked against HARM1's own
             -- phrases and notes (SongData::ValidateVocalSPPhrases; Magma refuses it).
@@ -427,7 +428,16 @@ function OdValidateModel(model, opts)
             -- HARM1 with no overdrive at all is fine: harmonies then earn it on PART
             -- VOCALS' phrases (verified in game; 169 official RB3 DLC harmony songs are
             -- authored that way), so only overdrive that exists and differs is warned.
-            local at = #v.harm_od > 0 and FirstMismatch(v.od, v.harm_od)
+            -- HARM1 overdrive where PART VOCALS has no phrase at all (a part only the
+            -- harmonies sing) is left out of the comparison: PART VOCALS can have no
+            -- overdrive there, so nothing differs from it (a community authoring tip,
+            -- not verified in game).
+            local harm_own = {}
+            for _, od in ipairs(v.harm_od) do
+                if OdAnyOverlap(v.phrases, od.s, od.e) then harm_own[#harm_own + 1] = od end
+            end
+            harm_extra = #v.harm_od - #harm_own
+            local at = #v.harm_od > 0 and FirstMismatch(v.od, harm_own)
             if at then
                 Warn('harm', ('Vocals: PART VOCALS and HARM1 overdrive differ, first at %s. Magma and Rock Band 3 accept it, but harmonies then show a known visual bug - make them match.'):format(
                     OdWhere(at)))
@@ -436,7 +446,9 @@ function OdValidateModel(model, opts)
         local ratio = #v.od > 0 and sung / #v.od or 0
         rep.summary[#rep.summary + 1] = #v.od > 0
             and ('Vocals\t%d phrases, 1 per %.1f sung phrases%s'):format(#v.od, ratio,
-                (v.harm_present and #v.harm_od == 0) and ' (HARM1 has none: harmonies use these)' or '')
+                (v.harm_present and #v.harm_od == 0) and ' (HARM1 has none: harmonies use these)'
+                or harm_extra > 0 and (' (HARM1 adds %d where PART VOCALS has no phrase)'):format(harm_extra)
+                or '')
             or  'Vocals\tno overdrive'
         if #v.od > 0 and (ratio < 3 or ratio > 7) then
             Warn('vocal count', ('Vocals: 1 overdrive per %.1f phrases (the guideline is 1 per 5).'):format(ratio))

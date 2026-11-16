@@ -759,6 +759,35 @@ Test.it('HARM1 with no overdrive at all is fine: harmonies use PART VOCALS\'', f
     Test.expect(table.concat(rep.summary, '\n'):find('HARM1 has none', 1, true) ~= nil, 'no Markers note')
 end)
 
+Test.it('HARM1 overdrive where PART VOCALS has no phrase is not a mismatch', function()
+    -- A part only the harmonies sing: PART VOCALS can have no overdrive there.
+    local model = GeneratedModel()
+    local s, e = model.bars[10].qn_s, model.bars[11].qn_e
+    local s2, e2 = model.bars[20].qn_s, model.bars[21].qn_e
+    model.vocal = { present = true, harm_present = true,
+                    phrases = { { s = s, e = e, has_notes = true } },
+                    od = { { s = s, e = e } }, harm_od = { { s = s, e = e }, { s = s2, e = e2 } },
+                    harm_phrases = { { s = s, e = e }, { s = s2, e = e2 } } }
+    local rep = OdValidateModel(model, STD)
+    Test.expect(table.concat(rep.warnings, '\n'):find('overdrive differ', 1, true) == nil, 'warned')
+    Test.expect(table.concat(rep.summary, '\n'):find('HARM1 adds 1 where PART VOCALS has no phrase', 1, true) ~= nil,
+                'no Markers note')
+end)
+
+Test.it('HARM1 overdrive missing one of PART VOCALS\' phrases is still a mismatch', function()
+    -- The extra HARM1 phrase is exempt, but PART VOCALS' second one is not on HARM1.
+    local model = GeneratedModel()
+    local s, e = model.bars[10].qn_s, model.bars[11].qn_e
+    local s2, e2 = model.bars[20].qn_s, model.bars[21].qn_e
+    local s3, e3 = model.bars[30].qn_s, model.bars[31].qn_e
+    model.vocal = { present = true, harm_present = true,
+                    phrases = { { s = s, e = e, has_notes = true }, { s = s3, e = e3, has_notes = true } },
+                    od = { { s = s, e = e }, { s = s3, e = e3 } }, harm_od = { { s = s, e = e }, { s = s2, e = e2 } },
+                    harm_phrases = { { s = s, e = e }, { s = s2, e = e2 }, { s = s3, e = e3 } } }
+    local rep = OdValidateModel(model, STD)
+    Test.expect(table.concat(rep.warnings, '\n'):find('overdrive differ', 1, true) ~= nil, 'not warned')
+end)
+
 -- A song with harmonies: PART VOCALS has phrases 10-11 and 12-13, HARM1 one phrase 10-13.
 local function HarmModel(vocal_od, harm_od, harm_sung)
     local model = GeneratedModel()
