@@ -3,8 +3,11 @@
 -- Checks authored overdrive, unisons, drum fills and vocal overdrive against the RBN
 -- rules the generator follows (see actions_overdrive.lua). Never writes and creates no
 -- undo point. Errors are the rules whose breach the docs tie to a game bug or to the
--- chart not working (overdrive overlapping a fill, vocal overdrive off its phrase
--- marker, HARM1 not matching PART VOCALS, mismatched mirror tracks). Everything else is
+-- chart not working, or that Magma refuses (overdrive overlapping a fill, vocal
+-- overdrive off its own track's phrase marker - PART VOCALS' or HARM1's, two phrases
+-- with no gems between them on any difficulty, mismatched mirror tracks). HARM1 not
+-- matching PART VOCALS is a warning: Magma and the game accept it, with a known visual
+-- bug in harmonies. Everything else is
 -- a warning, including two rules the docs state firmly but official charts break often
 -- enough that an error would be noise: measured over the reference corpus, a drum
 -- phrase ending exactly where a fill starts (the CARV "touching" rule) and one starting
@@ -145,6 +148,21 @@ function OdValidateModel(model, opts)
                 -- (about 9 phrases per song across the reference corpus). The
                 -- generator avoids it by choice, so it is worth knowing, not flagging.
                 if OdAnyOverlap(v.od, sp.s, sp.e) then under_vocal = under_vocal + 1 end
+            end
+            -- Phrases against each authored difficulty's gems (Magma checks every one):
+            -- two phrases with no gem between them is a Magma error; a phrase with no gem
+            -- in it can never be earned. Pro Keys is its own chart under the same overdrive.
+            for _, tier in ipairs(inst.tiers or {}) do
+                local who = tier.own_label and tier.name or (g.label .. ' ' .. tier.name)
+                local issues = OdPhraseGemIssues(tier.od or list, tier.events or {})
+                for _, pair in ipairs(issues.adjacent) do
+                    Err('no gems between', ('%s: no notes between the overdrive phrases at %s and %s - Magma refuses the song ("No gems between overdrive phrases"). Add notes between them, or remove one.'):format(
+                        who, OdWhere(pair.a.s), OdWhere(pair.b.s)))
+                end
+                for _, sp in ipairs(issues.empty) do
+                    Warn('empty', ('%s: overdrive phrase at %s has no notes - it can never be earned.'):format(
+                        who, OdWhere(sp.s)))
+                end
             end
             -- Markers carry facts only. Targets come from the current Generate settings,
             -- which need not be what the chart was made with (hand-placed overdrive,
@@ -346,15 +364,53 @@ function OdValidateModel(model, opts)
     if v.present then
         local sung = 0
         for _, ph in ipairs(v.phrases) do if ph.has_notes then sung = sung + 1 end end
+        -- Each track's overdrive against that track's own phrase markers and notes - what
+        -- Magma checks, per track (OdVocalOdProblem). Our reason first, then the text
+        -- Magma gives for it, so the two can be matched up.
+        local REASON = {
+            after_all   = 'comes after the last sung note',
+            during_note = 'starts in the middle of a sung note',
+            off         = 'is not on a phrase: the next sung note has no phrase marker (105)',
+            mid_phrase  = 'starts after the first note of its phrase',
+            no_notes    = 'is on a phrase with no %s notes in it, so it cannot be earned there',
+            short       = 'ends before the last note of its phrase starts',
+            long        = 'runs into the first note of the next phrase',
+        }
+        -- other: PART VOCALS' phrases and notes, for HARM1's hint.
+        local function CheckTrack(track_name, od_list, phrases, notes, any_notes, other)
+            for _, od in ipairs(od_list) do
+                local key, magma
+                if notes then
+                    key, magma = OdVocalOdProblem(od, phrases, notes, any_notes)
+                else
+                    -- A hand-built model without notes: the marker check alone.
+                    local fits = false
+                    for _, ph in ipairs(phrases) do
+                        if OdSameSpan(ph, od) then fits = true; break end
+                    end
+                    if not fits then key = 'off' end
+                end
+                if key then
+                    local hint = ''
+                    -- Fine on PART VOCALS but not on HARM1: the two tracks' phrases differ
+                    -- here, and fitting HARM1 alone would make the overdrive differ from
+                    -- PART VOCALS' - the fix for both is phrases that match.
+                    if other and other.notes and not OdVocalOdProblem(od, other.phrases, other.notes) then
+                        hint = ' It is fine on PART VOCALS: the two tracks\' phrases differ here, so fitting it to HARM1 alone would make it differ from PART VOCALS. Make the phrase markers (and notes) match on both tracks.'
+                    end
+                    local tail = ''
+                    if key == 'no_notes' then
+                        tail = (' Magma reports it as "%s".'):format(magma)
+                    elseif magma then
+                        tail = (' Magma: "vocal overdrive phrase ... %s".'):format(magma)
+                    end
+                    Err('vocal phrase', ('%s: overdrive at %s %s.%s%s'):format(track_name, OdWhere(od.s),
+                        REASON[key]:format(track_name), tail, hint))
+                end
+            end
+        end
+        CheckTrack('PART VOCALS', v.od, v.phrases, v.sung)
         for _, od in ipairs(v.od) do
-            local match = false
-            for _, ph in ipairs(v.phrases) do
-                if OdSameSpan(ph, od) then match = true; break end
-            end
-            if not match then
-                Err('vocal phrase', ('Vocals: overdrive at %s does not line up exactly with a phrase marker (105).'):format(
-                    OdWhere(od.s)))
-            end
             if model.coda_qn and od.e > model.coda_qn + OD_QN_EPS then
                 Err('bre', ('Vocals: overdrive at %s is in the Big Rock Ending.'):format(OdWhere(od.s)))
             elseif od.e > last_od_qn + OD_QN_EPS then
@@ -362,15 +418,25 @@ function OdValidateModel(model, opts)
             end
         end
         if v.harm_present then
-            local at = FirstMismatch(v.od, v.harm_od)
+            -- HARM1's overdrive is what harmonies play, checked against HARM1's own
+            -- phrases and notes (SongData::ValidateVocalSPPhrases; Magma refuses it).
+            CheckTrack('HARM1', v.harm_od, v.harm_phrases, v.harm_sung, v.harm_any,
+                       { phrases = v.phrases, notes = v.sung })
+            -- Magma and the game accept overdrive that differs between the two, but
+            -- harmonies then show a known visual bug - worth fixing, not a refusal.
+            -- HARM1 with no overdrive at all is fine: harmonies then earn it on PART
+            -- VOCALS' phrases (verified in game; 169 official RB3 DLC harmony songs are
+            -- authored that way), so only overdrive that exists and differs is warned.
+            local at = #v.harm_od > 0 and FirstMismatch(v.od, v.harm_od)
             if at then
-                Err('harm', ('Vocals: PART VOCALS and HARM1 overdrive differ, first at %s. Rock Band 3 has a visual bug in harmonies if the parts differ.'):format(
+                Warn('harm', ('Vocals: PART VOCALS and HARM1 overdrive differ, first at %s. Magma and Rock Band 3 accept it, but harmonies then show a known visual bug - make them match.'):format(
                     OdWhere(at)))
             end
         end
         local ratio = #v.od > 0 and sung / #v.od or 0
         rep.summary[#rep.summary + 1] = #v.od > 0
-            and ('Vocals\t%d phrases, 1 per %.1f sung phrases'):format(#v.od, ratio)
+            and ('Vocals\t%d phrases, 1 per %.1f sung phrases%s'):format(#v.od, ratio,
+                (v.harm_present and #v.harm_od == 0) and ' (HARM1 has none: harmonies use these)' or '')
             or  'Vocals\tno overdrive'
         if #v.od > 0 and (ratio < 3 or ratio > 7) then
             Warn('vocal count', ('Vocals: 1 overdrive per %.1f phrases (the guideline is 1 per 5).'):format(ratio))

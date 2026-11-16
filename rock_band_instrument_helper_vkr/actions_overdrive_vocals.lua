@@ -18,7 +18,7 @@
 -- and their spans then fence off the instrument planner.
 --
 -- Pure over the model from OdBuildModel.
--- Requires (globals): OD_QN_EPS (overdrive_read.lua)
+-- Requires (globals): OD_QN_EPS, OdVocalOdProblem (overdrive_read.lua)
 
 -- opts:
 --   every       vocal phrases per overdrive phrase (5)
@@ -46,9 +46,20 @@ function OdPlanVocals(model, opts)
     plan.candidates = #cands
 
     local K = math.max(2, opts.every or 5)
+    -- Magma checks each track's overdrive against that track's own notes too
+    -- (OdVocalOdProblem): a HARM1 phrase nobody in HARM1-3 sings in would be refused
+    -- even with markers matching. Hand-built models without note lists skip it.
     local function Ok(i)
         local ph = cands[i]
-        return ph ~= nil and (not v.harm_present or ph.harm ~= nil)
+        if ph == nil then return false end
+        if v.sung and OdVocalOdProblem(ph, v.phrases, v.sung) then return false end
+        if v.harm_present then
+            if ph.harm == nil then return false end
+            if v.harm_sung and OdVocalOdProblem(ph.harm, v.harm_phrases, v.harm_sung, v.harm_any) then
+                return false
+            end
+        end
+        return true
     end
 
     -- Start mid-cycle (the 3rd phrase of 5) so the first and last overdrive sit

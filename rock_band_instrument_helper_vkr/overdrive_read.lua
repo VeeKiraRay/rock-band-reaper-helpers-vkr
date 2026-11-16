@@ -17,6 +17,7 @@ OD_FILL_HI      = 124
 OD_PHRASE_PITCH = 105
 OD_SOLO_PITCH   = 103
 OD_QN_EPS       = 0.0005   -- under one tick at 960 PPQ: "the same position"
+OD_TIER_NAMES   = { 'Expert', 'Hard', 'Medium', 'Easy' }
 
 -- Pro Drums tom markers: gem pitch -> the marker that turns it from a cymbal into a
 -- tom. Blue 99 / 111 and green 100 / 112 matter here (crash detection); yellow is the
@@ -93,6 +94,129 @@ function OdSpanListsEqual(a, b)
         if not OdSameSpan(a[i], b[i]) then return false end
     end
     return true
+end
+
+-- True when a gem (an event with `qn`, from a list sorted by qn) starts in [s, e).
+-- Binary search: the planner asks this for every candidate bar.
+function OdHasGem(events, s, e)
+    local lo, hi = 1, #events + 1
+    local from = s - OD_QN_EPS
+    while lo < hi do                       -- first event at or after s
+        local mid = (lo + hi) // 2
+        if events[mid].qn < from then lo = mid + 1 else hi = mid end
+    end
+    local ev = events[lo]
+    return ev ~= nil and ev.qn < e - OD_QN_EPS
+end
+
+-- What is wrong with one vocal overdrive phrase on its own track (PART VOCALS or HARM1),
+-- or nil. Magma refuses each of these as a compile error, per track, with the game's own
+-- texts (SongData::ValidateVocalSPPhrases).
+--
+-- JUDGED BY NOTES, NOT MARKERS. The game starts from the next note of the track at or
+-- after the overdrive's start and takes the phrase (105) holding that note: the
+-- overdrive must start at or before that phrase's first note, reach at least the start
+-- of its last note (a last note ringing past the overdrive's end is fine), and stop
+-- before the next phrase's first note. Worked out from a test song built in Magma (every
+-- verdict matched, wording included) and from the official RBN songs, which Magma built:
+-- this gives 0 errors over their 1,777 vocal overdrive phrases, where an exact
+-- marker-match rule flagged 145. Magma's "ends prematurely" may be a catch-all text: a
+-- phrase with no note of the track is reported that way too.
+--
+--   od         { s, e }
+--   phrases    the track's 105 spans, sorted
+--   notes      the track's own sung notes { qn, qn_e }, sorted
+--   any_notes  HARM1 only: HARM1-3's notes together. A HARM1 phrase that only another
+--              voice sings in is fine (Magma-built RBN songs have them, and any singer
+--              clearing a HARM1 phrase earns its overdrive); the timing checks stay on
+--              HARM1's own notes, since HARM2 / HARM3 may cross HARM1's phrases.
+-- Returns key, magma_text:
+--   after_all   no note at or after its start
+--   during_note it starts inside one of the track's notes
+--   off         the next note is outside every phrase marker
+--   no_notes    it starts on a phrase with no note of this track (or of any voice, HARM1)
+--   mid_phrase  it starts after its phrase's first note
+--   short       it ends before its phrase's last note starts
+--   long        it reaches the next phrase's first note
+OD_VOCAL_MAGMA = {
+    after_all   = 'is after all notes',
+    during_note = 'begins during a note',
+    mid_phrase  = 'starts mid-phrase',
+    no_notes    = 'ends prematurely',
+    short       = 'ends prematurely',
+    long        = 'cuts into next phrase',
+}
+
+local function PhraseAt(phrases, qn)
+    for _, p in ipairs(phrases) do
+        if p.s <= qn + OD_QN_EPS and qn < p.e - OD_QN_EPS then return p end
+    end
+    return nil
+end
+
+function OdVocalOdProblem(od, phrases, notes, any_notes)
+    local start_ph = PhraseAt(phrases, od.s)
+    if any_notes then
+        if start_ph and not OdHasGem(notes, start_ph.s, start_ph.e)
+           and OdHasGem(any_notes, start_ph.s, start_ph.e) then
+            return nil
+        end
+        if not OdHasGem(any_notes, od.s, math.huge) then return 'after_all', OD_VOCAL_MAGMA.after_all end
+    end
+    local key
+    if not OdHasGem(notes, od.s, math.huge) then
+        key = 'after_all'
+    else
+        for _, n in ipairs(notes) do
+            if n.qn >= od.s then break end
+            if n.qn < od.s - OD_QN_EPS and (n.qn_e or n.qn) > od.s + OD_QN_EPS then key = 'during_note'; break end
+        end
+    end
+    if not key then
+        local nxt
+        for _, n in ipairs(notes) do
+            if n.qn >= od.s - OD_QN_EPS then nxt = n; break end
+        end
+        local ph = PhraseAt(phrases, nxt.qn)
+        if not ph then
+            key = 'off'
+        elseif start_ph and start_ph ~= ph and not OdHasGem(notes, start_ph.s, start_ph.e) then
+            key = 'no_notes'
+        else
+            local first, last, after
+            for _, n in ipairs(notes) do
+                if n.qn >= ph.s - OD_QN_EPS and n.qn < ph.e - OD_QN_EPS then
+                    first = first or n
+                    last = n
+                elseif n.qn >= ph.e - OD_QN_EPS and not after then
+                    after = n
+                end
+            end
+            if first.qn < od.s - OD_QN_EPS then key = 'mid_phrase'
+            elseif od.e <= last.qn + OD_QN_EPS then key = 'short'
+            elseif after and od.e > after.qn + OD_QN_EPS then key = 'long'
+            end
+        end
+    end
+    return key, key and OD_VOCAL_MAGMA[key]
+end
+
+-- Phrase problems on one difficulty of one part, against its gems. Pure.
+--   empty    phrases with no gem in them: never earned
+--   adjacent { a, b } consecutive phrases with no gem between them (a gem on a's end
+--            counts as between: a phrase's span ends before its note-off). Magma refuses
+--            the song: "No gems between overdrive phrases", checked on every difficulty.
+-- od: the phrase spans sorted by start; events: the gems sorted by qn.
+function OdPhraseGemIssues(od, events)
+    local out = { empty = {}, adjacent = {} }
+    for i, sp in ipairs(od) do
+        if not OdHasGem(events, sp.s, sp.e) then out.empty[#out.empty + 1] = sp end
+        local nx = od[i + 1]
+        if nx and nx.s >= sp.e - OD_QN_EPS and not OdHasGem(events, sp.e, nx.s) then
+            out.adjacent[#out.adjacent + 1] = { a = sp, b = nx }
+        end
+    end
+    return out
 end
 
 ----------------------------------------------------------------------
@@ -312,6 +436,29 @@ function OdBuildModel()
         inst.events = inst.present and ReadGemEvents(read_tr, lo, hi) or {}
         inst.od = tr and PitchSpans(tr, OD_PITCH) or {}
         inst.mirror_od = mtr and PitchSpans(mtr, OD_PITCH) or nil
+        -- Every authored difficulty's gems, for the phrase checks Magma makes per
+        -- difficulty (OdPhraseGemIssues). Hard / Medium / Easy are 12 pitches down each;
+        -- a difficulty with no gems at all is not authored yet and is left out. Pro Keys
+        -- is its own chart under the same overdrive, so PART REAL_KEYS_X's gems come along
+        -- with its own 116 notes.
+        -- `od` is set only where a tier has overdrive of its own (Pro Keys); the others
+        -- use inst.od, read when checked, so a list replaced later is still the one checked.
+        inst.tiers = { { name = 'Expert', events = inst.events } }
+        if inst.present and read_tr == tr then
+            for t = 1, 3 do
+                local ev = ReadGemEvents(tr, lo - 12 * t, hi - 12 * t)
+                if #ev > 0 then
+                    inst.tiers[#inst.tiers + 1] = { name = OD_TIER_NAMES[t + 1], events = ev }
+                end
+            end
+            if g.key == 'keys' and mtr and #OdTrackTakes(mtr) > 0 then
+                local ev = ReadGemEvents(mtr, g.mirror_lo, g.mirror_hi)
+                if #ev > 0 then
+                    inst.tiers[#inst.tiers + 1] = { name = 'Pro Keys', events = ev, od = inst.mirror_od or {},
+                                                    own_label = true }
+                end
+            end
+        end
         for _, ev in ipairs(inst.events) do
             if (ev.qn_e or ev.qn) > last_note_qn then last_note_qn = ev.qn_e or ev.qn end
         end
@@ -328,6 +475,26 @@ function OdBuildModel()
     vocal.od = vtr and PitchSpans(vtr, OD_PITCH) or {}
     vocal.harm_phrases = htr and PitchSpans(htr, OD_PHRASE_PITCH) or {}
     vocal.harm_od = htr and PitchSpans(htr, OD_PITCH) or {}
+    -- Sung notes per track, { qn, qn_e } sorted (OdHasGem reads qn): PART VOCALS' and
+    -- HARM1's own. Magma checks each track's overdrive against that track's own notes
+    -- (OdVocalOdProblem): a HARM1 phrase with no HARM1 note in it is refused even when
+    -- its overdrive fits the marker exactly.
+    local function Sung(t)
+        local out = {}
+        for _, n in ipairs(OdReadPitchNotes(t, 36, 84)) do out[#out + 1] = { qn = n.s, qn_e = n.e } end
+        return out
+    end
+    vocal.sung = vtr and Sung(vtr) or {}
+    vocal.harm_sung = htr and Sung(htr) or nil
+    if htr then
+        local any = Sung(htr)
+        for _, name in ipairs({ 'HARM2', 'HARM3' }) do
+            local t = FindTrackExact(name)
+            if t then for _, n in ipairs(Sung(t)) do any[#any + 1] = n end end
+        end
+        table.sort(any, function(x, y) return x.qn < y.qn end)
+        vocal.harm_any = any
+    end
     if vtr then
         local sung = OdReadPitchNotes(vtr, 36, 84)
         local k = 1
@@ -456,6 +623,8 @@ function OdFinishModel(model)
     for _, inst in pairs(model.inst) do
         inst.onset, inst.playing, inst.first = OdBarActivity(model.bars, inst.events or {})
         inst.od = inst.od or {}
+        -- A hand-built model (dev/tests) gives Expert only.
+        inst.tiers = inst.tiers or { { name = 'Expert', events = inst.events or {} } }
     end
     model.fills = model.fills or {}
     model.rolls = model.rolls or {}

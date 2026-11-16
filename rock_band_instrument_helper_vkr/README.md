@@ -190,11 +190,11 @@ Each generator has its own checkbox and settings:
 | **End fills at section changes / crashes** | On | Lines fills up with the song: a fill ends on a `[prc_*]` section change near its grid slot, or on a drum crash when there is none. |
 | **Skip fills before overdrive can be activated** | On | Leaves out fills that come before the drummer can have enough overdrive (two drum phrases, or one unison). |
 
-**Vocal overdrive** — copies a phrase marker (105) exactly, on PART VOCALS and HARM1. Only phrases with an identical phrase marker on HARM1 are used, because Rock Band 3 has a visual bug in harmonies when the parts differ. **Phrases per OD** (default 5) sets how often.
+**Vocal overdrive** — copies a phrase marker (105) exactly, on PART VOCALS and HARM1. Only phrases with an identical phrase marker on HARM1, and that Magma accepts on both tracks, are used: Rock Band 3 has a visual bug in harmonies when the parts differ. **Phrases per OD** (default 5) sets how often.
 
 **Generate** writes everything that is ticked, as one undo step. If a target already has overdrive or fill notes, you're asked first: **Replace** them, **Keep existing** (new phrases join their unisons and stay out of their bars), or **Cancel**.
 
-**Validate** checks the overdrive already in the song, read-only: phrase counts and spacing, unisons, fill collisions, matching tracks (Keys/Pro Keys, Drums/Drums 2X, Vocals/HARM1) and the end-of-song keep-outs. After Validate or Generate, an **overview strip** shows the whole song, one row per part: white for phrases, gold for unisons, blue for fills and red for the end keep-out. Hover it to see the measure.
+**Validate** checks the overdrive already in the song, read-only: phrase counts and spacing, unisons, fill collisions, matching tracks (Keys/Pro Keys, Drums/Drums 2X, Vocals/HARM1) and the end-of-song keep-outs. It also makes the overdrive checks Magma makes when it builds the song: no two phrases on a part without notes between them (on every difficulty), and vocal overdrive that covers its phrase's notes on PART VOCALS and HARM1, with Magma's own wording in each message. After Validate or Generate, an **overview strip** shows the whole song, one row per part: white for phrases, gold for unisons, blue for fills and red for the end keep-out. Hover it to see the measure.
 
 ---
 

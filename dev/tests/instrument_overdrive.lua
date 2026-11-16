@@ -622,6 +622,70 @@ Test.it('drum solos hold at most 4 phrases', function()
     Test.expect(plan.solo_trimmed > 0, 'expected trimming')
 end)
 
+Test.it('never two phrases on one part without a gem between (Magma), even when crowded', function()
+    -- One phrase per 4 beats asks for a phrase in every bar; a rest in the middle.
+    local model = MkModel(60, { guitar = Range(1, 25), bass = 'all', drums = 'all', keys = Range(30, 60) })
+    local plan = OdPlanInstruments(model, {
+        gen = { guitar = true, bass = true, drums = true, keys = true },
+        beats_per_phrase = 4, unison_share = 0.5, keepout_od = 8, keepout_unison = 12,
+        nogo = {}, fills = {} })
+    local placed = 0
+    for key, list in pairs(plan.phrases) do
+        placed = placed + #list
+        local issues = OdPhraseGemIssues(list, model.inst[key].events)
+        Test.expect(#issues.adjacent == 0, ('%s: %d pairs with no gem between'):format(key, #issues.adjacent))
+        Test.expect(#issues.empty == 0, key .. ': an empty phrase')
+    end
+    Test.expect(placed > 20, 'the planner still placed phrases (' .. placed .. ')')
+end)
+
+Test.it('a lower difficulty without a gem between also blocks a phrase', function()
+    -- Expert plays every beat; Hard only bar 1-10 and 21+, so Hard has nothing between
+    -- a phrase in bar 10 and one in bar 21.
+    local model = MkModel(40, { guitar = 'all' })
+    local g = model.inst.guitar
+    local hard = {}
+    for _, ev in ipairs(g.events) do
+        local b = OdBarAt(model.bars, ev.qn)
+        if b <= 10 or b >= 21 then hard[#hard + 1] = ev end
+    end
+    g.tiers = { { name = 'Expert', events = g.events }, { name = 'Hard', events = hard } }
+    local ten = model.bars[10]
+    g.od = { { s = ten.qn_s, e = ten.qn_e } }
+    local plan = OdPlanInstruments(model, { gen = { bass = true }, beats_per_phrase = 40,
+        unison_share = 0.5, keepout_od = 8, keepout_unison = 12, nogo = {}, fills = {} })
+    -- Guitar is kept here (not generated); the check itself is the validator's.
+    g.od[2] = { s = model.bars[21].qn_s, e = model.bars[21].qn_e }
+    local errs = table.concat(OdValidateModel(model, STD).errors, '\n')
+    Test.expect(errs:find('Guitar Hard: no notes between', 1, true) ~= nil, 'Hard not flagged:\n' .. errs)
+    Test.expect(errs:find('Guitar Expert: no notes between', 1, true) == nil, 'Expert has gems between')
+    Test.expect(plan ~= nil)
+end)
+
+----------------------------------------------------------------------
+Test.section('Phrase gem checks')
+----------------------------------------------------------------------
+
+Test.it('OdHasGem: start inclusive, end exclusive', function()
+    local ev = { { qn = 1 }, { qn = 3 }, { qn = 5 } }
+    Test.expect(OdHasGem(ev, 3, 4), 'gem on the start')
+    Test.expect(not OdHasGem(ev, 3.5, 5), 'gem on the end is outside')
+    Test.expect(not OdHasGem(ev, 6, 8), 'after every gem')
+    Test.expect(OdHasGem(ev, 0, 1.5) and not OdHasGem({}, 0, 9), 'first gem / no gems')
+end)
+
+Test.it('OdPhraseGemIssues: empty phrases and pairs with nothing between', function()
+    local ev = { { qn = 0 }, { qn = 4 }, { qn = 12 } }
+    local od = { { s = 0, e = 2 }, { s = 4, e = 6 }, { s = 8, e = 10 }, { s = 12, e = 14 } }
+    local i = OdPhraseGemIssues(od, ev)
+    Test.expect(#i.empty == 1 and i.empty[1].s == 8, 'phrase at 8 has no gem')
+    -- 0-2 -> 4-6: nothing in [2, 4) (the gem at 4 is inside the next phrase); 4-6 -> 8-10
+    -- and 8-10 -> 12-14 likewise.
+    Test.expect(#i.adjacent == 3, 'pairs ' .. #i.adjacent)
+    local ok = OdPhraseGemIssues({ { s = 0, e = 2 }, { s = 4, e = 6 } }, { { qn = 0 }, { qn = 3 }, { qn = 4 } })
+    Test.expect(#ok.adjacent == 0 and #ok.empty == 0, 'a gem at 3 separates them')
+end)
+
 ----------------------------------------------------------------------
 Test.section('Validator')
 ----------------------------------------------------------------------
@@ -669,14 +733,123 @@ Test.it('flags PART KEYS and PART REAL_KEYS_X that differ', function()
     Test.expect(table.concat(rep.errors, '\n'):find('PART REAL_KEYS_X', 1, true) ~= nil, 'not flagged')
 end)
 
-Test.it('flags HARM1 overdrive that differs from PART VOCALS', function()
+Test.it('HARM1 overdrive that differs from PART VOCALS is a warning (Magma accepts it)', function()
+    local model = GeneratedModel()
+    local s, e = model.bars[10].qn_s, model.bars[11].qn_e
+    local s2, e2 = model.bars[20].qn_s, model.bars[21].qn_e
+    model.vocal = { present = true, harm_present = true,
+                    phrases = { { s = s, e = e, has_notes = true }, { s = s2, e = e2, has_notes = true } },
+                    od = { { s = s, e = e } }, harm_od = { { s = s2, e = e2 } },
+                    harm_phrases = { { s = s, e = e }, { s = s2, e = e2 } } }
+    local rep = OdValidateModel(model, STD)
+    Test.expect(table.concat(rep.warnings, '\n'):find('PART VOCALS and HARM1 overdrive differ', 1, true) ~= nil,
+                'not warned')
+    Test.expect(table.concat(rep.errors, '\n'):find('HARM1', 1, true) == nil, 'still an error')
+end)
+
+Test.it('HARM1 with no overdrive at all is fine: harmonies use PART VOCALS\'', function()
+    -- Verified in game: harmonies earn overdrive on PART VOCALS' phrases then.
     local model = GeneratedModel()
     local s, e = model.bars[10].qn_s, model.bars[11].qn_e
     model.vocal = { present = true, harm_present = true,
                     phrases = { { s = s, e = e, has_notes = true } },
-                    od = { { s = s, e = e } }, harm_od = {}, harm_phrases = {} }
+                    od = { { s = s, e = e } }, harm_od = {}, harm_phrases = { { s = s, e = e } } }
     local rep = OdValidateModel(model, STD)
-    Test.expect(table.concat(rep.errors, '\n'):find('HARM1', 1, true) ~= nil, 'not flagged')
+    Test.expect(table.concat(rep.warnings, '\n'):find('overdrive differ', 1, true) == nil, 'warned')
+    Test.expect(table.concat(rep.summary, '\n'):find('HARM1 has none', 1, true) ~= nil, 'no Markers note')
+end)
+
+-- A song with harmonies: PART VOCALS has phrases 10-11 and 12-13, HARM1 one phrase 10-13.
+local function HarmModel(vocal_od, harm_od, harm_sung)
+    local model = GeneratedModel()
+    local b = model.bars
+    local a = { s = b[10].qn_s, e = b[11].qn_e }
+    local c = { s = b[12].qn_s, e = b[13].qn_e }
+    model.vocal = { present = true, harm_present = true,
+                    phrases = { { s = a.s, e = a.e, has_notes = true }, { s = c.s, e = c.e, has_notes = true } },
+                    harm_phrases = { { s = a.s, e = c.e } },
+                    od = vocal_od(a, c), harm_od = harm_od(a, c),
+                    sung = { { qn = a.s }, { qn = c.s } }, harm_sung = harm_sung or { { qn = a.s }, { qn = c.s } } }
+    return model
+end
+
+Test.it('HARM1 overdrive off a HARM1 marker is an error, with the reason when PART VOCALS fits', function()
+    local model = HarmModel(function(a) return { a } end, function(a) return { { s = a.s, e = a.e } } end)
+    local errs = table.concat(OdValidateModel(model, STD).errors, '\n')
+    Test.expect(errs:find('HARM1: overdrive at', 1, true) ~= nil, 'not flagged:\n' .. errs)
+    Test.expect(errs:find('It is fine on PART VOCALS', 1, true) ~= nil, 'no look-ahead hint:\n' .. errs)
+    -- Fitting HARM1's own marker: no HARM1 error (the mismatch with PART VOCALS is a warning).
+    local fit = HarmModel(function(a) return { a } end, function(a, c) return { { s = a.s, e = c.e } } end)
+    local rep = OdValidateModel(fit, STD)
+    Test.expect(table.concat(rep.errors, '\n'):find('HARM1:', 1, true) == nil, 'fitting overdrive flagged')
+    Test.expect(table.concat(rep.warnings, '\n'):find('overdrive differ', 1, true) ~= nil, 'mismatch not warned')
+end)
+
+Test.it('HARM1 overdrive on a HARM1 phrase with no HARM1 notes is a Magma error', function()
+    -- Fits HARM1's marker exactly, but HARM1 sings only later in the song (Magma:
+    -- "ends prematurely", verified on a test song).
+    local od = function(a, c) return { { s = a.s, e = c.e } } end
+    local model = HarmModel(function(a) return { a } end, od, nil)
+    local b40 = model.bars[40]
+    model.vocal.harm_phrases[2] = { s = b40.qn_s, e = b40.qn_e }
+    model.vocal.harm_sung = { { qn = b40.qn_s, qn_e = b40.qn_s + 1 } }
+    local errs = table.concat(OdValidateModel(model, STD).errors, '\n')
+    Test.expect(errs:find('phrase with no HARM1 notes', 1, true) ~= nil, 'not flagged:\n' .. errs)
+    Test.expect(errs:find('Magma reports it as "ends prematurely"', 1, true) ~= nil, 'no Magma text')
+    -- HARM2 sings there (HARM1-3 together): accepted, as in Magma-built RBN songs.
+    model.vocal.harm_any = { { qn = model.bars[10].qn_s, qn_e = model.bars[10].qn_s + 1 },
+                             { qn = b40.qn_s, qn_e = b40.qn_s + 1 } }
+    errs = table.concat(OdValidateModel(model, STD).errors, '\n')
+    Test.expect(errs:find('HARM1:', 1, true) == nil, 'flagged though HARM2 sings:\n' .. errs)
+    -- With a HARM1 note inside: clean.
+    model.vocal.harm_any = nil
+    model.vocal.harm_sung = { { qn = model.bars[10].qn_s, qn_e = model.bars[13].qn_s } }
+    errs = table.concat(OdValidateModel(model, STD).errors, '\n')
+    Test.expect(errs:find('HARM1:', 1, true) == nil, 'flagged with a HARM1 note:\n' .. errs)
+end)
+
+Test.it('OdVocalOdProblem: judged by notes, each case Magma reports', function()
+    -- Phrases 10-20 and 30-40; notes 11-12, 14-16, 31-32.
+    local ph = { { s = 10, e = 20 }, { s = 30, e = 40 } }
+    local n = { { qn = 11, qn_e = 12 }, { qn = 14, qn_e = 16 }, { qn = 31, qn_e = 32 } }
+    local function K(s, e) return (OdVocalOdProblem({ s = s, e = e }, ph, n)) end
+    Test.expect(K(10, 20) == nil, 'exact fit')
+    Test.expect(K(9, 25) == nil, 'off the markers but covering the notes: Magma accepts it')
+    Test.expect(K(10, 15) == nil, 'the last note rings past the end: still covered')
+    Test.expect(K(15, 20) == 'during_note', 'starts inside the 14-16 note')
+    Test.expect(K(12.5, 20) == 'mid_phrase', 'starts after the phrase\'s first note')
+    Test.expect(K(10, 13) == 'short', 'ends before the last note starts')
+    Test.expect(K(10, 31.5) == 'long', 'reaches the next phrase\'s first note')
+    Test.expect(K(8, 13) == 'short', 'early start ending short: judged by the next note\'s phrase')
+    Test.expect(K(45, 50) == 'after_all', 'after every note')
+    Test.expect(OdVocalOdProblem({ s = 10, e = 20 }, ph, { { qn = 31, qn_e = 32 } }) == 'no_notes',
+                'a phrase with no note of this track')
+    Test.expect(OdVocalOdProblem({ s = 10, e = 20 }, ph, { { qn = 50, qn_e = 51 } }) == 'off',
+                'the next note is outside every phrase')
+    -- HARM1: a phrase only HARM2 sings in is fine.
+    Test.expect(OdVocalOdProblem({ s = 10, e = 20 }, ph, { { qn = 31, qn_e = 32 } },
+                { { qn = 12, qn_e = 13 }, { qn = 31, qn_e = 32 } }) == nil, 'another voice sings there')
+end)
+
+Test.it('an instrument phrase with no gems is warned, two with none between are a Magma error', function()
+    local model = GeneratedModel()
+    -- Guitar rests in bars 60-62: a phrase there is empty; one at 59 and one at 63
+    -- (bars 60-62 empty) have no gem between them.
+    local g = model.inst.guitar
+    local keep = {}
+    for _, ev in ipairs(g.events) do
+        local b = OdBarAt(model.bars, ev.qn)
+        if b < 60 or b > 62 then keep[#keep + 1] = ev end
+    end
+    g.events = keep
+    g.tiers = { { name = 'Expert', events = keep } }
+    local b = model.bars
+    g.od = { { s = b[59].qn_s, e = b[59].qn_e }, { s = b[61].qn_s, e = b[61].qn_e },
+             { s = b[63].qn_s, e = b[63].qn_e } }
+    local rep = OdValidateModel(model, STD)
+    local errs, w = table.concat(rep.errors, '\n'), table.concat(rep.warnings, '\n')
+    Test.expect(w:find('Guitar Expert: overdrive phrase at', 1, true) ~= nil, 'empty phrase not warned:\n' .. w)
+    Test.expect(errs:find('Guitar Expert: no notes between', 1, true) ~= nil, 'no-gems-between not flagged:\n' .. errs)
 end)
 
 Test.it('warns about a two-instrument pair and a late phrase', function()

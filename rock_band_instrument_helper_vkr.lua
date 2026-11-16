@@ -67,6 +67,25 @@
 --     - Copy result's tooltip now says it also copies results a view draws
 --       itself (the General Helper's Metadata tabs use that). Nothing in this
 --       window draws its results that way, so what it copies is unchanged.
+--     - Overdrive > Validate follows Magma's own overdrive rules:
+--       * Two overdrive phrases on one part with no notes between them are
+--         an error, checked on every difficulty that is authored (Expert,
+--         Hard, Medium, Easy, Pro Keys) - Magma refuses the song ("No gems
+--         between overdrive phrases"). Generate never places them.
+--       * Vocal overdrive is checked as Magma checks it, by the notes rather
+--         than the phrase markers, on PART VOCALS and HARM1 separately: it
+--         must start at or before its phrase's first note, reach its last
+--         note and stop before the next phrase. Each message quotes Magma's
+--         text (begins during a note, starts mid-phrase, ends prematurely,
+--         cuts into next phrase). A HARM1 phrase only HARM2 or HARM3 sings
+--         in is fine; one nobody sings in is an error. Overdrive that is a
+--         little off its marker but covers the notes is no longer flagged.
+--       * PART VOCALS and HARM1 overdrive that differ is now a warning (Magma
+--         and the game accept it; harmonies show a visual bug), not an error.
+--         HARM1 with no overdrive at all is not warned about: harmonies then
+--         earn it on PART VOCALS' phrases, and Markers says so.
+--       * A phrase with no notes in it on some difficulty is warned about: it
+--         can never be earned there.
 --
 --   v0.1
 --     - First version. The Difficulty, Overdrive, Tab Input and MIDI tabs,

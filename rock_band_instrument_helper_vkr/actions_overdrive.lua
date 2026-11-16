@@ -224,11 +224,38 @@ function OdPlanInstruments(model, opts)
         return nil
     end
 
+    -- Magma refuses two overdrive phrases on one part with no gem between them, on any
+    -- difficulty ("No gems between overdrive phrases"). A phrase over [s, e) needs a gem
+    -- of every authored difficulty between it and this part's nearest planned phrase on
+    -- each side. Measured from the bar's own lines: a phrase never starts before its
+    -- barline or ends after the next one, so this can refuse a bar a trimmed span would
+    -- pass, never the other way round.
+    local function GemsAround(inst, s, e)
+        local prev, nxt
+        for _, p in ipairs(plan.phrases[inst.key] or {}) do
+            if p.e <= s + OD_QN_EPS and (not prev or p.e > prev.e) then prev = p end
+            if p.s >= e - OD_QN_EPS and (not nxt or p.s < nxt.s) then nxt = p end
+        end
+        for _, tier in ipairs(inst.tiers or { { events = inst.events } }) do
+            local ev = tier.events or {}
+            if prev and not OdHasGem(ev, prev.e, s) then return false end
+            if nxt and not OdHasGem(ev, e, nxt.s) then return false end
+        end
+        return true
+    end
+
     local function Eligible(inst, b, last, skip)
         if b < first_ok or b > last or not inst.onset[b] then return false end
         local bar = bars[b]
         if OdAnyOverlap(nogo, bar.qn_s, bar.qn_e) then return false end
         if inst.key == 'drums' and FillBlocks(b, skip) then return false end
+        if not GemsAround(inst, bar.qn_s, bar.qn_e) then return false end
+        -- A drum phrase can end DRUM_TRIM_QN before the barline (PhraseSpan, a fill
+        -- starting there); a bar whose only gem is in that tail would give an empty
+        -- phrase, which can never be earned.
+        if inst.key == 'drums' and not OdHasGem(inst.events, bar.qn_s, bar.qn_e - DRUM_TRIM_QN) then
+            return false
+        end
         return true
     end
 
@@ -361,7 +388,8 @@ function OdPlanInstruments(model, opts)
             if g.n >= 2 and b and not OdAnyOverlap(nogo, g.span.s, g.span.e) then
                 local joined = false
                 for _, inst in ipairs(gen_list) do
-                    if inst.onset[b] then
+                    if inst.onset[b] and OdHasGem(inst.events, g.span.s, g.span.e)
+                       and GemsAround(inst, g.span.s, g.span.e) then
                         Add(inst, b, g.span.s, g.span.e, true)
                         joined = true
                     end
@@ -881,9 +909,12 @@ function GenerateOverdrive(mode)
     local issues = {}
     if vplan then
         for _, ph in ipairs(vplan.unplaced) do
-            issues[#issues + 1] = ('Vocals: OD would have been generated starting at %s, but PART VOCALS and ' ..
-                'HARM1 have different phrase markers there. Rock Band 3 has a visual bug in ' ..
-                'harmonies if the parts differ.'):format(OdWhere(ph.s))
+            -- OdPlanVocals skips a slot when HARM1 has no identical phrase (harmonies show
+            -- a visual bug when the parts differ) or when Magma would refuse the phrase on
+            -- either track (HARM1 with nobody singing in it, say).
+            issues[#issues + 1] = ('Vocals: OD would have been generated starting at %s, but it cannot go ' ..
+                'there on both PART VOCALS and HARM1 - their phrase markers differ, or HARM1 has no ' ..
+                'singing in that phrase.'):format(OdWhere(ph.s))
         end
     end
     if iplan then
