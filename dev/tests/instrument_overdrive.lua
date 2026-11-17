@@ -979,6 +979,7 @@ local function DefaultSettings()
     S.od_keepout_od, S.od_keepout_unison = 8, 12
     S.od_fill_pacing, S.od_fill_sections, S.od_vocal_every = 2, false, 5
     S.od_keepout_start, S.od_fill_skip_early = 5, true
+    S.od_vocal_harm1 = true
 end
 
 Test.it('writes every part, mirrors 2X, and validates clean', function()
@@ -1011,6 +1012,47 @@ Test.it('asks before replacing and writes nothing until answered', function()
     S.od_pending.on_replace()
     Test.expect(S.od_pending == nil and Count('PART GUITAR', 116) > 0, 'replace did not write')
     CleanupFixture(base)
+end)
+
+Test.it('Generate OD for HARM1 off: HARM1 cleared, PART VOCALS written, no mismatch warning', function()
+    local base = r.CountTracks(0)
+    Build()
+    DefaultSettings()
+    GenerateOverdrive()   -- first with HARM1, so the second run has HARM1 overdrive to remove
+    Test.expect(Count('HARM1', 116) > 0, 'setup: no HARM1 overdrive')
+    S.od_vocal_harm1 = false
+    GenerateOverdrive()
+    Test.expect(S.od_pending ~= nil, 'no replace question asked')
+    Test.expect(not S.od_pending.message:find('HARM1', 1, true), 'replace question lists HARM1')
+    S.od_pending.on_replace()
+    Test.expect(S.od_pending ~= nil and S.od_pending.replace_label == 'Remove', 'no HARM1 question asked')
+    S.od_pending.on_replace()   -- Remove
+    Test.expect(S.od_pending == nil, 'still asking')
+    Test.expect(Count('PART VOCALS', 116) > 0, 'no PART VOCALS overdrive')
+    Test.expect(Count('HARM1', 116) == 0, 'HARM1 still has overdrive')
+    Test.expect(tostring(S.last_result):find('HARM1 left without', 1, true) ~= nil, 'no Written to note')
+    ValidateOverdrive()
+    Test.expect(tostring(S.last_result):find('overdrive differ', 1, true) == nil, 'mismatch warned')
+    CleanupFixture(base)
+    S.od_vocal_harm1 = true
+end)
+
+Test.it('Generate OD for HARM1 off: Keep leaves HARM1 overdrive untouched', function()
+    local base = r.CountTracks(0)
+    Build()
+    DefaultSettings()
+    GenerateOverdrive()
+    local before = Count('HARM1', 116)
+    S.od_vocal_harm1 = false
+    GenerateOverdrive()
+    S.od_pending.on_replace()   -- replace the other tracks
+    Test.expect(S.od_pending ~= nil and S.od_pending.keep_label == 'Keep', 'no HARM1 question asked')
+    S.od_pending.on_keep()
+    Test.expect(S.od_pending == nil, 'still asking')
+    Test.expect(Count('HARM1', 116) == before, 'HARM1 overdrive changed')
+    Test.expect(tostring(S.last_result):find('own overdrive kept', 1, true) ~= nil, 'no Written to note')
+    CleanupFixture(base)
+    S.od_vocal_harm1 = true
 end)
 
 end

@@ -210,6 +210,8 @@ function DrawOverdriveTab(ctx)
     r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
     _, S.od_vocal_every = r.ImGui_SliderInt(ctx, '##od_vev', S.od_vocal_every, 2, 10)
     SliderTooltip(TIPS.od_vocal_every)
+    _, S.od_vocal_harm1 = r.ImGui_Checkbox(ctx, 'Generate OD for HARM1##od_vh1', S.od_vocal_harm1)
+    Tooltip(TIPS.od_vocal_harm1)
     if not do_vocals then r.ImGui_EndDisabled(ctx) end
 
     -- Generate
@@ -241,20 +243,21 @@ function DrawOverdriveTab(ctx)
         local pending = S.od_pending
         if pending then r.ImGui_Text(ctx, pending.message) end
         r.ImGui_Spacing(ctx)
-        if Btn('Replace', BTN_H) then
+        -- The HARM1 question brings its own labels; the replace question uses the defaults.
+        if Btn((pending and pending.replace_label or 'Replace') .. '##od_cf_r', BTN_H) then
             S.od_pending = nil
             if pending then RunAction(pending.on_replace) end
             r.ImGui_CloseCurrentPopup(ctx)
         end
-        Tooltip(TIPS.od_replace)
+        Tooltip(pending and pending.replace_tip or TIPS.od_replace)
         if pending and pending.can_keep then
             r.ImGui_SameLine(ctx)
-            if Btn('Keep existing', BTN_H) then
+            if Btn((pending.keep_label or 'Keep existing') .. '##od_cf_k', BTN_H) then
                 S.od_pending = nil
                 RunAction(pending.on_keep)
                 r.ImGui_CloseCurrentPopup(ctx)
             end
-            Tooltip(TIPS.od_keep)
+            Tooltip(pending.keep_tip or TIPS.od_keep)
         end
         r.ImGui_SameLine(ctx)
         if Btn('Cancel', BTN_H) then

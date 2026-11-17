@@ -88,6 +88,11 @@
 --         the harmonies sing): PART VOCALS cannot differ from it there.
 --       * A phrase with no notes in it on some difficulty is warned about: it
 --         can never be earned there.
+--     - Overdrive > Generate: new "Generate OD for HARM1" checkbox (on by
+--       default, as before). Unticked, vocal overdrive goes on PART VOCALS only -
+--       harmonies then earn overdrive on PART VOCALS' phrases. If HARM1 already
+--       has overdrive, Generate asks whether to remove it or keep it. Phrases are still picked only where HARM1 has the identical
+--       phrase marker, to avoid the harmonies' visual bug. Saved per project.
 --
 --   v0.1
 --     - First version. The Difficulty, Overdrive, Tab Input and MIDI tabs,

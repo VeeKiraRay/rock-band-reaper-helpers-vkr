@@ -81,6 +81,7 @@ local function SerializeSettings()
         'odfse=' .. (S.od_fill_skip_early and '1' or '0'),
         'odfke=' .. S.od_fill_keepout_end,
         'odvev=' .. S.od_vocal_every,
+        'odvh1=' .. (S.od_vocal_harm1 and '1' or '0'),
     }, ';')
 end
 
@@ -175,6 +176,7 @@ local function DeserializeSettings(str)
         elseif k == 'odfse' then S.od_fill_skip_early  = (v == '1')
         elseif k == 'odfke' then S.od_fill_keepout_end = tonumber(v) or S.od_fill_keepout_end
         elseif k == 'odvev' then S.od_vocal_every      = tonumber(v) or S.od_vocal_every
+        elseif k == 'odvh1' then S.od_vocal_harm1      = (v == '1')
         end
     end
 end

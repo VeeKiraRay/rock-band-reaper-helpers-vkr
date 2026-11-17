@@ -190,7 +190,7 @@ Each generator has its own checkbox and settings:
 | **End fills at section changes / crashes** | On | Lines fills up with the song: a fill ends on a `[prc_*]` section change near its grid slot, or on a drum crash when there is none. |
 | **Skip fills before overdrive can be activated** | On | Leaves out fills that come before the drummer can have enough overdrive (two drum phrases, or one unison). |
 
-**Vocal overdrive** — copies a phrase marker (105) exactly, on PART VOCALS and HARM1. Only phrases with an identical phrase marker on HARM1, and that Magma accepts on both tracks, are used: Rock Band 3 has a visual bug in harmonies when the parts differ. **Phrases per OD** (default 5) sets how often.
+**Vocal overdrive** — copies a phrase marker (105) exactly, on PART VOCALS and HARM1. Only phrases with an identical phrase marker on HARM1, and that Magma accepts on both tracks, are used: Rock Band 3 has a visual bug in harmonies when the parts differ. **Phrases per OD** (default 5) sets how often. **Generate OD for HARM1** (on by default) can be unticked to write PART VOCALS only (if HARM1 already has overdrive, you are asked whether to remove it or keep it): the game does not need it, and harmonies then earn overdrive on PART VOCALS' phrases. Official charts do both.
 
 **Generate** writes everything that is ticked, as one undo step. If a target already has overdrive or fill notes, you're asked first: **Replace** them, **Keep existing** (new phrases join their unisons and stay out of their bars), or **Cancel**.
 

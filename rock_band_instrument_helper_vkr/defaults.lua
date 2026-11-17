@@ -165,6 +165,7 @@ S = {
     od_fill_skip_early  = true,  -- leave out fills before drum overdrive can first be activated
     od_fill_keepout_end = 2,     -- a fill's crash lands at least this many measures before the drums' last measure
     od_vocal_every      = 5,     -- vocal phrases per vocal overdrive phrase
+    od_vocal_harm1      = true,  -- also write the vocal overdrive to HARM1 (off: HARM1 gets none)
     -- Session only: { message, can_keep, on_replace, on_keep } while the replace
     -- confirmation is open; the overview strip's data from the last Generate/Validate.
     -- Both describe the current project and are cleared on a project switch.
@@ -956,7 +957,8 @@ TIPS = {
                            "drummer can never use them.\n\n" ..
                            "Untick to keep the full grid from the start of the song, as\n" ..
                            "many official charts do.",
-    od_inc_vocals        = "Generate vocal overdrive (note 116) on PART VOCALS and HARM1.\n\n" ..
+    od_inc_vocals        = "Generate vocal overdrive (note 116) on PART VOCALS and HARM1\n" ..
+                           "(HARM1 only with \"Generate OD for HARM1\" ticked).\n\n" ..
                            "Each one copies a phrase marker (105) exactly. Only phrases\n" ..
                            "with an identical phrase marker on HARM1 are used: Rock Band 3\n" ..
                            "has a visual bug in harmonies if the parts differ. If the cadence\n" ..
@@ -966,6 +968,17 @@ TIPS = {
                            "is the \"Over vocal OD\" setting above.",
     od_vocal_every       = "Vocal phrases per overdrive phrase. The doc recommends one\n" ..
                            "overdrive for every 5 phrases.",
+    od_vocal_harm1       = "Write the vocal overdrive to HARM1 too.\n\n" ..
+                           "Generate always makes the two identical. The game does not\n" ..
+                           "need HARM1's: without it, harmonies earn overdrive on PART\n" ..
+                           "VOCALS' phrases. Official charts do both, most with HARM1\n" ..
+                           "overdrive.\n\n" ..
+                           "Unticked, Generate asks before removing HARM1's existing\n" ..
+                           "overdrive (keeping it is allowed, but it then differs from\n" ..
+                           "the new PART VOCALS overdrive). Phrases are\n" ..
+                           "still picked only where HARM1 has the identical phrase marker:\n" ..
+                           "harmonies show a visual bug when PART VOCALS' overdrive lands\n" ..
+                           "on a phrase that differs on HARM1.",
     od_generate          = "Generate for the whole song. A time selection is ignored.\n\n" ..
                            "If a target already has overdrive or fill notes you are asked\n" ..
                            "first. Everything is one undo step.",
@@ -978,4 +991,8 @@ TIPS = {
     od_keep              = "Leave the listed tracks as they are and generate only the\n" ..
                            "rest. Kept overdrive is worked around: new phrases join its\n" ..
                            "unisons and stay out of its bars.",
+    od_harm1_remove      = "Delete HARM1's overdrive notes. Harmonies then earn overdrive\n" ..
+                           "on PART VOCALS' phrases. One undo step puts everything back.",
+    od_harm1_keep        = "Leave HARM1's overdrive notes as they are. Validate warns where\n" ..
+                           "they differ from PART VOCALS'.",
 }

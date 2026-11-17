@@ -656,7 +656,9 @@ end
 
 -- mode: nil = first press (asks before replacing anything), 'replace', or 'keep'
 -- (leave every track that already has notes alone and generate the rest).
-function GenerateOverdrive(mode)
+-- harm: with "Generate OD for HARM1" unticked and HARM1 already holding overdrive,
+-- nil = ask, 'remove' or 'keep' (HARM1's notes are then left as they are).
+function GenerateOverdrive(mode, harm)
     S.od_pending = nil
     local model, err = OdBuildModel()
     if not model then
@@ -698,8 +700,12 @@ function GenerateOverdrive(mode)
     if jobs.fills then
         Note('fills', 'drums', 'drum fills', #model.fills + (model.fills_2x and #model.fills_2x or 0))
     end
+    -- HARM1 is only part of this question when Generate writes it; otherwise it gets
+    -- its own question below.
+    local harm_writes = model.vocal.harm_present and S.od_vocal_harm1
     if jobs.vocals then
-        Note('vocals', 'vocals', 'vocal overdrive', #model.vocal.od + #model.vocal.harm_od)
+        Note('vocals', 'vocals', 'vocal overdrive',
+             #model.vocal.od + (harm_writes and #model.vocal.harm_od or 0))
     end
     local n_jobs = (jobs.fills and 1 or 0) + (jobs.vocals and 1 or 0)
     for _ in pairs(jobs.inst) do n_jobs = n_jobs + 1 end
@@ -718,8 +724,8 @@ function GenerateOverdrive(mode)
             message = 'These already contain overdrive notes:\n\n  ' .. table.concat(parts, '\n  ')
                    .. '\n\nReplace them?',
             can_keep = #existing < n_jobs,
-            on_replace = function() GenerateOverdrive('replace') end,
-            on_keep    = function() GenerateOverdrive('keep') end,
+            on_replace = function() GenerateOverdrive('replace', harm) end,
+            on_keep    = function() GenerateOverdrive('keep', harm) end,
         }
         S.status = 'Waiting for confirmation.'
         S.last_result = nil
@@ -736,6 +742,28 @@ function GenerateOverdrive(mode)
             S.last_result = 'Every selected track already has overdrive notes, and they were kept.'
             return
         end
+    end
+
+    -- "Generate OD for HARM1" unticked but HARM1 already has overdrive: removing it is
+    -- what the setting means, but the notes may be the author's own, so ask.
+    local n_harm = #model.vocal.harm_od
+    if jobs.vocals and model.vocal.harm_present and not S.od_vocal_harm1 and n_harm > 0 and harm == nil then
+        S.od_pending = {
+            message = ('You chose not to generate overdrive for HARM1, but HARM1 already has\n' ..
+                       '%d overdrive note%s.\n\nRemove them? Kept, they no longer match the new PART VOCALS\n' ..
+                       'overdrive, and harmonies show a visual bug where the two differ.'):format(
+                       n_harm, n_harm == 1 and '' or 's'),
+            replace_label = 'Remove',
+            replace_tip   = TIPS.od_harm1_remove,
+            keep_label    = 'Keep',
+            keep_tip      = TIPS.od_harm1_keep,
+            can_keep = true,
+            on_replace = function() GenerateOverdrive(mode, 'remove') end,
+            on_keep    = function() GenerateOverdrive(mode, 'keep') end,
+        }
+        S.status = 'Waiting for confirmation.'
+        S.last_result = nil
+        return
     end
 
     -- Plan, least flexible first:
@@ -818,14 +846,18 @@ function GenerateOverdrive(mode)
     if vplan then
         local vt = Prepare(model.vocal.track)
         ClearPitches(vt, OD_PITCH, OD_PITCH)
-        local ht = model.vocal.harm_present and Prepare(model.vocal.harm_track) or nil
+        -- With "Generate OD for HARM1" off, HARM1 is cleared (harmonies then use PART
+        -- VOCALS') unless the author chose to keep its notes.
+        local touch_harm = model.vocal.harm_present and (S.od_vocal_harm1 or harm ~= 'keep')
+        local ht = touch_harm and Prepare(model.vocal.harm_track) or nil
         if ht then ClearPitches(ht, OD_PITCH, OD_PITCH) end
+        local write_harm = ht and S.od_vocal_harm1
         for _, ph in ipairs(vplan.phrases) do
             -- The phrase marker's own ticks, not a QN round trip: the doc requires the
             -- overdrive note and the phrase marker to line up exactly.
             r.MIDI_InsertNote(ph.take, false, false, ph.sppq, ph.eppq, 0, OD_PITCH, 100, false)
             written = written + 1
-            if ht and ph.harm then
+            if write_harm and ph.harm then
                 r.MIDI_InsertNote(ph.harm.take, false, false, ph.harm.sppq, ph.harm.eppq,
                                   0, OD_PITCH, 100, false)
                 written = written + 1
@@ -891,7 +923,10 @@ function GenerateOverdrive(mode)
         written_to[#written_to + 1] = table.concat(names, ' + ') .. ' (fills)'
     end
     if vplan then
-        written_to[#written_to + 1] = model.vocal.harm_present and 'PART VOCALS + HARM1' or 'PART VOCALS'
+        written_to[#written_to + 1] = not model.vocal.harm_present and 'PART VOCALS'
+            or S.od_vocal_harm1 and 'PART VOCALS + HARM1'
+            or harm == 'keep' and 'PART VOCALS (HARM1\'s own overdrive kept)'
+            or 'PART VOCALS (HARM1 left without: harmonies use PART VOCALS\')'
     end
     if #written_to > 0 then
         lines[#lines + 1] = 'Written to: ' .. table.concat(written_to, ', ')
