@@ -335,6 +335,33 @@ function SelectSongUntilEnd()
         FormatTime(t_end), math.floor(len / 60), len % 60)
 end
 
+-- The track's Volume envelope, created when it does not exist yet: a track with no
+-- volume automation has no envelope object, so GetTrackEnvelopeByName returns nil.
+-- Created with REAPER's own "Toggle track volume envelope visible" (40406) on this
+-- track alone, with the track selection restored. Only called when the envelope does
+-- not exist, so the toggle always creates (and shows) it, never hides it.
+-- Not a state-chunk edit: a <VOLENV2 block injected with SetTrackStateChunk is
+-- dropped by REAPER and gives no envelope - measured on REAPER 7.73, with the block
+-- before the first <ITEM> and at the end of the chunk, on tracks with and without
+-- an item. That injection is what this action used to do, and why it always failed.
+-- Returns env, or nil and the reason.
+local function EnsureVolumeEnvelope(track)
+    local env = r.GetTrackEnvelopeByName(track, 'Volume')
+    if env then return env end
+
+    local selected = {}
+    for i = 0, r.CountSelectedTracks(0) - 1 do selected[#selected + 1] = r.GetSelectedTrack(0, i) end
+    r.SetOnlyTrackSelected(track)
+    r.Main_OnCommand(40406, 0)   -- Track: Toggle track volume envelope visible
+    r.SetTrackSelected(track, false)
+    for _, t in ipairs(selected) do r.SetTrackSelected(t, true) end
+    env = r.GetTrackEnvelopeByName(track, 'Volume')
+    if env then return env end
+
+    return nil, 'Could not create the Volume envelope on "SONG AUDIO". ' ..
+                'Show it once by hand and run Fade out again.'
+end
+
 -- Create a volume fade out on the SONG AUDIO track from time selection start to end.
 function CreateSongFadeOut()
     local track = FindTrackByName('SONG AUDIO')
@@ -349,28 +376,14 @@ function CreateSongFadeOut()
         return
     end
 
-    -- REAPER creates envelope objects lazily; a track with no volume automation
-    -- returns nil. Force creation by injecting a minimal VOLENV2 block into the
-    -- track state chunk - no actions or track-selection side-effects.
-    local env = r.GetTrackEnvelopeByName(track, 'Volume')
+    -- Inside the undo block, so one undo also removes an envelope created here.
+    r.Undo_BeginBlock2(0)
+    local env, env_err = EnsureVolumeEnvelope(track)
     if not env then
-        local _, chunk = r.GetTrackStateChunk(track, '', false)
-        if chunk and not chunk:find('<VOLENV') then
-            local env_block = '<VOLENV2\nACT 1 -1\nVIS 1 1 1\nLANEHEIGHT 0 0\nARM 0\nDEFSHAPE 0 -1 -1\n>'
-            -- chunk always ends with \n> (closing the <TRACK block); insert before it
-            local pos = chunk:find('>%s*$')
-            if pos then
-                r.SetTrackStateChunk(track, chunk:sub(1, pos - 1) .. '\n' .. env_block .. '\n>', false)
-            end
-        end
-        env = r.GetTrackEnvelopeByName(track, 'Volume')
-    end
-    if not env then
-        S.status = 'Could not create Volume envelope on "SONG AUDIO".'
+        r.Undo_EndBlock2(0, 'Create fade out on SONG AUDIO (failed)', -1)
+        S.status = env_err
         return
     end
-
-    r.Undo_BeginBlock2(0)
     r.DeleteEnvelopePointRange(env, ts, te + 1e-9)  -- +epsilon: range is exclusive at end
 
     -- Read the last envelope point strictly before ts and use its stored value

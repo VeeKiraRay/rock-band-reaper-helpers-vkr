@@ -23,7 +23,7 @@ One WIP tab appears only when **Show WIPs? = Yes** in the General tab (persisted
 *Actions sub-tab*
 - **Align all audio** — aligns every audio item on every track to a common reference position.
 - **Align count-in** — positions the COUNT IN clip relative to the first measure.
-- **Song fade out** — creates a fade-out automation envelope on the master track at the end of the project.
+- **Song fade out** — a fade-out on SONG AUDIO's Volume envelope over the time selection. The envelope is created when missing (`EnsureVolumeEnvelope`, local) with action 40406 on that track, selection restored. **Not by injecting a `<VOLENV2` block with `SetTrackStateChunk`**: REAPER 7.73 drops it and creates no envelope (measured: before the first `<ITEM>` and at the chunk end, with and without an item) - the old cause of "Could not create Volume envelope".
 - **Select song until end** — time selection from bar 1 to the EVENTS track's `[end]` (for rendering). Missing track, no `[end]` or several: reported, selection unchanged.
 
 *Settings sub-tab*

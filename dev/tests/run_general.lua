@@ -30,6 +30,7 @@ r.ClearConsole()
 r.ShowConsoleMsg('======  General Helper - smoke tests  ======\n')
 
 dofile(_tdir .. 'framework.lua')
+dofile(_tdir .. 'fixture_helpers.lua')               -- CreateEmptyFixtureTrack (Song fade out)
 dofile(_root .. 'lib/reaper_imgui_helpers.lua')
 dofile(_root .. 'lib/reaper_dsp.lua')
 dofile(_root .. 'lib/reaper_midi_helpers.lua')

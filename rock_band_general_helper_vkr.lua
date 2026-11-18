@@ -188,6 +188,10 @@
 --       is missing, or it has no [end] or more than one, the selection is left
 --       alone and the result says why (listing each [end] when there are
 --       several).
+--     - Fixed: General > Actions "Fade out" stopped with "Could not create
+--       Volume envelope" unless the SONG AUDIO track already had a volume
+--       envelope. It now creates the envelope itself, and one Undo removes the
+--       envelope together with the fade.
 --
 --   v0.9.63
 --     - The instrument tools moved to a new script, the Rock Band Instrument
