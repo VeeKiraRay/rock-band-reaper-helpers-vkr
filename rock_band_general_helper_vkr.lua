@@ -182,6 +182,12 @@
 --       work-in-progress "Copy details" button (removed). A copy no longer
 --       includes the status line's "Result copied to the clipboard." when
 --       pressed twice.
+--     - General > Actions: new "Select song until end" button. It sets the
+--       time selection from bar 1 to the [end] event on the EVENTS track, ready
+--       for rendering the song audio at the right length. If the EVENTS track
+--       is missing, or it has no [end] or more than one, the selection is left
+--       alone and the result says why (listing each [end] when there are
+--       several).
 --
 --   v0.9.63
 --     - The instrument tools moved to a new script, the Rock Band Instrument

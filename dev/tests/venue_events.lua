@@ -1009,6 +1009,72 @@ else
         end, 120, true)
     end)
 
+    ------------------------------------------------------------------
+    Test.section('FindEndEventTimes / SelectSongUntilEnd (General > Actions)')
+    ------------------------------------------------------------------
+
+    Test.it('FindEndEventTimes: every [end], sorted, other texts ignored', function()
+        WithEventsFixture(true, function(take)
+            local track = r.GetMediaItemTake_Track(take)
+            Test.expect(#FindEndEventTimes(track) == 0, 'none when no [end]')
+            r.MIDI_InsertTextSysexEvt(take, false, false,
+                r.MIDI_GetPPQPosFromProjTime(take, MeasureStart(5)), 1, '[end]')
+            r.MIDI_InsertTextSysexEvt(take, false, false,
+                r.MIDI_GetPPQPosFromProjTime(take, MeasureStart(3)), 1, '[end]')
+            r.MIDI_InsertTextSysexEvt(take, false, false,
+                r.MIDI_GetPPQPosFromProjTime(take, MeasureStart(4)), 1, '[music_end]')
+            local times = FindEndEventTimes(track)
+            Test.expect(#times == 2, 'two [end] events, got ' .. #times)
+            Test.expect(math.abs(times[1] - MeasureStart(3)) < 0.01
+                    and math.abs(times[2] - MeasureStart(5)) < 0.01, 'sorted by time')
+        end, 120, true)
+    end)
+
+    -- Runs fn with the project's time selection saved and restored afterwards.
+    -- SelectSongUntilEnd finds the first track named EVENTS, so these two tests
+    -- need a project without one of its own (as the other EVENTS tests do).
+    local function WithTimeSelectionKept(fn)
+        local s0, e0 = r.GetSet_LoopTimeRange2(0, false, false, 0, 0, false)
+        local ok, err = pcall(fn)
+        r.GetSet_LoopTimeRange2(0, true, false, s0, e0, false)
+        if not ok then error(err, 2) end
+    end
+
+    Test.it('SelectSongUntilEnd: one [end] -> bar 1 to [end]', function()
+        WithTimeSelectionKept(function()
+            WithEventsFixture(true, function(take)
+                r.MIDI_InsertTextSysexEvt(take, false, false,
+                    r.MIDI_GetPPQPosFromProjTime(take, MeasureStart(20)), 1, '[end]')
+                r.GetSet_LoopTimeRange2(0, true, false, 0, 0, false)
+                SelectSongUntilEnd()
+                local s, e = r.GetSet_LoopTimeRange2(0, false, false, 0, 0, false)
+                Test.expect(math.abs(s - MeasureStart(1)) < 0.001, 'starts at bar 1, got ' .. s)
+                Test.expect(math.abs(e - MeasureStart(20)) < 0.001, 'ends at [end], got ' .. e)
+            end, 120, true)
+        end)
+    end)
+
+    Test.it('SelectSongUntilEnd: two [end] -> reported, selection unchanged', function()
+        WithTimeSelectionKept(function()
+            WithEventsFixture(true, function(take)
+                for _, m in ipairs({ 10, 20 }) do
+                    r.MIDI_InsertTextSysexEvt(take, false, false,
+                        r.MIDI_GetPPQPosFromProjTime(take, MeasureStart(m)), 1, '[end]')
+                end
+                r.GetSet_LoopTimeRange2(0, true, false, 1, 2, false)
+                S.last_result = nil
+                SelectSongUntilEnd()
+                local s, e = r.GetSet_LoopTimeRange2(0, false, false, 0, 0, false)
+                Test.expect(math.abs(s - 1) < 1e-6 and math.abs(e - 2) < 1e-6,
+                            'selection unchanged, got ' .. s .. '-' .. e)
+                Test.expect(S.status:find('2 [end] events', 1, true), 'status: ' .. S.status)
+                Test.expect(S.last_result and S.last_result:find('m10', 1, true)
+                            and S.last_result:find('m20', 1, true),
+                            'both positions listed: ' .. tostring(S.last_result))
+            end, 120, true)
+        end)
+    end)
+
     -- 120 QN item = 30 measures in 4/4 (same convention as the bookends tests above).
     local function ItemBounds(take)
         local item = r.GetMediaItemTake_Item(take)

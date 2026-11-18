@@ -1083,6 +1083,10 @@ TIPS = {
                     "are replaced; points outside are untouched.\n\n" ..
                     "Select a range that starts at a musically meaningful point (e.g. end of\n" ..
                     "the last vocal phrase) for the most natural-sounding cutoff.",
+    select_song_until_end = "Set the time selection from bar 1 to the [end] event on the EVENTS track,\n" ..
+                    "so a render with bounds set to Time selection comes out at the song's length.\n\n" ..
+                    "The selection is left unchanged, and the reason reported, when the EVENTS\n" ..
+                    "track is missing or has no [end] event or more than one.",
 
     venue_preview_scale  = "Scale for venue event sprite previews shown in tooltips.\n\n" ..
                            "1\xc3\x97 - smaller display (213\xc3\x97120 px).\n" ..

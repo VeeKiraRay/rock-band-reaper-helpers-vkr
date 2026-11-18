@@ -42,6 +42,7 @@ dofile(_gdir .. 'venue_lighting.lua')             -- FindNextMeasureStartPpq, ke
 dofile(_gdir .. 'venue_generator.lua')            -- ResolveSongEndAndAnchor
 dofile(_gdir .. 'section_events.lua')
 dofile(_gdir .. 'actions_venue_events.lua')
+dofile(_gdir .. 'actions.lua')                       -- FindEndEventTimes, SelectSongUntilEnd
 
 EnableFixtureAutoCleanup()  -- one aborted test must not poison the rest
 

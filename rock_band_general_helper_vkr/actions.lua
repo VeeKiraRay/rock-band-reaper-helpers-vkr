@@ -277,6 +277,64 @@ function ConvertTimeSig6to3()
     S.last_result = nil
 end
 
+-- Project times of every "[end]" text event on the track, across all of its MIDI
+-- items, sorted. A muted [end] counts too: a stray one is worth reporting.
+function FindEndEventTimes(track)
+    local times = {}
+    for i = 0, r.CountTrackMediaItems(track) - 1 do
+        local take = r.GetActiveTake(r.GetTrackMediaItem(track, i))
+        if take and r.TakeIsMIDI(take) then
+            local _, _, _, text_count = r.MIDI_CountEvts(take)
+            for j = 0, text_count - 1 do
+                local ok, _, _, ppq, evt_type, msg = r.MIDI_GetTextSysexEvt(take, j)
+                if ok and evt_type == 1 and msg == '[end]' then
+                    times[#times + 1] = r.MIDI_GetProjTimeFromPPQPos(take, ppq)
+                end
+            end
+        end
+    end
+    table.sort(times)
+    return times
+end
+
+-- Time selection from bar 1 to the EVENTS track's [end] event, for rendering the
+-- song audio at the right length. Leaves the selection alone unless there is
+-- exactly one [end].
+function SelectSongUntilEnd()
+    local track = FindTrackByName('EVENTS')
+    if not track then
+        S.status = 'Track "EVENTS" not found. Time selection not changed.'
+        return
+    end
+
+    local times = FindEndEventTimes(track)
+    if #times == 0 then
+        S.status = 'No [end] event on the EVENTS track. Time selection not changed.'
+        return
+    end
+    if #times > 1 then
+        local lines = { ('%d [end] events on the EVENTS track - keep only one:'):format(#times) }
+        for _, t in ipairs(times) do
+            lines[#lines + 1] = '  ' .. FormatTime(t)
+        end
+        S.status = ('%d [end] events found. Time selection not changed.'):format(#times)
+        S.last_result = table.concat(lines, '\n')
+        return
+    end
+
+    local t_start = r.TimeMap2_beatsToTime(0, 0, 0)   -- bar 1
+    local t_end   = times[1]
+    if t_end <= t_start then
+        S.status = 'The [end] event is not after bar 1. Time selection not changed.'
+        return
+    end
+
+    r.GetSet_LoopTimeRange2(0, true, false, t_start, t_end, false)
+    local len = t_end - t_start
+    S.status = ('Selected bar 1 to [end] (%s), %d:%06.3f long.'):format(
+        FormatTime(t_end), math.floor(len / 60), len % 60)
+end
+
 -- Create a volume fade out on the SONG AUDIO track from time selection start to end.
 function CreateSongFadeOut()
     local track = FindTrackByName('SONG AUDIO')

@@ -112,6 +112,12 @@ local function Loop()
                         end
                         Tooltip(TIPS.song_fade_out)
 
+                        r.ImGui_Separator(ctx)
+                        SectionHeader('Render range')
+                        if Btn('Select song until end', BTN_H) then
+                            RunAction(SelectSongUntilEnd)
+                        end
+                        Tooltip(TIPS.select_song_until_end)
 
                         r.ImGui_EndTabItem(ctx)
                     end
