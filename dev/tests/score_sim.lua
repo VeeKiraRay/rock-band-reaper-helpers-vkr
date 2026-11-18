@@ -226,6 +226,46 @@ Test.it('drums: a fill too soon after ready is lost, the next one deploys', func
     Test.expect(res.gems == 60 - 3, 'gems 20, 21, 22 left out: ' .. res.gems)
 end)
 
+Test.it('drums: the fill gate is Expert\'s highway, 1.2 s (game\'s view_times)', function()
+    Test.expect(Near(SCORE_RULES.fill_gate_sec, 1.2), 'gate ' .. SCORE_RULES.fill_gate_sec)
+    -- Ready at 5.0 s (bar 10's phrase ends at QN 11 = 5.5 s; its last gem at QN 10 = 5.0 s).
+    -- The in-game tests: 0.97 s after the last gem lost, 1.36 s shown.
+    for _, case in ipairs({ { 5.97, true }, { 6.36, false } }) do
+        local fills = { { s = 12, e = 13, s_sec = case[1] }, { s = 30, e = 32, s_sec = 15 } }
+        local p = Part('drums', Gems(60, 1),
+                       { od = { { s = 0, e = 1 }, { s = 10, e = 11 } }, fills = fills })
+        local res = ScoreSimulateOD(p)
+        Test.expect((#res.lost_fills == 1) == case[2],
+                    ('fill at %.2f s: lost %d'):format(case[1], #res.lost_fills))
+        if case[2] then
+            -- Harmless (a later fill deploys): a grey note, not a counted warning.
+            local levels = {}
+            for _, f in ipairs(ScoreFindings(res, {}, 'drums')) do
+                if f.text:find('does not appear', 1, true) then levels[#levels + 1] = f.level end
+            end
+            Test.expect(#levels == 1 and levels[1] == 'note', 'level ' .. table.concat(levels, ','))
+        end
+    end
+end)
+
+Test.it('drums: a fill lost after a LATER activation gets no note (depends on the path)', function()
+    -- First ready at QN 10 (two phrases), deploys through the fill at 20-22 (drains 32
+    -- beats); ready again at QN 70, with a fill 0.5 s later the simulated path loses.
+    local fills = { { s = 20, e = 22, s_sec = 10 }, { s = 71, e = 72, s_sec = 35.5 },
+                    { s = 90, e = 92, s_sec = 45 } }
+    local p = Part('drums', Gems(200, 1), { od = { { s = 0, e = 1 }, { s = 10, e = 11 },
+                                                  { s = 60, e = 61 }, { s = 70, e = 71 } },
+                                           fills = fills })
+    local res = ScoreSimulateOD(p)
+    Test.expect(Near(res.first_ready_qn or -1, 10), 'first ready ' .. tostring(res.first_ready_qn))
+    Test.expect(#res.lost_fills == 1 and Near(res.lost_fills[1].qn, 71), 'setup: the later fill is lost')
+    local notes = 0
+    for _, f in ipairs(ScoreFindings(res, {}, 'drums')) do
+        if f.text:find('does not appear', 1, true) then notes = notes + 1 end
+    end
+    Test.expect(notes == 0, notes .. ' note(s) for a later activation')
+end)
+
 Test.it('drums deploy_anywhere (autoplay): deploys when ready, no fill gems lost', function()
     local fills = { { s = 20, e = 22, s_sec = 10 } }
     local p = Part('drums', Gems(60, 1),
@@ -345,16 +385,50 @@ Test.it('deploy in a 0.6 s gap doubles the phrases sung while deployed', functio
     Test.expect(#res.deploys >= 1, 'deployed')
     -- Ready at the end of phrase 2 (marker end 9 QN = 4.5 s). Its gap runs 4.0..5.0 s,
     -- a freestyle section 4.1..4.9 s: 500 ms of noise from 4.5 s does not fit, so the
-    -- deploy waits for the next section (6.6..7.4 s) and lands 500 ms into it, at
-    -- 7.1 s = 14.2 QN.
-    Test.expect(Near(res.deploys[1].s, 14.2, 1e-6), 'deploy start ' .. res.deploys[1].s)
+    -- deploy waits for the next section (6.6..7.4 s). Nobody sings in it, so it lands
+    -- as late as it fits - the section's end, 7.4 s = 14.8 QN - not 500 ms in.
+    Test.expect(Near(res.deploys[1].s, 14.8, 1e-6), 'deploy start ' .. res.deploys[1].s)
     -- Phrase 3 ended its note at 13: none of it is doubled.
-    -- Deploy 14.2..30.26: phrases 4, 5 and 6 (sung 15-18, 20-23, 25-28) in full, plus
-    -- the first 132 ms of phrase 7's note (30..33 QN = 1.5 s): inside its 150 ms ramp, so
-    -- only (2/3 x 132^1.5 / sqrt 150) / (100 + 1350) = 0.057 of it.
-    local ramp = (2 / 3) * 132 ^ 1.5 / math.sqrt(150) / (100 + 1350)
-    Test.expect(Near(res.od_gems, 3 + ramp, 1e-3), 'phrases doubled: ' .. res.od_gems)
+    -- Deploy 14.8..30.864 (16.064 beats): phrases 4, 5 and 6 (sung 15-18, 20-23, 25-28)
+    -- in full, plus the first 432 ms of phrase 7's note (30..33 QN = 1.5 s): its 150 ms
+    -- ramp (weight 100) and 282 ms more, of 100 + 1350.
+    local ms = (res.deploys[1].e - 30) * 500
+    Test.expect(Near(ms, 432, 1e-3), 'deploy end ' .. res.deploys[1].e)
+    Test.expect(Near(res.od_gems, 3 + (100 + ms - 150) / (100 + 1350), 1e-3),
+                'phrases doubled: ' .. res.od_gems)
     Test.expect(res.score > ScoreBaseVocals(p), 'more than the base')
+end)
+
+Test.it('a part ready during a rest deploys at its next note, not into the rest', function()
+    -- Keys-like: a unison at QN 0-1 makes it ready at once (0.502), then a 40-QN rest.
+    local g = {}
+    for i = 0, 3 do g[#g + 1] = { qn = i * 0.25, qn_e = i * 0.25 + 0.1, sec = i * 0.125, n = 1 } end
+    for i = 0, 15 do g[#g + 1] = { qn = 41 + i, qn_e = 41.1 + i, sec = (41 + i) * 0.5, n = 1 } end
+    local p = Part('keys', g, { od = { { s = 0, e = 1, unison = true } } })
+    local res = ScoreSimulatePart(p, { search = 'off' })
+    Test.expect(#res.deploys == 1 and Near(res.deploys[1].s, 41), 'deploy at ' .. tostring(res.deploys[1] and res.deploys[1].s))
+    Test.expect(res.od_gems == 16, 'notes doubled: ' .. res.od_gems)
+    -- Autoplay (deploy_anywhere) still deploys at once, as the game's autoplay does.
+    local auto = ScoreSimulatePart(p, { search = 'off', deploy_anywhere = true })
+    Test.expect(Near(auto.deploys[1].s, 0.75), 'autoplay deploy at ' .. auto.deploys[1].s)
+end)
+
+Test.it('vocals deploy at the end of a long break, not at its start', function()
+    -- Two phrases make it ready; a 30 QN instrumental break; then 4 phrases. The deploy
+    -- lands just before the singing comes back and doubles it.
+    local p = VocalPart(6, { true, true }, 1)
+    local ph = p.phrases
+    for i = 3, #ph do
+        local d = 30
+        ph[i].s, ph[i].e = ph[i].s + d, ph[i].e + d
+        if ph[i].e_sec then ph[i].e_sec = ph[i].e_sec + d * 0.5 end
+    end
+    for _, n in ipairs(p.notes) do
+        if n.qn > 12 then n.qn, n.qn_e = n.qn + 30, n.qn_e + 30; n.s, n.e = n.s + 15, n.e + 15 end
+    end
+    local res = ScoreSimulateVocals(p)
+    Test.expect(#res.deploys >= 1 and res.deploys[1].s > 30, 'deploy at ' .. tostring(res.deploys[1] and res.deploys[1].s))
+    Test.expect(res.od_gems > 1, 'sung phrases doubled: ' .. res.od_gems)
 end)
 
 Test.it('harmonies: extra parts add 10% each, the star base stays solo', function()

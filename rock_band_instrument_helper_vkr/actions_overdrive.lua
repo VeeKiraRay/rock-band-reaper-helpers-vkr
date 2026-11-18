@@ -116,6 +116,10 @@ end
 --                     ones when fills are not being regenerated. Not modified; a fill
 --                     that gives way to a unison is returned in plan.yielded
 --   together          prefer unison measures where the band plays together (below)
+--   beats             the BEAT track's beats in QN (ScoreReadBeats): a part's last phrase
+--                     needs its overdrive's beats before the part's own last note
+--   rest_beats        a rest bar inside the part counts as this many beats toward the
+--                     spacing and the phrase target (nil = rests count 0, the doc's rule)
 --
 -- TOGETHER, measured over 60 reference songs: official unisons sit on the LAST MEASURE
 -- BEFORE A SECTION 5.8x as often as chance (20.6% of unisons vs 3.6% of bars) - the
@@ -244,9 +248,35 @@ function OdPlanInstruments(model, opts)
         return true
     end
 
-    local function Eligible(inst, b, last, skip)
+    -- Room before the part's OWN last note: the overdrive a phrase gives (0.251 of a
+    -- meter = 8 beats, a unison 16; SCORE_RULES) must fit between the phrase's end and
+    -- the part's last note, or it can never be fully spent - Validate's "too close to
+    -- the end" advice. A part may stop long before the song does (keys out after the
+    -- last chorus), which the song-end keep-out does not see. Counted in BEAT-track
+    -- beats (opts.beats), which are what drains overdrive - a half-time BEAT track
+    -- makes it last twice as long; with no BEAT track, quarter notes (ScoreBeatAt).
+    local function LastQN(inst)
+        if inst.last_qn == nil then
+            local q = false
+            for _, ev in ipairs(inst.events or {}) do
+                if not q or ev.qn > q then q = ev.qn end
+            end
+            inst.last_qn = q
+        end
+        return inst.last_qn
+    end
+    local function RoomBeforeEnd(inst, e, unison)
+        local last = LastQN(inst)
+        if not last then return true end
+        local need = SCORE_RULES.od_phrase * (unison and 2 or 1) * SCORE_RULES.deploy_beats
+        local beats = opts.beats or {}
+        return ScoreBeatAt(beats, last) - ScoreBeatAt(beats, e) >= need - OD_QN_EPS
+    end
+
+    local function Eligible(inst, b, last, skip, unison)
         if b < first_ok or b > last or not inst.onset[b] then return false end
         local bar = bars[b]
+        if not RoomBeforeEnd(inst, bar.qn_e, unison) then return false end
         if OdAnyOverlap(nogo, bar.qn_s, bar.qn_e) then return false end
         if inst.key == 'drums' and FillBlocks(b, skip) then return false end
         if not GemsAround(inst, bar.qn_s, bar.qn_e) then return false end
@@ -291,11 +321,28 @@ function OdPlanInstruments(model, opts)
         Occupy(inst.key, sp)
     end
 
+    -- opts.rest_beats: each bar the part rests in, between its first and last playing bar,
+    -- counts as that many beats ("Count rests in OD spacing"). Off (nil) counts playing
+    -- bars only, as the doc's rule does.
+    local function BarBeats(inst, b)
+        if inst.playing[b] then return bars[b].beats end
+        if not opts.rest_beats then return 0 end
+        if inst.span_first == nil then
+            local f, l = false, false
+            for i = 1, nb do
+                if inst.playing[i] then f = f or i; l = i end
+            end
+            inst.span_first, inst.span_last = f, l
+        end
+        if inst.span_first and b > inst.span_first and b < inst.span_last then return opts.rest_beats end
+        return 0
+    end
+
     -- Targets: the frequency rule over the bars the part is actually playing.
     for _, inst in ipairs(gen_list) do
         local beats = 0
         for b = 1, math.max(0, math.min(last_od, nb)) do
-            if inst.playing[b] then beats = beats + bars[b].beats end
+            beats = beats + BarBeats(inst, b)
         end
         plan.targets[inst.key] = beats > 0
             and math.max(1, math.floor(beats / opts.beats_per_phrase + 0.5)) or 0
@@ -347,7 +394,7 @@ function OdPlanInstruments(model, opts)
                        and not OdAnyOverlap(nogo, bars[b].qn_s, bars[b].qn_e) then
                         local members, sum, ok = {}, 0, true
                         for _, inst in ipairs(gen_list) do
-                            if Eligible(inst, b, last_un, yield) then
+                            if Eligible(inst, b, last_un, yield, true) then
                                 members[#members + 1] = inst
                                 sum = sum + (inst.interest[b] or 0)
                             elseif inst.key ~= 'keys' then
@@ -389,7 +436,8 @@ function OdPlanInstruments(model, opts)
                 local joined = false
                 for _, inst in ipairs(gen_list) do
                     if inst.onset[b] and OdHasGem(inst.events, g.span.s, g.span.e)
-                       and GemsAround(inst, g.span.s, g.span.e) then
+                       and GemsAround(inst, g.span.s, g.span.e)
+                       and RoomBeforeEnd(inst, g.span.e, true) then
                         Add(inst, b, g.span.s, g.span.e, true)
                         joined = true
                     end
@@ -411,7 +459,7 @@ function OdPlanInstruments(model, opts)
         local px, x = {}, 0
         for b = 1, nb do
             px[b] = x
-            if inst.playing[b] then x = x + bars[b].beats end
+            x = x + BarBeats(inst, b)
         end
         local X = (last_od >= 1 and last_od < nb) and px[last_od + 1] or x
         -- The usable stretch starts at the start keep-out, so the spacing is spread
@@ -772,9 +820,14 @@ function GenerateOverdrive(mode, harm)
     --   2. fills - a grid from the drum part and the sections, the order drum
     --      authoring happens in anyway
     --   3. instrument overdrive and unisons, around both
+    -- The BEAT track drains overdrive one 32nd of the meter per note, so the planners
+    -- count a part's room before its last note in those beats (quarter notes without one).
+    local beats = ScoreReadBeats()
     local vplan
     if jobs.vocals then
-        vplan = OdPlanVocals(model, { every = S.od_vocal_every, keepout_od = S.od_keepout_od })
+        vplan = OdPlanVocals(model, { every = S.od_vocal_every, keepout_od = S.od_keepout_od,
+                                      beats = beats,
+                                      break_bars = S.od_count_breaks and 10 or nil })
     end
     local nogo = OdVocalNoGo(model.bars, vplan and vplan.phrases or model.vocal.od, S.od_vocal_overlap)
 
@@ -804,6 +857,8 @@ function GenerateOverdrive(mode, harm)
             keepout_unison = S.od_keepout_unison,
             keepout_start = S.od_keepout_start,
             together = S.od_together,
+            beats = beats,
+            rest_beats = S.od_count_rests and 1 or nil,
             nogo = nogo,
             fills = fplan and fplan.fills or model.fills,
         })
@@ -823,10 +878,11 @@ function GenerateOverdrive(mode, harm)
         fplan.fills = kept
     end
 
-    local early_fills = {}
+    local early_fills, soon_fills = {}, {}
     if fplan and S.od_fill_skip_early then
         local arm = OdActivationQN(OdDrumPhrasesForActivation(model, iplan, jobs))
-        fplan.fills, early_fills = OdSplitEarlyFills(fplan.fills, arm)
+        fplan.fills, early_fills, soon_fills = OdSplitEarlyFills(fplan.fills, arm, OD_FILL_GATE_SEC,
+            function(qn) return r.TimeMap2_QNToTime(0, qn) end)
         fplan.no_activation = arm == nil
     end
 
@@ -987,6 +1043,11 @@ function GenerateOverdrive(mode, harm)
         elseif #early_fills > 0 then
             issues[#issues + 1] = ('Fills: left out %d before drum overdrive can first be activated (%s).'):format(
                 #early_fills, OdWhere(early_fills[1].s))
+        end
+        if #soon_fills > 0 then
+            issues[#issues + 1] = ('Fills: left out the one at %s - it starts too soon after drum overdrive ' ..
+                'first becomes ready to appear (under %.1f s, one Hard highway length).'):format(
+                OdWhere(soon_fills[1].s), OD_FILL_GATE_SEC)
         end
         -- A fill followed a section start the drums do not mark: the section event may
         -- be a measure off, and moving it moves the fill with it.

@@ -28,13 +28,16 @@
 --   v0.2
 --     - Overdrive > Validate has a new "Overdrive in play" section at the end:
 --       each part's overdrive played through the game's meter, a full combo
---       deploying as soon as it can. Per part: how much of it is played in
+--       deploying as soon as it is useful (not into a rest or a long vocal
+--       break). Per part: how much of it is played in
 --       overdrive, and what overdrive adds - for example "+52,476: x1.38 of
 --       the full combo (FC) - gold needs x1.15, reached" (or how far short). Under
 --       it, warnings where authored overdrive is lost (earned into a full
---       meter, or a drum fill that probably cannot appear because it starts
---       too soon after the drummer has overdrive ready) and a note when the
---       last overdrive phrase is too close to the end to be spent.
+--       meter), a grey note for a drum fill that cannot appear because it
+--       starts less than one highway length - 1.2 s on Expert - after drum
+--       overdrive first becomes ready (harmless: a later fill deploys
+--       instead), and a note when the last overdrive phrase is too close to
+--       the end to be spent.
 --     - Overdrive > Validate: the gap between a part's phrases and the first
 --       half / second half balance now count only the measures the part
 --       plays, so a long rest (keys silent for a verse) no longer reads as a
@@ -91,8 +94,27 @@
 --     - Overdrive > Generate: new "Generate OD for HARM1" checkbox (on by
 --       default, as before). Unticked, vocal overdrive goes on PART VOCALS only -
 --       harmonies then earn overdrive on PART VOCALS' phrases. If HARM1 already
---       has overdrive, Generate asks whether to remove it or keep it. Phrases are still picked only where HARM1 has the identical
---       phrase marker, to avoid the harmonies' visual bug. Saved per project.
+--       has overdrive, Generate asks whether to remove it or keep it. Phrases
+--       are still picked only where HARM1 has the identical phrase marker, to
+--       avoid the harmonies' visual bug. Saved per project.
+--     - Overdrive > Generate: "Skip fills before overdrive can be activated"
+--       also leaves out the fill that starts less than 1.6 s (one Hard highway
+--       length) after drum overdrive first becomes ready - the game cannot
+--       show it, so it could never be used. The result names it.
+--     - Overdrive > Generate: a part's last phrase now leaves room for its
+--       overdrive before that part's own last note (8 beats, 16 for a unison,
+--       counted on the BEAT track), not only before the end of the song - so
+--       keys that stop after the last chorus, or vocals before an
+--       instrumental outro, no longer get overdrive they could never spend
+--       (Validate's "too close to the end" advice).
+--     - Overdrive > Generate: two new checkboxes, both off by default. "Count
+--       rests in OD spacing": each measure a part rests in counts as 1 beat
+--       towards Beats per phrase, so parts with long rests (often keys) get
+--       their next phrase sooner. "Count long breaks in OD spacing": every 10
+--       measures without singing count as one vocal phrase. Saved per project.
+--     - Overdrive > Validate's "in play" lines deploy overdrive when it is
+--       useful: not into a rest, and for vocals just before the singing comes
+--       back after a long break, so a sparse part's gold verdict is fairer.
 --
 --   v0.1
 --     - First version. The Difficulty, Overdrive, Tab Input and MIDI tabs,
@@ -519,7 +541,8 @@ local _files = {
     -- Overdrive tab: the song model first (it reads through lib/reaper_difficulty_read.lua's
     -- FindTrackExact / ReadGemEvents), then the per-bar interest score, the fill and vocal
     -- planners, the instrument planner and Generate action that calls them, and the
-    -- validator. ui_overdrive.lua reads OD_FILL_PACINGS at load time.
+    -- validator. ui_overdrive.lua reads OD_FILL_PACINGS at load time;
+    -- actions_overdrive_fills.lua reads SCORE_FILL_GATE_SEC.
     _mdir .. 'overdrive_read.lua',
     _mdir .. 'overdrive_interest.lua',
     _mdir .. 'actions_overdrive_fills.lua',

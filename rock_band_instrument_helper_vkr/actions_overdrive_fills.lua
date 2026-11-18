@@ -253,13 +253,33 @@ function OdActivationQN(drum_phrases)
     return nil
 end
 
--- Split fills into those that can be used and those that start before activation.
--- With no activation point at all, every fill is early. Returns kept, early.
-function OdSplitEarlyFills(fills, arm_qn)
-    local kept, early = {}, {}
+-- TOO SOON AFTER ACTIVATION: the game shows a fill only if it starts at least one
+-- highway length after the drummer's overdrive becomes ready (SCORE_FILL_GATE_SEC,
+-- lib/reaper_score_sim.lua; the view time per difficulty, confirmed in game on Expert
+-- and Easy). The first activation is the same moment for every player - nothing can be
+-- deployed before it - so a fill that close after it is never usable, like an early
+-- one. Hard's highway is used, so every fill left works on Expert and Hard; Medium and
+-- Easy players, with longer highways, may still see the odd one hidden. Later
+-- activations are not checked: they depend on how the drummer uses overdrive (deploy
+-- at once, wait for a full meter, wait for the band), so any later fill may be used.
+-- Measured from the arming phrase's marker end, never before its last gem. Over the
+-- official RB3 DLC charts, Generate's output had such a fill in 29% of songs.
+OD_FILL_GATE_SEC = SCORE_FILL_GATE_SEC.hard
+
+-- Split fills into those that can be used, those that start before activation and
+-- those that start too soon after it (within gate_sec; qn_to_sec converts QN to
+-- seconds - both optional). With no activation point at all, every fill is early.
+-- Returns kept, early, soon.
+function OdSplitEarlyFills(fills, arm_qn, gate_sec, qn_to_sec)
+    local kept, early, soon = {}, {}, {}
     for _, f in ipairs(fills) do
-        if arm_qn and f.s >= arm_qn - OD_QN_EPS then kept[#kept + 1] = f
-        else early[#early + 1] = f end
+        if not arm_qn or f.s < arm_qn - OD_QN_EPS then
+            early[#early + 1] = f
+        elseif gate_sec and qn_to_sec and qn_to_sec(f.s) - qn_to_sec(arm_qn) < gate_sec - 1e-6 then
+            soon[#soon + 1] = f
+        else
+            kept[#kept + 1] = f
+        end
     end
-    return kept, early
+    return kept, early, soon
 end

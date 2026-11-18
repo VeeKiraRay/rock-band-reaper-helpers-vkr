@@ -284,7 +284,7 @@ TIPS = {
     score_calculate =
         "Work out each Expert part's full-combo score: without overdrive (what the\n" ..
         "stars are measured against), the star cut-offs, and with overdrive deployed\n" ..
-        "as soon as possible - and so whether gold stars can be reached.\n\n" ..
+        "as soon as it is useful - and so whether gold stars can be reached.\n\n" ..
         "Read-only, nothing is written. Results are not kept up to date: press again\n" ..
         "after changing the charts (for example the overdrive in the Instrument Helper).",
     score_stars =
@@ -293,9 +293,11 @@ TIPS = {
         "overdrive. Bonus points (solos, Big Rock Ending) count towards the stars at\n" ..
         "their own rate.",
     score_od =
-        "A full combo with overdrive deployed as soon as it can be: guitar, bass, keys\n" ..
-        "and Pro Keys the moment the meter is half full, drums at the first fill the game\n" ..
-        "shows, vocals in the first freestyle section. Whammy on every overdrive sustain.\n\n" ..
+        "A full combo with overdrive deployed as soon as it is useful: guitar, bass,\n" ..
+        "keys and Pro Keys the moment the meter is half full - or, before a rest, at\n" ..
+        "the next note - drums at the first fill the game shows, vocals in the first\n" ..
+        "freestyle section, just before the singing comes back (a long instrumental\n" ..
+        "break does not drain it). Whammy on every overdrive sustain.\n\n" ..
         "One exception, at the end: when that would leave the last overdrive unusable,\n" ..
         "one of the last three deploys is held - started later, just early enough to\n" ..
         "still be running when the next phrase comes in - so the last one is used too.\n" ..

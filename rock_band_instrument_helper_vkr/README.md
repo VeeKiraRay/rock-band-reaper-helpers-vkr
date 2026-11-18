@@ -175,6 +175,7 @@ Each generator has its own checkbox and settings:
 | Setting | Default | What it does |
 | ------- | ------- | ------------ |
 | **Beats per phrase** | 40 | Playing time per phrase, in counted beats (the RBN guideline: about 10 measures of 4/4). Bars where the part rests don't count. |
+| **Count rests in OD spacing** | Off | Each measure the part rests in counts as 1 beat towards **Beats per phrase**, so a part with long rests gets its next phrase sooner after them (a 40-measure rest counts like 40 beats of playing). Useful when a sparse part, often keys, is short of gold stars in Validate's "OD boost" line or the General Helper's Metadata > Score. |
 | **Unison share** | 50% | How many unisons, as a share of the phrase count (the documentation asks for about half). All only. |
 | **Prefer measures where the band plays together** | On | Unisons go on the measure before a new section, or where guitar and bass move together, as official charts do. All only. |
 | **Over vocal OD** | Overlap anywhere | Whether instrument overdrive may sit under vocal overdrive: anywhere (as official charts do), not in its first measure, or never. |
@@ -190,7 +191,7 @@ Each generator has its own checkbox and settings:
 | **End fills at section changes / crashes** | On | Lines fills up with the song: a fill ends on a `[prc_*]` section change near its grid slot, or on a drum crash when there is none. |
 | **Skip fills before overdrive can be activated** | On | Leaves out fills that come before the drummer can have enough overdrive (two drum phrases, or one unison). |
 
-**Vocal overdrive** — copies a phrase marker (105) exactly, on PART VOCALS and HARM1. Only phrases with an identical phrase marker on HARM1, and that Magma accepts on both tracks, are used: Rock Band 3 has a visual bug in harmonies when the parts differ. **Phrases per OD** (default 5) sets how often. **Generate OD for HARM1** (on by default) can be unticked to write PART VOCALS only (if HARM1 already has overdrive, you are asked whether to remove it or keep it): the game does not need it, and harmonies then earn overdrive on PART VOCALS' phrases. Official charts do both.
+**Vocal overdrive** — copies a phrase marker (105) exactly, on PART VOCALS and HARM1. Only phrases with an identical phrase marker on HARM1, and that Magma accepts on both tracks, are used: Rock Band 3 has a visual bug in harmonies when the parts differ. **Phrases per OD** (default 5) sets how often. **Count long breaks in OD spacing** (off by default) counts every 10 measures without singing as one sung phrase, so after a long instrumental break the next vocal overdrive comes sooner; official charts keep the same spacing across breaks. Useful when vocals with long breaks are short of gold stars. **Generate OD for HARM1** (on by default) can be unticked to write PART VOCALS only (if HARM1 already has overdrive, you are asked whether to remove it or keep it): the game does not need it, and harmonies then earn overdrive on PART VOCALS' phrases. Official charts do both.
 
 **Generate** writes everything that is ticked, as one undo step. If a target already has overdrive or fill notes, you're asked first: **Replace** them, **Keep existing** (new phrases join their unisons and stay out of their bars), or **Cancel**.
 

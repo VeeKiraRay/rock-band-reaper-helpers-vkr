@@ -166,6 +166,8 @@ S = {
     od_fill_keepout_end = 2,     -- a fill's crash lands at least this many measures before the drums' last measure
     od_vocal_every      = 5,     -- vocal phrases per vocal overdrive phrase
     od_vocal_harm1      = true,  -- also write the vocal overdrive to HARM1 (off: HARM1 gets none)
+    od_count_rests      = false, -- instrument spacing: each rest bar inside a part counts 1 beat
+    od_count_breaks     = false, -- vocal cadence: each 10 bars without singing count 1 phrase
     -- Session only: { message, can_keep, on_replace, on_keep } while the replace
     -- confirmation is open; the overview strip's data from the last Generate/Validate.
     -- Both describe the current project and are cleared on a project switch.
@@ -955,6 +957,10 @@ TIPS = {
     od_fill_skip_early   = "Leave out fills that come before the drummer can have enough\n" ..
                            "overdrive to activate - two drum phrases, or one unison. The\n" ..
                            "drummer can never use them.\n\n" ..
+                           "Also leaves out a fill that starts less than 1.6 s after that\n" ..
+                           "moment: the game shows a fill only from one highway length\n" ..
+                           "after overdrive becomes ready (Expert 1.2 s, Hard 1.6 s), so it\n" ..
+                           "can never be used either.\n\n" ..
                            "Untick to keep the full grid from the start of the song, as\n" ..
                            "many official charts do.",
     od_inc_vocals        = "Generate vocal overdrive (note 116) on PART VOCALS and HARM1\n" ..
@@ -968,6 +974,23 @@ TIPS = {
                            "is the \"Over vocal OD\" setting above.",
     od_vocal_every       = "Vocal phrases per overdrive phrase. The doc recommends one\n" ..
                            "overdrive for every 5 phrases.",
+    od_count_rests       = "Count the part's rests in the phrase spacing: each measure the\n" ..
+                           "part rests in counts as 1 beat towards \"Beats per phrase\".\n" ..
+                           "A 40-measure rest then counts like 40 beats of playing, so a\n" ..
+                           "part with long rests gets its next phrase sooner after them.\n\n" ..
+                           "Useful when a part plays sparsely and Validate (\"OD boost\") or\n" ..
+                           "the General Helper's Metadata > Score shows it short of gold\n" ..
+                           "stars: it gives that part more overdrive.\n\n" ..
+                           "Off counts only the beats the part plays, as the doc's rule\n" ..
+                           "does. Two phrases are never placed with no notes between them.",
+    od_count_breaks      = "Count long vocal breaks in the cadence: every 10 measures with\n" ..
+                           "no singing count as one sung phrase. After a 20-measure break,\n" ..
+                           "with 1 per 5 phrases, the next overdrive comes 2 phrases sooner.\n\n" ..
+                           "Useful when the vocals have long breaks and Validate (\"OD\n" ..
+                           "boost\") or the General Helper's Metadata > Score shows them\n" ..
+                           "short of gold stars: it gives the vocals more overdrive.\n\n" ..
+                           "Off counts sung phrases only, as official charts do (they keep\n" ..
+                           "the same spacing across long breaks).",
     od_vocal_harm1       = "Write the vocal overdrive to HARM1 too.\n\n" ..
                            "Generate always makes the two identical. The game does not\n" ..
                            "need HARM1's: without it, harmonies earn overdrive on PART\n" ..

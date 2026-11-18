@@ -367,10 +367,13 @@ end
 
 -- What the simulated overdrive path says about the authored overdrive. Returns
 -- { text, level } lines, bars named by measure number:
---   'warn'    overdrive the chart loses whatever the player does - into a full meter, or a
---             drum fill that cannot appear (the Validate warnings);
+--   'warn'    overdrive the chart loses whatever the player does - into a full meter (the
+--             Validate warnings);
 --   'advice'  the last overdrive phrase sits too close to the end for its overdrive to be
 --             spent before the last note - worth a look, not an error (amber);
+--   'note'    about the chart, harmless: a drum fill that cannot appear because it starts
+--             too soon after drum overdrive FIRST becomes ready (a later fill deploys
+--             instead; official RB3 DLC charts have one in 15% of songs). Grey, not counted;
 --   'info'    about the simulated path, not the chart: where it holds overdrive so the
 --             last one is usable, overdrive it leaves unused at the end, a last deploy
 --             running past the last note. A better path may do better.
@@ -394,12 +397,16 @@ function ScoreFindings(res, bars, kind)
             :format(Pct(full), table.concat(full_bars, ', ')))
     end
     for _, f in ipairs(res.lost_fills) do
-        -- "Probably": the game's gate is one highway length, which depends on the track
-        -- speed; fill_gate_sec is a working value, not read from the game.
-        Add('warn', ('Fill at bar %d probably does not appear: it starts %.1f s after '
-            .. 'overdrive becomes ready (bar %d), and fills show only from about %.1f s '
-            .. '(one highway length) after that.')
-            :format(Bar(f.qn), f.gap_sec, Bar(f.ready_qn), SCORE_RULES.fill_gate_sec))
+        -- Only after the FIRST activation, which every player reaches at the same moment.
+        -- Later ready moments depend on how the drummer uses overdrive (deploy at once,
+        -- wait for a full meter, wait for the band), so a fill the simulated path skips
+        -- there may well be used. The gate is Expert's highway length (SCORE_FILL_GATE_SEC).
+        if res.first_ready_qn and math.abs(f.ready_qn - res.first_ready_qn) < 1e-6 then
+            Add('note', ('Fill at bar %d does not appear on Expert: it starts %.1f s after '
+                .. 'drum overdrive first becomes ready (bar %d), and fills show only from '
+                .. '%.1f s (one highway length) after that.')
+                :format(Bar(f.qn), f.gap_sec, Bar(f.ready_qn), SCORE_RULES.fill_gate_sec))
+        end
     end
 
     local lo = res.last_od
@@ -449,7 +456,7 @@ end
 -- order (stars, full combo without and with overdrive, coverage), then its findings with
 -- their level as a prefix - '!' warning, '?' advice, '-' about the simulated path.
 -- result = S.score_result ({ cards, bars, no_beat }). Pure.
-local SCORE_FINDING_MARK = { warn = '!', advice = '?', info = '-' }
+local SCORE_FINDING_MARK = { warn = '!', advice = '?', note = '-', info = '-' }
 
 function ScoreReportText(result)
     local lines = { 'Score and stars - a full combo (FC), overdrive (OD) deployed as soon as possible' }

@@ -44,12 +44,16 @@
 --       earns (the stars count it at 100), and the card says how much of the
 --       total that is. Unisons follow the game's rule: phrases on two different
 --       instruments starting less than a beat apart (vocals never).
---       Overdrive is deployed as soon as possible, except at the end: when
+--       Overdrive is deployed as soon as it is useful - at once, or at the
+--       part's next note after a rest, and for vocals just before the singing
+--       comes back after a long break - except at the end: when
 --       that would leave the last overdrive unusable, an earlier deploy is held
 --       so it is used too, and the card says where. Also how much of each part
 --       is played in overdrive, warnings where authored overdrive is lost
---       (earned into a full meter, or a drum fill that probably cannot appear
---       because it starts too soon after the drummer has overdrive ready), and
+--       (earned into a full meter), a grey note for a drum fill that cannot
+--       appear because it starts less than one highway length - 1.2 s on
+--       Expert - after drum overdrive first becomes ready (harmless: a later
+--       fill deploys instead), and
 --       an amber note when the last overdrive phrase is too close to the end
 --       for its overdrive to be spent.
 --       Harmonies get their own card when the song has HARM1 and HARM2: scored

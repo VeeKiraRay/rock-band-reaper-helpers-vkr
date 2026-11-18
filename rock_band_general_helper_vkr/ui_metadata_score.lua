@@ -132,15 +132,15 @@ local function DrawCard(card, bars)
     local cov = ScoreCoverageText(card.runs[1])
     r.ImGui_Text(ctx, cov or 'Never in OD.')
     Tooltip(TIPS.score_coverage)
-    -- Three levels (ScoreFindings): a warning gets "!", advice is amber (worth a look, not
-    -- an error), information about the simulated path is grey.
+    -- Levels (ScoreFindings): a warning gets "!", advice is amber (worth a look, not an
+    -- error), a harmless note about the chart and information about the simulated path
+    -- are grey.
     for _, f in ipairs(card.findings or {}) do
         if f.level == 'warn' then
             r.ImGui_TextColored(ctx, COL_WARN, '!')
             r.ImGui_SameLine(ctx)
             r.ImGui_TextWrapped(ctx, f.text)
         else
-            -- Grey = the theme's own disabled-text colour, so no new hex value.
             r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Text(), f.level == 'advice' and COL_WARN
                 or COL_DIM)
             r.ImGui_TextWrapped(ctx, f.text)
@@ -159,7 +159,8 @@ function DrawMetadataScoreTab(ctx)
     r.ImGui_TextWrapped(ctx,
         'The score each Expert part reaches with a full combo (FC), its star cut-offs, and ' ..
         'whether gold stars are in reach. Uses the game\'s own scoring rules. ' ..
-        'Overdrive (OD) is deployed as soon as possible - except at the end: when that would ' ..
+        'Overdrive (OD) is deployed as soon as it is useful (not into a rest or an ' ..
+        'instrumental break) - except at the end: when that would ' ..
         'leave the last overdrive unusable, an earlier one is held so it can be used. ' ..
         'That is a simple plan, not the best one, so a player with a better plan can ' ..
         'score more. The whole song is read - a time selection does not change the result.')

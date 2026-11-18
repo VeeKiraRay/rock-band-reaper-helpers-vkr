@@ -125,6 +125,9 @@ function DrawOverdriveTab(ctx)
     SliderTooltip(TIPS.od_beats_per_phrase)
     r.ImGui_SameLine(ctx)
     TextDim(('(~%d measures in 4/4)'):format(math.floor(S.od_beats_per_phrase / 4 + 0.5)))
+    _, S.od_count_rests = r.ImGui_Checkbox(ctx, 'Count rests in OD spacing (1 beat per measure)##od_crs',
+                                           S.od_count_rests)
+    Tooltip(TIPS.od_count_rests)
 
     local lock_share = not is_all
     if lock_share and do_phrases then r.ImGui_BeginDisabled(ctx) end
@@ -210,6 +213,9 @@ function DrawOverdriveTab(ctx)
     r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
     _, S.od_vocal_every = r.ImGui_SliderInt(ctx, '##od_vev', S.od_vocal_every, 2, 10)
     SliderTooltip(TIPS.od_vocal_every)
+    _, S.od_count_breaks = r.ImGui_Checkbox(ctx, 'Count long breaks in OD spacing (1 phrase per 10 measures)##od_cbr',
+                                            S.od_count_breaks)
+    Tooltip(TIPS.od_count_breaks)
     _, S.od_vocal_harm1 = r.ImGui_Checkbox(ctx, 'Generate OD for HARM1##od_vh1', S.od_vocal_harm1)
     Tooltip(TIPS.od_vocal_harm1)
     if not do_vocals then r.ImGui_EndDisabled(ctx) end

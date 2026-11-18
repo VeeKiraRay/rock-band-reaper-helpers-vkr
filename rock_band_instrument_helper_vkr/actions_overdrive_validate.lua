@@ -559,6 +559,8 @@ local function PlayReport(rep)
                     out[#out + 1] = '! ' .. f.text
                 elseif f.level == 'advice' then
                     out[#out + 1] = '{warn}? ' .. f.text   -- amber, as Metadata > Score
+                elseif f.level == 'note' then
+                    out[#out + 1] = '{dim}- ' .. f.text    -- grey, not counted
                 end
             end
         end

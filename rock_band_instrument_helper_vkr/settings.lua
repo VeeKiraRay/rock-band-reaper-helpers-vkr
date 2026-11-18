@@ -82,6 +82,8 @@ local function SerializeSettings()
         'odfke=' .. S.od_fill_keepout_end,
         'odvev=' .. S.od_vocal_every,
         'odvh1=' .. (S.od_vocal_harm1 and '1' or '0'),
+        'odcrs=' .. (S.od_count_rests and '1' or '0'),
+        'odcbr=' .. (S.od_count_breaks and '1' or '0'),
     }, ';')
 end
 
@@ -177,6 +179,8 @@ local function DeserializeSettings(str)
         elseif k == 'odfke' then S.od_fill_keepout_end = tonumber(v) or S.od_fill_keepout_end
         elseif k == 'odvev' then S.od_vocal_every      = tonumber(v) or S.od_vocal_every
         elseif k == 'odvh1' then S.od_vocal_harm1      = (v == '1')
+        elseif k == 'odcrs' then S.od_count_rests      = (v == '1')
+        elseif k == 'odcbr' then S.od_count_breaks     = (v == '1')
         end
     end
 end

@@ -35,8 +35,11 @@
 --     deploy from 0.5; drains 1/32 per BEAT-track beat; x2 on everything the part
 --       scores while deployed - gem heads and the part of a sustain held during it.
 --       The BRE and the solo bonus are never multiplied.
---   DRUMS deploy only through a fill. Fills appear only once the drummer is ready, and
---     only those starting at least a highway length (2.4 s) after that moment. Every
+--   DRUMS deploy only through a fill. Fills appear only once the drummer is ready (the
+--     last gem of the phrase that brings the meter to half is hit), and only those
+--     starting at least one highway length after that moment (GemPlayer::
+--     EnableDrumFills -> TrackDir::TopSeconds: the view time in track_paneldir.dta,
+--     drums Expert 1.2 s; SCORE_FILL_GATE_SEC). Every
 --     gem inside the fill used, its closing crash included, scores nothing (and is
 --     left out of the streak - assumed).
 --   VOCALS: each sung phrase 1000 x the phrase streak (+1 per phrase to x4), paid at
@@ -62,13 +65,23 @@
 --     extra parts are pure gain over the cut-offs (matches play: about the same cut-offs
 --     as solo vocals).
 --
--- The deploy policy is "as soon as possible": guitar, bass and keys deploy the moment
--- the meter reaches 0.5; drums at the first fill the game shows; vocals as soon as a
--- freestyle section allows. One exception, at the end: when that leaves the last
+-- The deploy policy is "as soon as it is useful": guitar, bass and keys deploy the moment
+-- the meter reaches 0.5 - or, when a rest follows, at the part's next note if that doubles
+-- more; drums at the first fill the game shows; vocals in the first freestyle section,
+-- as late in it as the shout still fits when nobody sings meanwhile (a long instrumental
+-- break then does not drain the meter). Both that and deploying at once (opts.no_wait)
+-- are run and the better total is kept, so waiting never costs. One exception, at the end: when that leaves the last
 -- overdrive unusable, ScoreSimulatePart tries holding any of the last three deploys for
 -- the next phrase, and takes the best path that uses it. It is not the best possible
 -- run (a deliberate choice: gold should be reachable without perfect overdrive paths),
 -- so "gold not reached" means "not with this simple plan".
+
+-- How long a drum fill must start after the drummer becomes ready to appear: the drum
+-- highway's view time per difficulty (track_paneldir.dta view_times; the same for
+-- guitar, bass, keys and Pro Keys). Checked in game on Expert and Easy. The double-speed
+-- modifier divides it by 1.5; in a band without independent track speeds every track
+-- uses the average of the local players' view times.
+SCORE_FILL_GATE_SEC = { expert = 1.2, hard = 1.6, medium = 2.0, easy = 2.4 }
 
 SCORE_RULES = {
     head          = 25,          -- per note; Pro Keys see SCORE_POINTS
@@ -84,7 +97,7 @@ SCORE_RULES = {
     od_threshold  = 0.5,
     deploy_beats  = 32,
     whammy_per_qn = 0.034,
-    fill_gate_sec = 2.4,         -- one highway length: depends on track speed; a working value
+    fill_gate_sec = SCORE_FILL_GATE_SEC.expert,   -- the simulator plays Expert
     -- Vocal freestyle sections: { gap over, trim each end, deploy needs } in seconds,
     -- longest first (scoring.dta freestyle_min_duration / _pad / _deployment_time).
     freestyle     = { { gap = 0.8, pad = 0.1, deploy = 0.5 },
@@ -298,7 +311,7 @@ local function LastOdRoom(res, beats, last_qn)
     lo.too_late = lo.beats_left < lo.beats_needed - 1e-6
 end
 
--- Simulate a full combo with overdrive deployed as soon as possible.
+-- Simulate a full combo with overdrive deployed as soon as it is useful (header).
 --   part = { kind, gems = { { qn, qn_e, sec, n, toms } } sorted, od = { { s, e,
 --            unison } }, solos = { { s, e } }, fills = { { s, e, s_sec } } (drums),
 --            bre = { s, e, sec } or nil, beats = { qn }, bars = { { qn_s, qn_e } } }
@@ -366,10 +379,11 @@ function ScoreSimulateOD(part, opts)
     end
 
     local pending_hold            -- the res.held entry waiting for its deploy
+    local deploy_at               -- ready in a rest: deploy at this next note (BecameReady)
     local function Deploy(qn)
         if pending_hold then pending_hold.deploy = qn; pending_hold = nil end
         dep, dep_s = true, qn
-        ready_qn, active_fill = nil, nil
+        ready_qn, active_fill, deploy_at = nil, nil, nil
     end
     local function EndDeploy(qn)
         res.deploys[#res.deploys + 1] = { s = dep_s, e = qn }
@@ -402,6 +416,9 @@ function ScoreSimulateOD(part, opts)
     local function BecameReady(qn, sec, from_phrase)
         if dep or ready_qn or meter < SCORE_RULES.od_threshold - 1e-9 then return end
         if hold_wait and not from_phrase then return end
+        -- The first time the meter reaches half: the same for every player (nothing can be
+        -- deployed before it). Later ready moments depend on how overdrive was used.
+        res.first_ready_qn = res.first_ready_qn or qn
         hold_wait = false
         planned_qn = nil
         decisions = decisions + 1
@@ -432,6 +449,42 @@ function ScoreSimulateOD(part, opts)
         -- opts.deploy_anywhere: drums deploy like the others (autoplay does, with no fill),
         -- for comparing with autoplay recordings.
         if kind ~= 'drums' or opts.deploy_anywhere then
+            -- Ready before a rest (the next note over a beat away): a player would wait
+            -- and deploy at that note rather than drain the meter over the rest. Waits
+            -- when that doubles more - note heads and sustain held in each deploy's
+            -- window (a sustain still ringing now favours deploying at once).
+            local nxt
+            for i = gi, #gems do
+                if gems[i].qn > qn + EPS then nxt = gems[i].qn; break end
+            end
+            -- (Not in the autoplay comparison: the game's autoplay deploys at once.)
+            if not opts.deploy_anywhere and not opts.no_wait and nxt
+               and ScoreBeatAt(beats, nxt) - ScoreBeatAt(beats, qn) > 1 + 1e-9 then
+                local P = Points(part)
+                local function Doubled(a)
+                    local z = ScoreQNAtBeat(beats, ScoreBeatAt(beats, a) + meter * SCORE_RULES.deploy_beats)
+                    local v = 0
+                    for _, tl in ipairs(tails) do               -- sustains ringing now
+                        local x0, x1 = math.max(a, qn), math.min(z, tl.e)
+                        if x1 > x0 then v = v + P.tail * tl.n * (x1 - x0) end
+                    end
+                    for i = gi, #gems do
+                        local g = gems[i]
+                        if g.qn >= z - EPS then break end
+                        if g.qn > qn + EPS and g.qn >= a - EPS then
+                            v = v + P.head * (g.n or 1)
+                            if HasTail(part, g) then
+                                v = v + P.tail * (g.n or 1) * math.max(0, math.min(z, g.qn_e) - g.qn)
+                            end
+                        end
+                    end
+                    return v
+                end
+                if Doubled(nxt) > Doubled(qn) + 1e-9 then
+                    deploy_at = nxt
+                    return
+                end
+            end
             Deploy(qn)
             return
         end
@@ -516,6 +569,9 @@ function ScoreSimulateOD(part, opts)
             if tl.e > t + EPS then still[#still + 1] = tl end
         end
         tails = still
+
+        -- Ready during a rest: deploy just before the next note, so it is doubled.
+        if deploy_at and not dep and t >= deploy_at - EPS then Deploy(t) end
 
         -- Gems at this position.
         while gi <= #gems and gems[gi].qn <= t + EPS do
@@ -665,6 +721,7 @@ function ScoreVocalSliceWeight(n, x, y)
 end
 
 function ScoreSimulateVocals(part, opts)
+    opts = opts or {}
     local beats = part.beats or {}
     local phrases = part.phrases or {}
     local res = { score = 0, bonus = 0, deploys = {}, waste = {}, lost_fills = {},
@@ -719,6 +776,23 @@ function ScoreSimulateVocals(part, opts)
                 end
                 local at_sec = from_sec + needs
                 if at_sec <= sec.e_sec + 1e-9 then
+                    -- As late in the section as the shout still fits - just before the
+                    -- singing comes back - when nobody sings in between (harmonies: another
+                    -- part may sing through this part's gap, and an early deploy doubles
+                    -- that). A long instrumental break then no longer drains the meter.
+                    local late = sec.e_sec < math.huge and sec.e_sec or nil
+                    if late and late > at_sec + 1e-9 then
+                        local a = sec.s_qn + (from_sec - sec.s_sec) * sec.rate
+                        local z = sec.s_qn + (late - sec.s_sec) * sec.rate
+                        local sung = false
+                        for _, line in ipairs(part.lines or { part.notes or {} }) do
+                            for _, n in ipairs(line) do
+                                if n.qn < z - EPS and n.qn_e > a + EPS then sung = true; break end
+                            end
+                            if sung then break end
+                        end
+                        if not sung and not opts.no_wait then at_sec = late end
+                    end
                     local qn = sec.s_qn + (at_sec - sec.s_sec) * sec.rate
                     if qn >= upto_qn - EPS then return end   -- later than this phrase end
                     qn = math.max(qn, ready_qn)
@@ -835,7 +909,7 @@ end
 -- How many of the last deploy decisions the path search may hold back.
 SCORE_HOLD_LAST = 3
 
--- One entry point for any part: deploy as soon as possible; if that leaves the last
+-- One entry point for any part: deploy as soon as useful; if that leaves the last
 -- overdrive unused, hold the fewest (latest first) of the last SCORE_HOLD_LAST deploys
 -- that makes it usable (none found: the plain path stays, with its "never used" note).
 -- res.held lists the holds as { qn = where the meter was ready, deploy = where that
@@ -845,8 +919,24 @@ local function Unspent(res)
     return false
 end
 
+-- Two plans, each with the end-of-song hold search below, and the better one: waiting
+-- for the part's next note / the end of a freestyle section when that doubles more, and
+-- deploying at once (opts.no_wait). Waiting is a local choice and can cost more later (a
+-- phrase then collected outside a deploy, or the hold search no longer needed); a player
+-- would take the plan that scores more, so the result never drops below deploying at once.
+local SearchPart
 function ScoreSimulatePart(part, opts)
     opts = opts or {}
+    if opts.no_wait or opts.deploy_anywhere then return SearchPart(part, opts) end
+    local wait = SearchPart(part, opts)
+    local o = {}
+    for k, v in pairs(opts) do o[k] = v end
+    o.no_wait = true
+    local now = SearchPart(part, o)
+    return (now.total > wait.total + 1e-6) and now or wait
+end
+
+function SearchPart(part, opts)
     local best = SimulateOnce(part, opts)
     local asap_total = best.total
     -- Only when the last overdrive would otherwise go unused, and a path is taken only if

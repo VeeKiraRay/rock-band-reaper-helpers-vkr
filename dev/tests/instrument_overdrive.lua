@@ -143,6 +143,47 @@ Test.it('picks every 5th sung phrase, starting mid-cycle', function()
     Test.expect(#plan.unplaced == 0, 'nothing unplaced')
 end)
 
+Test.it('leaves room for the overdrive before the vocals\' own last note', function()
+    -- The last note is phrase 24's first, half a beat after phrase 23 ends: phrase 23
+    -- has no room for its 8 beats, so the cadence ends at 18 - not on 23, and with
+    -- nothing reported unplaced. No BEAT track: quarter notes.
+    local model, phrases = VocalModel()
+    local sung = {}
+    for i = 1, 24 do sung[#sung + 1] = { qn = phrases[i].s, qn_e = phrases[i].s + 1 } end
+    model.vocal.sung = sung
+    local plan = OdPlanVocals(model, { every = 5, keepout_od = 8, beats = {} })
+    Test.expect(Index(phrases, plan.phrases) == '3,8,13,18', Index(phrases, plan.phrases))
+    Test.expect(#plan.unplaced == 0, #plan.unplaced .. ' unplaced')
+end)
+
+Test.it('"Count long breaks": 10 bars without singing count as one phrase', function()
+    -- Phrases 1-8 in bars 1-16, a 20-bar break, phrases 9-24 from bar 37.
+    local model = MkModel(90, {})
+    local phrases = {}
+    for i = 1, 24 do
+        local b = (i <= 8) and (2 * i - 1) or (2 * i - 1 + 20)
+        local s, e = model.bars[b].qn_s, model.bars[b + 1].qn_e - 0.5
+        phrases[i] = { s = s, e = e, has_notes = true, harm = { s = s, e = e } }
+    end
+    model.vocal = { present = true, harm_present = true, phrases = phrases, od = {},
+                    harm_od = {}, harm_phrases = {} }
+    local off = OdPlanVocals(model, { every = 5, keepout_od = 8 })
+    Test.expect(Index(phrases, off.phrases) == '3,8,13,18,23', 'off: ' .. Index(phrases, off.phrases))
+    -- On: the break counts 2, so after phrase 8 the next is 3 sung phrases later.
+    local on = OdPlanVocals(model, { every = 5, keepout_od = 8, break_bars = 10 })
+    Test.expect(Index(phrases, on.phrases) == '3,8,11,16,21', 'on: ' .. Index(phrases, on.phrases))
+    -- A 40-bar break counts 4: the next would be the very next phrase - one is kept between.
+    local on4 = OdPlanVocals(model, { every = 5, keepout_od = 8, break_bars = 5 })
+    for k = 2, #on4.phrases do
+        local a, b
+        for i, p in ipairs(phrases) do
+            if p == on4.phrases[k - 1] then a = i end
+            if p == on4.phrases[k] then b = i end
+        end
+        Test.expect(b - a >= 2, ('adjacent overdrive phrases %d and %d'):format(a, b))
+    end
+end)
+
 Test.it('moves one phrase earlier when HARM1 differs there', function()
     local model, phrases = VocalModel({ [8] = true })
     local plan = OdPlanVocals(model, { every = 5, keepout_od = 8 })
@@ -379,6 +420,24 @@ Test.it('fills before activation are split off', function()
     Test.expect(#k2 == 0 and #e2 == 3, 'no activation means every fill is early')
 end)
 
+Test.it('a fill too soon after the first activation is split off (Hard highway)', function()
+    -- 120 BPM: 1 QN = 0.5 s. Activation at QN 34 (17.0 s).
+    local function Sec(qn) return qn * 0.5 end
+    local fills = { { s = 20, e = 24 },     -- before activation: early
+                    { s = 37, e = 40 },     -- 1.5 s after: too soon on Hard
+                    { s = 52, e = 56 } }    -- 9.0 s after: kept
+    local kept, early, soon = OdSplitEarlyFills(fills, 34, OD_FILL_GATE_SEC, Sec)
+    Test.expect(#kept == 1 and kept[1].s == 52, #kept .. ' kept')
+    Test.expect(#early == 1 and early[1].s == 20, #early .. ' early')
+    Test.expect(#soon == 1 and soon[1].s == 37, #soon .. ' too soon')
+    Test.expect(OD_FILL_GATE_SEC == 1.6, 'gate ' .. OD_FILL_GATE_SEC)
+    -- 1.7 s after is fine; without a gate nothing is too soon.
+    local k2, _, s2 = OdSplitEarlyFills({ { s = 37.4, e = 40 } }, 34, OD_FILL_GATE_SEC, Sec)
+    Test.expect(#k2 == 1 and #s2 == 0, '1.7 s after was dropped')
+    local k3, _, s3 = OdSplitEarlyFills(fills, 34)
+    Test.expect(#k3 == 2 and #s3 == 0, 'no gate: the old split')
+end)
+
 Test.it('skips drum solos and slots next to kept overdrive', function()
     local bars = MkBars(40)
     local model = MkModel(40, { drums = 'all' },
@@ -606,6 +665,45 @@ Test.it('rests are not counted toward the target', function()
         unison_share = 0.5, keepout_od = 8, keepout_unison = 12, nogo = {}, fills = {} })
     Test.expect(plan.targets.guitar == 4, 'target ' .. plan.targets.guitar)   -- 36 x 4 / 40
     for _, sp in ipairs(plan.phrases.guitar) do Test.expect(sp.bar <= 36, 'phrase in a rest') end
+end)
+
+Test.it('a part that stops early keeps its overdrive room before its own last note', function()
+    -- Keys stop at bars 20-40 while the band plays to bar 80. For every stop point, keys'
+    -- last phrase ends at least 8 beats (16 for a unison) before keys' last note.
+    local bad, phrases = {}, 0
+    for stop = 20, 40, 2 do
+        local model = MkModel(80, { guitar = 'all', bass = 'all', drums = 'all', keys = Range(1, stop) })
+        local plan = PlanAll(model)
+        local last = 0
+        for _, ev in ipairs(model.inst.keys.events) do last = math.max(last, ev.qn) end
+        local list = plan.phrases.keys
+        phrases = phrases + #list
+        for _, sp in ipairs(list) do
+            local need = 0.251 * 32 * (sp.unison and 2 or 1)
+            if last - sp.e < need - 1e-6 then bad[#bad + 1] = ('stop %d: phrase at %.0f'):format(stop, sp.s) end
+        end
+    end
+    Test.expect(phrases > 0, 'setup: keys got no phrases')
+    Test.expect(#bad == 0, table.concat(bad, '; '))
+end)
+
+Test.it('"Count rests": a rest bar inside the part counts 1 beat toward the spacing', function()
+    -- Guitar plays bars 1-20 and 61-100 (240 beats), resting 40 bars in between.
+    local function Plan(rest)
+        local bars_played = Range(1, 20)
+        for b = 61, 100 do bars_played[b] = true end
+        local model = MkModel(110, { guitar = bars_played })
+        return OdPlanInstruments(model, { gen = { guitar = true }, beats_per_phrase = 40,
+            unison_share = 0.5, keepout_od = 8, keepout_unison = 12, nogo = {}, fills = {},
+            rest_beats = rest })
+    end
+    local off, on = Plan(nil), Plan(1)
+    Test.expect(off.targets.guitar == 6, 'off target ' .. off.targets.guitar)
+    Test.expect(on.targets.guitar == 7, 'on target ' .. on.targets.guitar .. ' (280 beats / 40)')
+    Test.expect(#on.phrases.guitar == 7, #on.phrases.guitar .. ' phrases placed')
+    for _, sp in ipairs(on.phrases.guitar) do
+        Test.expect(sp.bar <= 20 or sp.bar >= 61, 'a phrase in the rest, bar ' .. sp.bar)
+    end
 end)
 
 Test.it('drum solos hold at most 4 phrases', function()
