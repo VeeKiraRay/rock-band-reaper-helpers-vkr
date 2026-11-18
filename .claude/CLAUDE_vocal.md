@@ -162,7 +162,7 @@ ui.lua:
 | `rock_band_vocal_helper_vkr.lua`                    | Entry point: ReaImGui check, path derivation, dofile calls, startup                                                                          |
 | `rock_band_vocal_helper_vkr/defaults.lua`           | `DEFAULTS`, `S`, `ResetXxx()`, constants (`MODE_*`, `RB3_*`, `LYRIC_IGNORE`)                                                                |
 | `rock_band_vocal_helper_vkr/tips.lua`               | `TIPS` (global) — all tooltip strings                                                                                                        |
-| `rock_band_vocal_helper_vkr/settings.lua`           | `SaveSettings`, `LoadSettings`                                                                                                               |
+| `rock_band_vocal_helper_vkr/settings.lua`           | `SaveSettings`, `LoadSettings`; `ApplyDefaults`, `SaveUserDefaults`, `ClearUserDefaults`, `ResetUserDefault`, `UserDefaultRows` (defined by `UserDefaultsSetup`) |
 | `rock_band_vocal_helper_vkr/helpers.lua`            | `IsOnGrid`, `SetDefaultTracks`, `AutoDetectLyricsFile`, `RunActionErrorCleanup` — the track/action helpers it used to carry are in `lib/reaper_helper_common.lua` |
 | `rock_band_vocal_helper_vkr/pipeline.lua`           | `ResolveAnalysisRange`, `ResolveApplyPitchTarget`, `RunDetection`, `AssignPitches`, `ApplyPitchRange`, `FindNearestRefPitch`, `FormatResult` |
 | `rock_band_vocal_helper_vkr/autotune.lua`           | `AutoTune`, `AutoTuneYIN`, `ApplyAutoTuneResult`, format helpers                                                                             |
@@ -576,7 +576,9 @@ Local helper: `EditDistance` (Wagner–Fischer algorithm on pitch sequences or i
 
 ### Save / Load
 
-Section `VocalMIDIGenVKR`, key `settings_v1`. Auto-loads on script open.
+Section `VocalMIDIGenVKR`, key `settings_v1`. Auto-loads on script open. My defaults: global ExtState section `VocalMIDIGenVKR_defaults`, same key, only the values that differ from the shipped ones (CLAUDE.md "Settings save/load"). `LoadSettings` applies shipped + my defaults first, then the project. The Settings tab draws the shared `DrawSettingsPersistence()`. The My defaults list names each key from `NAMES` in `settings.lua` (On / Off from the `SETTINGS` entry's `kind`), so a new `SETTINGS` entry needs a name there. `ProjectOnly` (song-specific, never my defaults): `hkr`, `hkq`, `skr`, `skq`, `tkq`, `tkm` above `TUNER_KEY_LEAD`, `minpe`, `minp`, `maxpe`, `maxp`, `pitch`.
+
+The Detection / Pitch / MIDI **Reset** buttons still reset to the shipped values (`DEFAULTS`), not to my defaults.
 
 **Saved:** all detection sliders + pitch settings (YIN params, reference tolerance) + velocity + slide scan params.
 **Not saved:** track selections (`audio_idx`, `midi_idx`, `ref_idx`) — positional, brittle across sessions. Use `GetTrackGUID` if persistence is ever needed.

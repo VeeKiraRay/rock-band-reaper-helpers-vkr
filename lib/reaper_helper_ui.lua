@@ -4,9 +4,11 @@
 -- which cannot be dofile'd by another entry point: its last line is a bare
 -- r.defer(Loop) that would spawn that helper's whole window.
 --
--- Requires globals: r, ctx, S, Btn, BtnWidth, Tooltip, BTN_H, FormatTime,
---                   GetTimeSelection, TextDim, COL_* (lib/reaper_imgui_helpers.lua -
---                   load first).
+-- Requires globals: r, ctx, S, Btn, BtnWidth, BtnGroupWidth, LabelColWidth, Tooltip,
+--                   BTN_H, FormatTime, GetTimeSelection, TextDim, TextDimWrapped,
+--                   COL_* (lib/reaper_imgui_helpers.lua - load first); for
+--                   DrawSettingsPersistence also SaveSettings / LoadSettings and the
+--                   UserDefaultsSetup functions (each helper's settings.lua).
 
 -- Track dropdown: stores and matches by REAPER track index (t.idx, from
 -- RefreshTrackLists), so a selection survives the filtered lists being rebuilt.
@@ -250,6 +252,172 @@ function DrawHelperFooter(opts)
         if Btn('Undo', BTN_H) then r.Undo_DoUndo2(0) end
         if not can_undo then r.ImGui_EndDisabled(ctx) end
         if can_undo then Tooltip('Undo: ' .. undo_str) end
+    end
+end
+
+----------------------------------------------------------------------
+-- Settings block: this project / my defaults
+----------------------------------------------------------------------
+-- Drawn by every helper's Settings tab. Calls the helper's SaveSettings / LoadSettings
+-- (settings.lua) and the functions UserDefaultsSetup defines there
+-- (lib/reaper_helper_common.lua). Shared, so its tooltips live here (CLAUDE.md
+-- "Tooltips": a lib module drawing for several helpers keeps its own strings).
+local SETTINGS_TIPS = {
+    save       = 'Save the current settings in this project. When it is opened, the\n' ..
+                 'helper uses these instead of your defaults.\n\n' ..
+                 'Track selections are not saved: they are picked again by track name.',
+    load       = 'Load the settings saved in this project. Without any, the settings go\n' ..
+                 'back to your defaults (or the shipped ones).',
+    save_mine  = 'Save the current settings as your defaults, for every project that has\n' ..
+                 'no settings of its own. Only the values that differ from the shipped\n' ..
+                 'defaults are stored, so a value you never changed follows the defaults\n' ..
+                 'of later versions.\n\n' ..
+                 'Stored in REAPER (reaper-extstate.ini), not in a project: updates of\n' ..
+                 'these scripts do not touch it.',
+    clear_mine = 'Forget your defaults: projects without settings of their own start from\n' ..
+                 'the shipped defaults again. The settings shown now do not change.',
+    reset_row  = 'Forget this one: it goes back to the shipped value, here and in new\n' ..
+                 'projects.',
+    ask_both   = 'Save these values as your defaults and in this project, so the\n' ..
+                 'project opens with them too.',
+    ask_mine   = 'Save them as your defaults only. This project keeps the settings it\n' ..
+                 'saved before.',
+}
+
+-- Save as my defaults was pressed while the project has other settings of its own.
+local _ask_project = false
+-- Clear my defaults was pressed: waiting for the confirmation.
+local _ask_clear = false
+
+-- also_project: save the current values in this project too.
+local function SaveMyDefaults(also_project)
+    local n = SaveUserDefaults()
+    if also_project then SaveSettings() end
+    local saved = n > 0 and string.format('Saved %d setting%s as your defaults', n, n == 1 and '' or 's')
+                         or 'Every setting is at its shipped default - no defaults of your own stored'
+    S.status = saved .. (also_project and ', and the settings in this project.' or '.')
+end
+
+function DrawSettingsPersistence()
+    local bw = BtnGroupWidth({ 'Save to project', 'Load from project',
+                               'Save as my defaults', 'Clear my defaults' })
+    TextDim('This project')
+    if Btn('Save to project', BTN_H, bw) then
+        SaveSettings()
+        S.status = 'Settings saved to this project.'
+    end
+    Tooltip(SETTINGS_TIPS.save)
+    r.ImGui_SameLine(ctx)
+    if Btn('Load from project', BTN_H, bw) then
+        if LoadSettings() then
+            S.status = 'Settings loaded from this project.'
+        else
+            S.status = 'No settings saved in this project - back to your defaults.'
+        end
+    end
+    Tooltip(SETTINGS_TIPS.load)
+
+    r.ImGui_Spacing(ctx)
+    TextDim('My defaults (every project)')
+    if Btn('Save as my defaults', BTN_H, bw) then
+        -- A project with other settings of its own would keep using them next time:
+        -- ask whether to save these values there too.
+        if ProjectSettingsDiffer() then
+            _ask_project = true
+        else
+            SaveMyDefaults(false)
+        end
+    end
+    Tooltip(SETTINGS_TIPS.save_mine)
+    if _ask_project then r.ImGui_OpenPopup(ctx, 'ConfirmMyDefaultsProject') end
+    if r.ImGui_BeginPopupModal(ctx, 'ConfirmMyDefaultsProject', nil, r.ImGui_WindowFlags_AlwaysAutoResize()) then
+        r.ImGui_Text(ctx, 'This project has settings of its own, and it uses them instead of\n' ..
+                          'your defaults whenever it is opened.')
+        r.ImGui_Spacing(ctx)
+        if Btn('Save to this project too', BTN_H) then
+            _ask_project = false
+            SaveMyDefaults(true)
+            r.ImGui_CloseCurrentPopup(ctx)
+        end
+        Tooltip(SETTINGS_TIPS.ask_both)
+        r.ImGui_SameLine(ctx)
+        if Btn('Only my defaults', BTN_H) then
+            _ask_project = false
+            SaveMyDefaults(false)
+            S.status = S.status .. ' This project keeps its own settings.'
+            r.ImGui_CloseCurrentPopup(ctx)
+        end
+        Tooltip(SETTINGS_TIPS.ask_mine)
+        r.ImGui_SameLine(ctx)
+        if Btn('Cancel##ud_ask', BTN_H) then
+            _ask_project = false
+            S.status = 'Nothing saved.'
+            r.ImGui_CloseCurrentPopup(ctx)
+        end
+        r.ImGui_EndPopup(ctx)
+    end
+    r.ImGui_SameLine(ctx)
+    local rows = UserDefaultRows()
+    local none = #rows == 0   -- snapshot: drives the disabled pair
+    if none then r.ImGui_BeginDisabled(ctx) end
+    if Btn('Clear my defaults', BTN_H, bw) then _ask_clear = true end
+    if none then r.ImGui_EndDisabled(ctx) end
+    Tooltip(SETTINGS_TIPS.clear_mine)
+    -- Every stored value at once and no undo, so ask first. (Reset on one row does not
+    -- ask: the row shows what goes, and saving again brings it back.)
+    if _ask_clear then r.ImGui_OpenPopup(ctx, 'ConfirmClearMyDefaults') end
+    if r.ImGui_BeginPopupModal(ctx, 'ConfirmClearMyDefaults', nil, r.ImGui_WindowFlags_AlwaysAutoResize()) then
+        r.ImGui_Text(ctx, string.format('Forget your %d default%s? Projects without settings of their own will\n' ..
+                                        'start from the shipped defaults again. This cannot be undone.',
+                                        #rows, #rows == 1 and '' or 's'))
+        r.ImGui_Spacing(ctx)
+        if Btn('Clear my defaults##ud_clear_yes', BTN_H) then
+            _ask_clear = false
+            ClearUserDefaults()
+            S.status = 'Your defaults were cleared.'
+            r.ImGui_CloseCurrentPopup(ctx)
+        end
+        r.ImGui_SameLine(ctx)
+        if Btn('Cancel##ud_clear_no', BTN_H) then
+            _ask_clear = false
+            S.status = 'Your defaults were kept.'
+            r.ImGui_CloseCurrentPopup(ctx)
+        end
+        r.ImGui_EndPopup(ctx)
+    end
+
+    if none then
+        TextDimWrapped('No defaults of your own: new projects use the shipped defaults.')
+        return
+    end
+    if r.ImGui_TreeNode(ctx, string.format('My defaults (%d)##settings_mine', #rows)) then
+        local names, values, shipped = {}, {}, {}
+        for _, row in ipairs(rows) do
+            names[#names + 1] = row.label
+            values[#values + 1] = row.value
+            shipped[#shipped + 1] = 'shipped ' .. row.shipped
+        end
+        local col = LabelColWidth(names)
+        local val_w = LabelColWidth(values)
+        local ship_w = LabelColWidth(shipped)
+        local reset_key, reset_label
+        for _, row in ipairs(rows) do
+            local x = r.ImGui_GetCursorPosX(ctx)   -- includes the tree indent
+            r.ImGui_Text(ctx, row.label)
+            r.ImGui_SameLine(ctx, x + col)
+            r.ImGui_Text(ctx, row.value)
+            r.ImGui_SameLine(ctx, x + col + val_w)
+            TextDim('shipped ' .. row.shipped)
+            r.ImGui_SameLine(ctx, x + col + val_w + ship_w)
+            if Btn('Reset##ud_' .. row.key, BTN_H) then reset_key, reset_label = row.key, row.label end
+            Tooltip(SETTINGS_TIPS.reset_row)
+        end
+        if reset_key then
+            ResetUserDefault(reset_key)
+            S.status = 'Back to the shipped value: ' .. reset_label .. '.'
+        end
+        TextDimWrapped('A project with settings of its own uses those instead.')
+        r.ImGui_TreePop(ctx)
     end
 end
 

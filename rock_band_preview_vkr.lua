@@ -45,6 +45,11 @@
 --       amber as the General Helper's other warnings (they were a lighter
 --       amber). The Players row's idle blue is a brighter sky blue, the blue
 --       the General Helper uses everywhere now.
+--     - Starts from your My defaults (saved in the General Helper's
+--       General > Settings) when the project has no settings of its own -
+--       preview size, Animated / Still, Players and Show included. Switching
+--       to a project without settings no longer keeps the previous project's.
+--       (With General Helper v0.9.64.)
 --   v0.7
 --     - No change to this window. The General Helper's instrument tabs moved
 --       to the new Instrument Helper (General Helper v0.9.63), and the track

@@ -1,5 +1,6 @@
 -- Track and action helpers shared by the General, Instrument and Vocal helpers
--- (and the standalone windows that draw their modules).
+-- (and the standalone windows that draw their modules), and the settings layers
+-- (shipped < my defaults < project, UserDefaultsSetup).
 --
 -- Requires globals: r, S. S is each script's own state table: RefreshTrackLists
 -- writes S.all_track_list / S.audio_track_list / S.midi_track_list, RunAction
@@ -156,5 +157,156 @@ function MakeProjectSwitchCheck()
         local switched = p ~= proj or (f ~= path and path ~= '')
         proj, path = p, f
         return switched
+    end
+end
+
+----------------------------------------------------------------------
+-- Settings: shipped defaults < my defaults < this project
+----------------------------------------------------------------------
+-- Each helper's settings.lua turns S into a 'k=v;k=v' string (SerializeSettings) and
+-- back (DeserializeSettings). Three layers, lowest first:
+--   shipped     - defaults.lua, captured as a string when settings.lua loads;
+--   my defaults - REAPER's global ExtState (reaper-extstate.ini: every project reads
+--                 it, updates never touch it), holding ONLY the values that differ
+--                 from the shipped ones, so a later release's new default still
+--                 reaches every value the user never changed;
+--   the project - project ext-state, as before (every key, so it wins outright).
+
+-- Ordered { { k, v } } of a settings string; the 'v' format key is skipped. Pure.
+function SettingsPairs(str)
+    local out = {}
+    for k, v in (str or ''):gmatch('([^=;]+)=([^;]*)') do
+        if k ~= 'v' then out[#out + 1] = { k, v } end
+    end
+    return out
+end
+
+local function JoinPairs(pairs_list)
+    local parts = {}
+    for _, p in ipairs(pairs_list) do parts[#parts + 1] = p[1] .. '=' .. p[2] end
+    return table.concat(parts, ';')
+end
+
+-- The pairs of `current` whose value differs from `shipped` (or that shipped lacks),
+-- in current's order, as a settings string. Pure.
+function SettingsDiff(shipped, current)
+    local base = {}
+    for _, p in ipairs(SettingsPairs(shipped)) do base[p[1]] = p[2] end
+    local out = {}
+    for _, p in ipairs(SettingsPairs(current)) do
+        if base[p[1]] ~= p[2] then out[#out + 1] = p end
+    end
+    return JoinPairs(out)
+end
+
+-- `str` without the pairs for which drop(key, value) is true. Pure.
+function SettingsFilter(str, drop)
+    local out = {}
+    for _, p in ipairs(SettingsPairs(str)) do
+        if not drop(p[1], p[2]) then out[#out + 1] = p end
+    end
+    return JoinPairs(out)
+end
+
+-- `str` without `key`. Pure.
+function SettingsRemoveKey(str, key)
+    local out = {}
+    for _, p in ipairs(SettingsPairs(str)) do
+        if p[1] ~= key then out[#out + 1] = p end
+    end
+    return JoinPairs(out)
+end
+
+local USER_DEFAULTS_KEY = 'settings_v1'
+
+-- My defaults of a helper, stored under '<section>_defaults' (persisted). '' = none.
+function UserDefaultsGet(section)
+    local s = r.GetExtState(section .. '_defaults', USER_DEFAULTS_KEY)
+    return s or ''
+end
+
+function UserDefaultsSet(section, str)
+    if str == nil or str == '' then
+        r.DeleteExtState(section .. '_defaults', USER_DEFAULTS_KEY, true)
+    else
+        r.SetExtState(section .. '_defaults', USER_DEFAULTS_KEY, str, true)
+    end
+end
+
+-- Called once at the end of each helper's settings.lua, while S still holds the
+-- shipped defaults (defaults.lua loads first in every entry point):
+--   section     - the helper's project ext-state section ('RBHelperVKR', ...)
+--   serialize   - SerializeSettings
+--   deserialize - DeserializeSettings(str, project): project = false for the shipped
+--                 and my-defaults strings, so rules for old PROJECTS (migrations) do
+--                 not fire on a string that holds only differences
+--   labels      - key -> 'Tab > Setting' or { 'Tab > Setting', bool = true }
+--   project_key - the key the project's settings are saved under ('settings_v1')
+--   project_only(key, value) - true for a value that belongs to one song (a tempo map's
+--                 first measure, a picked song key, ...): never one of my defaults,
+--                 only saved with a project. Checked on save AND on load, so a value
+--                 an earlier version stored is ignored too.
+-- Defines the globals the shared Settings block (DrawSettingsPersistence) calls:
+--   ProjectSettingsDiffer()  true when this project has saved settings of its own that
+--                            are not the current values - they would win over saved
+--                            defaults the next time the project is opened
+--   ApplyDefaults()          S back to shipped, then my defaults on top
+--   SaveUserDefaults()       store the current values that differ; returns how many
+--   ClearUserDefaults()      drop them all (S unchanged)
+--   ResetUserDefault(key)    drop one, and set that value back to the shipped one
+--   UserDefaultRows()        { { key, label, value, shipped } } for the list
+function UserDefaultsSetup(spec)
+    local shipped = spec.serialize()
+    local shipped_v = {}
+    for _, p in ipairs(SettingsPairs(shipped)) do shipped_v[p[1]] = p[2] end
+    local labels = spec.labels or {}
+    local project_only = spec.project_only or function() return false end
+    -- My defaults as stored, without anything that belongs to one song.
+    local function Mine()
+        return SettingsFilter(UserDefaultsGet(spec.section), project_only)
+    end
+
+    function ProjectSettingsDiffer()
+        local _, str = r.GetProjExtState(0, spec.section, spec.project_key or USER_DEFAULTS_KEY)
+        return str ~= nil and str ~= '' and str ~= spec.serialize()
+    end
+
+    function ApplyDefaults()
+        spec.deserialize(shipped, false)
+        local mine = Mine()
+        if mine ~= '' then spec.deserialize(mine, false) end
+    end
+
+    function SaveUserDefaults()
+        local diff = SettingsFilter(SettingsDiff(shipped, spec.serialize()), project_only)
+        UserDefaultsSet(spec.section, diff)
+        return #SettingsPairs(diff)
+    end
+
+    function ClearUserDefaults()
+        UserDefaultsSet(spec.section, '')
+    end
+
+    function ResetUserDefault(key)
+        UserDefaultsSet(spec.section, SettingsRemoveKey(UserDefaultsGet(spec.section), key))
+        if shipped_v[key] then spec.deserialize(key .. '=' .. shipped_v[key], false) end
+    end
+
+    local function Show(v, bool)
+        if v == nil then return '-' end
+        if bool then return v == '1' and 'On' or 'Off' end
+        return v ~= '' and v or '(empty)'
+    end
+
+    function UserDefaultRows()
+        local rows = {}
+        for _, p in ipairs(SettingsPairs(Mine())) do
+            local l = labels[p[1]]
+            local name = type(l) == 'table' and l[1] or l or p[1]
+            local bool = type(l) == 'table' and l.bool
+            rows[#rows + 1] = { key = p[1], label = name, value = Show(p[2], bool),
+                                shipped = Show(shipped_v[p[1]], bool) }
+        end
+        return rows
     end
 end

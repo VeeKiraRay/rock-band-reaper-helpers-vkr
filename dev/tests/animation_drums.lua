@@ -373,12 +373,14 @@ Test.section('Drums - velocity settings')
 if not (r and r.GetProjExtState and LoadSettings) then
     -- offline harness: no REAPER / settings.lua
 else
--- LoadSettings from a given saved string (GetProjExtState stubbed, restored after).
+-- LoadSettings from a given saved string (GetProjExtState stubbed, and GetExtState so
+-- the tester's own My defaults do not apply; both restored after).
 local function LoadFrom(str)
-    local real = r.GetProjExtState
+    local real, real_ext = r.GetProjExtState, r.GetExtState
     r.GetProjExtState = function() return 1, str end
+    r.GetExtState = function() return '' end
     local ok, err = pcall(LoadSettings)
-    r.GetProjExtState = real
+    r.GetProjExtState, r.GetExtState = real, real_ext
     if not ok then error(err, 0) end
 end
 

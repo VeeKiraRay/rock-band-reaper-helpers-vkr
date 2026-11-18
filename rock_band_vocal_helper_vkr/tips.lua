@@ -208,15 +208,6 @@ TIPS = {
     reset_pitch     = "Reset all Pitch settings to factory defaults.",
     reset_midi      = "Reset MIDI output sliders to factory defaults.",
 
-    save_settings =
-        "Save the current Detection, Pitch, and Velocity values into the " ..
-        "project file. They'll be auto-loaded next time the script is " ..
-        "opened in this project.\n\n" ..
-        "Track selections (audio / MIDI dest / reference MIDI) are NOT saved.",
-
-    load_settings =
-        "Reload the most recently saved values from the project file.",
-
     preview =
         "Run detection only and show stats, without writing any notes.",
 

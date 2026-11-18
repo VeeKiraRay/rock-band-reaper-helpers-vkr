@@ -132,6 +132,22 @@
 --       official charts do. With either on, earlier open-hat pedal notes in
 --       range are replaced; the foot-keeping-time 25s stay. Off, note 25 is
 --       never touched, as before.
+--     - New My defaults (General > Settings): "Save as my defaults" keeps
+--       your preferred settings for every project, stored in REAPER (not in a
+--       project), so they also survive updates. Only the values you changed
+--       are stored: a value you never touched follows the defaults of later
+--       versions. Song-specific settings (a song key, a tempo map's first
+--       measure, ...) are never stored there, only with a project. A project
+--       with settings of its own still uses those. The
+--       My defaults list shows each stored value beside the shipped one, with
+--       a Reset per value; "Clear my defaults" forgets them all. If the open
+--       project has other settings of its own (which it would keep using),
+--       Save as my defaults asks whether to save them there too. Save / Load
+--       are now "Save to project" / "Load from project". The Instrument and
+--       Vocal helpers have the same.
+--     - Fixed: opening or switching to a project without saved settings kept
+--       the previous project's settings. It now starts from your defaults
+--       (or the shipped ones).
 --       The game ignores gem velocity and most charts use one velocity on
 --       every gem, so nothing changes until you set some. The result counts
 --       the soft snares, soft crashes and chokes written. "Crash riding:

@@ -1,5 +1,6 @@
--- Settings save/load (project state)
--- Requires: S (from defaults.lua), r (global)
+-- Settings save/load: shipped defaults < my defaults < this project
+-- Requires: S (from defaults.lua), r, UserDefaultsSetup (lib/reaper_helper_common.lua,
+-- loaded before this file)
 --
 -- Own section key, not the General Helper's 'RBHelperVKR': the two helpers
 -- save independently, so saving in one never overwrites the other's settings.
@@ -87,7 +88,9 @@ local function SerializeSettings()
     }, ';')
 end
 
-local function DeserializeSettings(str)
+-- project: str comes from a project, not the shipped / my-defaults string
+-- (UserDefaultsSetup passes false). No old-project rules here yet; one would check it.
+local function DeserializeSettings(str, _project)
     for k, v in str:gmatch('([^=;]+)=([^;]*)') do
         -- MIDI converter
         if     k == 'mcgt'  then S.mc_ghost_thresh     = tonumber(v) or S.mc_ghost_thresh
@@ -190,11 +193,90 @@ function SaveSettings()
     r.MarkProjectDirty(0)
 end
 
+-- Shipped defaults, then my defaults, then the project's own settings when it has
+-- some (lib/reaper_helper_common.lua, "Settings"). Returns true when it had some.
 function LoadSettings()
+    ApplyDefaults()
     local _, str = r.GetProjExtState(0, PROJ_KEY_SECTION, PROJ_KEY_NAME)
     if str and str ~= '' then
-        DeserializeSettings(str)
+        DeserializeSettings(str, true)
         return true
     end
     return false
 end
+
+-- Names for the My defaults list (General > Settings); { name, bool = true } shows
+-- On / Off.
+local LABELS = {
+    mcgt   = 'MIDI > Drums: ghost note threshold',
+    mcc2g  = { 'MIDI > Drums: crashes to green', bool = true },
+    mcpd   = { 'MIDI > Drums: Pro Drums', bool = true },
+    mcdpv  = { 'MIDI > Drums: preview (off = auto-insert)', bool = true },
+    mcksc  = { 'MIDI > Keys: split by channel', bool = true },
+    mcksp  = 'MIDI > Keys: split pitch',
+    mckpv  = { 'MIDI > Keys: preview (off = auto-insert)', bool = true },
+    mcpkis = { 'MIDI > Pro Keys: insert lane shift markers', bool = true },
+    mc5kpg = 'MIDI > Keys: phrase gap (ms)',
+    mc5kmc = 'MIDI > Keys: max chord (notes)',
+    mcgwg  = 'MIDI > Guitar: wrap gap (ms)',
+    mcgmc  = 'MIDI > Guitar: max chord (notes)',
+    mcga14 = { 'MIDI > Guitar: allow 1-4 chords', bool = true },
+    mcgwf  = 'MIDI > Guitar: workflow (0 = Preview)',
+    mcgtf  = 'Tab Input: tab format (0 = Horizontal)',
+    tabim  = 'Tab Input: mode',
+    dgin   = 'Difficulty > Generate: instrument',
+    dvci   = 'Difficulty > Validate & copy: instrument',
+    dgst   = 'Difficulty > Generate: style',
+    dg2x   = { 'Difficulty > Generate: only 2x pedal on PART DRUMS', bool = true },
+    dgbd   = 'Difficulty > Generate (Custom): Hard 8th runs',
+    dgfr   = 'Difficulty > Generate (Custom): Hard fast runs',
+    dgdb   = 'Difficulty > Generate (Custom): Drums Medium',
+    dgde   = 'Difficulty > Generate (Custom): Drums fast 8ths',
+    dgor   = 'Difficulty > Generate (Custom): other rules',
+    dgcs   = 'Difficulty > Generate: Custom values (0 = none yet)',
+    d5kpkr = { 'Difficulty > Keys copy: reduce using Pro Keys', bool = true },
+    mama   = 'MIDI > Alignment: mode',
+    mndi   = 'MIDI > Length: difficulty',
+    mnnt   = 'MIDI > Length: note type (0 = Non-sustains)',
+    mnnd   = 'MIDI > Length: note size',
+    mns32  = 'MIDI > Length: sustain (32nds)',
+    mngm   = 'MIDI > Length: gap (0 Default, 1 Custom)',
+    swip   = { 'General > Settings: show WIPs', bool = true },
+    ctkm   = 'Keys > Tuner: key mode',
+    ctkt   = 'Keys > Tuner: key tonic',
+    ctkn   = { 'Keys > Tuner: minor', bool = true },
+    ctpl   = { 'Keys > Tuner: prefer plain chords', bool = true },
+    ctrl   = { 'Keys > Tuner: long read (off = short, 0.2 s)', bool = true },
+    ctpa   = { 'Keys > Tuner: passage check', bool = true },
+    odgrp  = 'Overdrive: part',
+    odiph  = { 'Overdrive: phrases', bool = true },
+    odifl  = { 'Overdrive: drum fills', bool = true },
+    odivo  = { 'Overdrive: vocals', bool = true },
+    odbpp  = 'Overdrive: beats per phrase',
+    odush  = 'Overdrive: unison share',
+    odkod  = 'Overdrive: keep-out at the end (measures)',
+    odkun  = 'Overdrive: unison keep-out at the end (measures)',
+    odkst  = 'Overdrive: first phrase after (measures)',
+    odtog  = { 'Overdrive: prefer where the band plays together', bool = true },
+    odvol  = 'Overdrive: over vocal OD',
+    odfpc  = 'Overdrive: fill pacing',
+    odfsc  = { 'Overdrive: end fills at section changes / crashes', bool = true },
+    odfse  = { 'Overdrive: skip fills before OD can be activated', bool = true },
+    odfke  = 'Overdrive: no fill into the last (measures)',
+    odvev  = 'Overdrive: vocal OD every (phrases)',
+    odvh1  = { 'Overdrive: generate OD for HARM1', bool = true },
+    odcrs  = { 'Overdrive: count rests in OD spacing', bool = true },
+    odcbr  = { 'Overdrive: count long breaks in OD spacing', bool = true },
+}
+
+-- Values that belong to one song: saved with a project, never one of my defaults.
+-- The Keys Tuner's picked key; its mode is a preference unless it is 'manual' (the
+-- picked key itself).
+local function ProjectOnly(k, v)
+    return k == 'ctkt' or k == 'ctkn' or (k == 'ctkm' and v == 'manual')
+end
+
+-- Last, while S still holds the shipped defaults: defaults.lua loads first.
+UserDefaultsSetup({ section = PROJ_KEY_SECTION, project_key = PROJ_KEY_NAME,
+                    serialize = SerializeSettings, deserialize = DeserializeSettings,
+                    labels = LABELS, project_only = ProjectOnly })

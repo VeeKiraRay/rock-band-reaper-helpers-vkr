@@ -44,7 +44,7 @@ local results = { vocal = nil, general = nil, instrument = nil,
                   animation_character = nil, animation_drums = nil,
                   guitar_theory = nil, music_notation = nil,
                   karplus_strong = nil, wav_writer = nil,
-                  script_links = nil, window_title = nil, helper_ui = nil,
+                  script_links = nil, window_title = nil, helper_ui = nil, settings_defaults = nil,
                   difficulty_score = nil,
                   difficulty_bpm = nil, difficulty_suggester = nil,
                   metadata_genres = nil, key_detect = nil, score_sim = nil, harmony_style = nil,
@@ -319,6 +319,14 @@ function Loop()
         end
         r.ImGui_SameLine(ctx)
         draw_status(results.helper_ui)
+
+        r.ImGui_Spacing(ctx)
+
+        if r.ImGui_Button(ctx, 'Settings Tests', 155, 24) then
+            run('run_settings_defaults.lua', 'settings_defaults')
+        end
+        r.ImGui_SameLine(ctx)
+        draw_status(results.settings_defaults)
 
         r.ImGui_Spacing(ctx)
 

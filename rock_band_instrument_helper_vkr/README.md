@@ -71,7 +71,15 @@ Contains three sub-tabs: **Actions**, **Settings**, and **Other tools**.
 
 **Show WIPs?** — toggles whether the Drums and Guitar tabs and the Keys → WIP sub-tab appear (see [WIP tabs](#wip-tabs)). Default No.
 
-**Save** writes this window's settings to the project using REAPER's project state. **Load** restores them. Settings are loaded automatically when the script opens (if a save exists) and when you switch REAPER project tabs. They are saved separately from the General Helper's, so saving in one never changes the other.
+**This project:** **Save to project** writes this window's settings to the project using REAPER's project state; **Load from project** restores them. A project's own settings are loaded automatically when the script opens and when you switch projects. They are saved separately from the General Helper's, so saving in one never changes the other.
+
+**My defaults (every project):** **Save as my defaults** keeps your preferred settings for every project that has no settings of its own, for example a Difficulty > Generate style. They are stored in REAPER, not in a project, so script updates do not touch them. Only the values you changed from the shipped defaults are stored, so a setting you never touched follows the defaults of later versions. The **My defaults** list shows each stored value beside the shipped one, with a **Reset** per value; **Clear my defaults** forgets them all, after asking (it cannot be undone). If the open project has saved settings of its own that differ (it would keep using them), **Save as my defaults** asks whether to save the values to that project too.
+
+**Saved only with the project, never as one of your defaults** (they belong to one song):
+
+- Keys > Tuner: the key you picked (the key mode Off / From vocals / From Pro Keys can be one of your defaults)
+
+Settings load in this order: the shipped defaults, then your defaults, then the project's own settings when it has some.
 
 **What is saved:** the Overdrive tab's options, the Tab Input format and mode, the Difficulty tab's instrument picks, Generate's rule style, Custom options and 2x pedal checkbox, the Keys reduce checkbox, the MIDI Alignment mode and Length settings, the Keys Tuner's settings (track selections aside), the WIP tabs' options, and Show WIPs?.
 

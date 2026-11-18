@@ -63,16 +63,30 @@ Test.it('CreateSongFadeOut creates the envelope on a track with an item', functi
         local env = r.GetTrackEnvelopeByName(track, 'Volume')
         Test.expect(env ~= nil, 'envelope created, status: ' .. tostring(S.status))
         if env then
-            Test.expect(r.CountEnvelopePoints(env) == 2,
-                        'two fade points, got ' .. r.CountEnvelopePoints(env))
-            local _, t1, v1 = r.GetEnvelopePoint(env, 0)
-            local _, t2, v2 = r.GetEnvelopePoint(env, 1)
-            Test.expect(math.abs(t1 - 10) < 1e-6 and math.abs(t2 - 15) < 1e-6,
-                        ('points at 10 / 15 s, got %s / %s'):format(t1, t2))
-            Test.expect(v1 > 0 and v2 == 0, ('fades to silence, got %s -> %s'):format(v1, v2))
+            -- REAPER's envelope action (40406) adds a starting point of its own when it
+            -- creates the envelope, so count only the fade's points: the ones in the
+            -- selection. Any point before it keeps the track's level.
+            local inside, before, all = {}, {}, {}
+            for i = 0, r.CountEnvelopePoints(env) - 1 do
+                local _, t, v = r.GetEnvelopePoint(env, i)
+                all[#all + 1] = string.format('%.3f=%.3f', t, v)
+                if t >= 10 - 1e-6 and t <= 15 + 1e-6 then inside[#inside + 1] = { t, v }
+                else before[#before + 1] = { t, v } end
+            end
+            local where = ' (points: ' .. table.concat(all, ' ') .. ')'
+            Test.expect(#inside == 2, 'two fade points in the selection, got ' .. #inside .. where)
+            if #inside == 2 then
+                local t1, v1, t2, v2 = inside[1][1], inside[1][2], inside[2][1], inside[2][2]
+                Test.expect(math.abs(t1 - 10) < 1e-6 and math.abs(t2 - 15) < 1e-6,
+                            ('points at 10 / 15 s, got %s / %s'):format(t1, t2))
+                Test.expect(v1 > 0 and v2 == 0, ('fades to silence, got %s -> %s'):format(v1, v2))
+            end
+            for _, p in ipairs(before) do
+                Test.expect(p[1] < 10 and p[2] > 0, 'a point outside the fade is before it, at the track level' .. where)
+            end
         end
         Test.expect(r.CountMediaItems(0) > 0 and r.GetTrackNumMediaItems(track) == 1,
-                    'the item survived the chunk rewrite')
+                    'the item is still there')
     end)
     CleanupFixture(idx)
     r.GetSet_LoopTimeRange2(0, true, false, s0, e0, false)

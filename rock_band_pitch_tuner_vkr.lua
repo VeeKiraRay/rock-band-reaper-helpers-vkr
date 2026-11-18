@@ -28,6 +28,11 @@
 --     - Copy result's tooltip now says it also copies results a view draws
 --       itself (the General Helper's Metadata tabs use that). Nothing in this
 --       window draws its results that way, so what it copies is unchanged.
+--     - Starts from your My defaults (saved in the Vocal Helper's
+--       General > Settings) when the project has no settings of its own - the
+--       Tuner's level, harmony, key snap and spectral options included.
+--       Switching to a project without settings no longer keeps the previous
+--       project's. (With Vocal Helper v1.22.)
 --   v0.3
 --     - New Harmony readout (experimental): tick it and pick the lead chart
 --       (HARM1, or PART VOCALS) to see, below the usual note and history, the

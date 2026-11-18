@@ -251,8 +251,6 @@ S = {
 -- Tooltip text
 ----------------------------------------------------------------------
 TIPS = {
-    save          = "Save current settings to this project.",
-    load          = "Load previously saved settings from this project.",
 
     -- Metadata > Genre
     genre_mode_style =

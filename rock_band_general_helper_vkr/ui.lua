@@ -177,22 +177,7 @@ local function Loop()
 
                         r.ImGui_Separator(ctx)
                         SectionHeader('Settings')
-
-                        local bw_settings = BtnGroupWidth({ 'Save', 'Load' })
-                        if Btn('Save', BTN_H, bw_settings) then
-                            SaveSettings()
-                            S.status = 'Settings saved to project.'
-                        end
-                        Tooltip(TIPS.save)
-                        r.ImGui_SameLine(ctx)
-                        if Btn('Load', BTN_H, bw_settings) then
-                            if LoadSettings() then
-                                S.status = 'Settings loaded from project.'
-                            else
-                                S.status = 'No saved settings found in this project.'
-                            end
-                        end
-                        Tooltip(TIPS.load)
+                        DrawSettingsPersistence()   -- lib/reaper_helper_ui.lua
 
                         r.ImGui_EndTabItem(ctx)
                     end

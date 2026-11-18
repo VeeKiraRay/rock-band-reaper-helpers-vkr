@@ -28,7 +28,7 @@ Each view shows the track selector(s) it uses at its top, and a [footer](#window
 | Area                   | Description                                                                                         |
 | ---------------------- | ----------------------------------------------------------------------------------------------------- |
 | Track selectors        | At the top of each view, only the ones it uses — MIDI destination, Audio source; one setting shared by every view |
-| **General** tab        | Save / Load project settings; Show WIPs toggle; buttons that open the other tools                   |
+| **General** tab        | Project settings and my defaults (every project); Show WIPs toggle; buttons that open the other tools |
 | **Pitch** tab          | Tuner (live pitch detector), Snap to Key Scale, Slide scan, and the pitch source for Apply pitch changes: Built-in detection (YIN) or Reference MIDI |
 | **Lyrics** tab         | Select a lyrics file, assign or clear lyric events                                                  |
 | **Harmonies** tab      | Copy lead vocal notes to up to three harmony tracks, transposed or keeping the target's own pitches |
@@ -87,7 +87,18 @@ Contains two sub-tabs: **Settings** and **Other tools**. (The Actions sub-tab he
 
 **Show WIPs?** — toggles whether the Note Placement tab appears (see [WIP tabs](#wip-tabs)). Default No.
 
-Settings are saved per-project using REAPER's project state. Click **Save** to store the current Detection and Pitch settings. Click **Load** to restore them.
+**This project:** **Save to project** stores the current Detection, Pitch and other settings in the project using REAPER's project state; **Load from project** restores them. A project's own settings are loaded automatically when the script opens and when you switch projects.
+
+**My defaults (every project):** **Save as my defaults** keeps your preferred settings for every project that has no settings of its own, for example the YIN thresholds that suit your recordings. They are stored in REAPER, not in a project, so script updates do not touch them. Only the values you changed from the shipped defaults are stored, so a setting you never touched follows the defaults of later versions. The **My defaults** list shows each stored value beside the shipped one, with a **Reset** per value; **Clear my defaults** forgets them all, after asking (it cannot be undone). If the open project has saved settings of its own that differ (it would keep using them), **Save as my defaults** asks whether to save the values to that project too.
+
+**Saved only with the project, never as one of your defaults** (they belong to one song):
+
+- Harmonies: the key
+- Pitch > Snap: the key
+- Pitch > Tuner: a key note picked for the key snap (Off and From charted lead can be one of your defaults)
+- Pitch: the min / max pitch range and the fixed pitch
+
+Settings load in this order: the shipped defaults, then your defaults, then the project's own settings when it has some. The Reset buttons in the Detection, Pitch and MIDI tabs go back to the shipped values.
 
 Settings are loaded automatically when the script opens (if a save exists for the current project) and when you switch REAPER project tabs.
 

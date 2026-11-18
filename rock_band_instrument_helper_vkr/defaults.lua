@@ -179,8 +179,6 @@ S = {
 -- Tooltip text
 ----------------------------------------------------------------------
 TIPS = {
-    save          = "Save current settings to this project.",
-    load          = "Load previously saved settings from this project.",
 
     -- MIDI converter - Drums tab
     mc_drum_src    = "MIDI track containing the source drum notation.\n" ..

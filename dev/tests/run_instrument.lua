@@ -35,8 +35,8 @@ dofile(_root .. 'lib/reaper_dsp.lua')
 dofile(_root .. 'lib/reaper_midi_helpers.lua')
 dofile(_root .. 'lib/reaper_guitar_theory.lua')  -- GuitarSuggestRBMapping, used by actions_guitar.lua
 dofile(_mdir .. 'defaults.lua')
+dofile(_root .. 'lib/reaper_helper_common.lua')   -- before settings.lua: UserDefaultsSetup
 dofile(_mdir .. 'settings.lua')
-dofile(_root .. 'lib/reaper_helper_common.lua')
 dofile(_mdir .. 'helpers.lua')
 dofile(_mdir .. 'actions_drums.lua')
 dofile(_mdir .. 'actions_keys.lua')

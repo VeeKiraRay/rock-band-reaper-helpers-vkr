@@ -1,5 +1,6 @@
--- Settings save/load (project state)
--- Requires: S (from defaults.lua), r (global)
+-- Settings save/load: shipped defaults < my defaults < this project
+-- Requires: S (from defaults.lua), r, UserDefaultsSetup (lib/reaper_helper_common.lua,
+-- loaded before this file)
 --
 -- The Instrument Helper saves its tabs' settings under its own key
 -- (rock_band_instrument_helper_vkr/settings.lua). Projects saved before the
@@ -81,9 +82,13 @@ local function Velocity(v, fallback)
     return math.max(0, math.min(128, math.floor(n)))
 end
 
-local function DeserializeSettings(str)
+-- project: str comes from a project (old-project rules apply), not from the shipped or
+-- my-defaults string (UserDefaultsSetup passes false).
+local function DeserializeSettings(str, project)
     -- Saved before the drum velocity thresholds, a soft option meant every hit soft:
     -- such a project gets threshold 128 below, so Generate writes what it did then.
+    -- Projects only: a my-defaults string holds just the values that differ, so a
+    -- stored soft option without its threshold means the shipped threshold.
     local soft_seen, below_seen = {}, {}
     for k, v in str:gmatch('([^=;]+)=([^;]*)') do
         if     k == 'tmrth'   then S.tm_rms_threshold      = tonumber(v) or S.tm_rms_threshold
@@ -159,11 +164,20 @@ local function DeserializeSettings(str)
         elseif k == 'wfhd'   then S.workflow_hide_done      = (v == '1')
         end
     end
+    if not project then return end
     if soft_seen.snare and not below_seen.snare and S.drum_anim_soft_snare then
         S.drum_anim_soft_snare_below = 128
     end
     if soft_seen.cym and not below_seen.cym and S.drum_anim_soft_cym then
         S.drum_anim_choke_below, S.drum_anim_soft_cym_below = 0, 128
+    end
+end
+
+local function TimesigText()
+    if S.tm_timesig_num == 0 then
+        S.tm_timesig_text = ''
+    else
+        S.tm_timesig_text = S.tm_timesig_num .. '/' .. S.tm_timesig_denom
     end
 end
 
@@ -178,20 +192,93 @@ function SaveSettings()
     r.MarkProjectDirty(0)
 end
 
+-- Shipped defaults, then my defaults, then the project's own settings when it has
+-- some (lib/reaper_helper_common.lua, "Settings"). Starting from the defaults every
+-- time also means a project without settings never keeps the previous project's.
+-- Returns true when the project had settings.
 function LoadSettings()
+    ApplyDefaults()
     local _, str = r.GetProjExtState(0, PROJ_KEY_SECTION, PROJ_KEY_NAME)
-    if str and str ~= '' then
-        DeserializeSettings(str)
-        if S.tm_timesig_num == 0 then
-            S.tm_timesig_text = ''
-        else
-            S.tm_timesig_text = S.tm_timesig_num .. '/' .. S.tm_timesig_denom
-        end
-        if LoadSectionConfigs then LoadSectionConfigs() end
-        if LoadWorkflowState then LoadWorkflowState() end
-        return true
-    end
+    local loaded = str and str ~= '' or false
+    if loaded then DeserializeSettings(str, true) end
+    TimesigText()
     if LoadSectionConfigs then LoadSectionConfigs() end
     if LoadWorkflowState then LoadWorkflowState() end
-    return false
+    return loaded
 end
+
+-- Names for the My defaults list (General > Settings); { name, bool = true } shows
+-- On / Off.
+local LABELS = {
+    tmrth   = 'Tempo Map: RMS threshold',
+    tmrwm   = 'Tempo Map: RMS window (ms)',
+    tmfbthr = 'Tempo Map: fallback RMS threshold',
+    tmfbrwm = 'Tempo Map: fallback RMS window (ms)',
+    tmswm   = 'Tempo Map: search window (ms)',
+    tmdtm   = 'Tempo Map: drift threshold (ms)',
+    tmbpf   = 'Tempo Map: BPM failsafe',
+    tmfm    = 'Tempo Map: first measure',
+    tmtsn   = 'Tempo Map: time signature, top',
+    tmtsd   = 'Tempo Map: time signature, bottom',
+    tmofs   = { 'Tempo Map: override failsafe', bool = true },
+    tmatd   = 'Tempo Map: auto-tune density',
+    tmfbflx = { 'Tempo Map: fallback uses spectral flux', bool = true },
+    vthn    = 'Venue: theme',
+    vkfa    = 'Venue > Keyframes: alignment',
+    vkfis   = 'Venue > Keyframes: instrument subdivision',
+    vcpac   = 'Venue: camera pacing',
+    vcpacc  = 'Venue: camera pacing, custom (16ths)',
+    vcpacj  = { 'Venue: camera pacing jitter', bool = true },
+    vsecm   = 'Venue > Section gen: mode',
+    vsectm  = 'Venue > Section gen: template',
+    vmgt    = 'Venue: target (0 VENUE, 1 Subtracks)',
+    vmgr    = 'Venue > Manual gen: insert (0 Add, 1 Replace)',
+    vpscl   = 'Venue preview: size',
+    vpan    = { 'Venue preview: animated', bool = true },
+    vpcombo = 'Venue preview: players',
+    vpshwm  = 'Venue > Preview: show',
+    abhs    = 'Animation > Beat: half-time downbeat',
+    abds    = 'Animation > Beat: double-time downbeat',
+    acsd    = 'Animation > Character: drums state',
+    acsg    = 'Animation > Character: guitar state',
+    acsb    = 'Animation > Character: bass state',
+    acsv    = 'Animation > Character: vocals state',
+    acsk    = 'Animation > Character: keys state',
+    acgi    = 'Animation > Character: instrument rest (bars)',
+    acgv    = 'Animation > Character: vocal rest (bars)',
+    acig    = { 'Animation > Character: idle in rests', bool = true },
+    acmd    = 'Animation > Character: mode (0 Generate, 1 Manual)',
+    adcr    = 'Animation > Drums: default crash (0 crash 2, 1 crash 1)',
+    adbh    = { 'Animation > Drums: blue cymbal as the hi-hat', bool = true },
+    admc    = 'Animation > Drums: min cymbal hits',
+    adfl    = { 'Animation > Drums: snare + yellow tom as a flam', bool = true },
+    adsv    = { 'Animation > Drums: slow snare variety', bool = true },
+    adsc    = { 'Animation > Drums: crash hits by velocity', bool = true },
+    adss    = { 'Animation > Drums: soft snare hits by velocity', bool = true },
+    adsnb   = 'Animation > Drums: soft snare below velocity',
+    adchb   = 'Animation > Drums: choke below velocity',
+    adcyb   = 'Animation > Drums: soft crash below velocity',
+    adoh    = { 'Animation > Drums: open hi-hat by velocity', bool = true },
+    adbo    = { 'Animation > Drums: open the hat on blue hi-hat hits', bool = true },
+    adoha   = 'Animation > Drums: open hi-hat above velocity',
+    adra    = { 'Animation > Drums: crash riding soft / hard', bool = true },
+    adfll   = { 'Animation > Drums: flam left hand late', bool = true },
+    swip    = { 'General > Settings: show WIPs', bool = true },
+    wffn    = 'Workflow: checklist',
+    wfsts   = { 'Workflow: show timestamps', bool = true },
+    wfhd    = { 'Workflow: hide done', bool = true },
+}
+
+-- Values that belong to one song: saved with a project, never one of my defaults.
+local PROJECT_ONLY = {
+    tmfm = true, tmtsn = true, tmtsd = true,   -- Tempo Map: first measure, time signature
+    tmofs = true,                              -- Tempo Map: failsafe bypassed for one song
+    acsd = true, acsg = true, acsb = true, acsv = true, acsk = true,   -- character states (mood)
+    vthn = true,                               -- venue theme
+}
+
+-- Last, while S still holds the shipped defaults: defaults.lua loads first.
+UserDefaultsSetup({ section = PROJ_KEY_SECTION, project_key = PROJ_KEY_NAME,
+                    serialize = SerializeSettings, deserialize = DeserializeSettings,
+                    labels = LABELS,
+                    project_only = function(k) return PROJECT_ONLY[k] == true end })

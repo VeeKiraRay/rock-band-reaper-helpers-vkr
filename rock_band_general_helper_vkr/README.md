@@ -100,7 +100,17 @@ The result panel adds a heads-up if the selected range looks unusual for a game 
 
 **Show WIPs?** — toggles whether the Tempo Map tab appears (see [WIP tabs](#wip-tabs)). Default No.
 
-**Save** writes the current slider values to the project using REAPER's project state. **Load** restores them. Settings are loaded automatically when the script opens (if a save exists) and when you switch REAPER project tabs.
+**This project:** **Save to project** writes the current settings to the project using REAPER's project state; **Load from project** restores them. A project's own settings are loaded automatically when the script opens and when you switch projects.
+
+**My defaults (every project):** **Save as my defaults** keeps your preferred settings for every project that has no settings of its own, for example the Animation > Drums velocity thresholds. They are stored in REAPER, not in a project, so script updates do not touch them. Only the values you changed from the shipped defaults are stored, so a setting you never touched follows the defaults of later versions. The **My defaults** list shows each stored value beside the shipped one, with a **Reset** per value; **Clear my defaults** forgets them all, after asking (it cannot be undone). If the open project has saved settings of its own that differ (it would keep using them), **Save as my defaults** asks whether to save the values to that project too.
+
+**Saved only with the project, never as one of your defaults** (they belong to one song):
+
+- Tempo Map: first measure, time signature and failsafe override
+- Animation > Character: the state of each part
+- Venue: the theme
+
+Settings load in this order: the shipped defaults, then your defaults, then the project's own settings when it has some.
 
 **What is saved:** all Tempo Map sliders and the override checkbox.
 

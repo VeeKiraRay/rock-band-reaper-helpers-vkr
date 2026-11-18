@@ -33,8 +33,8 @@ dofile(_tdir .. 'fixture_helpers.lua')
 dofile(_root .. 'lib/reaper_imgui_helpers.lua')   -- GetTimeSelection
 dofile(_root .. 'lib/reaper_midi_helpers.lua')    -- FindFirstMIDIItem
 dofile(_gdir .. 'defaults.lua')                   -- S
+dofile(_root .. 'lib/reaper_helper_common.lua')   -- FindTrackByName, UserDefaultsSetup
 dofile(_gdir .. 'settings.lua')                   -- LoadSettings (velocity thresholds)
-dofile(_root .. 'lib/reaper_helper_common.lua')   -- FindTrackByName
 dofile(_gdir .. 'animation_drums.lua')
 
 EnableFixtureAutoCleanup()  -- one aborted test must not leave tracks behind
