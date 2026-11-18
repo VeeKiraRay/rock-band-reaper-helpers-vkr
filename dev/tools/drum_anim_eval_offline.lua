@@ -45,8 +45,11 @@ for piece, info in pairs(DRUM_ANIM_PIECES) do
         if info[k] then OFF[info[k]] = { piece, k:sub(1, 1) } end
     end
 end
-OFF[40] = { 'c1', 'R' }   -- chokes: hit with the right hand
-OFF[41] = { 'c2', 'R' }
+-- Chokes, hit with the right hand: 40 grabs crash 2 (the right cymbal), 41 crash 1
+-- (the left). The RBN doc has them the other way round; the game's code revealed
+-- this and an in-game test confirmed it.
+OFF[40] = { 'c2', 'R' }
+OFF[41] = { 'c1', 'R' }
 OFF[32] = { 'perc', 'R' }
 
 -- CAT-like hands over the same pieces: runs of single-hand hits up to an 8th

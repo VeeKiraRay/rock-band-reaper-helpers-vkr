@@ -40,8 +40,8 @@
 --     starting at least one highway length after that moment (GemPlayer::
 --     EnableDrumFills -> TrackDir::TopSeconds: the view time in track_paneldir.dta,
 --     drums Expert 1.2 s; SCORE_FILL_GATE_SEC). Every
---     gem inside the fill used, its closing crash included, scores nothing (and is
---     left out of the streak - assumed).
+--     gem inside the fill used, its closing crash included, scores nothing and does
+--     not count toward the streak (checked in game).
 --   VOCALS: each sung phrase 1000 x the phrase streak (+1 per phrase to x4), paid at
 --     the phrase end. The phrase's points build up as it is sung, in proportion to each
 --     note's weight (VocalPart::GetNoteSliceWeight: sung milliseconds, the first 150 ms

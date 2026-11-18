@@ -66,7 +66,7 @@
 --       tab.
 --     - Venue: the lighting keyframe trigger is now written [prev], not
 --       [previous]. [prev] is what the game, the RBN documentation and the
---       official charts use; [previous] most likely did nothing in game.
+--       official charts use; [previous] is not a game event.
 --       Manual gen inserts [prev], and Validate accepts it and lists any
 --       [previous] as "not a game event: the keyframe trigger is [prev]" -
 --       swap those by hand. Regenerate keyframes and Remove still find the
