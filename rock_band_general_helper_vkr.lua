@@ -106,12 +106,38 @@
 --       game's section names, so it is not translated: every game language
 --       shows the event text "prc_dj_intro" instead of its own name for it.
 --       Rename any you have.
---     - Animation > Drums: "Soft snare and crash hits" is now two options,
---       "Soft crash hits" and "Soft snare hits (ghost strokes)". In the game
---       a soft snare note is a ghost stroke: the stick hovers and the snare
---       on the kit does not move, so the old option left every snare hit in
---       the song still. Soft cymbals still hit, just lighter. A project saved
---       with the old option on gets both new ones on, as before.
+--     - Animation > Drums: soft hits now follow the velocity of the Expert
+--       gems, so the author decides note by note. "Soft snare hits by
+--       velocity (ghost strokes)": snares under the Soft below velocity (50
+--       by default) get the soft notes - in the game a ghost stroke, the
+--       stick hovers and the snare on the kit does not move. "Crash hits by
+--       velocity (choke / soft)": crashes under Choke below (20 by default)
+--       become chokes (the cymbal grabbed, notes 40 / 41, written instead of
+--       the hit), those under Soft below (50) soft crashes (still a hit,
+--       lighter), the rest normal hits. Either order works: the lower
+--       threshold takes the lowest velocities. Hi-hat and ride are not
+--       affected. The Drums options are now grouped under Cymbals, Hi-hat
+--       and Snare.
+--     - Animation > Drums, open hi-hats (the pedal note 25, held while the
+--       hat is open), in a new Hi-hat section. The Blue cymbal choice is now
+--       Ride / Hi-hat; new "Open the hat on blue hi-hat hits" (off by
+--       default) also holds the pedal under those hits so the hat opens -
+--       Harmonix's way (official charts open 83% of blue hi-hat hits), which
+--       not every community chart follows. Before, blue as the hi-hat wrote
+--       only the hands, so the hat stayed closed, as it still does with the
+--       new option off. New "Open hi-hat by velocity": yellow hi-hat gems above Open
+--       above (100 by default, so the usual 96 / 100 stay closed) open, for
+--       charts that keep blue for the ride. A run of open hits shares one
+--       pedal note, from a 16th before the first to the next hi-hat hit, as
+--       official charts do. With either on, earlier open-hat pedal notes in
+--       range are replaced; the foot-keeping-time 25s stay. Off, note 25 is
+--       never touched, as before.
+--       The game ignores gem velocity and most charts use one velocity on
+--       every gem, so nothing changes until you set some. The result counts
+--       the soft snares, soft crashes and chokes written. "Crash riding:
+--       alternate soft and hard" works as before. A project saved with the
+--       old "Soft snare and crash hits" option or the soft options on keeps
+--       every hit soft, as before.
 --     - Metadata > Genre has two views: Animation style (new, shown first)
 --       and the Genre converter. Animation style lists the four band
 --       animation styles - Rocker, Banger, Dramatic, Spazz - and which major

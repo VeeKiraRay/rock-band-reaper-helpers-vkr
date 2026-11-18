@@ -311,8 +311,23 @@ local function DrawAnimationDrumsTab()
                              'The hi-hat pedal notes are not generated.')
     r.ImGui_Spacing(ctx)
 
+    -- Velocity options: a checkbox, and its thresholds under it while it is on.
+    -- "below" rows run 0-128 (128 = every hit); "above" rows 0-127 (velocity tops at 127).
+    local vel_col = LabelColWidth({ 'Soft below', 'Choke below', 'Open above' })
+    local function VelocityRow(label, id, value, tip, above)
+        local row_x = r.ImGui_GetCursorPosX(ctx)   -- includes the indent
+        TextDim(label)
+        r.ImGui_SameLine(ctx, row_x + vel_col)
+        r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
+        local _, v = r.ImGui_SliderInt(ctx, id, value, 0, above and 127 or 128,
+                                       above and 'velocity > %d' or 'velocity < %d')
+        SliderTooltip(tip)
+        return v
+    end
+
+    SectionHeader('Cymbals')
     local lbl_col = LabelColWidth({ 'Default crash', 'Blue cymbal', 'Min cymbal hits' })
-    local radio_w = RadioGroupWidth({ 'Crash 2 (right)', 'Crash 1 (left)', 'Ride', 'Open hi-hat' })
+    local radio_w = RadioGroupWidth({ 'Crash 2 (right)', 'Crash 1 (left)', 'Ride', 'Hi-hat' })
     r.ImGui_Text(ctx, 'Default crash')
     r.ImGui_SameLine(ctx, lbl_col)
     if r.ImGui_RadioButton(ctx, 'Crash 2 (right)##da_crash', S.drum_anim_crash == 0) then S.drum_anim_crash = 0 end
@@ -326,7 +341,7 @@ local function DrawAnimationDrumsTab()
     if r.ImGui_RadioButton(ctx, 'Ride##da_blue', not S.drum_anim_blue_hh) then S.drum_anim_blue_hh = false end
     Tooltip(TIPS.drum_anim_blue)
     r.ImGui_SameLine(ctx, lbl_col + radio_w)
-    if r.ImGui_RadioButton(ctx, 'Open hi-hat##da_blue', S.drum_anim_blue_hh) then S.drum_anim_blue_hh = true end
+    if r.ImGui_RadioButton(ctx, 'Hi-hat##da_blue', S.drum_anim_blue_hh) then S.drum_anim_blue_hh = true end
     Tooltip(TIPS.drum_anim_blue)
 
     r.ImGui_Text(ctx, 'Min cymbal hits')
@@ -335,22 +350,64 @@ local function DrawAnimationDrumsTab()
     _, S.drum_anim_min_cym = r.ImGui_SliderInt(ctx, '##da_mincym', S.drum_anim_min_cym, 2, 8, '%d hits')
     SliderTooltip(TIPS.drum_anim_min_cym)
 
-    _, S.drum_anim_flam = r.ImGui_Checkbox(ctx, 'Snare + yellow tom as a flam##da_flam', S.drum_anim_flam)
-    Tooltip(TIPS.drum_anim_flam)
-    _, S.drum_anim_snare_variety = r.ImGui_Checkbox(ctx, 'Slow snare variety##da_sv', S.drum_anim_snare_variety)
-    Tooltip(TIPS.drum_anim_snare_variety)
-    _, S.drum_anim_soft_cym = r.ImGui_Checkbox(ctx, 'Soft crash hits##da_softc', S.drum_anim_soft_cym)
+    _, S.drum_anim_soft_cym = r.ImGui_Checkbox(ctx, 'Crash hits by velocity (choke / soft)##da_softc',
+                                               S.drum_anim_soft_cym)
     Tooltip(TIPS.drum_anim_soft_cym)
-    _, S.drum_anim_soft_snare = r.ImGui_Checkbox(ctx, 'Soft snare hits (ghost strokes)##da_softs',
-                                                 S.drum_anim_soft_snare)
-    Tooltip(TIPS.drum_anim_soft_snare)
+    if S.drum_anim_soft_cym then
+        r.ImGui_Indent(ctx)
+        S.drum_anim_choke_below = VelocityRow('Choke below', '##da_chb',
+                                              S.drum_anim_choke_below, TIPS.drum_anim_choke_below)
+        S.drum_anim_soft_cym_below = VelocityRow('Soft below', '##da_cyb',
+                                                 S.drum_anim_soft_cym_below, TIPS.drum_anim_soft_cym_below)
+        r.ImGui_Unindent(ctx)
+    end
     _, S.drum_anim_ride_alt = r.ImGui_Checkbox(ctx, 'Crash riding: alternate soft and hard##da_ra',
                                                S.drum_anim_ride_alt)
     Tooltip(TIPS.drum_anim_ride_alt)
+
+    r.ImGui_Spacing(ctx)
+    r.ImGui_Separator(ctx)
+    SectionHeader('Hi-hat')
+    _, S.drum_anim_open_hat = r.ImGui_Checkbox(ctx, 'Open hi-hat by velocity##da_oh', S.drum_anim_open_hat)
+    Tooltip(TIPS.drum_anim_open_hat)
+    if S.drum_anim_open_hat then
+        r.ImGui_Indent(ctx)
+        S.drum_anim_open_hat_above = VelocityRow('Open above', '##da_oha',
+                                                 S.drum_anim_open_hat_above, TIPS.drum_anim_open_hat_above, true)
+        r.ImGui_Unindent(ctx)
+    end
+    local blue_ride = not S.drum_anim_blue_hh   -- snapshot: BeginDisabled / EndDisabled pair
+    if blue_ride then r.ImGui_BeginDisabled(ctx) end
+    _, S.drum_anim_blue_open = r.ImGui_Checkbox(ctx, 'Open the hat on blue hi-hat hits##da_bo',
+                                                S.drum_anim_blue_open)
+    if blue_ride then r.ImGui_EndDisabled(ctx) end
+    -- shown while disabled too, so it can say why
+    if r.ImGui_IsItemHovered(ctx, r.ImGui_HoveredFlags_AllowWhenDisabled()) then
+        r.ImGui_SetTooltip(ctx, TIPS.drum_anim_blue_open)
+    end
+
+    r.ImGui_Spacing(ctx)
+    r.ImGui_Separator(ctx)
+    SectionHeader('Snare')
+    _, S.drum_anim_flam = r.ImGui_Checkbox(ctx, 'Snare + yellow tom as a flam##da_flam', S.drum_anim_flam)
+    Tooltip(TIPS.drum_anim_flam)
     _, S.drum_anim_flam_late = r.ImGui_Checkbox(ctx, 'Flam: left hand slightly late##da_fl',
                                                 S.drum_anim_flam_late)
     Tooltip(TIPS.drum_anim_flam_late)
+    _, S.drum_anim_snare_variety = r.ImGui_Checkbox(ctx, 'Slow snare variety##da_sv', S.drum_anim_snare_variety)
+    Tooltip(TIPS.drum_anim_snare_variety)
+    _, S.drum_anim_soft_snare = r.ImGui_Checkbox(ctx, 'Soft snare hits by velocity (ghost strokes)##da_softs',
+                                                 S.drum_anim_soft_snare)
+    Tooltip(TIPS.drum_anim_soft_snare)
+    if S.drum_anim_soft_snare then
+        r.ImGui_Indent(ctx)
+        S.drum_anim_soft_snare_below = VelocityRow('Soft below', '##da_snb',
+                                                   S.drum_anim_soft_snare_below, TIPS.drum_anim_soft_snare_below)
+        r.ImGui_Unindent(ctx)
+    end
 
+    r.ImGui_Spacing(ctx)
+    r.ImGui_Separator(ctx)
     r.ImGui_Spacing(ctx)
     if Btn('Generate drum animations', BTN_H) then
         RunAction(GenerateDrumAnimations)

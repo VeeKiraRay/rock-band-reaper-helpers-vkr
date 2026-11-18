@@ -228,7 +228,7 @@ A **Mode** radio switches between **Generate** (the whole song or the time selec
 <!-- TODO: screenshot of the Animation > Drums sub-tab -->
 ![Animation - Drums sub-tab](../assets/g_animation_drums.jpg)
 
-Writes the drummer's animation notes on PART DRUMS and PART DRUMS_2X from their Expert gems: which drum or cymbal each hit is, which hand plays it, and the kick. Existing animation notes are replaced (only inside the time selection, if there is one); muted tracks are skipped. **Hi-hat pedal notes are not generated** and are never touched, so pedal work you've placed by hand stays.
+Writes the drummer's animation notes on PART DRUMS and PART DRUMS_2X from their Expert gems: which drum or cymbal each hit is, which hand plays it, and the kick. Existing animation notes are replaced (only inside the time selection, if there is one); muted tracks are skipped. **Hi-hat pedal notes (25) are written only for open hi-hats** (the Hi-hat options below); the foot keeping time is not generated, so pedal work you've placed by hand for it stays.
 
 The hands follow the official charts rather than alternating blindly:
 
@@ -239,17 +239,39 @@ The hands follow the official charts rather than alternating blindly:
 
 Measured against the official charts' own animation notes, the hand is right on 94% of one-hand hits (CAT's rules: 83%).
 
+The options are in two groups.
+
+**Cymbals**
+
 | Option | Default | What it does |
 | ------ | ------- | ------------ |
 | **Default crash** | Crash 2 (right) | Which crash a green cymbal plays: crash 2 on the drummer's right or crash 1 on the left. Official charts choose per song. |
-| **Blue cymbal** | Ride | **Ride**, with a lone blue hit played as a crash 1 accent, or **Open hi-hat** for charts that put the closed hi-hat on yellow and the open hi-hat on blue (~10% of official songs). |
+| **Blue cymbal** | Ride | **Ride**, with a lone blue hit played as a crash 1 accent, or **Hi-hat** for charts that play the hi-hat on blue (~10% of official songs). Whether those hits are open is the Hi-hat section's **Open the hat on blue hi-hat hits**. |
 | **Min cymbal hits** | 3 | How many fast cymbal hits in a row before the hands start alternating (CAT uses 4). |
+| **Crash hits by velocity (choke / soft)** | Off | Crash gems under **Choke below** (20; 0 = none) become chokes - the cymbal is grabbed, notes 40 / 41, written instead of the hit. Those under **Soft below** (50) are soft crashes - still a hit, lighter. The rest are normal hits. Either order works: the lower threshold takes the lowest velocities (Choke 50 / Soft 20 gives 0-19 soft, 20-49 choke). Hi-hat and ride are not affected. |
+| **Crash riding: alternate soft and hard** | Off | An RBN documentation tip for riding a crash in 8ths; rare in the official charts. Works with the velocity options: it flips every other hit of the ride, and never a choke. |
+
+**Hi-hat**
+
+The hi-hat opens while the pedal note 25 is held: it opens at the note's start and closes over its end. Official charts keep 78% of yellow hi-hat hits closed; one open hit gets a short pedal note, a run of them one long note.
+
+| Option | Default | What it does |
+| ------ | ------- | ------------ |
+| **Open the hat on blue hi-hat hits** | Off | With Blue cymbal = Hi-hat, every blue hit is an open hat: the pedal note is held under it. Harmonix charted open hi-hats on blue (official charts open 83% of blue hi-hat hits), but not every community chart does, so it is off by default. Greyed out while blue is the ride. |
+| **Open hi-hat by velocity** | Off | Yellow hi-hat gems (the red gem in a disco beat) above **Open above** (velocity 100 by default) are open. A run of open hits shares one pedal note, from a 16th before the first to the next hi-hat hit, which closes it. For charts that keep blue for the ride. |
+
+With either open-hat option on, open-hat pedal notes from an earlier run (or placed by hand over hi-hat hits) are replaced in the range Generate works on; other 25s - the foot keeping time - stay. With both off, note 25 is never touched.
+
+**Snare**
+
+| Option | Default | What it does |
+| ------ | ------- | ------------ |
 | **Snare + yellow tom as a flam** | On | Both hands on the snare instead of snare + tom 1 (official charts: 83%). |
-| **Slow snare variety** | On | Lone slow snares vary: right hand in snare-only passages, both hands for accents. Off: always the left hand. |
-| **Soft crash hits** | Off | Every crash hit uses the soft notes - still a hit, with a lighter stroke. |
-| **Soft snare hits (ghost strokes)** | Off | Every snare hit uses the soft notes (28 / 29). In game these are ghost strokes: the stick hovers and the kit's snare does not move. Official charts use them only for a few ghost notes - for those, change the notes by hand. |
-| **Crash riding: alternate soft and hard** | Off | An RBN documentation tip for riding a crash in 8ths; rare in the official charts. |
 | **Flam: left hand slightly late** | Off | An RBN documentation tip; official flams put both hands on the same tick. |
+| **Slow snare variety** | On | Lone slow snares vary: right hand in snare-only passages, both hands for accents. Off: always the left hand. |
+| **Soft snare hits by velocity (ghost strokes)** | Off | Snare gems on Expert under **Soft below** (velocity 50 by default) use the soft notes (28 / 29). In game these are ghost strokes: the stick hovers and the kit's snare does not move. Lower the velocity of the ghost notes you want; 128 makes every snare soft. |
+
+The game ignores gem velocity, and most charts put one velocity on every gem (official charts too: 447 of 585 RB3 DLC songs, mostly 96 or 100), so the two velocity options change nothing until you set velocities on the gems you want. The result lists how many soft snares, soft crashes and chokes were written.
 
 The result lists, per track, the kicks, one-hand hits (right / left), two-hand hits and flams, then the options used.
 

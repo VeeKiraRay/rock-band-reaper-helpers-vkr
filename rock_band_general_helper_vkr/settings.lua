@@ -53,6 +53,12 @@ local function SerializeSettings()
         'adsv='   .. (S.drum_anim_snare_variety and '1' or '0'),
         'adsc='   .. (S.drum_anim_soft_cym and '1' or '0'),
         'adss='   .. (S.drum_anim_soft_snare and '1' or '0'),
+        'adsnb='  .. S.drum_anim_soft_snare_below,
+        'adchb='  .. S.drum_anim_choke_below,
+        'adcyb='  .. S.drum_anim_soft_cym_below,
+        'adoh='   .. (S.drum_anim_open_hat and '1' or '0'),
+        'adbo='   .. (S.drum_anim_blue_open and '1' or '0'),
+        'adoha='  .. S.drum_anim_open_hat_above,
         'adra='   .. (S.drum_anim_ride_alt and '1' or '0'),
         'adfll='  .. (S.drum_anim_flam_late and '1' or '0'),
         'vsectm=' .. S.venue_sec_tmpl_name,
@@ -68,7 +74,17 @@ local function SerializeSettings()
     }, ';')
 end
 
+-- A drum velocity threshold, 0-128 (128 = every hit).
+local function Velocity(v, fallback)
+    local n = tonumber(v)
+    if not n then return fallback end
+    return math.max(0, math.min(128, math.floor(n)))
+end
+
 local function DeserializeSettings(str)
+    -- Saved before the drum velocity thresholds, a soft option meant every hit soft:
+    -- such a project gets threshold 128 below, so Generate writes what it did then.
+    local soft_seen, below_seen = {}, {}
     for k, v in str:gmatch('([^=;]+)=([^;]*)') do
         if     k == 'tmrth'   then S.tm_rms_threshold      = tonumber(v) or S.tm_rms_threshold
         elseif k == 'tmrwm'   then S.tm_rms_window_ms      = tonumber(v) or S.tm_rms_window_ms
@@ -108,13 +124,27 @@ local function DeserializeSettings(str)
         elseif k == 'admc'   then S.drum_anim_min_cym       = math.max(2, math.min(8, tonumber(v) or 3))
         elseif k == 'adfl'   then S.drum_anim_flam          = (v == '1')
         elseif k == 'adsv'   then S.drum_anim_snare_variety = (v == '1')
-        elseif k == 'adsc'   then S.drum_anim_soft_cym      = (v == '1')
-        elseif k == 'adss'   then S.drum_anim_soft_snare    = (v == '1')
+        elseif k == 'adsc'   then S.drum_anim_soft_cym      = (v == '1') soft_seen.cym = true
+        elseif k == 'adss'   then S.drum_anim_soft_snare    = (v == '1') soft_seen.snare = true
         -- before v0.9.64 one option made snare AND crash hits soft; a project saved
         -- with it keeps both on (the next Save writes adsc / adss instead)
         elseif k == 'adso'   then
             S.drum_anim_soft_cym   = (v == '1')
             S.drum_anim_soft_snare = (v == '1')
+            soft_seen.cym, soft_seen.snare = true, true
+        elseif k == 'adsnb'  then
+            S.drum_anim_soft_snare_below = Velocity(v, S.drum_anim_soft_snare_below)
+            below_seen.snare = true
+        elseif k == 'adchb'  then
+            S.drum_anim_choke_below = Velocity(v, S.drum_anim_choke_below)
+            below_seen.cym = true
+        elseif k == 'adcyb'  then
+            S.drum_anim_soft_cym_below = Velocity(v, S.drum_anim_soft_cym_below)
+            below_seen.cym = true
+        elseif k == 'adoh'   then S.drum_anim_open_hat      = (v == '1')
+        elseif k == 'adbo'   then S.drum_anim_blue_open     = (v == '1')
+        elseif k == 'adoha'  then
+            S.drum_anim_open_hat_above = math.min(127, Velocity(v, S.drum_anim_open_hat_above))
         elseif k == 'adra'   then S.drum_anim_ride_alt      = (v == '1')
         elseif k == 'adfll'  then S.drum_anim_flam_late     = (v == '1')
         elseif k == 'vsectm' then S.venue_sec_tmpl_name     = v
@@ -128,6 +158,12 @@ local function DeserializeSettings(str)
         elseif k == 'wfsts'  then S.workflow_show_ts        = (v == '1')
         elseif k == 'wfhd'   then S.workflow_hide_done      = (v == '1')
         end
+    end
+    if soft_seen.snare and not below_seen.snare and S.drum_anim_soft_snare then
+        S.drum_anim_soft_snare_below = 128
+    end
+    if soft_seen.cym and not below_seen.cym and S.drum_anim_soft_cym then
+        S.drum_anim_choke_below, S.drum_anim_soft_cym_below = 0, 128
     end
 end
 

@@ -217,15 +217,23 @@ S = {
     char_mode            = 0,    -- 0=Generate 1=Manual (persisted: 'acmd')
     char_manual_part     = 1,    -- Manual part, index into CHAR_PARTS (not persisted)
     char_manual_state    = '[play]', -- Manual state, an event text from CHAR_STATES (not persisted)
-    -- Animation > Drums (all persisted: 'adcr' 'admc' 'adfl' 'adsv' 'adsc' 'adss' 'adra' 'adfll';
-    -- the old combined 'adso' is still read: 1 = both soft options on)
+    -- Animation > Drums (all persisted: 'adcr' 'admc' 'adfl' 'adsv' 'adsc' 'adss' 'adra' 'adfll',
+    -- thresholds 'adsnb' 'adchb' 'adcyb', open hi-hat 'adoh' 'adoha' 'adbo'; the old combined 'adso' is still read: 1 = both soft
+    -- options on. A project saved before the thresholds with a soft option on loads that
+    -- option's soft threshold as 128 - every hit soft, as the option did then)
     drum_anim_crash         = 0,     -- default crash: 0 = crash 2, 1 = crash 1
-    drum_anim_blue_hh       = false, -- blue cymbal = open hi-hat (false = ride)
+    drum_anim_blue_hh       = false, -- blue cymbal = hi-hat (false = ride)
+    drum_anim_blue_open     = false, -- blue hi-hat hits are open (pedal 25 held; Harmonix's way)
     drum_anim_min_cym       = 3,     -- fast cymbal hits in a row before the hands alternate
+    drum_anim_open_hat      = false, -- open hi-hat by velocity (yellow hi-hat gems)
+    drum_anim_open_hat_above = 100,  -- yellow hi-hat gems above this velocity: open (pedal 25 held)
     drum_anim_flam          = true,  -- snare + yellow tom = both hands on the snare
     drum_anim_snare_variety = true,  -- slow lone snares: right hand / both hands by context
-    drum_anim_soft_cym      = false, -- soft crash notes (still hit, lighter)
-    drum_anim_soft_snare    = false, -- soft snare notes (ghost strokes: the kit snare does not move)
+    drum_anim_soft_cym      = false, -- crash hits by velocity: chokes and soft crash notes
+    drum_anim_choke_below   = 20,    -- crash gems under this velocity: chokes (0 = none)
+    drum_anim_soft_cym_below = 50,   -- other crash gems under this velocity: soft (still hit, lighter)
+    drum_anim_soft_snare    = false, -- soft snare notes by velocity (ghost strokes: the kit snare does not move)
+    drum_anim_soft_snare_below = 50, -- snare gems under this velocity: soft
     drum_anim_ride_alt      = false, -- riding a crash in 8ths alternates soft and hard
     drum_anim_flam_late     = false, -- a flam's left hand a 1/32 note late
     -- UI visibility (persisted)
@@ -725,10 +733,30 @@ TIPS = {
     drum_anim_blue = "What a blue cymbal gem plays.\n\n" ..
                      "Ride: the ride cymbal. A lone blue hit (no other blue within a beat)\n" ..
                      "is played as a crash 1 accent.\n" ..
-                     "Open hi-hat: for charts that put the closed hi-hat on yellow and the\n" ..
-                     "open hi-hat on blue - every blue hit is the hi-hat.\n\n" ..
+                     "Hi-hat: every blue hit is played on the hi-hat. To also open the hat\n" ..
+                     "on those hits, tick \"Open the hat on blue hi-hat hits\" (Hi-hat).\n\n" ..
                      "Official charts: most play blue as the ride; ~10% of songs play it as\n" ..
-                     "the hi-hat nearly every time.",
+                     "the hi-hat nearly every time, open on 83% of those hits.",
+    drum_anim_blue_open = "Needs Blue cymbal = Hi-hat (Cymbals).\n\n" ..
+                          "The hat is open on every blue hi-hat hit: the\n" ..
+                          "pedal note (25) is held under it. A run of open hits shares one\n" ..
+                          "pedal note, from a 16th before the first to the next hi-hat hit.\n\n" ..
+                          "Harmonix charted open hi-hats on blue (official charts open 83% of\n" ..
+                          "blue hi-hat hits), but not every community chart follows that, so it\n" ..
+                          "is off by default.",
+    drum_anim_open_hat = "Open the hi-hat on loud yellow hi-hat gems: those with a velocity\n" ..
+                         "above Open above get the pedal note (25) held under them. A run of\n" ..
+                         "open hits shares one pedal note, from a 16th before the first to the\n" ..
+                         "next hi-hat hit, which closes it - as official charts do.\n\n" ..
+                         "For charts that keep blue for the ride. The game ignores gem velocity,\n" ..
+                         "so raise it on the hats you want open: most charts have one velocity\n" ..
+                         "on every gem (often 96 or 100), and then nothing opens. Official\n" ..
+                         "charts keep 78% of yellow hi-hat hits closed.\n\n" ..
+                         "Other pedal notes - the foot keeping time while the hands play the\n" ..
+                         "ride or crashes, most of the 25s in official charts - are left as\n" ..
+                         "they are.",
+    drum_anim_open_hat_above = "Yellow hi-hat gems with a velocity above this are open. 100 opens\n" ..
+                               "only gems louder than the usual 96 / 100; 0 opens every one.",
     drum_anim_min_cym = "Fast hi-hat / cymbal hits (under ~130 ms apart, e.g. 16ths at 120 BPM\n" ..
                         "or 8ths at 240 BPM) switch to alternating hands only after this many\n" ..
                         "in a row; until then the right hand plays them. Hi-hat 16ths also\n" ..
@@ -742,15 +770,35 @@ TIPS = {
                               "  - on the beat after a pause or next to toms, both hands (an accent).\n" ..
                               "Off: the left hand plays them all. Official charts play these\n" ..
                               "~50% left, ~30% right, ~20% both hands.",
-    drum_anim_soft_cym = "Every crash hit uses the soft crash notes. The drummer still hits the\n" ..
-                         "cymbal, with a lighter stroke.",
-    drum_anim_soft_snare = "Every snare hit uses the soft snare notes (28 / 29). In the game these\n" ..
-                           "are ghost strokes: the stick hovers over the snare and the snare on\n" ..
-                           "the kit does not move. Meant for quiet ghost notes, so with this on\n" ..
-                           "no snare hit in the song moves the snare.\n\n" ..
-                           "Official charts use soft snare notes for a few ghost notes in about\n" ..
-                           "half of the songs, never for every hit. For ghost notes, leave this\n" ..
-                           "off and change those notes by hand.",
+    drum_anim_soft_cym = "Choose how each crash is played from the velocity of its Expert gem:\n" ..
+                         "  - under Choke below: a choke - the drummer grabs the cymbal to stop\n" ..
+                         "    it (notes 40 / 41, written instead of the hit);\n" ..
+                         "  - under Soft below: a soft crash - still a hit, lighter;\n" ..
+                         "  - the rest: a normal hit.\n" ..
+                         "The lower of the two thresholds takes the lowest velocities, so\n" ..
+                         "either order works.\n" ..
+                         "Hi-hat and ride have no soft or choke notes and are not affected.\n\n" ..
+                         "The game ignores gem velocity, so set it on the gems you want: most\n" ..
+                         "charts have one velocity on every gem (often 96 or 100), and then\n" ..
+                         "nothing changes. Official charts choke a crash before a stop, and\n" ..
+                         "even then only about one time in ten.",
+    drum_anim_choke_below = "Crash gems with a velocity under this become chokes (the cymbal is\n" ..
+                            "grabbed, not hit). 0 = no chokes.\n\n" ..
+                            "Either order works: the lower of Choke below and Soft below takes\n" ..
+                            "the lowest velocities. Choke 20 / Soft 50: 0-19 choke, 20-49 soft.\n" ..
+                            "Choke 50 / Soft 20: 0-19 soft, 20-49 choke.",
+    drum_anim_soft_cym_below = "Crash gems with a velocity under this become soft crashes, except\n" ..
+                               "where Choke below claims them (see its tooltip). 0 = no soft crashes.",
+    drum_anim_soft_snare = "Snare gems on Expert with a low velocity use the soft snare notes\n" ..
+                           "(28 / 29). In the game these are ghost strokes: the stick hovers over\n" ..
+                           "the snare and the snare on the kit does not move - meant for quiet\n" ..
+                           "ghost notes.\n\n" ..
+                           "The game ignores gem velocity, so lower it on the ghost notes you\n" ..
+                           "want: most charts have one velocity on every gem (often 96 or 100),\n" ..
+                           "and then nothing changes. Official charts use soft snare notes for a\n" ..
+                           "few ghost notes in about half of the songs, never for every hit.",
+    drum_anim_soft_snare_below = "Snare gems with a velocity under this become ghost strokes.\n" ..
+                                 "128 = every snare hit (no snare in the song then moves).",
     drum_anim_ride_alt = "When the drummer rides a crash in 8th notes, alternate soft and hard\n" ..
                          "hits so it looks less robotic (an RBN doc tip). Rare in official\n" ..
                          "charts (6% of 8th-note crash riding, 13% when slow); quarters and\n" ..
@@ -760,8 +808,10 @@ TIPS = {
                           "on the same tick.",
     drum_anim_generate = "Write the animation notes on PART DRUMS and PART DRUMS_2X from their\n" ..
                          "Expert gems. Existing animation notes are replaced - on the whole\n" ..
-                         "track, or only inside the time selection. Hi-hat pedal notes are\n" ..
-                         "never touched. Muted tracks are skipped. One undo step.",
+                         "track, or only inside the time selection. Hi-hat pedal notes (25)\n" ..
+                         "are touched only for open hi-hats (Open the hat on blue hi-hat hits,\n" ..
+                         "or Open hi-hat by velocity): those are replaced, the rest stay. Muted\n" ..
+                         "tracks are skipped. One undo step.",
     char_set_all ="Set every part's active state at once. The rows below can then be\n" ..
                    "changed one by one.",
     char_gap_inst = "Drums, guitar, bass and keys go [idle] when they rest at least this\n" ..

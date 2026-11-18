@@ -1,11 +1,22 @@
 -- Animation > Drums: the drummer's hand and foot animation notes on PART DRUMS
 -- (and PART DRUMS_2X), generated from the Expert gems.
 --
--- The notes (RBN drum doc, "Animations"): kick 24, hi-hat pedal 25 (not
--- generated - left to the author), snare L/R 26/27 (soft 28/29), hi-hat L/R
+-- The notes (RBN drum doc, "Animations"): kick 24, hi-hat pedal 25 (held: the
+-- hat is open while it is held; written only for open hi-hats, see
+-- DrumAnimOpenHatSpans - official charts mostly use it for the foot keeping time,
+-- which is left to the author), snare L/R 26/27 (soft 28/29), hi-hat L/R
 -- 30/31, crash 1 L 34 (soft 35), crash 1 R 36 (soft 37), crash 2 R 38 (soft 39),
 -- ride R/L 42/43, crash 2 L 44 (soft 45), tom 1 L/R 46/47, tom 2 L/R 48/49,
--- floor tom L/R 50/51.
+-- floor tom L/R 50/51; chokes 40 (crash 2, the right cymbal) / 41 (crash 1, the
+-- left) - the RBN doc has them the other way round, the game's code revealed this
+-- and an in-game test confirmed it.
+--
+-- Soft snares, soft crashes and chokes follow the Expert gem's velocity, with the
+-- author's own thresholds (options). Official charts do not use velocity for this
+-- (447 of 585 RB3 DLC songs use one velocity on every gem; their soft notes were
+-- placed by hand), so a chart only gets them where its author set the velocities.
+-- A choke replaces the crash hit: one note on the gem's tick, no hand variant (all
+-- 518 official chokes are like that).
 --
 -- Which drum each gem is follows CAT's drums_animations (and the official
 -- charts: yellow cymbal = hi-hat 91%, blue cymbal = ride 78%, ...). Which HAND
@@ -43,20 +54,28 @@ DRUM_ANIM_PARAMS = {
     pause_ms      = 500,  -- a slow snare after this long a gap counts as an accent
     flam_late_qn  = 1 / 32, -- "Flam: left hand slightly after": how far after
     len_qn        = 0.125, -- written note length (animation length has no effect)
+    -- Open hi-hat pedal (25), from the official open-hat 25s: start ~a 16th before the
+    -- first open hit (11,025 of 15,723), end on the next hi-hat hit (7,387).
+    open_lead_qn  = 0.25,  -- the pedal opens this far before the first open hit
+    open_next_qn  = 1,     -- the next hi-hat hit closes it when it comes within this
+    open_tail_qn  = 1,     -- otherwise held a quarter note after the last open hit
+    open_min_qn   = 0.5,   -- shortest pedal note, an 8th (the game opens and closes over time)
 }
 
 -- Kit pieces left to right (the RBN visual template) and their notes.
 DRUM_ANIM_PIECES = {
     hh   = { pos = 1, hand = 'R', L = 30, R = 31,                     cym = true },
-    c1   = { pos = 2, hand = 'R', L = 34, R = 36, Ls = 35, Rs = 37,   cym = true },
+    c1   = { pos = 2, hand = 'R', L = 34, R = 36, Ls = 35, Rs = 37,   cym = true, choke = 41 },
     sn   = { pos = 3, hand = 'L', L = 26, R = 27, Ls = 28, Rs = 29 },
     t1   = { pos = 4, hand = 'L', L = 46, R = 47 },
     t2   = { pos = 5, hand = 'R', L = 48, R = 49 },
     ft   = { pos = 6, hand = 'R', L = 50, R = 51 },
-    c2   = { pos = 7, hand = 'R', L = 44, R = 38, Ls = 45, Rs = 39,   cym = true },
+    c2   = { pos = 7, hand = 'R', L = 44, R = 38, Ls = 45, Rs = 39,   cym = true, choke = 40 },
     ride = { pos = 8, hand = 'R', L = 43, R = 42,                     cym = true },
 }
 DRUM_ANIM_KICK = 24
+-- Velocity of a gem that carries none (synthetic onsets): a normal hit.
+DRUM_ANIM_VEL_DEFAULT = 100
 
 local EPS = 1e-6
 local function Other(h) return h == 'L' and 'R' or 'L' end
@@ -68,20 +87,40 @@ local function Other(h) return h == 'L' and 'R' or 'L' end
 -- blue cymbals play it as the hi-hat 99% of the time; no gem pattern tells them
 -- apart, so it is the author's choice). A blue already sharing its hit with the
 -- hi-hat stays the ride. A lone blue (o.lone_blue) is a crash accent: crash 1.
+-- Also records o.pvel[piece]: the velocity of the gem that made the piece (the
+-- velocity options read it; DrumAnimPieceVel).
 local function Pieces(o, opts)
-    local p = {}
-    if o.R then p[#p + 1] = o.disco and 'hh' or 'sn' end
-    if o.Y then p[#p + 1] = o.Yt and 't1' or (o.disco and 'sn' or 'hh') end
+    local p, vel = {}, o.vel or {}
+    o.pvel = {}
+    o.hh_lane = nil
+    local function Add(piece, lane)
+        p[#p + 1] = piece
+        o.pvel[piece] = math.max(o.pvel[piece] or 0, vel[lane] or DRUM_ANIM_VEL_DEFAULT)
+        if piece == 'hh' then o.hh_lane = lane end   -- open hi-hat: which gem made it
+    end
+    if o.R then Add(o.disco and 'hh' or 'sn', 'R') end
+    if o.Y then Add(o.Yt and 't1' or (o.disco and 'sn' or 'hh'), 'Y') end
     if o.B then
         local hh_taken = (o.R and o.disco) or (o.Y and not o.Yt and not o.disco)
-        if o.Bt then p[#p + 1] = 't2'
-        elseif opts.blue_hh and not hh_taken then p[#p + 1] = 'hh'
-        elseif o.lone_blue and not opts.blue_hh then p[#p + 1] = 'c1'
-        else p[#p + 1] = 'ride' end
+        if o.Bt then Add('t2', 'B')
+        elseif opts.blue_hh and not hh_taken then Add('hh', 'B')
+        elseif o.lone_blue and not opts.blue_hh then Add('c1', 'B')
+        else Add('ride', 'B') end
     end
-    if o.G then p[#p + 1] = o.Gt and 'ft' or (opts.crash1 and 'c1' or 'c2') end
+    if o.G then Add(o.Gt and 'ft' or (opts.crash1 and 'c1' or 'c2'), 'G') end
     return p
 end
+
+-- Velocity of a planned hand's piece. Two-hand rules can turn a piece into another
+-- (hi-hat + crash -> both crashes): such a piece takes the loudest gem of the hit.
+local function PieceVel(o, piece)
+    local v = o.pvel and o.pvel[piece]
+    if v then return v end
+    local best
+    for _, x in pairs(o.pvel or {}) do best = math.max(best or 0, x) end
+    return best or DRUM_ANIM_VEL_DEFAULT
+end
+DrumAnimPieceVel = PieceVel
 
 -- Beat position of a hit: 'beat' / 'and' (8th grid) / 'e' (16th off the 8th
 -- grid) / 'trip' / 'other'.
@@ -134,8 +173,16 @@ end
 --   onsets: { { qn, sec, K, R, Y, B, G (gems hit), Yt, Bt, Gt (under a tom marker),
 --               disco }, ... } sorted by qn, one per hit time
 --   opts:   crash1 (bool) - green cymbal on crash 1 instead of crash 2
---           soft_cym (bool)   - soft crash notes (still a hit, lighter)
---           soft_snare (bool) - soft snare notes (ghost strokes: the kit snare does not move)
+--           soft_snare_below - snare gems under this velocity are soft (ghost strokes:
+--                           the kit snare does not move); nil = off, 128 = every snare
+--           choke_below    - crash gems under this velocity are chokes (40 / 41,
+--                           replacing the hit); nil or 0 = none
+--           soft_cym_below - crash gems under this velocity are soft (still a hit,
+--                           lighter); nil = off, 128 = every crash. With both set, the
+--                           lower of the two takes the lowest velocities (choke 20 /
+--                           soft 50: 0-19 choke, 20-49 soft; soft 20 / choke 50: 0-19
+--                           soft, 20-49 choke)
+--           (gem velocity: onset.vel = { R=, Y=, B=, G= }, missing = DRUM_ANIM_VEL_DEFAULT)
 --           flam (bool)   - snare + yellow tom = both hands on the snare (default on)
 --           min_cym_hits  - cymbal hits in a row before fast cymbals alternate
 --           snare_variety (bool) - slow lone snares by the right hand in snare-only
@@ -327,27 +374,98 @@ function DrumAnimPlan(onsets, opts)
 
     for _, o in ipairs(onsets) do
         if o.K then notes[#notes + 1] = { qn = o.qn, pitch = DRUM_ANIM_KICK } end
+        local choked = {}
         for _, ph in ipairs(o.hands) do
             local info = DRUM_ANIM_PIECES[ph[1]]
             local key = ph[2]
-            -- Soft snare notes are ghost strokes in game (the kit snare does not move);
-            -- soft cymbals still hit - hence two options.
-            local soft = (ph[1] == 'sn' and opts.soft_snare) or (info.cym and opts.soft_cym) or false
-            -- crash riding flips every other hit of the run against the option
-            if o.soft_hit ~= nil and info.cym then soft = (soft ~= o.soft_hit) end
-            if soft and info[key .. 's'] then key = key .. 's' end
-            local qn = o.qn
-            -- Option: in a flam the left hand lands slightly after the right (RBN doc
-            -- tip; official flams are almost all on one tick - off by default).
-            if opts.flam_late and o.flam and ph[2] == 'L' then qn = qn + P.flam_late_qn end
-            notes[#notes + 1] = { qn = qn, pitch = info[key] }
+            local vel = PieceVel(o, ph[1])
+            -- A crash's bands work in either order: the lower threshold takes the
+            -- lowest velocities, the higher one the band between the two.
+            local cut_ch, cut_soft = opts.choke_below, opts.soft_cym_below
+            local is_choke = info.choke and cut_ch and vel < cut_ch
+                             and not (cut_soft and cut_soft < cut_ch and vel < cut_soft)
+            -- A choke replaces the hit: one note per cymbal, whichever hand (or both).
+            if is_choke then
+                if not choked[ph[1]] then
+                    choked[ph[1]] = true
+                    notes[#notes + 1] = { qn = o.qn, pitch = info.choke }
+                end
+            else
+                -- Soft snare notes are ghost strokes in game (the kit snare does not
+                -- move); soft cymbals still hit - hence separate thresholds.
+                local below = (ph[1] == 'sn' and opts.soft_snare_below)
+                           or (info.Ls and info.cym and opts.soft_cym_below)
+                local soft = below and vel < below or false
+                -- crash riding flips every other hit of the run against the velocity
+                if o.soft_hit ~= nil and info.cym then soft = (soft ~= o.soft_hit) end
+                if soft and info[key .. 's'] then key = key .. 's' end
+                local qn = o.qn
+                -- Option: in a flam the left hand lands slightly after the right (RBN
+                -- doc tip; official flams are almost all on one tick - off by default).
+                if opts.flam_late and o.flam and ph[2] == 'L' then qn = qn + P.flam_late_qn end
+                notes[#notes + 1] = { qn = qn, pitch = info[key] }
+            end
         end
     end
     return notes
 end
 
+-- Open hi-hat pedal notes (25) from planned onsets (after DrumAnimPlan).
+--   opts.blue_open      - a hi-hat hit from a blue gem is open (Blue cymbal = Hi-hat plus
+--                         "Open the hat on blue hi-hat hits" - Harmonix's way, not all
+--                         community charts agree)
+--   opts.open_hat_above - a hi-hat hit from a yellow gem (red in a disco flip) with a
+--                         velocity above this is open; nil = off
+-- Consecutive open hits (no closed hi-hat hit between) share one 25: from open_lead_qn
+-- before the first (not back to the previous hi-hat hit) to the next hi-hat hit, or
+-- open_tail_qn after the last when none comes within open_next_qn; at least
+-- open_min_qn long unless the next hi-hat hit comes sooner.
+-- Returns { { qn_s, qn_e, hits }, ... } sorted.
+function DrumAnimOpenHatSpans(onsets, opts)
+    opts = opts or {}
+    local P = DRUM_ANIM_PARAMS
+    if not opts.blue_open and not opts.open_hat_above then return {} end
+    local hats = {}
+    for _, o in ipairs(onsets) do
+        for _, ph in ipairs(o.hands or {}) do
+            if ph[1] == 'hh' then
+                local lane = o.hh_lane
+                local open = (lane == 'B' and opts.blue_open)
+                    or (opts.open_hat_above and lane ~= 'B'
+                        and PieceVel(o, 'hh') > opts.open_hat_above)
+                hats[#hats + 1] = { qn = o.qn, open = open and true or false }
+                break
+            end
+        end
+    end
+    local spans = {}
+    local i = 1
+    while i <= #hats do
+        if hats[i].open then
+            local j = i
+            while hats[j + 1] and hats[j + 1].open do j = j + 1 end
+            local first, last = hats[i].qn, hats[j].qn
+            local prev, nxt = hats[i - 1], hats[j + 1]
+            local s = first - P.open_lead_qn
+            if prev and s <= prev.qn + EPS then s = (prev.qn + first) / 2 end
+            local e
+            if nxt and nxt.qn - last <= P.open_next_qn + EPS then e = nxt.qn
+            else e = last + P.open_tail_qn end
+            if e - s < P.open_min_qn then
+                e = s + P.open_min_qn
+                if nxt and e > nxt.qn then e = nxt.qn end
+            end
+            spans[#spans + 1] = { qn_s = s, qn_e = e, hits = j - i + 1 }
+            i = j + 1
+        else
+            i = i + 1
+        end
+    end
+    return spans
+end
+
 -- Onsets from Expert gems.
---   gems:  { { qn, sec, pitch } } with pitch 95-100 (95 = 2x kick)
+--   gems:  { { qn, sec, pitch, vel } } with pitch 95-100 (95 = 2x kick); vel optional
 --   toms:  { { qn_s, qn_e, pitch } } tom markers 110-112
 --   disco: { { qn_s, qn_e } } disco flip spans
 function DrumAnimOnsets(gems, toms, disco)
@@ -361,7 +479,13 @@ function DrumAnimOnsets(gems, toms, disco)
             order[#order + 1] = o
         end
         local lane = ({ [95] = 'K', [96] = 'K', [97] = 'R', [98] = 'Y', [99] = 'B', [100] = 'G' })[g.pitch]
-        if lane then o[lane] = true end
+        if lane then
+            o[lane] = true
+            if g.vel and lane ~= 'K' then
+                o.vel = o.vel or {}
+                o.vel[lane] = math.max(o.vel[lane] or 0, g.vel)
+            end
+        end
     end
     table.sort(order, function(a, b) return a.qn < b.qn end)
     local function Under(spans, qn, pitch)
@@ -410,8 +534,11 @@ function DrumAnimOptions()
     return {
         crash1         = S.drum_anim_crash == 1,
         blue_hh        = S.drum_anim_blue_hh,
-        soft_cym       = S.drum_anim_soft_cym,
-        soft_snare     = S.drum_anim_soft_snare,
+        blue_open      = S.drum_anim_blue_hh and S.drum_anim_blue_open,   -- Harmonix: a blue hi-hat is open
+        open_hat_above = S.drum_anim_open_hat and S.drum_anim_open_hat_above or nil,
+        soft_snare_below = S.drum_anim_soft_snare and S.drum_anim_soft_snare_below or nil,
+        choke_below      = S.drum_anim_soft_cym and S.drum_anim_choke_below or nil,
+        soft_cym_below   = S.drum_anim_soft_cym and S.drum_anim_soft_cym_below or nil,
         flam           = S.drum_anim_flam,
         min_cym_hits   = S.drum_anim_min_cym,
         snare_variety  = S.drum_anim_snare_variety,
@@ -425,11 +552,12 @@ local function ReadDrumsTake(take)
     local gems, toms, texts = {}, {}, {}
     local _, n_notes, _, n_txt = r.MIDI_CountEvts(take)
     for i = 0, n_notes - 1 do
-        local ok, _, _, sppq, eppq, _, pitch = r.MIDI_GetNote(take, i)
+        local ok, _, _, sppq, eppq, _, pitch, vel = r.MIDI_GetNote(take, i)
         if ok then
             if pitch >= 95 and pitch <= 100 then
                 gems[#gems + 1] = { qn = r.MIDI_GetProjQNFromPPQPos(take, sppq),
-                                    sec = r.MIDI_GetProjTimeFromPPQPos(take, sppq), pitch = pitch }
+                                    sec = r.MIDI_GetProjTimeFromPPQPos(take, sppq),
+                                    pitch = pitch, vel = vel }
             elseif pitch >= 110 and pitch <= 112 then
                 toms[#toms + 1] = { qn_s = r.MIDI_GetProjQNFromPPQPos(take, sppq),
                                     qn_e = r.MIDI_GetProjQNFromPPQPos(take, math.max(eppq, sppq + 1)),
@@ -445,10 +573,58 @@ local function ReadDrumsTake(take)
 end
 
 local function IsAnimPitch(p) return p >= 24 and p <= 51 and p ~= 25 end
-local ANIM_RANGES = { { 24, 24 }, { 26, 51 } }   -- what Generate replaces (25 stays)
+local ANIM_RANGES = { { 24, 24 }, { 26, 51 } }   -- what the bulk write replaces (25 apart)
+local PEDAL = 25
+
+-- The open hi-hat pedal notes, only while an open-hat option is on. Of the 25s that
+-- start in range, those with a hi-hat hit under them (open-hat 25s from an earlier run
+-- or placed by hand) and those a new one would overlap are replaced; the rest - the
+-- foot keeping time, 87% of official 25s - stay. Per note: a song has few.
+-- in_range(qn), item_s / item_e in QN. Returns written, replaced.
+local function WriteOpenHatPedal(take, onsets, spans, in_range, item_s, item_e)
+    local hats = {}
+    for _, o in ipairs(onsets) do
+        for _, ph in ipairs(o.hands or {}) do
+            if ph[1] == 'hh' then hats[#hats + 1] = o.qn break end
+        end
+    end
+    local new = {}
+    for _, sp in ipairs(spans) do
+        if in_range(sp.qn_s) and sp.qn_s >= item_s - EPS and sp.qn_e <= item_e + EPS then
+            new[#new + 1] = sp
+        end
+    end
+    local function Covers(s, e, list)
+        for _, q in ipairs(list) do if q >= s - EPS and q < e - EPS then return true end end
+        return false
+    end
+    local function Overlaps(s, e)
+        for _, sp in ipairs(new) do if s < sp.qn_e - EPS and e > sp.qn_s + EPS then return true end end
+        return false
+    end
+    local replaced = 0
+    local _, n_notes = r.MIDI_CountEvts(take)
+    for i = n_notes - 1, 0, -1 do
+        local ok, _, _, sppq, eppq, _, pitch = r.MIDI_GetNote(take, i)
+        if ok and pitch == PEDAL then
+            local s = r.MIDI_GetProjQNFromPPQPos(take, sppq)
+            local e = r.MIDI_GetProjQNFromPPQPos(take, math.max(eppq, sppq + 1))
+            if in_range(s) and (Covers(s, e, hats) or Overlaps(s, e)) then
+                r.MIDI_DeleteNote(take, i)
+                replaced = replaced + 1
+            end
+        end
+    end
+    for _, sp in ipairs(new) do
+        r.MIDI_InsertNote(take, false, false, r.MIDI_GetPPQPosFromProjQN(take, sp.qn_s),
+                          r.MIDI_GetPPQPosFromProjQN(take, sp.qn_e), 0, PEDAL, 100, false)
+    end
+    return #new, replaced
+end
 
 -- The Generate button: PART DRUMS and PART DRUMS_2X, whole song or the notes
--- that start in the time selection. The hi-hat pedal (25) is never touched.
+-- that start in the time selection. The hi-hat pedal (25) is touched only by the
+-- open hi-hat options (WriteOpenHatPedal).
 function GenerateDrumAnimations()
     local t0 = r.time_precise()
     local opts = DrumAnimOptions()
@@ -530,6 +706,12 @@ function GenerateDrumAnimations()
             end
         end
         r.MIDI_Sort(take)   -- as Difficulty > Generate does after its bulk write
+        local pedal_n, pedal_old, pedal_hits = 0, 0, 0
+        if opts.blue_open or opts.open_hat_above then
+            local spans = DrumAnimOpenHatSpans(j.onsets, opts)
+            for _, sp in ipairs(spans) do if InRange(sp.qn_s) then pedal_hits = pedal_hits + sp.hits end end
+            pedal_n, pedal_old = WriteOpenHatPedal(take, j.onsets, spans, InRange, i_s, i_e)
+        end
         local written = #new
         total = total + written
         -- what the hands did
@@ -553,6 +735,23 @@ function GenerateDrumAnimations()
         lines[#lines + 1] = string.format('- One hand hits: %d (%d right / %d left)', right + left, right, left)
         lines[#lines + 1] = string.format('- Two hand hits: %d (%d notes)', two, 2 * two)
         lines[#lines + 1] = string.format('- Flams: %d (%d notes)', flams, 2 * flams)
+        if opts.soft_snare_below or opts.soft_cym_below or opts.choke_below then
+            local SOFT_SN = { [28] = true, [29] = true }
+            local SOFT_CY = { [35] = true, [37] = true, [39] = true, [45] = true }
+            local n_sn, n_cy, n_ch = 0, 0, 0
+            for _, n in ipairs(new) do
+                if SOFT_SN[n.pitch] then n_sn = n_sn + 1
+                elseif SOFT_CY[n.pitch] then n_cy = n_cy + 1
+                elseif n.pitch == 40 or n.pitch == 41 then n_ch = n_ch + 1 end
+            end
+            lines[#lines + 1] = string.format('- By velocity: %d soft snares, %d soft crashes, %d chokes',
+                                              n_sn, n_cy, n_ch)
+        end
+        if opts.blue_open or opts.open_hat_above then
+            lines[#lines + 1] = string.format('- Open hi-hat: %d pedal notes (25) over %d open hits%s',
+                pedal_n, pedal_hits,
+                pedal_old > 0 and string.format(', %d old open-hat 25s replaced', pedal_old) or '')
+        end
         if outside > 0 then
             lines[#lines + 1] = string.format('- %d notes outside the MIDI item - extend the item and run again', outside)
         end
@@ -566,16 +765,26 @@ function GenerateDrumAnimations()
     lines[#lines + 1] = ''
     lines[#lines + 1] = 'Options'
     lines[#lines + 1] = '- Default crash: ' .. (o.crash1 and 'crash 1' or 'crash 2')
-    lines[#lines + 1] = '- Blue cymbal: ' .. (o.blue_hh and 'open hi-hat' or 'ride')
+    lines[#lines + 1] = '- Blue cymbal: ' .. (o.blue_hh and 'hi-hat' or 'ride')
+    if o.blue_hh then lines[#lines + 1] = '- Open the hat on blue hi-hat hits: ' .. OnOff(o.blue_open) end
     lines[#lines + 1] = '- Min cymbal hits: ' .. (o.min_cym_hits or DRUM_ANIM_PARAMS.min_cym_hits)
+    lines[#lines + 1] = '- Open hi-hat by velocity: ' .. (o.open_hat_above
+        and ('above velocity ' .. o.open_hat_above) or 'off')
     lines[#lines + 1] = '- Snare + yellow tom as a flam: ' .. OnOff(o.flam)
     lines[#lines + 1] = '- Slow snare variety: ' .. OnOff(o.snare_variety)
-    lines[#lines + 1] = '- Soft crash hits: ' .. OnOff(o.soft_cym)
-    lines[#lines + 1] = '- Soft snare hits (ghost strokes): ' .. OnOff(o.soft_snare)
+    lines[#lines + 1] = '- Soft snare hits (ghost strokes): ' .. (o.soft_snare_below
+        and ('below velocity ' .. o.soft_snare_below) or 'off')
+    lines[#lines + 1] = '- Crash hits by velocity: ' .. (o.soft_cym_below
+        and ('choke below ' .. o.choke_below .. ', soft below ' .. o.soft_cym_below) or 'off')
     lines[#lines + 1] = '- Crash riding soft / hard: ' .. OnOff(o.crash_ride_alt)
     lines[#lines + 1] = '- Flam left hand late: ' .. OnOff(o.flam_late)
     lines[#lines + 1] = ''
-    lines[#lines + 1] = 'The hi-hat pedal notes were left as they were.'
+    if o.blue_open or o.open_hat_above then
+        lines[#lines + 1] = 'Hi-hat pedal (25): open-hat notes written; the other 25s (the foot ' ..
+                            'keeping time) were left as they were.'
+    else
+        lines[#lines + 1] = 'The hi-hat pedal notes were left as they were.'
+    end
     local dt = r.time_precise() - t0
     if dt > 2 then lines[#lines + 1] = string.format('Took %.1f s.', dt) end
     if #skipped > 0 then

@@ -260,9 +260,10 @@ local row_x = r.ImGui_GetCursorPosX(ctx)   -- includes the current indent
 TextDim(label)
 r.ImGui_SameLine(ctx, row_x + lbl_col)
 ```
-`rock_band_general_helper_vkr/ui_metadata.lua` is currently the only file that
-combines `Indent` with a label column — every other tab draws unindented, where
-the two forms are identical.
+`rock_band_general_helper_vkr/ui_metadata.lua` and Animation > Drums' velocity rows
+(`ui_animation.lua`, `VelocityRow`) are currently the only places that combine
+`Indent` with a label column — every other tab draws unindented, where the two
+forms are identical.
 
 ### Radio button columns
 `RadioButton` has no width parameter, so when a tab has multiple rows of

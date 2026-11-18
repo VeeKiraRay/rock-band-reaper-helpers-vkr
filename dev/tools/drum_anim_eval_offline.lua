@@ -3,7 +3,7 @@
 -- rule: strict R L R L through runs up to an 8th apart).
 --
 --   lua dev/tools/drum_anim_eval_offline.lua [dev|holdout|all] [csv]
---   DRUM_ANIM_BLUE=pick - "Blue cymbal: open hi-hat" on for the songs that play
+--   DRUM_ANIM_BLUE=pick - "Blue cymbal: Hi-hat" on for the songs that play
 --   blue as the hi-hat (see below), as their authors would choose.
 --
 -- Corpus: _external_docs/all_rb3_dlc_reference_songs (local, not in the repo).
@@ -111,7 +111,7 @@ for i, e in ipairs(names) do
             end
             for _, x in ipairs(t.texts) do texts[#texts + 1] = { qn = x.tick / tp, text = x.text } end
             local onsets = DrumAnimOnsets(gems, toms, DrumAnimDiscoSpans(texts))
-            -- DRUM_ANIM_BLUE=pick: the "Blue cymbal: open hi-hat" option turned on for
+            -- DRUM_ANIM_BLUE=pick: the "Blue cymbal: Hi-hat" option turned on for
             -- the songs whose official chart plays blue as the hi-hat 90%+ (as the
             -- author of that song would pick it).
             local opts = {}
@@ -195,7 +195,7 @@ for i, e in ipairs(names) do
 end
 
 print(string.format('Drum animation vs official - %s, %d songs', mode, songs))
-if blue_songs then print(string.format('  "Blue cymbal: open hi-hat" picked for %d songs', blue_songs)) end
+if blue_songs then print(string.format('  "Blue cymbal: Hi-hat" picked for %d songs', blue_songs)) end
 local keys = {}
 for k in pairs(M) do keys[#keys + 1] = k end
 table.sort(keys)
