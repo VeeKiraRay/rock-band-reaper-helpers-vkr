@@ -367,6 +367,24 @@ function SmfListFiles(root, pattern)
     return out
 end
 
+-- The corpus folder a dev tool was given on its command line. Committed tools never say
+-- where a corpus lives - it is local data that outlives no tool - so the caller passes it
+-- on every run. Returns the folder with a trailing separator. Prints `usage` and exits
+-- when the argument is missing, or when nothing under the folder matches `pattern` (a Lua
+-- pattern on the full path, default '%.mid$').
+function SmfCorpusArg(value, usage, pattern)
+    if not value or value == '' then
+        io.stderr:write(usage .. '\n')
+        os.exit(2)
+    end
+    local dir = value:gsub('[/\\]+$', '') .. '/'
+    if #SmfListFiles(dir, pattern) == 0 then
+        io.stderr:write(('Nothing matching %s under %s\n\n%s\n'):format(pattern or '%.mid$', dir, usage))
+        os.exit(2)
+    end
+    return dir
+end
+
 -- Shortname for a reference-corpus MIDI: the file's own basename, which in this corpus
 -- is always the song shortname. Identifiers, not content - safe to print in a report.
 function SmfShortname(path)

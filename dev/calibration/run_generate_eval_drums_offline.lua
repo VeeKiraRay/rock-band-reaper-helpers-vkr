@@ -104,7 +104,9 @@ local function KeepRates(dl, upper, gen, off)
     end
 end
 
-local CORPUS = _root .. '_external_docs/all_rb3_dlc_reference_songs/'
+dofile(_root .. 'dev/dev_defaults.lua')
+local CORPUS, CORPUS_WHY = DevPath('corpus_rb3_dlc', true)
+if not CORPUS then io.stderr:write(CORPUS_WHY .. '\n') os.exit(2) end
 local OUT    = _dir .. 'generate_eval_drums_report.txt'
 local LO     = { X = 96, H = 84, M = 72, E = 60 }
 local UPPER  = { H = 'X', M = 'H', E = 'M' }

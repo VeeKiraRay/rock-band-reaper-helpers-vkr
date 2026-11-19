@@ -1,9 +1,9 @@
 -- @description Rock Band Difficulty Calibration - corpus scoring run
 -- @author VeeKiraRay
 -- @about
---   Calibration pilot for the difficulty suggester. Walks the reference corpus in
---   _external_docs/ (see _corpora below - reference_songs/ plus the low-end set
---   new_reference_songs/), imports each song's MIDI, scores Expert
+--   Calibration pilot for the difficulty suggester. Walks the reference corpus (the
+--   corpus_* keys of dev/dev_defaults.lua; see _corpora below), imports each song's
+--   MIDI, scores Expert
 --   guitar and bass with the four planned difficulty factors, and appends a row
 --   per (song, instrument) to dev/calibration/corpus_scores.csv.
 --
@@ -17,10 +17,10 @@
 --   Analysis (Spearman rho, the score->rank fit, tier accuracy) is a separate
 --   action: run_calibration_analysis_vkr.lua, which reads the CSV this writes.
 --
---   RUN THIS FROM THE REPO, not from a deploy_to_reaper.bat copy. It locates the
---   corpus relative to its own path, and _external_docs/ is neither versioned nor
---   deployed - a deployed copy would find no songs. Register it via
---   Actions > Load ReaScript pointed at the repo checkout.
+--   RUN THIS FROM THE REPO, not from a deploy_to_reaper.bat copy. It finds the corpus
+--   through dev/dev_defaults.lua (your paths in the gitignored dev_defaults.local.lua),
+--   and neither those nor the corpus are deployed - a deployed copy would find no songs.
+--   Register it via Actions > Load ReaScript pointed at the repo checkout.
 --
 --   Results appear in the REAPER console (View > Show REAPER console).
 
@@ -32,6 +32,7 @@ local function _strip(d)
     return (d:match('^(.+)[/\\]+$') or d):match('^(.+[/\\])') or d
 end
 local _root   = _strip(_strip(_dir))                    -- repo root
+dofile(_root .. 'dev/dev_defaults.lua')                 -- DevPath: where the corpus lives
 -- Every corpus root, walked in order and pooled into one song list.
 --
 -- More than one because the low-end set added in 2026-08 sits beside the original corpus
@@ -45,20 +46,29 @@ local _root   = _strip(_strip(_dir))                    -- repo root
 -- (reference_songs, new_reference_songs, hard_reference_songs, genre_reference_songs)
 -- held overlapping copies in two different layouts; every song they carried now lives
 -- under exactly one of these, verified by hash.
-local _corpora = {
+local _corpus_keys = {
     -- rb3_dlc only. HOLDS THE RESERVED TEST PARTITION TOO - 258 of its 588 songs have
     -- never been walked. That is safe only because of the reserved guard below; without
     -- it, listing this root would score them and nothing about the result would look
     -- wrong afterwards.
-    _root .. '_external_docs/all_rb3_dlc_reference_songs/',
+    'corpus_rb3_dlc',
     -- lego, rb2, greenday. Always-training at weight 0.30, never predicted.
-    _root .. '_external_docs/aux_reference_songs/',
+    'corpus_aux',
     -- RBN (game_origin ugc_plus), whose dta files ParseSongsDta does not read -
     -- deliberately: every RBN rank is exactly a tier floor, so those rows are tier
     -- labels rather than ranks and cannot be regression targets. Listed so the walk
     -- reports them rather than leaving them invisible.
-    _root .. '_external_docs/rbn_reference_songs/',
+    'corpus_rbn',
 }
+local _corpora = {}
+for i, key in ipairs(_corpus_keys) do
+    local path, why = DevPath(key, true)
+    if not path then
+        r.ShowConsoleMsg(why .. '\nNothing scored.\n')
+        return
+    end
+    _corpora[i] = path
+end
 
 -- THE RESERVED PARTITION GUARD.
 --
@@ -339,10 +349,9 @@ if #songs == 0 then
     for _, root in ipairs(_corpora) do r.ShowConsoleMsg(('  %s\n'):format(root)) end
     r.ShowConsoleMsg('\n')
     r.ShowConsoleMsg('Nothing to do - skipping rather than failing.\n\n')
-    r.ShowConsoleMsg('If you expected songs there, the usual cause is running a deployed\n')
-    r.ShowConsoleMsg('copy of this script instead of the repo one. The corpus path is derived\n')
-    r.ShowConsoleMsg('from the script location, and _external_docs/ is neither versioned nor\n')
-    r.ShowConsoleMsg('deployed. Register the repo copy via Actions > Load ReaScript.\n')
+    r.ShowConsoleMsg('If you expected songs there, check the corpus_* paths in\n')
+    r.ShowConsoleMsg('dev/dev_defaults.local.lua, and that this is the repo copy of the script\n')
+    r.ShowConsoleMsg('(Actions > Load ReaScript), not a deployed one.\n')
     return
 end
 
@@ -642,8 +651,10 @@ local function WriteManifest()
     -- Which roots were pooled. Origin counts alone cannot show this: the low-end set is
     -- rb3_dlc too, so a manifest without the roots gives no way to tell a corpus that
     -- includes it from one that does not.
-    for i, root in ipairs(_corpora) do
-        f:write(('corpus root %d   : %s\n'):format(i, root))
+    -- The key names, never the paths: this file is committed, and a path would name this
+    -- machine's folders (see dev/dev_defaults.lua).
+    for i, key in ipairs(_corpus_keys) do
+        f:write(('corpus root %d   : %s\n'):format(i, key))
     end
     f:write(('rows this run   : %d\n'):format(n_scored))
     f:write(('rows skipped    : %d  (already present)\n'):format(n_skipped))

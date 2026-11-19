@@ -3,9 +3,9 @@
 -- NextSectionEvent / ValidatePlainInsert validation logic, and EVENTS-track
 -- integration (inserts, quick actions).
 --
--- The runner sets _EVENTS_LIST_PATH (path to the ground-truth txt); the
--- vocabulary test is skipped with a note when the file is not present
--- (e.g. deployed installs without _external_docs/).
+-- The runner sets _EVENTS_LIST_PATH (the community "Text Events List", local data
+-- found through dev/dev_defaults.lua); the vocabulary test is skipped with a note
+-- when it is not set or the file is not there.
 
 -- Build a scan structure (same shape as ScanEventsTextEvents) from an array
 -- of { msg=, t= } pairs. Pure - usable without a take.
@@ -31,6 +31,7 @@ Test.section('Event vocabulary (generated strings vs full list)')
 ----------------------------------------------------------------------
 
 local function LoadEventList()
+    if not _EVENTS_LIST_PATH then return nil end
     local f = io.open(_EVENTS_LIST_PATH, 'r')
     if not f then return nil end
     local set = {}
@@ -51,8 +52,9 @@ end
 
 local _list = LoadEventList()
 if not _list then
-    r.ShowConsoleMsg('  SKIP  vocabulary test (events list not found at\n         '
-                     .. tostring(_EVENTS_LIST_PATH) .. ')\n')
+    r.ShowConsoleMsg('  SKIP  vocabulary test (' .. (_EVENTS_LIST_PATH
+                     and ('events list not found at\n         ' .. _EVENTS_LIST_PATH)
+                     or tostring(_EVENTS_LIST_WHY):gsub('\n', ' ')) .. ')\n')
 else
     Test.it('every generatable event string exists in the full list', function()
         local missing = {}

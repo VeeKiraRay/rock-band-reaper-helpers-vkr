@@ -108,7 +108,7 @@ Items 1 and 2 are covered by `dev/tests/script_links.lua`, which checks the regi
 | `lib/reaper_karplus_strong.lua` | `KarplusStrongVoice`, `SynthesizeChordSamples`, `SYNTH_TONES`, `SYNTH_TONE_ORDER`, `SynthToneOpts`, `SynthTonesInFamily` — struck/plucked-string synthesis and its per-instrument tone presets, for chord audition |
 | `lib/reaper_difficulty_score.lua` | `ScoreChart`, `SCORE_FACTOR_KEYS`, `NormalizeSpans`, `EventsInSegments`, `DeriveSpansFromEvents`, `ProRemapEvents`, `Percentile`, `TotalSpanSeconds`, `SpanOverlapSeconds`, `DIFFICULTY_PRIMITIVES` — chart difficulty factors for guitar/bass/drums/keys/Pro Keys. Pure, no `r`/`ctx`/`S`. `DIFFICULTY_PRIMITIVES` exports four per-event building blocks (`PitchSetChanged`, `ShapeKey`, `MotionKey`, `ConditionalEntropy`) for the general helper's Overdrive tab, which scores single bars. Exported rather than copied, so the models stay tied to one implementation |
 | `lib/reaper_difficulty_score_vocals.lua` | `ScoreVocalChart`, `NormalizeVocalPhrases`, `VocalClassifyLyric`, `VocalPitchClassDistance`, `VocalNoteIsPitched`, `VocalSubtractPercussion` — the vocal factor set. Pure. **Load after `reaper_difficulty_score.lua`**: it uses that file's span helpers and appends its columns to `SCORE_FACTOR_KEYS` |
-| `lib/reaper_difficulty_tiers.lua` | `RANK_TIER_THRESHOLDS`, `TIER_NAMES`, `TierForRank`, `TierName`, `TierBand`, `TierPosition` — rank to displayed tier (0 Warmup … 6 Impossible), from `_external_docs/InstrumentDifficulty.ts`. Pure. **Both open-ended bands are closed by the model, not the tier table**: tier 6 by `rank_hi`, tier 0 by `rank_lo`. Measured from rank 1 instead, every floor-clamped Warmup chart computed 0.85–0.97 and read as almost-Apprentice while having fallen off the *bottom* of the scale (drums: 97% of a 1–124 band whose model floor is 120). Both args are optional and omitting them keeps the tier table's own 1-and-infinity |
+| `lib/reaper_difficulty_tiers.lua` | `RANK_TIER_THRESHOLDS`, `TIER_NAMES`, `TierForRank`, `TierName`, `TierBand`, `TierPosition` — rank to displayed tier (0 Warmup … 6 Impossible), from the community `InstrumentDifficulty.ts` tier table. Pure. **Both open-ended bands are closed by the model, not the tier table**: tier 6 by `rank_hi`, tier 0 by `rank_lo`. Measured from rank 1 instead, every floor-clamped Warmup chart computed 0.85–0.97 and read as almost-Apprentice while having fallen off the *bottom* of the scale (drums: 97% of a 1–124 band whose model floor is 120). Both args are optional and omitting them keeps the tier table's own 1-and-infinity |
 | `lib/reaper_difficulty_predict.lua` | `DIFFICULTY_SCALE_INV`, `DifficultyModelInputs`, `DifficultyPredictRank`, `DifficultyFactorZ`, `DifficultyOutOfRange` — how to apply a frozen model. Pure. Coefficients are in **standardized** units, so nothing may apply them by hand |
 | `lib/reaper_difficulty_models.lua` | **Generated** — `RB_DIFFICULTY_MODELS`, `RB_DIFFICULTY_MODEL_ORDER`, `RB_DIFFICULTY_MODELS_SCHEMA`. The six frozen fitted models. The file states its own format version in `RB_DIFFICULTY_MODELS_SCHEMA`, which is the only place to read it — a copy quoted here drifts the first time the exporter bumps it. Carries coefficients, standardization stats, rank clamp, per-factor `bounds`, concentration thresholds, and `corr` (pairwise factor correlations at \|r\| ≥ 0.70, used to stop the explanation panel restating one observation twice). Rewritten only by `dev/calibration/export_production_models.lua`; never hand-edit |
 | `lib/reaper_difficulty_read.lua` | `FindTrackExact`, `ReadGemEvents`, `RB_CHART_SPECS`, `ScoreChartForSpec`, `ReadVocalNotes`, … — the chart readers. Used by the General Helper's Metadata > Difficulty, the Instrument Helper's Generate and Overdrive, and `dev/calibration/`; touches `r` only inside functions |
@@ -529,8 +529,9 @@ context. Results print to the REAPER console.
 not from a copy deployed into REAPER's Scripts folder. Suites read files a
 deployed copy does not carry — `dev/calibration/` (the difficulty suites load
 the scorer and stats from there), `.github/workflows/release.yml` (the Script
-Links suite checks the release zip list), and `_external_docs/` for
-corpus-based tools — and fail to load or fail spuriously without them. Running
+Links suite checks the release zip list), and `dev/dev_defaults.lua` with your local
+`dev/dev_defaults.local.lua` for the suites that check against local reference files —
+and fail to load or fail spuriously without them. Running
 from the repo also tests the current code with no deploy step in between.
 
 Structure: `framework.lua` provides `Test.section` / `Test.it` / `Test.expect`
@@ -742,11 +743,24 @@ can act on; the same sentence prefixed with `_external_docs/` only looks like a 
 repo path. Where a planning document holds a durable lesson, write the lesson into the
 committed file and leave the document out of it.
 
-**A path the code actually loads is not a citation and stays.** `dev/calibration/` and
-`dev/tests/` build real filesystem paths under `_external_docs/` because that is where
-the corpus and reference files have to be placed; those, and the prose explaining that the
-folder is unversioned and must be supplied, are operating instructions rather than
-pointers to reading material.
+**No committed file says where local data lives.** The corpora and reference files are
+gathered for one question and the tools outlive them, so code never builds a path to them:
+- `dev/tools/` command-line scripts take the corpus folder as an argument on every run
+  (`SmfCorpusArg` in `dev/tools/smf_reader.lua` prints the usage and exits without one).
+- Scripts REAPER runs, the calibration harness and the test suites ask
+  `DevPath('<key>')` (`dev/dev_defaults.lua`, committed with a placeholder per key and a
+  line saying what each is). Each machine sets its values in `dev/dev_defaults.local.lua`,
+  which is gitignored; a relative value is taken from the repo root. A key left unset
+  returns nil and a message naming it, so a fresh clone still loads every script: a
+  calibration runner stops, a test skips. A new dataset gets a new key there.
+- A probe in `dev/probes/` (gitignored) may hard-code its path.
+
+**No absolute path in any committed file** - not in code, docs, test fixtures, or anything
+a script writes into the repo (manifests, reports, CSVs). A machine's path names the person
+and their folders, is wrong on every other checkout, and stays in git history after it is
+removed. Write the dataset's key, a repo-relative path, or a description instead. A
+generator that records where it read from writes the key name (`run_calibration_vkr.lua`'s
+manifest does).
 
 ### Probes (`dev/probes/`, gitignored) vs tools (`dev/tools/`)
 

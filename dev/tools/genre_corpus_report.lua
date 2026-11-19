@@ -1,8 +1,8 @@
 -- What the released-song catalogue says about genre, and where it disagrees with itself.
 --
---     lua dev/tools/genre_corpus_report.lua [repo_root]
+--     lua dev/tools/genre_corpus_report.lua <exports folder> [repo_root]
 --
--- Reads the tab-separated exports in _external_docs/genre_reference_songs/ (name, artist,
+-- Reads the tab-separated catalogue exports in <exports folder> (name, artist,
 -- genre, sub_genre; one song per line, a header line first) and reports what is actually
 -- in them. Plain Lua, no REAPER: run it from a terminal.
 --
@@ -11,7 +11,7 @@
 -- way to re-check it after the mapping or the catalogue changes.
 --
 -- DEV ONLY, AND NOTHING HERE SHIPS. The catalogue is licensed content the repo does not
--- own; it is gitignored under _external_docs/*, and no song title, artist or count derived
+-- own; it stays outside the repo, and no song title, artist or count derived
 -- from it may reach a shipped module or the UI. What ships is the mapping those numbers
 -- informed, not the numbers.
 --
@@ -24,10 +24,15 @@
 --      metadata_genres_ext.lua.
 -- The report cannot tell these apart. It flags the artists so a human can check.
 
-local root = ... or './'
+local song_arg, root = ...
+if not song_arg or song_arg == '' then
+    io.stderr:write('usage: lua dev/tools/genre_corpus_report.lua <exports folder> [repo_root]\n')
+    os.exit(2)
+end
+root = root or './'
 if not root:match('[/\\]$') then root = root .. '/' end
 
-local SONG_DIR = root .. '_external_docs/genre_reference_songs/'
+local SONG_DIR = song_arg:gsub('[/\\]+$', '') .. '/'
 local MOD_DIR  = root .. 'rock_band_general_helper_vkr/'
 
 ----------------------------------------------------------------------

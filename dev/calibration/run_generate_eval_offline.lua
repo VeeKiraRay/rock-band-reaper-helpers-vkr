@@ -55,7 +55,9 @@ if OFFICIAL then
     GEN5_PARAMS.fast_runs_default = 'thin'
 end
 
-local CORPUS = _root .. '_external_docs/all_rb3_dlc_reference_songs/'
+dofile(_root .. 'dev/dev_defaults.lua')
+local CORPUS, CORPUS_WHY = DevPath('corpus_rb3_dlc', true)
+if not CORPUS then io.stderr:write(CORPUS_WHY .. '\n') os.exit(2) end
 local OUT    = _dir .. 'generate_eval_report.txt'
 
 local INSTRUMENTS = {

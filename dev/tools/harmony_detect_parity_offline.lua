@@ -6,7 +6,8 @@
 -- measured), frame by frame, on the decrypted official moggs. The shipped accuracy numbers
 -- only apply while this passes.
 --
---   lua dev/tools/harmony_detect_parity_offline.lua [shortname ...]
+--   lua dev/tools/harmony_detect_parity_offline.lua <corpus> [shortname ...]
+--   <corpus> = the folder of decrypted official moggs (see harmony_audio_core.lua).
 --
 -- Default songs: a few with harmonies. Inputs and env: see harmony_audio_core.lua
 -- (HAP_CACHE advised).
@@ -27,9 +28,11 @@ local SP_MI
 for i, me in ipairs(SP.METHODS) do if me.name == 'mask 128ms max' then SP_MI = i end end
 assert(SP_MI, 'the spectral core no longer has the measured method')
 
+local CORPUS = SmfCorpusArg(arg[1], 'usage: lua dev/tools/harmony_detect_parity_offline.lua <corpus folder> [shortname ...]',
+                            H.MOGG_PATTERN)
 local SONGS = {}
-for i = 1, #arg do SONGS[arg[i]] = true end
-if #arg == 0 then
+for i = 2, #arg do SONGS[arg[i]] = true end
+if #arg <= 1 then
     for _, s in ipairs({ 'californication', 'amaranth', 'webuiltthiscity', 'takeonme', 'otherside' }) do
         SONGS[s] = true
     end
@@ -81,7 +84,7 @@ local function Bad(what, sn, t, a, b)
     end
 end
 
-for _, mogg in ipairs(SmfListFiles(_root .. H.FOLDER_REL, 'decrypted[\\/][^\\/]+%.mogg$')) do
+for _, mogg in ipairs(SmfListFiles(CORPUS, H.MOGG_PATTERN)) do
     local sn = mogg:match('([^\\/]+)%.[Mm][Oo][Gg][Gg]$')
     if SONGS[sn] then
         local song_dir = mogg:match('^(.*[\\/])decrypted[\\/]')

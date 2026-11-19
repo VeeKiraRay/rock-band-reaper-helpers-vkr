@@ -25,6 +25,8 @@ resources/**/*.png
 resources/**/*.rbtheme
 
 _external_docs/*
+# This machine's paths to the local data the dev scripts read (see dev/dev_defaults.lua).
+dev/dev_defaults.local.lua
 _future_ideas/*
 _raw_assets/*
 _old_stuff/*

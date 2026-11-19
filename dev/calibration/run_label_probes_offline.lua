@@ -344,11 +344,13 @@ do
     dofile(_dir .. 'corpus.lua')
 
     local n = 0
-    for _, root in ipairs({
-        _root .. '_external_docs/reference_songs/',
-        _root .. '_external_docs/new_reference_songs/',
-        _root .. '_external_docs/hard_reference_songs/',
-    }) do
+    dofile(_root .. 'dev/dev_defaults.lua')
+    local roots = {}
+    for _, key in ipairs({ 'corpus_legacy', 'corpus_legacy_new', 'corpus_legacy_hard' }) do
+        local path, why = DevPath(key, true)
+        if path then roots[#roots + 1] = path else Msg('  ' .. why .. '\n') end
+    end
+    for _, root in ipairs(roots) do
         for _, s in ipairs(WalkCorpus(root)) do
             if s.song_id and not song_id[s.shortname] then
                 song_id[s.shortname] = s.song_id

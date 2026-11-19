@@ -3,8 +3,9 @@
 -- @about
 --   Tests for the shipped difficulty suggester:
 --     lib/reaper_difficulty_tiers.lua    - rank to tier, tier bands, position in band,
---       re-asserted against _external_docs/InstrumentDifficulty.ts rather than trusting
---       the transcription.
+--       re-asserted against the community InstrumentDifficulty.ts tier table (dev path
+--       instrument_difficulty_ts, dev/dev_defaults.lua) rather than trusting the
+--       transcription; skipped without it.
 --     lib/reaper_difficulty_predict.lua  - standardization, scale inversion, rank
 --       clamping, out-of-range detection, factor z-scores.
 --     lib/reaper_difficulty_models.lua   - the frozen artifact: schema, shape, and the

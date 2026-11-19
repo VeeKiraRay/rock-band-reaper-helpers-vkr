@@ -21,7 +21,10 @@ local function _up(d) return d:match('^(.*[/\\])[^/\\]+[/\\]$') or '' end
 local _root  = _up(_up(_tdir))
 
 local CSV_PATH = _root .. 'dev/calibration/corpus_scores.csv'
-local TS_PATH  = _root .. '_external_docs/InstrumentDifficulty.ts'
+-- The community InstrumentDifficulty.ts tier table: local data, found through
+-- dev/dev_defaults.lua. Without it the threshold test is skipped, not failed.
+dofile(_root .. 'dev/dev_defaults.lua')
+local TS_PATH, TS_WHY = DevPath('instrument_difficulty_ts')
 
 local function Split(line)
     local out = {}
@@ -91,7 +94,10 @@ local TS_TO_LUA = {
     PRO_GUITAR = 'real_guitar', BAND = 'band',
 }
 
-Test.it('every threshold row matches _external_docs/InstrumentDifficulty.ts', function()
+if not TS_PATH then
+    r.ShowConsoleMsg('  SKIP  threshold rows vs InstrumentDifficulty.ts (' .. TS_WHY:gsub('\n', ' ') .. ')\n')
+else
+Test.it('every threshold row matches the InstrumentDifficulty.ts tier table', function()
     local ts = ParseThresholdsTs(TS_PATH)
     Test.expect(ts ~= nil, 'InstrumentDifficulty.ts not found at ' .. TS_PATH)
     local checked = 0
@@ -108,6 +114,7 @@ Test.it('every threshold row matches _external_docs/InstrumentDifficulty.ts', fu
     end
     Test.expect(checked == 9, 'expected 9 instrument rows, checked ' .. checked)
 end)
+end
 
 Test.it('the drums diff5 correction is still 345, not 245', function()
     -- Guarding the specific regression: 245 made Challenging span 242-244 and put zero

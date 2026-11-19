@@ -24,7 +24,8 @@ local _tdir = _root .. 'dev/tests/'
 local _gdir = _root .. 'rock_band_general_helper_vkr/'
 
 ctx = nil
-_EVENTS_LIST_PATH = _root .. '_external_docs/Text Events List - Events.txt'
+dofile(_root .. 'dev/dev_defaults.lua')                         -- DevPath
+_EVENTS_LIST_PATH, _EVENTS_LIST_WHY = DevPath('text_events_list')
 
 r.ClearConsole()
 r.ShowConsoleMsg('======  Venue Events - tests  ======\n')

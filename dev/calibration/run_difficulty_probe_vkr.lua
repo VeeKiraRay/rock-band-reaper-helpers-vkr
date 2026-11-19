@@ -35,7 +35,7 @@
 --
 --   Imports tracks and restores the tempo map around each song, so RUN IT IN A
 --   SCRATCH PROJECT. Run the repo copy (Actions > Load ReaScript), not a deployed one:
---   the corpus is found relative to this script and _external_docs/ is never deployed.
+--   the corpus is found through dev/dev_defaults.lua (corpus_rb3_dlc), never deployed.
 
 r = reaper
 
@@ -105,7 +105,12 @@ SCRIPT_MDIR   = _mdir
 SCRIPT_DIR    = _root
 
 -- Only the official RB3 DLC root: its charts are Harmonix-authored at all four tiers.
-local CORPUS_ROOT = _root .. '_external_docs/all_rb3_dlc_reference_songs/'
+dofile(_root .. 'dev/dev_defaults.lua')
+local CORPUS_ROOT, CORPUS_WHY = DevPath('corpus_rb3_dlc', true)
+if not CORPUS_ROOT then
+    r.ShowConsoleMsg(CORPUS_WHY .. '\n')
+    return
+end
 
 local OUT_REPORT = _dir .. 'difficulty_probe_report.txt'
 local OUT_TIERS  = _dir .. 'difficulty_probe_tiers.csv'
@@ -569,7 +574,7 @@ table.sort(pool, function(a, b) return a.shortname < b.shortname end)
 
 if #pool == 0 then
     r.ShowConsoleMsg('No songs found under ' .. CORPUS_ROOT .. '\n')
-    r.ShowConsoleMsg('Run the repo copy of this script; _external_docs/ is never deployed.\n')
+    r.ShowConsoleMsg('Check corpus_rb3_dlc in dev/dev_defaults.local.lua, and run the repo copy of this script.\n')
     return
 end
 

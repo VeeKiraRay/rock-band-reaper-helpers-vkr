@@ -1,7 +1,8 @@
 -- Scores Events > Metronome (MetronomePlan) against the official charts' practice
 -- metronome notes, EVENTS 24 / 25 / 26.
 --
---   lua dev/tools/metronome_eval_offline.lua [dev|holdout|all] [songs]
+--   lua dev/tools/metronome_eval_offline.lua <corpus> [dev|holdout|all] [songs]
+--   <corpus> = the folder of official RB3 DLC MIDIs (local data, not in the repo).
 --   METRONOME_SET="auto_16th_below_bpm=100" - try parameters without
 --   editing the planner.
 --   METRONOME_INTRO=chart|steady|audio (default audio, the shipped default: the
@@ -42,11 +43,13 @@ for kv in (os.getenv('METRONOME_SET') or ''):gmatch('[^,]+') do
     end
 end
 
-local mode = arg[1] or 'dev'
-local list_songs = arg[2] == 'songs'
+local USAGE = 'usage: lua dev/tools/metronome_eval_offline.lua <corpus folder> [dev|holdout|all] [songs]'
+local corpus = SmfCorpusArg(arg[1], USAGE)
+local mode = arg[2] or 'dev'
+local list_songs = arg[3] == 'songs'
 local TOL_TICKS = 10
 
-local files = SmfListFiles(_root .. '_external_docs/all_rb3_dlc_reference_songs')
+local files = SmfListFiles(corpus)
 local names, seen = {}, {}
 for _, f in ipairs(files) do
     local n = SmfShortname(f)

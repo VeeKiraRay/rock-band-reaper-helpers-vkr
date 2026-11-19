@@ -11,13 +11,15 @@
 -- and the pitch searches on what is left. It is the reference for
 -- lib/reaper_harmony_detect.lua, which must reproduce it frame by frame (the parity tool).
 --
--- Callers must have loaded dev/tools/smf_reader.lua and lib/reaper_dsp.lua first.
+-- Callers must have loaded dev/tools/smf_reader.lua and lib/reaper_dsp.lua first, and pass
+-- the corpus folder themselves (the decrypted official moggs with their charts and
+-- songs.dta; local data, not in the repo) - H.MOGG_PATTERN finds the moggs under it.
 -- Env: FFMPEG (default 'ffmpeg' on PATH), TEMP for temp files, HAP_CACHE=<folder> to keep the
 -- decoded audio between runs (~15 MB a song; derived commercial audio, keep it outside the repo).
 
 local H = {}
 
-H.FOLDER_REL = '_external_docs/reference_songs'
+H.MOGG_PATTERN = 'decrypted[\\/][^\\/]+%.mogg$'
 local FFMPEG = os.getenv('FFMPEG') or 'ffmpeg'
 local TMP    = (os.getenv('TEMP') or os.getenv('TMP') or '.'):gsub('[\\/]$', '') .. '\\'
 

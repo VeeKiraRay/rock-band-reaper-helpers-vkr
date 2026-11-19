@@ -1,4 +1,4 @@
--- Regenerate _external_docs/all_rb3_dlc_reference_songs/FROZEN_DEVELOPMENT_SET.txt.
+-- Regenerate FROZEN_DEVELOPMENT_SET.txt in the corpus_rb3_dlc folder (dev/dev_defaults.lua).
 --
 --     lua dev/calibration/write_frozen_set.lua
 --
@@ -31,7 +31,16 @@ if not io.open(root .. 'dev/calibration/corpus_scores.csv', 'r') then
     io.write('Run from the repository root.\n')
     os.exit(1)
 end
-local ext  = root .. '_external_docs/'
+dofile(root .. 'dev/dev_defaults.lua')
+-- A corpus root's folder by its dev/dev_defaults.lua key; stops when one is not set.
+local function Root(key)
+    local path, why = DevPath(key, true)
+    if not path then
+        io.write(why .. '\n')
+        os.exit(1)
+    end
+    return path
+end
 
 local FNV_OFFSET, FNV_PRIME = 0xcbf29ce484222325, 0x100000001b3
 local function Hash(path)
@@ -49,10 +58,10 @@ local function Hash(path)
     return string.format('%016x', h), n
 end
 
-local function ListMids(folder)
+local function ListMids(key)
     local out = {}
-    local p = io.popen(('cmd /c dir /b /s "%s\\*.mid" 2>nul'):format(
-        (ext .. folder):gsub('/', '\\')))
+    local p = io.popen(('cmd /c dir /b /s "%s*.mid" 2>nul'):format(
+        Root(key):gsub('/', '\\')))
     if not p then return out end
     for line in p:lines() do
         local base = line:match('([^\\/]+)%.[Mm][Ii][Dd]$')
@@ -65,7 +74,9 @@ local function ListMids(folder)
     return out
 end
 
-local ROOTS = { 'all_rb3_dlc_reference_songs', 'aux_reference_songs', 'rbn_reference_songs' }
+local ROOTS = { 'corpus_rb3_dlc', 'corpus_aux', 'corpus_rbn' }
+-- The "root" column of the frozen set: the labels it has always carried.
+local ROOT_LABEL = { corpus_rb3_dlc = 'all_rb3_dlc', corpus_aux = 'aux', corpus_rbn = 'rbn' }
 local where = {}
 for _, f in ipairs(ROOTS) do
     for base, path in pairs(ListMids(f)) do
@@ -76,7 +87,7 @@ end
 -- The previous record, for scored_hash.
 local prev = {}
 do
-    local f = io.open(ext .. 'all_rb3_dlc_reference_songs/FROZEN_DEVELOPMENT_SET.txt', 'rb')
+    local f = io.open(Root('corpus_rb3_dlc') .. 'FROZEN_DEVELOPMENT_SET.txt', 'rb')
     if f then
         local body = false
         for line in f:lines() do
@@ -117,17 +128,17 @@ local names = {}
 for sn in pairs(origin) do names[#names + 1] = sn end
 table.sort(names)
 
-local out = assert(io.open(ext .. 'all_rb3_dlc_reference_songs/FROZEN_DEVELOPMENT_SET.txt', 'wb'))
+local out = assert(io.open(Root('corpus_rb3_dlc') .. 'FROZEN_DEVELOPMENT_SET.txt', 'wb'))
 local function W(s) out:write(s) end
 
 W('FROZEN DEVELOPMENT SET - the songs every published difficulty figure rests on\n')
 W('===========================================================================\n\n')
 W('Generated. This is the corpus that produced dev/calibration/corpus_scores.csv, and\n')
 W('through it the coefficients in lib/reaper_difficulty_models.lua.\n\n')
-W('LAYOUT. The reference corpus is three origin-separated roots under _external_docs:\n')
-W('  all_rb3_dlc_reference_songs/   rb3_dlc only\n')
-W('  aux_reference_songs/           lego, rb2, greenday - always-training, never predicted\n')
-W('  rbn_reference_songs/           RBN ugc_plus - unscored; ranks are tier floors\n\n')
+W('LAYOUT. The reference corpus is three origin-separated roots (dev/dev_defaults.lua keys):\n')
+W('  corpus_rb3_dlc   (root all_rb3_dlc)   rb3_dlc only\n')
+W('  corpus_aux       (root aux)           lego, rb2, greenday - always-training, never predicted\n')
+W('  corpus_rbn       (root rbn)           RBN ugc_plus - unscored; ranks are tier floors\n\n')
 W('THE RESERVED TEST PARTITION IS DEFINED BY COMPLEMENT. Any song in the rb3 root that\n')
 W('is NOT listed below has never been walked and is reserved. That is why the non-rb3\n')
 W('origins live in their own roots: putting them here would make 148 RBN charts read as\n')
@@ -159,7 +170,7 @@ for _, sn in ipairs(names) do
         if scored ~= cur then drift[#drift + 1] = sn end
         rows[#rows + 1] = ('%-34s %-9s %s %s %9d  %s\n')
             :format(sn, o, scored, (scored == cur) and '       =        ' or cur,
-                    bytes, w.root:gsub('_reference_songs', ''))
+                    bytes, ROOT_LABEL[w.root])
     end
 end
 
@@ -174,7 +185,7 @@ for _, o in ipairs(ord) do
 end
 W(('  %-10s %4d  frozen development songs\n'):format('TOTAL', total))
 
-local rb3 = ListMids('all_rb3_dlc_reference_songs')
+local rb3 = ListMids('corpus_rb3_dlc')
 local reserved = 0
 for base in pairs(rb3) do if not origin[base] then reserved = reserved + 1 end end
 W(('\n  %4d songs in the rb3 root are NOT listed below.\n'):format(reserved))

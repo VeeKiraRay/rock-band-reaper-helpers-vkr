@@ -17,7 +17,9 @@ dofile(root .. 'dev/tools/smf_reader.lua')
 
 local source_csv = dir .. 'corpus_scores.csv'
 local output_csv = dir .. 'corpus_scores_round14.csv'
-local corpus_root = root .. '_external_docs/reference_songs/'
+dofile(root .. 'dev/dev_defaults.lua')
+local corpus_root, corpus_why = DevPath('corpus_legacy', true)
+if not corpus_root then io.stderr:write(corpus_why .. '\n') os.exit(2) end
 
 local function Split(line)
     local out = {}

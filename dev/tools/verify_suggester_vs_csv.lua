@@ -1,6 +1,9 @@
 -- Offline verification: does the shipped suggester measure what the corpus was scored on?
 --
---     lua dev/tools/verify_suggester_vs_csv.lua [n_songs]
+--     lua dev/tools/verify_suggester_vs_csv.lua <corpus> [n_songs]
+--
+-- <corpus> = the calibration corpus folder with the official songs' songs.dta files (local
+-- data, not in the repo).
 --
 -- Loads real corpus MIDIs through a mock REAPER API backed by dev/tools/smf_reader.lua,
 -- runs SuggestProjectDifficulties() exactly as the Metadata > Difficulty view will, and
@@ -38,7 +41,7 @@ local _dir    = _script:match('^(.+[/\\])') or 'dev/tools/'
 local function _up(d) return d:match('^(.*[/\\])[^/\\]+[/\\]$') or '' end
 local _root   = _up(_up(_dir))
 
-local N_SONGS = tonumber(arg and arg[1]) or 6
+local N_SONGS = tonumber(arg and arg[2]) or 6
 
 ----------------------------------------------------------------------
 -- Mock REAPER
@@ -181,7 +184,9 @@ local function ReadFile(p)
 end
 
 local songs = {}
-for _, dta in ipairs(SmfListFiles(_root .. '_external_docs/reference_songs/', 'songs%.dta$')) do
+local CORPUS = SmfCorpusArg(arg and arg[1],
+    'usage: lua dev/tools/verify_suggester_vs_csv.lua <corpus folder> [n_songs]', 'songs%.dta$')
+for _, dta in ipairs(SmfListFiles(CORPUS, 'songs%.dta$')) do
     local pack = dta:gsub('[/\\]Root[/\\]songs[/\\]songs%.dta$', '')
     for _, e in ipairs(ParseSongsDta(ReadFile(dta) or '')) do
         if e.origin == 'rb3_dlc' then

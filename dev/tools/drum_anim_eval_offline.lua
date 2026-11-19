@@ -2,11 +2,11 @@
 -- animation notes, beside a CAT-like reference (CAT's drums_animations hand
 -- rule: strict R L R L through runs up to an 8th apart).
 --
---   lua dev/tools/drum_anim_eval_offline.lua [dev|holdout|all] [csv]
+--   lua dev/tools/drum_anim_eval_offline.lua <corpus> [dev|holdout|all] [csv]
+--   <corpus> = the folder of official RB3 DLC MIDIs (local data, not in the repo).
 --   DRUM_ANIM_BLUE=pick - "Blue cymbal: Hi-hat" on for the songs that play
 --   blue as the hi-hat (see below), as their authors would choose.
 --
--- Corpus: _external_docs/all_rb3_dlc_reference_songs (local, not in the repo).
 -- Hold-out, declared 2026-11-08 BEFORE any tuning: every 5th song by sorted
 -- shortname (index % 5 == 0). Tune on `dev` only; run `holdout` once, when the
 -- rules are final, and record the number - never tune on it afterwards.
@@ -26,14 +26,16 @@ r, S = nil, {}
 dofile(_root .. 'rock_band_general_helper_vkr/animation_drums.lua')
 
 -- Try a parameter change without editing the planner:
---   DRUM_ANIM_SET="crash_keep_qn=-1,drum_fast_ms=160" lua dev/tools/drum_anim_eval_offline.lua
+--   DRUM_ANIM_SET="crash_keep_qn=-1,drum_fast_ms=160" lua dev/tools/drum_anim_eval_offline.lua <corpus>
 for kv in (os.getenv('DRUM_ANIM_SET') or ''):gmatch('[^,]+') do
     local k, v = kv:match('^%s*([%w_]+)%s*=%s*(%S+)')
     if k then DRUM_ANIM_PARAMS[k] = tonumber(v) or v print('param ' .. k .. ' = ' .. v) end
 end
 
-local mode = arg[1] or 'dev'
-local files = SmfListFiles(_root .. '_external_docs/all_rb3_dlc_reference_songs')
+local USAGE = 'usage: lua dev/tools/drum_anim_eval_offline.lua <corpus folder> [dev|holdout|all] [csv]'
+local corpus = SmfCorpusArg(arg[1], USAGE)
+local mode = arg[2] or 'dev'
+local files = SmfListFiles(corpus)
 local names = {}
 for _, f in ipairs(files) do names[#names + 1] = { f = f, n = SmfShortname(f) } end
 table.sort(names, function(a, b) return a.n < b.n end)

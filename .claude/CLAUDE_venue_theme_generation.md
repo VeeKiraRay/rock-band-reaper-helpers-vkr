@@ -444,7 +444,7 @@ call it (see `CLAUDE.md`'s global-vs-local function rule). Both bookend call sit
 ### Camera shot priority (`venue_camera_priority.lua`)
 
 Stacking only works because the game **ranks** the shots it finds on one tick. Source:
-`_external_docs/RBN2 Camera And Lights - RBN_C3 Documentation.htm`, sections "Camera Shot
+the RBN2 "Camera And Lights" RBN/C3 documentation, sections "Camera Shot
 Priority" and "Directed Cuts Priority". The engine evaluates every shot at that tick in a
 fixed order and plays the one that most closely matches the members actually on stage. The
 documented order runs most generic → most specific, and **more specific wins**.

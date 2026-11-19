@@ -67,7 +67,7 @@ Each instrument section gets its own named table(s). Current tables:
 |---|---|
 | `DRUM_NOTATION` | Rows: `img_idx` (0-based column in `drum.png`), `name`, `rb_pro`, `notes`, plus the optional layout/playback fields `col_w`, `gap_after`, `audio_file` — see the table's own header comment in `defaults.lua` |
 | `DRUM_PATTERNS` | Rows: `name`, `desc` |
-| `GUITAR_CHORDS` | Rows: `shape`, `type`, `name`, `sound`, `rb_mapping`. `shape` is standard low-to-high fret notation (`x 3 2 0 1 0` is C major), the same form `_ParseFretPositions` reads — see the table's own header comment in `defaults.lua` for which rows were regenerated rather than copied from `_external_docs/GUITAR_THEORY.md`, and why that doc's fret numbers must not be trusted |
+| `GUITAR_CHORDS` | Rows: `shape`, `type`, `name`, `sound`, `rb_mapping`. `shape` is standard low-to-high fret notation (`x 3 2 0 1 0` is C major), the same form `_ParseFretPositions` reads — see the table's own header comment in `defaults.lua` for which rows were regenerated rather than copied from the earlier guitar-theory reference notes the table started from, and why those notes' fret numbers must not be trusted |
 | `GUITAR_CHORD_TYPES` | Rows: `name`, `description` — drives the Chord Type Explorer selector; every `GUITAR_CHORDS.type` value appears here exactly once and vice versa |
 | `GUITAR_LANE_TERMS` | Rows: `width`, `combos` — RB lane-combo letter names (GR/RY/... ) per spread width |
 

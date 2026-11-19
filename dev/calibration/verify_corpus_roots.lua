@@ -2,9 +2,9 @@
 --
 --     lua dev/calibration/verify_corpus_roots.lua
 --
--- Run it after moving, adding or deleting anything under _external_docs. It is what said
--- the 2026-08-21 consolidation was safe, and it is the check to repeat before the older
--- reference folders are finally removed.
+-- Run it after moving, adding or deleting anything in the corpus folders (the corpus_*
+-- keys of dev/dev_defaults.lua). It is what said the 2026-08-21 consolidation was safe,
+-- and it is the check to repeat before the older reference folders are finally removed.
 --
 -- Four things have to hold.
 --
@@ -27,7 +27,16 @@ if not io.open(root .. 'dev/calibration/corpus_scores.csv', 'r') then
     io.write('Run from the repository root.\n')
     os.exit(1)
 end
-local ext  = root .. '_external_docs/'
+dofile(root .. 'dev/dev_defaults.lua')
+-- A corpus root's folder by its dev/dev_defaults.lua key; stops when one is not set.
+local function Root(key)
+    local path, why = DevPath(key, true)
+    if not path then
+        io.write(why .. '\n')
+        os.exit(1)
+    end
+    return path
+end
 
 local FNV_OFFSET, FNV_PRIME = 0xcbf29ce484222325, 0x100000001b3
 local function Hash(path)
@@ -45,10 +54,10 @@ local function Hash(path)
     return string.format('%016x', h)
 end
 
-local function ListMids(folder)
+local function ListMids(key)
     local out = {}
-    local p = io.popen(('cmd /c dir /b /s "%s\\*.mid" 2>nul'):format(
-        (ext .. folder):gsub('/', '\\')))
+    local p = io.popen(('cmd /c dir /b /s "%s*.mid" 2>nul'):format(
+        Root(key):gsub('/', '\\')))
     if not p then return out end
     for line in p:lines() do
         local base = line:match('([^\\/]+)%.[Mm][Ii][Dd]$')
@@ -61,8 +70,8 @@ local function ListMids(folder)
     return out
 end
 
-local NEW_ROOTS = { 'all_rb3_dlc_reference_songs', 'aux_reference_songs', 'rbn_reference_songs' }
-local OLD_ROOTS = { 'reference_songs', 'new_reference_songs', 'hard_reference_songs' }
+local NEW_ROOTS = { 'corpus_rb3_dlc', 'corpus_aux', 'corpus_rbn' }
+local OLD_ROOTS = { 'corpus_legacy', 'corpus_legacy_new', 'corpus_legacy_hard' }
 
 local newsets, union = {}, {}
 for _, f in ipairs(NEW_ROOTS) do
@@ -81,7 +90,7 @@ io.write(('%-32s %4d distinct songs across the three roots\n\n'):format('UNION',
 -- Frozen set with the hash each song was scored from.
 local frozen = {}
 do
-    local f = assert(io.open(ext .. 'all_rb3_dlc_reference_songs/FROZEN_DEVELOPMENT_SET.txt', 'rb'))
+    local f = assert(io.open(Root('corpus_rb3_dlc') .. 'FROZEN_DEVELOPMENT_SET.txt', 'rb'))
     local body = false
     for line in f:lines() do
         if line:match('^shortname%s+origin') then body = true
@@ -119,9 +128,9 @@ end
 io.write('1. FROZEN SONGS FINDABLE IN THE NEW ROOTS\n')
 local missing, wrong_root = {}, {}
 local EXPECT_ROOT = {
-    rb3_dlc = 'all_rb3_dlc_reference_songs',
-    lego = 'aux_reference_songs', rb2 = 'aux_reference_songs',
-    greenday = 'aux_reference_songs',
+    rb3_dlc = 'corpus_rb3_dlc',
+    lego = 'corpus_aux', rb2 = 'corpus_aux',
+    greenday = 'corpus_aux',
 }
 for sn, rec in pairs(frozen) do
     local u = union[sn]
@@ -154,7 +163,7 @@ io.write(('   mismatches: %d   unchecked: %d\n'):format(#mismatch, unchecked))
 for i = 1, math.min(#mismatch, 12) do io.write('     ' .. mismatch[i] .. '\n') end
 io.write('   (the three known same-name-different-bytes charts are expected here:\n')
 io.write('    the rb3 folder holds its own copy of badmedicine / waitandbleed /\n')
-io.write('    wanteddeadoralive2, and the frozen hash names the reference_songs one)\n')
+io.write('    wanteddeadoralive2, and the frozen hash names the corpus_legacy one)\n')
 
 ------------------------------------------------------------------
 io.write('\n3. ANYTHING LEFT UNIQUE IN THE OLD FOLDERS\n')
@@ -170,7 +179,7 @@ for i = 1, math.min(#left, 12) do io.write('     ' .. left[i] .. '\n') end
 
 ------------------------------------------------------------------
 io.write('\n4. RESERVED PARTITION UNCHANGED\n')
-local rb3 = newsets['all_rb3_dlc_reference_songs']
+local rb3 = newsets['corpus_rb3_dlc']
 local dev, reserved = 0, 0
 for base in pairs(rb3) do
     if frozen[base] then dev = dev + 1 else reserved = reserved + 1 end

@@ -2,13 +2,14 @@
 -- the official RB3 DLC charts, whose songs.dta files carry Harmonix's own
 -- vocal_tonic_note and song_tonality. Plain Lua 5.4, no REAPER:
 --
---   lua dev/tools/key_detect_fit_offline.lua            -- development songs: 5-fold CV
---                                                          report, then writes
---                                                          lib/reaper_key_profiles.lua
---   lua dev/tools/key_detect_fit_offline.lua report     -- the CV report only, no write
---   lua dev/tools/key_detect_fit_offline.lua holdout    -- the hold-out, ONCE (frozen file)
+--   lua dev/tools/key_detect_fit_offline.lua <corpus>          -- development songs: 5-fold CV
+--                                                                report, then writes
+--                                                                lib/reaper_key_profiles.lua
+--   lua dev/tools/key_detect_fit_offline.lua <corpus> report   -- the CV report only, no write
+--   lua dev/tools/key_detect_fit_offline.lua <corpus> holdout  -- the hold-out, ONCE (frozen file)
 --
--- No other reference set can check it: the other folders under _external_docs/ repeat
+-- <corpus> = the folder of official RB3 DLC charts with their songs.dta files (local data,
+-- not in the repo). No other reference set can check it: the other local corpora repeat
 -- these songs, and Rock Band Network songs.dta files carry no vocal_tonic_note.
 --
 -- THE HOLD-OUT is dev/calibration/difficulty_holdout.lua's split (one song in five, by
@@ -26,13 +27,14 @@
 
 local _dir  = (arg and arg[0] or ''):match('^(.+[\\/])') or './'
 local _root = _dir .. '../../'
-local MODE  = arg and arg[1] or 'dev'
 
 dofile(_root .. 'dev/tools/smf_reader.lua')
 dofile(_root .. 'dev/calibration/difficulty_holdout.lua')
 dofile(_root .. 'lib/reaper_key_detect.lua')
 
-local MAIN = _root .. '_external_docs/all_rb3_dlc_reference_songs/'
+local USAGE = 'usage: lua dev/tools/key_detect_fit_offline.lua <corpus folder> [report|holdout]'
+local MAIN = SmfCorpusArg(arg and arg[1], USAGE, 'songs%.dta$')
+local MODE = arg and arg[2] or 'dev'
 local PROFILES_OUT = _root .. 'lib/reaper_key_profiles.lua'
 
 ----------------------------------------------------------------------

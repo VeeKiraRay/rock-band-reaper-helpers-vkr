@@ -5,7 +5,8 @@
 -- rounds measured), on the keys stems of the decrypted official moggs. The shipped accuracy
 -- numbers only apply while this passes.
 --
---   lua dev/tools/chord_detect_parity_offline.lua [all | shortname ...]
+--   lua dev/tools/chord_detect_parity_offline.lua <corpus> [all | shortname ...]
+--   <corpus> = the folder of decrypted official moggs (see harmony_audio_core.lua).
 --
 -- Default songs: a few with many charted chords; 'all' = every development song (held-out
 -- songs are never read), which also re-measures the core's own accuracy against the chart -
@@ -33,10 +34,12 @@ dofile(_root .. 'dev/calibration/difficulty_holdout.lua')
 local H = dofile(_dir .. 'harmony_audio_core.lua')
 local C = dofile(_dir .. 'chord_core.lua')
 
-local ALL = arg[1] == 'all'
+local CORPUS = SmfCorpusArg(arg[1], 'usage: lua dev/tools/chord_detect_parity_offline.lua <corpus folder> [all | shortname ...]',
+                            H.MOGG_PATTERN)
+local ALL = arg[2] == 'all'
 local SONGS = {}
-for i = 1, #arg do SONGS[arg[i]] = true end
-if #arg == 0 then
+for i = 2, #arg do SONGS[arg[i]] = true end
+if #arg <= 1 then
     for _, s in ipairs({ 'onlythelonely', 'lightmyfire', 'touchme', 'takeonme', 'bluemonday' }) do SONGS[s] = true end
 end
 
@@ -133,7 +136,7 @@ local function Bad(what, sn, t, a, b)
     end
 end
 
-for _, mogg in ipairs(SmfListFiles(_root .. H.FOLDER_REL, 'decrypted[\\/][^\\/]+%.mogg$')) do
+for _, mogg in ipairs(SmfListFiles(CORPUS, H.MOGG_PATTERN)) do
     local sn = mogg:match('([^\\/]+)%.[Mm][Oo][Gg][Gg]$')
     if (ALL or SONGS[sn]) and not DiffIsHeldOut(sn) then
         local song_dir = mogg:match('^(.*[\\/])decrypted[\\/]')

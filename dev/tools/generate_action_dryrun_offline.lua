@@ -1,9 +1,10 @@
 -- Offline dry run of Difficulty > Generate - the real GenerateDifficulties action, not just
 -- the planner - under plain Lua 5.4, against MIDI files. No REAPER.
 --
---   lua dev/tools/generate_action_dryrun_offline.lua
---       the test fixtures (verbose) + every 6th development song of the RB3 DLC corpus
---       (summary: runs that leave Validate errors)
+--   lua dev/tools/generate_action_dryrun_offline.lua [corpus]
+--       the test fixtures (verbose); with <corpus> (the folder of official RB3 DLC MIDIs,
+--       local data, not in the repo) also every 6th development song of it (summary: runs
+--       that leave Validate errors)
 --   lua dev/tools/generate_action_dryrun_offline.lua <song.mid> [gtr|bass|keys|pk|drums|drums2x|drums+2x|all|
 --       drums-1x-muted|drums-muted|drums-2x-on-1x|drums-2x-as-1x] [from_qn to_qn]
 --       one song, one part (default gtr): the result text, then X/H/M/E for the range
@@ -402,7 +403,7 @@ local function DumpTiers(track, key, q0, q1)
     end
 end
 
-if arg[1] then
+if arg[1] and arg[1]:lower():match('%.mid$') then
     local key = arg[2] or 'gtr'
     local track = Run(arg[1], key)
     local part = PARTS[(key == 'all' and 'pk') or ((key == 'drums-1x-muted' or key == 'drums-muted' or key == 'drums-2x-on-1x'
@@ -453,7 +454,12 @@ else
         Run(_root .. 'dev/tests/midi/' .. f[1], f[2])
         print(('%-14s %s'):format(f[1], S.status))
     end
-    local files = SmfListFiles(_root .. '_external_docs/all_rb3_dlc_reference_songs/', '%.mid$')
+    if not arg[1] then
+        print('(pass the corpus folder to also dry-run the corpus sample)')
+        return
+    end
+    local files = SmfListFiles(SmfCorpusArg(arg[1],
+        'usage: lua dev/tools/generate_action_dryrun_offline.lua [corpus folder | <song.mid> ...]'), '%.mid$')
     local n, bad = 0, 0
     for i, path in ipairs(files) do
         local name = SmfShortname(path)
