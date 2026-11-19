@@ -1,5 +1,5 @@
-﻿-- Events tab: DrawEventsTab (the tab's sub-tab bar and its General sub-tab)
--- and DrawVenueEventsTab, the Manual gen sub-tab body.
+﻿-- Events tab: DrawEventsTab (the tab's sub-tab bar and its General and
+-- Metronome sub-tabs) and DrawVenueEventsTab, the Manual gen sub-tab body.
 -- Manual gen inserts EVENTS-track section/crowd/global text events at the
 -- playhead, one row per event group, with number stepper, letter suffixes, and
 -- insert validation. Also hosts the Clear all / Insert bookends quick actions.
@@ -11,7 +11,9 @@
 --                   FindEventsTake, ScanEventsTextEvents, NextSectionEvent,
 --                   ValidatePlainInsert, InsertEventsEvent, AddSectionEvent,
 --                   SectionLettersOnly, SectionNoLetters,
---                   ClearAllEventsTexts, InsertEventsBookends
+--                   ClearAllEventsTexts, InsertEventsBookends,
+--                   GenerateMetronome, Btn, BTN_H, WIDTH_STD, LabelColWidth,
+--                   TextDimWrapped, SectionHeader
 
 -- Cached EVENTS take + scan, refreshed via MakeProjectPoll (at most every
 -- 1 s and only when the project changed; 5 s fallback). This tab's own edit
@@ -218,6 +220,44 @@ local function DrawEventsGeneralTab()
     Tooltip(TIPS.venue_sections)
 end
 
+-- Events > Metronome sub-tab: the practice-mode drum clicks (EVENTS 24 / 25 / 26).
+local METRONOME_PULSE_LABELS = { 'Auto', '8ths', '16ths' }   -- S.metronome_pulse 0 / 1 / 2
+local METRONOME_INTRO_LABELS = { 'From COUNT IN', 'Count in from chart', 'Steady pulse' }   -- S.metronome_intro
+
+local function DrawEventsMetronomeTab()
+    TextDimWrapped('Writes the practice-mode metronome on the EVENTS track: kick (24) and ' ..
+                   'snare (25) clicks from PART DRUMS Medium, and a steady hi-hat pulse (26) ' ..
+                   'from measure 1 up to [end], with a count-in before the band. The game ' ..
+                   'plays them when someone practises any part except drums.')
+    r.ImGui_Spacing(ctx)
+
+    local lbl_col = LabelColWidth({ 'Pulse', 'Intro' })
+    -- One labelled dropdown; returns the picked index (0-based), else the current one.
+    local function Choice(label, id, labels, cur, tip)
+        r.ImGui_Text(ctx, label)
+        r.ImGui_SameLine(ctx, lbl_col)
+        r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
+        local picked = cur
+        if r.ImGui_BeginCombo(ctx, id, labels[cur + 1] or labels[1]) then
+            for i, l in ipairs(labels) do
+                if r.ImGui_Selectable(ctx, l .. id .. i, cur == i - 1) then picked = i - 1 end
+            end
+            r.ImGui_EndCombo(ctx)
+        end
+        Tooltip(tip)
+        return picked
+    end
+    S.metronome_pulse = Choice('Pulse', '##metronome_pulse', METRONOME_PULSE_LABELS,
+                               S.metronome_pulse or 0, TIPS.metronome_pulse)
+    S.metronome_intro = Choice('Intro', '##metronome_intro', METRONOME_INTRO_LABELS,
+                               S.metronome_intro or 0, TIPS.metronome_intro)
+
+    if Btn('Generate metronome', BTN_H) then
+        RunAction(GenerateMetronome)
+    end
+    Tooltip(TIPS.metronome_generate)
+end
+
 -- Events main tab. Body only: the caller owns BeginTabItem / EndTabItem.
 function DrawEventsTab()
     if r.ImGui_BeginTabBar(ctx, '##events_subtabs') then
@@ -227,6 +267,10 @@ function DrawEventsTab()
         end
         if r.ImGui_BeginTabItem(ctx, 'Manual gen') then
             DrawVenueEventsTab()
+            r.ImGui_EndTabItem(ctx)
+        end
+        if r.ImGui_BeginTabItem(ctx, 'Metronome') then
+            DrawEventsMetronomeTab()
             r.ImGui_EndTabItem(ctx)
         end
         r.ImGui_EndTabBar(ctx)

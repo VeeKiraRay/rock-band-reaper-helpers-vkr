@@ -12,7 +12,7 @@
 --                  Character: band member animation states per part;
 --                  Drums: the drummer's hand and kick animation notes
 --     Events     - list song sections, insert EVENTS track events at the
---                  playhead
+--                  playhead, write the practice-mode metronome
 --     Venue      - list, validate, and generate VENUE track events
 --     Metadata   - genre converter (real-world genre to the supported major genre
 --                  and subgenre), suggested difficulty rank and tier per
@@ -31,6 +31,24 @@
 --   Full history: CHANGELOG.md in the repo.
 --
 --   v0.9.64
+--     - New Events > Metronome: writes the practice-mode metronome on the
+--       EVENTS track - the kick, snare and hi-hat clicks (notes 24, 25, 26) the
+--       game plays when someone practises any part except drums. Every
+--       official song has them; charts without them play no clicks in
+--       practice. Built the way the official charts are: kick and snare
+--       clicks on PART DRUMS Medium's kicks and snares, and a steady hi-hat
+--       pulse up to [end] that also clicks on every Medium hit.
+--       Pulse: Auto picks 16ths when the song's median tempo is under 95 BPM,
+--       else 8ths, as the official charts do in about 6 songs of 7; pick 8ths
+--       or 16ths when it guesses wrong. Intro: most official songs open with a
+--       drummer's count-in ("one . two . one two three four") before the band,
+--       not the pulse. From COUNT IN (the default) puts a click on each clip
+--       of the template's COUNT IN track, snapped to the nearest 8th; without
+--       one it counts in from the chart, in the two bars before the band's
+--       first note. Steady pulse runs the pulse from measure 1 instead. A time
+--       selection limits the range, so a section can get its own pulse.
+--       Without Medium drums only the pulse is written. Earlier 24-26 notes
+--       in the range are replaced; one undo step.
 --     - New Metadata > Score: for each Expert part (Guitar, Bass,
 --       Drums, Keys, Pro Keys, Vocals) the full-combo score without overdrive, the
 --       points needed for each star, and the score with overdrive deployed as
@@ -487,6 +505,7 @@ for _, _f in ipairs({
     _mdir .. 'helpers.lua',
     _mdir .. 'venue.lua',
     _mdir .. 'venue_awareness.lua',
+    _mdir .. 'events_metronome.lua',
     _mdir .. 'animation_beat.lua',
     _mdir .. 'animation_character.lua',
     _mdir .. 'animation_drums.lua',
@@ -571,6 +590,7 @@ dofile(_mdir .. 'settings.lua')
 dofile(_mdir .. 'helpers.lua')
 dofile(_mdir .. 'venue.lua')
 dofile(_mdir .. 'venue_awareness.lua')
+dofile(_mdir .. 'events_metronome.lua')     -- Events > Metronome (planner + action)
 dofile(_mdir .. 'animation_beat.lua')       -- uses FindEventTime from venue_awareness.lua
 dofile(_mdir .. 'animation_character.lua')
 dofile(_mdir .. 'animation_drums.lua')

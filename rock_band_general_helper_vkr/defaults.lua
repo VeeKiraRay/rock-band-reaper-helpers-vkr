@@ -205,6 +205,9 @@ S = {
     -- { message=.., on_confirm=function() ... end } - set by CopyAllSubtracksToMain when
     -- VENUE already has events; consumed by the confirm popup in ui_venue.lua.
     venue_subtrack_copy_pending = nil,
+    -- Events > Metronome
+    metronome_pulse      = 0,    -- hi-hat pulse: 0=Auto (by tempo) 1=8ths 2=16ths (persisted: 'emp')
+    metronome_intro      = 0,    -- intro: 0=From COUNT IN 1=Count in from chart 2=Steady pulse (persisted: 'emi')
     -- Animation > Beat
     beat_half_style      = 0,    -- half-time downbeat: 0=every other bar 1=every bar (persisted: 'abhs')
     beat_double_style    = 0,    -- double-time downbeat: 0=every 4 beats 1=every bar (persisted: 'abds')
@@ -511,6 +514,36 @@ TIPS = {
                       "Letter-suffix events ([prc_verse_1a], [prc_verse_1b], ...) are grouped\n" ..
                       "into a single section. Plain-number ([prc_verse_1]) and bare\n" ..
                       "([prc_verse]) events are each their own standalone section.",
+    metronome_pulse = "How often the hi-hat click (26) ticks between the drum hits.\n\n" ..
+                      "Auto: 16ths when the song's median tempo is under 95 BPM, else 8ths -\n" ..
+                      "what the official charts do in about 6 songs of 7. Pick 8ths or 16ths\n" ..
+                      "when Auto guesses wrong for the song; select a section first to change\n" ..
+                      "only that part.\n\n" ..
+                      "The pulse keeps its grid whatever the music plays: official charts keep\n" ..
+                      "it at 8ths or 16ths through drum rests and quarter-note bars alike.",
+    metronome_intro = "What the hi-hat click (26) plays before the band comes in.\n\n" ..
+                      "Most official songs open with a drummer's count-in instead of the pulse:\n" ..
+                      "\"one . two . one two three four\", then the pulse starts with the band.\n" ..
+                      "The count-in is in the song audio, not the chart, so:\n\n" ..
+                      "From COUNT IN: a click where each COUNT IN clip starts (the template's\n" ..
+                      "count-in track, one hi-hat sample per clip), snapped to the nearest 8th.\n" ..
+                      "Without COUNT IN clips it counts in from the chart instead.\n" ..
+                      "Count in from chart: the official pattern in the two bars before the bar\n" ..
+                      "line nearest the band's first note (a pickup counts in to the bar after\n" ..
+                      "it) - the same as 63% of the official intros.\n" ..
+                      "Steady pulse: the pulse from measure 1, as about 1 official song in 6 does.",
+    metronome_generate = "Write the practice metronome on the EVENTS track, from measure 1 up\n" ..
+                         "to [end], or inside the time selection:\n" ..
+                         "  24 (kick) on each PART DRUMS Medium kick,\n" ..
+                         "  25 (snare) on each Medium snare,\n" ..
+                         "  26 (hi-hat) on every pulse step and every Medium hit, with the\n" ..
+                         "  Intro choice before the band comes in.\n" ..
+                         "This is how the official RB3 charts build them. Without Medium drums\n" ..
+                         "only the hi-hat pulse is written.\n\n" ..
+                         "The game plays these sounds only in practice mode, when the player\n" ..
+                         "practises any part except drums - a drum-kit click to follow the beat.\n" ..
+                         "Earlier 24 / 25 / 26 notes in the range are replaced; other EVENTS\n" ..
+                         "notes and text events stay. One undo step.",
     venue_sing_along = "Derive VENUE sing-along notes from the HARM2/HARM3 harmony tracks:\n" ..
                       "pitch 87 (guitarist) from HARM2, pitch 85 (bassist) from HARM3.\n\n" ..
                       "For each vocal phrase (bounded by a pitch-105 marker) where the harmony\n" ..

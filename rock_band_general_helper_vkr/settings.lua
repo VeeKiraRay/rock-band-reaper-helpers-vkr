@@ -36,6 +36,8 @@ local function SerializeSettings()
         'vsecm='  .. S.venue_sec_mode,
         'vmgt='   .. S.venue_mg_target,
         'vmgr='   .. S.venue_mg_replace,
+        'emp='    .. S.metronome_pulse,
+        'emi='    .. S.metronome_intro,
         'abhs='   .. S.beat_half_style,
         'abds='   .. S.beat_double_style,
         'acsd='   .. S.char_active.drums,
@@ -114,6 +116,12 @@ local function DeserializeSettings(str, project)
         elseif k == 'vsecm'  then S.venue_sec_mode          = tonumber(v) or 0
         elseif k == 'vmgt'   then S.venue_mg_target         = (v == '1') and 1 or 0
         elseif k == 'vmgr'   then S.venue_mg_replace        = (v == '1') and 1 or 0
+        elseif k == 'emi'    then
+            local n = tonumber(v)
+            if n == 0 or n == 1 or n == 2 then S.metronome_intro = n end
+        elseif k == 'emp'    then
+            local n = tonumber(v)
+            if n == 0 or n == 1 or n == 2 then S.metronome_pulse = n end
         elseif k == 'abhs'   then S.beat_half_style         = (v == '1') and 1 or 0
         elseif k == 'abds'   then S.beat_double_style       = (v == '1') and 1 or 0
         elseif k:match('^acs[dgbvk]$') then
@@ -237,6 +245,8 @@ local LABELS = {
     vpan    = { 'Venue preview: animated', bool = true },
     vpcombo = 'Venue preview: players',
     vpshwm  = 'Venue > Preview: show',
+    emp     = 'Events > Metronome: pulse (0 Auto, 1 8ths, 2 16ths)',
+    emi     = 'Events > Metronome: intro (0 From COUNT IN, 1 Count in from chart, 2 Steady)',
     abhs    = 'Animation > Beat: half-time downbeat',
     abds    = 'Animation > Beat: double-time downbeat',
     acsd    = 'Animation > Character: drums state',
@@ -281,4 +291,8 @@ local PROJECT_ONLY = {
 UserDefaultsSetup({ section = PROJ_KEY_SECTION, project_key = PROJ_KEY_NAME,
                     serialize = SerializeSettings, deserialize = DeserializeSettings,
                     labels = LABELS,
-                    project_only = function(k) return PROJECT_ONLY[k] == true end })
+                    project_only = function(k, v)
+                        -- A picked metronome pulse (8ths / 16ths) fits one song; Auto is a preference.
+                        if k == 'emp' then return v ~= '0' end
+                        return PROJECT_ONLY[k] == true
+                    end })

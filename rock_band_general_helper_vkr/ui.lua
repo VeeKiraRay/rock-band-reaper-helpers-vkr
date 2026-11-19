@@ -216,7 +216,7 @@ local function Loop()
             end
 
             ------------------------------------------------------------
-            -- Events tab (ui_venue_events.lua): General + Manual gen
+            -- Events tab (ui_venue_events.lua): General, Manual gen, Metronome
             ------------------------------------------------------------
             if r.ImGui_BeginTabItem(ctx, 'Events') then
                 _new_tab = 'Events'
