@@ -1,5 +1,6 @@
--- MIDI converter: Piano MIDI -> Rock Band Keys (hand split, Pro Keys range, 5-Lane Keys)
--- Requires: S, r, GetTimeSelection, FindFirstMIDIItem, InsertNotes, PitchName (globals)
+-- MIDI converter: Piano MIDI -> Rock Band Keys (Pro Keys range, 5-Lane Keys). The hand
+-- animations are the General Helper's Animation > Keys.
+-- Requires: S, r, GetTimeSelection, FindFirstMIDIItem, InsertNotes (globals)
 
 -- Read all notes with channel info from every MIDI item on a track.
 -- Returns array sorted by start time: { s, e, pitch, vel, chan }
@@ -29,17 +30,6 @@ local function ReadMIDINotesWithChannel(track, t_s, t_e)
     end
     table.sort(notes, function(a, b) return a.s < b.s end)
     return notes
-end
-
--- Returns true if a note belongs to the right hand, based on current split settings.
--- Channel-based: MIDI channel 1 (0-indexed chan == 0) = right hand.
--- Pitch-based:   pitch >= S.mc_keys_split_pitch = right hand.
-local function IsRightHand(note)
-    if S.mc_keys_split_by_ch then
-        return note.chan == 0
-    else
-        return note.pitch >= S.mc_keys_split_pitch
-    end
 end
 
 -- Write notes to a target track. Clears the range first, then inserts.
@@ -96,186 +86,10 @@ local function CompressChord(pitches, max_chord)
     return { lo, best_mid, hi }
 end
 
-function SplitHands()
-    if S.mc_keys_src_idx < 0 then
-        S.status = 'Error: no source track selected.'
-        S.last_result = 'Select the piano MIDI source track in the Keys tab.'
-        return
-    end
-    if S.mc_keys_rh_tgt_idx < 0 and S.mc_keys_lh_tgt_idx < 0 then
-        S.status = 'Error: no target tracks selected.'
-        S.last_result = 'Select at least one target track (right hand or left hand).'
-        return
-    end
-
-    local src_tr = r.GetTrack(0, S.mc_keys_src_idx)
-    if not src_tr then
-        S.status = 'Error: source track no longer exists - pick the track again.'
-        S.last_result = nil
-        return
-    end
-
-    local sel_s, sel_e = GetTimeSelection()
-    local src_notes = ReadMIDINotesWithChannel(src_tr, sel_s, sel_e)
-    if #src_notes == 0 then
-        S.status = 'No MIDI notes found on source track.'
-        S.last_result = sel_s and 'No notes in the current time selection.' or
-                                  'Source track has no MIDI notes.'
-        return
-    end
-
-    -- Partition into right-hand and left-hand note lists (strip channel for output).
-    local rh_notes, lh_notes = {}, {}
-    for _, n in ipairs(src_notes) do
-        local out = { s = n.s, e = n.e, pitch = n.pitch }
-        if IsRightHand(n) then
-            rh_notes[#rh_notes + 1] = out
-        else
-            lh_notes[#lh_notes + 1] = out
-        end
-    end
-
-    local split_desc
-    if S.mc_keys_split_by_ch then
-        split_desc = 'by MIDI channel (ch 1 = RH, ch 2 = LH)'
-    else
-        split_desc = ('by pitch  (%s and above = RH)'):format(
-            PitchName(S.mc_keys_split_pitch))
-    end
-
-    if S.mc_keys_preview then
-        local lines = {
-            ('Source: %d notes total'):format(#src_notes),
-            ('Split %s'):format(split_desc),
-            '',
-            ('Right hand: %d notes'):format(#rh_notes),
-            ('Left hand:  %d notes'):format(#lh_notes),
-            '',
-            'Preview only - switch to Auto-insert and run again to write.',
-        }
-        S.status = ('Hand split preview: %d RH + %d LH (not written)'):format(
-            #rh_notes, #lh_notes)
-        S.last_result = table.concat(lines, '\n')
-        return
-    end
-
-    r.PreventUIRefresh(1)
-    r.Undo_BeginBlock2(0)
-
-    local written_rh = WriteNotesToTrack(S.mc_keys_rh_tgt_idx, rh_notes, sel_s, sel_e)
-    local written_lh = WriteNotesToTrack(S.mc_keys_lh_tgt_idx, lh_notes, sel_s, sel_e)
-
-    r.Undo_EndBlock2(0, 'Split Piano Hands', -1)
-    r.PreventUIRefresh(-1)
-    r.UpdateArrange()
-
-    local lines = {
-        ('Source: %d notes total'):format(#src_notes),
-        ('Split %s'):format(split_desc),
-        '',
-    }
-    if S.mc_keys_rh_tgt_idx >= 0 then
-        lines[#lines + 1] = ('Right hand: %d notes written'):format(written_rh)
-    end
-    if S.mc_keys_lh_tgt_idx >= 0 then
-        lines[#lines + 1] = ('Left hand:  %d notes written'):format(written_lh)
-    end
-
-    S.status = ('Hands split: %d RH + %d LH notes written.'):format(written_rh, written_lh)
-    S.last_result = table.concat(lines, '\n')
-end
-
-function ConvertProKeys()
-    if S.mc_keys_pk_src_idx < 0 then
-        S.status = 'Error: no Expert PK source track selected.'
-        S.last_result = 'Select the Expert Pro Keys source track in the Pro Keys section.'
-        return
-    end
-    if S.mc_keys_rh_tgt_idx < 0 and S.mc_keys_lh_tgt_idx < 0 then
-        S.status = 'Error: no animation target track selected.'
-        S.last_result = 'Select at least one animation target (RH or LH) in Hand Split above.'
-        return
-    end
-
-    local src_tr = r.GetTrack(0, S.mc_keys_pk_src_idx)
-    if not src_tr then
-        S.status = 'Error: source track no longer exists - pick the track again.'
-        S.last_result = nil
-        return
-    end
-
-    local sel_s, sel_e = GetTimeSelection()
-    local raw = ReadMIDINotesWithChannel(src_tr, sel_s, sel_e)
-
-    -- Keep only C2-C4 (48-72). Strips lane markers (0,2,4,5,7,9) automatically.
-    local anim_notes = {}
-    local stripped = 0
-    for _, n in ipairs(raw) do
-        if n.pitch >= 48 and n.pitch <= 72 then
-            anim_notes[#anim_notes + 1] = { s = n.s, e = n.e, pitch = n.pitch }
-        else
-            stripped = stripped + 1
-        end
-    end
-
-    if #anim_notes == 0 then
-        S.status = 'No notes in C2-C4 found on source track.'
-        S.last_result = sel_s and 'No C2-C4 notes in the time selection.'
-                                or 'Source track has no notes in C2-C4.'
-        return
-    end
-
-    local strip_note = stripped == 1 and '1 note' or (stripped .. ' notes')
-    local anim_note  = #anim_notes == 1 and '1 note' or (#anim_notes .. ' notes')
-
-    if S.mc_keys_preview then
-        local lines = {
-            ('Source: %d notes total'):format(#raw),
-            ('Animation notes (C2-C4): %s'):format(anim_note),
-        }
-        if stripped > 0 then
-            lines[#lines + 1] = ('Excluded (lane markers / out of range): %s'):format(strip_note)
-        end
-        lines[#lines + 1] = ''
-        lines[#lines + 1] = 'Preview only - switch to Auto-insert and run again to write.'
-        S.status = ('Animation preview: %s ready (not written)'):format(anim_note)
-        S.last_result = table.concat(lines, '\n')
-        return
-    end
-
-    r.PreventUIRefresh(1)
-    r.Undo_BeginBlock2(0)
-    local written_rh = WriteNotesToTrack(S.mc_keys_rh_tgt_idx, anim_notes, sel_s, sel_e)
-    local written_lh = WriteNotesToTrack(S.mc_keys_lh_tgt_idx, anim_notes, sel_s, sel_e)
-    r.Undo_EndBlock2(0, 'Generate Keys Animation', -1)
-    r.PreventUIRefresh(-1)
-    r.UpdateArrange()
-
-    local lines = {
-        ('Source: %d notes total'):format(#raw),
-        ('Animation notes (C2-C4): %s'):format(anim_note),
-    }
-    if stripped > 0 then
-        lines[#lines + 1] = ('Excluded (lane markers / out of range): %s'):format(strip_note)
-    end
-    lines[#lines + 1] = ''
-    if S.mc_keys_rh_tgt_idx >= 0 then
-        lines[#lines + 1] = ('RH animation: %d notes written'):format(written_rh)
-    end
-    if S.mc_keys_lh_tgt_idx >= 0 then
-        lines[#lines + 1] = ('LH animation: %d notes written'):format(written_lh)
-    end
-
-    local written_total = written_rh + written_lh
-    S.status = ('Keys animation generated: %d note%s written.'):format(
-        written_total, written_total == 1 and '' or 's')
-    S.last_result = table.concat(lines, '\n')
-end
-
 function ConvertPianoToProKeys()
     if S.mc_keys_src_idx < 0 then
         S.status = 'Error: no source track selected.'
-        S.last_result = 'Select the piano MIDI source track in the Hand Split section.'
+        S.last_result = 'Select the piano MIDI source track in the Source section.'
         return
     end
     if S.mc_pk_conv_tgt_idx < 0 then
@@ -451,7 +265,7 @@ end
 function ConvertKeys5()
     if S.mc_keys_src_idx < 0 then
         S.status = 'Error: no source track selected.'
-        S.last_result = 'Select the piano MIDI source track in the Hand Split section.'
+        S.last_result = 'Select the piano MIDI source track in the Source section.'
         return
     end
     if S.mc_5k_tgt_idx < 0 then

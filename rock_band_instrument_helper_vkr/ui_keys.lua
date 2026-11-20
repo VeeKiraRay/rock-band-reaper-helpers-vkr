@@ -2,13 +2,15 @@
 
 function DrawKeysTab(ctx)
     local midi_tracks = S.midi_track_list
-    local lbl_col_keys = LabelColWidth({ 'Split by:', 'Max chord:' })
+    local lbl_col_keys = LabelColWidth({ 'Max chord:' })
     local radio_w_keys = RadioGroupWidth({
-        'Channel (ch1=RH)', 'Pitch threshold', '2 notes', '3 notes',
-        'Auto-insert', 'Preview only',
+        '2 notes', '3 notes', 'Auto-insert', 'Preview only',
     })
 
-    SectionHeader('Hand Split')
+    TextDimWrapped('Hand animations (PART KEYS_ANIM_RH / _LH) are in the General Helper: ' ..
+                   'Animation > Keys.')
+
+    SectionHeader('Source')
 
     r.ImGui_Text(ctx, 'Source        ')
     r.ImGui_SameLine(ctx)
@@ -16,45 +18,8 @@ function DrawKeysTab(ctx)
     S.mc_keys_src_idx = TrackCombo('##mc_keys_src', S.mc_keys_src_idx, midi_tracks)
     Tooltip(TIPS.mc_keys_src)
 
-    r.ImGui_Text(ctx, 'Right hand tgt')
-    r.ImGui_SameLine(ctx)
-    r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
-    S.mc_keys_rh_tgt_idx = TrackCombo('##mc_keys_rh', S.mc_keys_rh_tgt_idx, midi_tracks)
-    Tooltip(TIPS.mc_keys_rh_tgt)
-
-    r.ImGui_Text(ctx, 'Left hand tgt ')
-    r.ImGui_SameLine(ctx)
-    r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
-    S.mc_keys_lh_tgt_idx = TrackCombo('##mc_keys_lh', S.mc_keys_lh_tgt_idx, midi_tracks)
-    Tooltip(TIPS.mc_keys_lh_tgt)
-
-    r.ImGui_Spacing(ctx)
-    r.ImGui_Text(ctx, 'Split by:')
-    r.ImGui_SameLine(ctx, lbl_col_keys)
-    local _t_kspl = TIPS.mc_keys_split
-    if r.ImGui_RadioButton(ctx, 'Channel (ch1=RH)', S.mc_keys_split_by_ch) then
-        S.mc_keys_split_by_ch = true
-    end
-    Tooltip(_t_kspl)
-    r.ImGui_SameLine(ctx, lbl_col_keys + radio_w_keys)
-    if r.ImGui_RadioButton(ctx, 'Pitch threshold', not S.mc_keys_split_by_ch) then
-        S.mc_keys_split_by_ch = false
-    end
-    Tooltip(_t_kspl)
-
-    local slider_w = 200
-    local split_disabled = S.mc_keys_split_by_ch
-    if split_disabled then r.ImGui_BeginDisabled(ctx) end
-    r.ImGui_SetNextItemWidth(ctx, slider_w)
-    _, S.mc_keys_split_pitch = r.ImGui_SliderInt(
-        ctx, 'Split pitch', S.mc_keys_split_pitch, 21, 108, '%d')
-    SliderTooltip(TIPS.mc_keys_split_pitch)
-    r.ImGui_SameLine(ctx)
-    TextDim(PitchName(S.mc_keys_split_pitch))
-    if split_disabled then r.ImGui_EndDisabled(ctx) end
-
     SectionHeader('Convert to Pro Keys')
-    TextDim('Source: same as Hand Split above.')
+    TextDim('Source: same as above.')
 
     r.ImGui_Text(ctx, 'Pro Keys target')
     r.ImGui_SameLine(ctx)
@@ -75,24 +40,8 @@ function DrawKeysTab(ctx)
     if no_pk_src or no_pk_tgt then r.ImGui_EndDisabled(ctx) end
     Tooltip(TIPS.gen_pk_from_piano)
 
-    SectionHeader('Pro Keys Animation')
-
-    r.ImGui_Text(ctx, 'Expert PK src  ')
-    r.ImGui_SameLine(ctx)
-    r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
-    S.mc_keys_pk_src_idx = TrackCombo('##mc_keys_pk_src', S.mc_keys_pk_src_idx, midi_tracks)
-    Tooltip(TIPS.mc_keys_pk_src)
-
-    TextDim('RH / LH targets: see Hand Split above.')
-
-    r.ImGui_Spacing(ctx)
-    if Btn('Generate Animation', BTN_H) then
-        RunAction(ConvertProKeys)
-    end
-    Tooltip(TIPS.gen_animation)
-
     SectionHeader('5-Lane Keys')
-    TextDim('Source: same as Hand Split above.')
+    TextDim('Source: same as above.')
 
     r.ImGui_Text(ctx, 'Target track  ')
     r.ImGui_SameLine(ctx)
@@ -140,9 +89,4 @@ function DrawKeysTab(ctx)
         S.mc_keys_preview = true
     end
     Tooltip(_t_kpv)
-
-    r.ImGui_Spacing(ctx)
-    if Btn('Split Hands', BTN_H) then
-        RunAction(SplitHands)
-    end
 end

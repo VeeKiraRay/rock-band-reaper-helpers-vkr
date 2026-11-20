@@ -16,12 +16,7 @@ S = {
     mc_drum_preview       = false, -- true=preview only, false=auto-insert
     -- MIDI converter: keys (persisted except track indices)
     mc_keys_src_idx       = -1,
-    mc_keys_rh_tgt_idx    = -1,
-    mc_keys_lh_tgt_idx    = -1,
     mc_keys_mode          = 0,     -- 0=hand split, 1=pro keys, 2=5-key (stub)
-    mc_keys_pk_src_idx    = -1,    -- Expert Pro Keys source for animation copy
-    mc_keys_split_by_ch   = true,  -- true=channel-based (ch1=RH), false=pitch threshold
-    mc_keys_split_pitch   = 60,    -- pitch threshold for hand split (default C4/middle C)
     mc_keys_preview       = false,
     -- MIDI converter: piano→Pro Keys range (persisted except track index)
     mc_pk_conv_tgt_idx    = -1,     -- Piano→PK target track
@@ -203,23 +198,9 @@ TIPS = {
                       "Auto-insert: analyse and insert notes in one step (fully undoable).",
 
     -- MIDI converter - Keys tab
-    mc_keys_src     = "MIDI track containing the source piano notation.\n" ..
-                      "Guitar Pro exports typically use channel 1 for right hand and\n" ..
-                      "channel 2 for left hand.",
-    mc_keys_rh_tgt  = "Target track that will receive right-hand notes after the split.\n" ..
-                      "Set to (none) to skip writing the right hand.",
-    mc_keys_lh_tgt  = "Target track that will receive left-hand notes after the split.\n" ..
-                      "Set to (none) to skip writing the left hand.",
-    mc_keys_split   = "How to determine which notes belong to each hand.\n\n" ..
-                      "Channel-based: right hand = MIDI channel 1, left hand = channel 2.\n" ..
-                      "  Guitar Pro and most notation software exports use this convention.\n\n" ..
-                      "Pitch threshold: notes at or above the threshold pitch = right hand;\n" ..
-                      "  notes below = left hand.  Use when channels are not separated.",
-    mc_keys_split_pitch = "Pitch boundary for the pitch-threshold hand split.\n" ..
-                          "Notes at or above this pitch are treated as right hand.\n" ..
-                          "Default C4 (middle C, pitch 60) works for most piano pieces.",
+    mc_keys_src     = "MIDI track containing the source piano notation.",
     mc_keys_preview = "Preview: show note counts without writing to the project.\n" ..
-                      "Auto-insert: split and insert notes in one step (fully undoable).",
+                      "Auto-insert: convert and insert notes in one step (fully undoable).",
 
     -- MIDI converter - Guitar tab
     mc_gtr_src       = 'Source MIDI track with raw guitar pitches (Guitar Pro import, DAW export, etc.).\n' ..
@@ -280,15 +261,6 @@ TIPS = {
                          '(MIDI 36-84), and report any out-of-range notes.\n\n' ..
                          'Nothing is written to the project - reference guide only.\n' ..
                          'Blank lines separate phrases.',
-
-    -- MIDI converter - Keys tab (Pro Keys animation)
-    mc_keys_pk_src     = 'Expert Pro Keys source track (PART REAL_KEYS_X or similar).\n' ..
-                         'Notes in C2-C4 (MIDI 48-72) are copied to the animation track.\n' ..
-                         'Lane shift markers (MIDI 0-9) are automatically excluded.',
-    gen_animation      = 'Copy Expert Pro Keys notes (C2-C4) to the animation target track(s).\n\n' ..
-                         'Lane shift markers and any notes outside C2-C4 are stripped.\n' ..
-                         'RH/LH targets are shared with the Hand Split section above.\n\n' ..
-                         'Respects time selection if active. Fully undoable.',
 
     -- MIDI converter - Keys tab (piano→Pro Keys range)
     mc_pk_conv_tgt      = 'Target Pro Keys track (typically PART REAL_KEYS_X).\n' ..

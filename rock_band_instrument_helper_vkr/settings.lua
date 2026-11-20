@@ -18,8 +18,6 @@ local function SerializeSettings()
         'mcc2g=' .. (S.mc_crash_to_green and '1' or '0'),
         'mcpd='  .. (S.mc_pro_drums and '1' or '0'),
         'mcdpv=' .. (S.mc_drum_preview and '1' or '0'),
-        'mcksc=' .. (S.mc_keys_split_by_ch and '1' or '0'),
-        'mcksp=' .. S.mc_keys_split_pitch,
         'mckpv=' .. (S.mc_keys_preview and '1' or '0'),
         'mcpkis=' .. (S.mc_pk_insert_shifts and '1' or '0'),
         'mc5kpg=' .. S.mc_5k_phrase_gap_ms,
@@ -97,8 +95,6 @@ local function DeserializeSettings(str, _project)
         elseif k == 'mcc2g' then S.mc_crash_to_green   = (v == '1')
         elseif k == 'mcpd'  then S.mc_pro_drums        = (v == '1')
         elseif k == 'mcdpv' then S.mc_drum_preview     = (v == '1')
-        elseif k == 'mcksc' then S.mc_keys_split_by_ch  = (v == '1')
-        elseif k == 'mcksp' then S.mc_keys_split_pitch  = tonumber(v) or S.mc_keys_split_pitch
         elseif k == 'mckpv' then S.mc_keys_preview      = (v == '1')
         elseif k == 'mcpkis' then S.mc_pk_insert_shifts = (v == '1')
         elseif k == 'mc5kpg' then S.mc_5k_phrase_gap_ms = tonumber(v) or S.mc_5k_phrase_gap_ms
@@ -212,8 +208,6 @@ local LABELS = {
     mcc2g  = { 'MIDI > Drums: crashes to green', bool = true },
     mcpd   = { 'MIDI > Drums: Pro Drums', bool = true },
     mcdpv  = { 'MIDI > Drums: preview (off = auto-insert)', bool = true },
-    mcksc  = { 'MIDI > Keys: split by channel', bool = true },
-    mcksp  = 'MIDI > Keys: split pitch',
     mckpv  = { 'MIDI > Keys: preview (off = auto-insert)', bool = true },
     mcpkis = { 'MIDI > Pro Keys: insert lane shift markers', bool = true },
     mc5kpg = 'MIDI > Keys: phrase gap (ms)',

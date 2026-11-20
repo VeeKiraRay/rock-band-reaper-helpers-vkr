@@ -17,7 +17,7 @@
 --     Keys       - Tuner: chord names from the keys audio stem
 --   Work-in-progress tabs (General > Settings > Show WIPs?):
 --     Drums      - convert GM MIDI to Rock Band 5-lane drum notation
---     Keys > WIP - hand split, Pro Keys conversion + animation, 5-Lane Keys conversion
+--     Keys > WIP - Pro Keys conversion, 5-Lane Keys conversion
 --     Guitar     - convert raw MIDI to Expert Guitar gems, validate
 --
 --   Built with Claude (Anthropic) - https://claude.ai
@@ -26,6 +26,11 @@
 --   earlier history is under that script in CHANGELOG.md in the repo.
 --
 --   v0.2
+--     - Keys > WIP: Hand Split and Pro Keys Animation are removed. The
+--       keyboardist's hand animations moved to the General Helper's
+--       Animation > Keys, which writes the left hand on its own part
+--       instead of copying Expert to both hands, and checks the result.
+--       Convert to Pro Keys and 5-Lane Keys stay, reading one Source track.
 --     - Overdrive > Validate has a new "Overdrive in play" section at the end:
 --       each part's overdrive played through the game's meter, a full combo
 --       deploying as soon as it is useful (not into a rest or a long vocal

@@ -1,6 +1,5 @@
--- Animation tab: DrawAnimationTab (the sub-tab bar), the Beat and Character
--- sub-tabs. Drums, Keys and Guitar sub-tabs are planned; each comes with its
--- own feature.
+-- Animation tab: DrawAnimationTab (the sub-tab bar), the Beat, Character, Drums
+-- and Keys sub-tabs. A Guitar sub-tab is planned.
 -- Requires globals: r, ctx, S, TIPS, Tooltip, SliderTooltip, Btn, BtnGroupWidth,
 --                   BTN_H, WIDTH_STD, LabelColWidth, RadioGroupWidth, SectionHeader, RunAction,
 --                   MakeProjectPoll, FindTrackByName, FindFirstMIDIItem,
@@ -10,7 +9,9 @@
 --                   BeginVenueTooltip, EndVenueTooltip, DrawVenueTooltipSprite
 --                   (venue_sprites.lua - the shared tooltip layout and sprites),
 --                   CharGroupStatus, CharacterStateAt,
---                   GenerateCharacterAnimations, InsertCharacterState
+--                   GenerateCharacterAnimations, InsertCharacterState,
+--                   TrackCombo, KEYS_ANIM_LH_MODES, GenerateKeysAnimations,
+--                   ValidateKeysAnimations
 
 local function DrawAnimationBeatTab()
     r.ImGui_TextWrapped(ctx, 'Writes the BEAT track from measure 1 up to [end], or inside ' ..
@@ -415,6 +416,61 @@ local function DrawAnimationDrumsTab()
     Tooltip(TIPS.drum_anim_generate)
 end
 
+-- Keys sub-tab: the left-hand source, Generate and Validate.
+local function DrawAnimationKeysTab()
+    r.ImGui_TextWrapped(ctx, 'Writes the keyboardist\'s hand animations. The right hand ' ..
+                             '(PART KEYS_ANIM_RH) copies Pro Keys Expert, as the official charts ' ..
+                             'do: Expert is the right hand\'s part. The left hand (PART KEYS_ANIM_LH) ' ..
+                             'is usually not in Expert, so it comes from a track of its own - ' ..
+                             'leave the source at (none) for right-hand-only animations.')
+    r.ImGui_Spacing(ctx)
+    r.ImGui_TextWrapped(ctx, 'Good to know: 290 of the 352 official RB3 DLC songs with Pro Keys ' ..
+                             'animate the left hand too. The left hand mostly plays single notes, ' ..
+                             'lower on the keyboard than the right hand and in time with it - ' ..
+                             'often the same note as the right hand\'s lowest, played lower. ' ..
+                             'The in-game keyboard has three octaves, and the left-hand track plays ' ..
+                             'an octave lower than the right-hand one, so the hands share the middle ' ..
+                             'octave - official charts almost never let them meet there.')
+    r.ImGui_Spacing(ctx)
+
+    SectionHeader('Left hand')
+    local lbl_col = LabelColWidth({ 'Source track', 'Notes' })
+    r.ImGui_Text(ctx, 'Source track')
+    r.ImGui_SameLine(ctx, lbl_col)
+    r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
+    S.keys_anim_lh_idx = TrackCombo('##ka_lh_src', S.keys_anim_lh_idx, S.midi_track_list or {})
+    Tooltip(TIPS.keys_anim_lh_src)
+
+    local no_src = S.keys_anim_lh_idx < 0   -- snapshot: BeginDisabled / EndDisabled pair
+    if no_src then r.ImGui_BeginDisabled(ctx) end
+    local labels = {}
+    for i, m in ipairs(KEYS_ANIM_LH_MODES) do labels[i] = m.label end
+    local radio_w = RadioGroupWidth(labels)
+    r.ImGui_Text(ctx, 'Notes')
+    for i, m in ipairs(KEYS_ANIM_LH_MODES) do
+        r.ImGui_SameLine(ctx, lbl_col + (i - 1) * radio_w)
+        if r.ImGui_RadioButton(ctx, m.label .. '##ka_lhm', S.keys_anim_lh_mode == i - 1) then
+            S.keys_anim_lh_mode = i - 1
+        end
+        Tooltip(TIPS.keys_anim_lh_mode)
+    end
+    if no_src then r.ImGui_EndDisabled(ctx) end
+
+    r.ImGui_Spacing(ctx)
+    r.ImGui_Separator(ctx)
+    r.ImGui_Spacing(ctx)
+    local bw = BtnGroupWidth({ 'Generate keys animations', 'Validate' })
+    if Btn('Generate keys animations', BTN_H, bw) then
+        RunAction(GenerateKeysAnimations)
+    end
+    Tooltip(TIPS.keys_anim_generate)
+    r.ImGui_SameLine(ctx)
+    if Btn('Validate##ka_val', BTN_H, bw) then
+        RunAction(ValidateKeysAnimations)
+    end
+    Tooltip(TIPS.keys_anim_validate)
+end
+
 -- Animation main tab. Body only: the caller owns BeginTabItem / EndTabItem.
 function DrawAnimationTab()
     if r.ImGui_BeginTabBar(ctx, '##animation_subtabs') then
@@ -428,6 +484,10 @@ function DrawAnimationTab()
         end
         if r.ImGui_BeginTabItem(ctx, 'Drums') then
             DrawAnimationDrumsTab()
+            r.ImGui_EndTabItem(ctx)
+        end
+        if r.ImGui_BeginTabItem(ctx, 'Keys') then
+            DrawAnimationKeysTab()
             r.ImGui_EndTabItem(ctx)
         end
         r.ImGui_EndTabBar(ctx)

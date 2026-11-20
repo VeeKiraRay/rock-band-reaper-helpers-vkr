@@ -38,9 +38,7 @@ Test.section('Drums')
 smoke('ConvertDrums', function() ConvertDrums() end)
 
 Test.section('Keys')
-smoke('SplitHands',           function() SplitHands() end)
 smoke('ConvertPianoToProKeys', function() ConvertPianoToProKeys() end)
-smoke('ConvertProKeys',        function() ConvertProKeys() end)
 smoke('ConvertKeys5',          function() ConvertKeys5() end)
 
 Test.section('Guitar')

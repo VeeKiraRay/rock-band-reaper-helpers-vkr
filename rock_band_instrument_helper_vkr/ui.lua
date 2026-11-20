@@ -27,8 +27,6 @@ local function Loop()
         S.mc_drum_src_idx    = -1
         S.mc_drum_tgt_idx    = -1
         S.mc_keys_src_idx    = -1
-        S.mc_keys_rh_tgt_idx = -1
-        S.mc_keys_lh_tgt_idx = -1
         S.mc_pk_conv_tgt_idx = -1
         S.mc_5k_tgt_idx      = -1
         S.mc_gtr_src_idx      = -1

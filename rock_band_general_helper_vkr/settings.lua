@@ -64,6 +64,7 @@ local function SerializeSettings()
         'adoha='  .. S.drum_anim_open_hat_above,
         'adra='   .. (S.drum_anim_ride_alt and '1' or '0'),
         'adfll='  .. (S.drum_anim_flam_late and '1' or '0'),
+        'aklm='   .. S.keys_anim_lh_mode,
         'vsectm=' .. S.venue_sec_tmpl_name,
         'vpscl='   .. S.venue_preview_scale,
         'vpan='    .. (S.venue_preview_animate and '1' or '0'),
@@ -160,6 +161,7 @@ local function DeserializeSettings(str, project)
             S.drum_anim_open_hat_above = math.min(127, Velocity(v, S.drum_anim_open_hat_above))
         elseif k == 'adra'   then S.drum_anim_ride_alt      = (v == '1')
         elseif k == 'adfll'  then S.drum_anim_flam_late     = (v == '1')
+        elseif k == 'aklm'   then S.keys_anim_lh_mode       = math.max(0, math.min(2, tonumber(v) or 0))
         elseif k == 'vsectm' then S.venue_sec_tmpl_name     = v
         elseif k == 'vpscl'   then S.venue_preview_scale   = tonumber(v) or 1
         elseif k == 'vpan'    then S.venue_preview_animate = (v == '1')
@@ -273,6 +275,7 @@ local LABELS = {
     adoha   = 'Animation > Drums: open hi-hat above velocity',
     adra    = { 'Animation > Drums: crash riding soft / hard', bool = true },
     adfll   = { 'Animation > Drums: flam left hand late', bool = true },
+    aklm    = 'Animation > Keys: left-hand notes (0 whole track, 1 channel 2, 2 not on Expert)',
     swip    = { 'General > Settings: show WIPs', bool = true },
     wffn    = 'Workflow: checklist',
     wfsts   = { 'Workflow: show timestamps', bool = true },

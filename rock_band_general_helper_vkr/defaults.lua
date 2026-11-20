@@ -239,6 +239,9 @@ S = {
     drum_anim_soft_snare_below = 50, -- snare gems under this velocity: soft
     drum_anim_ride_alt      = false, -- riding a crash in 8ths alternates soft and hard
     drum_anim_flam_late     = false, -- a flam's left hand a 1/32 note late
+    -- Animation > Keys
+    keys_anim_lh_idx        = -1,    -- left-hand source track (REAPER index, -1 = none); NOT persisted
+    keys_anim_lh_mode       = 0,     -- left-hand notes: 0 whole track, 1 channel 2, 2 not on Expert
     -- UI visibility (persisted)
     show_wip_tabs           = false, -- show the Tempo Map tab
     -- Workflow checklist (Workflow tab)
@@ -843,6 +846,42 @@ TIPS = {
                          "are touched only for open hi-hats (Open the hat on blue hi-hat hits,\n" ..
                          "or Open hi-hat by velocity): those are replaced, the rest stay. Muted\n" ..
                          "tracks are skipped. One undo step.",
+    keys_anim_lh_src = "A MIDI track with the left-hand part, e.g. an imported piano MIDI.\n" ..
+                       "(none) leaves PART KEYS_ANIM_LH alone: right-hand-only animations\n" ..
+                       "are fine in game (62 of 352 official RB3 DLC songs with Pro Keys have\n" ..
+                       "no left hand).\n\n" ..
+                       "Each left-hand phrase is moved by whole octaves into C2-C4 (48-72),\n" ..
+                       "kept below the right hand on the in-game keyboard - the LH track\n" ..
+                       "plays an octave lower there, so the hands share its middle octave.",
+    keys_anim_lh_mode = "Which notes of the source track are the left hand.\n\n" ..
+                        "Whole track: every note (the track holds only the left hand).\n" ..
+                        "Channel 2: notes on MIDI channel 2 (piano MIDIs often put the right\n" ..
+                        "hand on channel 1 and the left on channel 2).\n" ..
+                        "Not on Expert: the track holds both hands. Each Pro Keys Expert note\n" ..
+                        "marks one note on the same onset as the right hand's - the same\n" ..
+                        "pitch, else the same note in the nearest octave - and those are left\n" ..
+                        "out. A left-hand note doubling the right hand an octave or two down\n" ..
+                        "stays.",
+    keys_anim_generate = "Write PART KEYS_ANIM_RH as a copy of PART REAL_KEYS_X (Pro Keys\n" ..
+                         "Expert), as the official charts do, and PART KEYS_ANIM_LH from the\n" ..
+                         "left-hand source when one is picked. Existing notes are replaced - on\n" ..
+                         "the whole track, or only inside the time selection. Left-hand notes\n" ..
+                         "that would meet the right hand on the in-game keyboard are left out\n" ..
+                         "and listed. Validate runs on the result. Muted tracks are not\n" ..
+                         "written. One undo step.",
+    keys_anim_validate = "Check PART KEYS_ANIM_RH and PART KEYS_ANIM_LH as they are, hand-made\n" ..
+                         "or generated:\n" ..
+                         "- notes outside 48-72 (the game ignores them)\n" ..
+                         "- the hands 2 semitones or less apart on the in-game keyboard, or\n" ..
+                         "  crossed\n" ..
+                         "- one hand holding notes more than an octave apart\n" ..
+                         "- left-hand chords of 4+ notes\n" ..
+                         "- bars with Pro Keys Expert notes but no hand animation.\n" ..
+                         "Lists the bars. Changes nothing.\n\n" ..
+                         "The official RB3 DLC charts (352 songs with Pro Keys) do each of\n" ..
+                         "these in few songs: the hands meet in 10, the right hand wider\n" ..
+                         "than an octave in 14 (the left in 1), 4+ note left-hand chords in\n" ..
+                         "14, Expert bars without animation in 30, notes outside 48-72 in none.",
     char_set_all ="Set every part's active state at once. The rows below can then be\n" ..
                    "changed one by one.",
     char_gap_inst = "Drums, guitar, bass and keys go [idle] when they rest at least this\n" ..

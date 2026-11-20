@@ -25,7 +25,7 @@ The window is organized into tabs plus a [footer](#window-footer) that is always
 | -------------- | ------------------------------------------------------------------------------------ |
 | **General**    | Stem import, audio alignment, song fade out, settings save/load, and buttons that open the other tools |
 | **Workflow**   | A per-project authoring checklist from a template you can edit                      |
-| **Animation**  | Generate the BEAT track, the band's character animation states and the drummer's hand animations |
+| **Animation**  | Generate the BEAT track, the band's character animation states, the drummer's hand animations and the keyboardist's hand animations (with a check) |
 | **Events**     | List the song sections and insert EVENTS-track markers at the playhead               |
 | **Venue**      | Validate and generate text events on the VENUE track                                |
 | **Metadata**   | Convert a real-world genre to the closest supported Rock Band genre, suggest a difficulty rank and tier for each finished Expert chart, and suggest the song key from the charted vocals |
@@ -179,7 +179,7 @@ Switching templates (via the combo) immediately drops checked history for any st
 
 ## Animation tab
 
-Generates the animation data the game uses to move the band: the **BEAT** track, each part's **character states**, and the **drummer's hands and kick**. Contains three sub-tabs: **Beat**, **Character** and **Drums**. Keys and Guitar sub-tabs are planned.
+Generates the animation data the game uses to move the band: the **BEAT** track, each part's **character states**, the **drummer's hands and kick**, and the **keyboardist's hands**. Contains four sub-tabs: **Beat**, **Character**, **Drums** and **Keys**. A Guitar sub-tab is planned.
 
 Every action respects the time selection (only that part of the song is rewritten) and is a single undo step. The rules were measured against the official Rock Band 3 DLC charts, so a generated song should look like an official one before you hand-edit anything.
 
@@ -284,6 +284,45 @@ With either open-hat option on, open-hat pedal notes from an earlier run (or pla
 The game ignores gem velocity, and most charts put one velocity on every gem (official charts too: 447 of 585 RB3 DLC songs, mostly 96 or 100), so the two velocity options change nothing until you set velocities on the gems you want. The result lists how many soft snares, soft crashes and chokes were written.
 
 The result lists, per track, the kicks, one-hand hits (right / left), two-hand hits and flams, then the options used.
+
+### Keys sub-tab
+
+<!-- TODO: screenshot of the Animation > Keys sub-tab -->
+![Animation - Keys sub-tab](../assets/g_animation_keys.jpg)
+
+Writes the keyboardist's hand animations, **PART KEYS_ANIM_RH** and **PART KEYS_ANIM_LH**, and checks them.
+
+How the game plays them: only notes C2-C4 (48-72) are read, and the left-hand track plays **an octave lower** than the right-hand one on the in-game keyboard, which has three octaves. So both hands can reach the middle octave, and the two tracks have to be written with that in mind.
+
+What the official Rock Band 3 DLC charts do (352 songs with Pro Keys):
+
+- The **right hand is a copy of Pro Keys Expert**. Expert is the right hand's part; the left hand is rarely in it.
+- **290 of the 352 songs animate the left hand too** (62 are right hand only). The left hand is mostly the authors' own part. It mostly plays single notes, lower on the keyboard than the right hand and in time with it (about half the time the same note as the right hand's lowest, played lower). It plays in most of the song, together with the right hand rather than taking turns.
+- The hands **almost never meet**: while both play, the right hand's lowest key is usually more than an octave above the left hand's highest.
+
+**Left hand**
+
+- **Source track** — a MIDI track with the left-hand part, for example an imported piano MIDI. **(none)** leaves PART KEYS_ANIM_LH untouched: right-hand-only animations are fine in game.
+- **Notes** — which notes of that track are the left hand:
+  - **Whole track** — every note (the track holds only the left hand).
+  - **Channel 2** — notes on MIDI channel 2 (piano MIDIs often put the right hand on channel 1 and the left on channel 2).
+  - **Not on Expert** — the track holds both hands. Each Pro Keys Expert note marks one note on the same beat as the right hand's (the same pitch, or else the same note in the nearest octave, since Expert is often moved into the Pro Keys range), and those are left out. A left-hand note doubling the right hand an octave or two lower stays.
+
+Each left-hand phrase is moved by whole octaves into C2-C4, below the right hand on the in-game keyboard, as close to the official charts' usual left-hand range as that allows. Left-hand notes that would still meet the right hand are left out and listed by bar. Given the official left-hand tracks as the source, this placement keeps the authors' own octave for 96% of their notes.
+
+**Generate keys animations** writes the right hand from PART REAL_KEYS_X and, with a source picked, the left hand. Existing notes are replaced (only inside the time selection, if there is one); muted tracks are not written. The result ends with Validate's findings.
+
+**Validate** checks the two tracks as they are, hand-made or generated, and lists the bars:
+
+| Finding | Level |
+| ------- | ----- |
+| Notes outside C2-C4 (48-72) - the game ignores them | Error |
+| The hands 2 semitones or less apart on the in-game keyboard, or crossed | Warning |
+| One hand holding notes more than an octave apart | Check |
+| Left-hand chords of 4 or more notes | Check |
+| Bars with Pro Keys Expert notes but no hand animation | Note |
+
+Each of these turns up in a few official songs: the hands meet in 10, the right hand spans more than an octave in 14, 4+ note left-hand chords in 14, Expert bars without animation in 30.
 
 ---
 

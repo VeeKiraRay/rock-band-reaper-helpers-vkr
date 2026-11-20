@@ -55,20 +55,6 @@ end)
 ----------------------------------------------------------------------
 Test.section('Piano → Keys - external_piano.mid')
 
-Test.it('SplitHands preview: partitions notes by pitch into RH and LH', function()
-    reset()
-    local base, n = LoadFixture('external_piano.mid')
-    Test.expect(n > 0, 'external_piano.mid created no tracks')
-    local rh = CreateEmptyFixtureTrack('KEYS RH')
-    S.mc_keys_src_idx    = base
-    S.mc_keys_rh_tgt_idx = rh
-    S.mc_keys_lh_tgt_idx = -1
-    S.mc_keys_preview    = true
-    SplitHands()
-    CleanupFixture(base)
-    Test.expect(S.status:find('preview'), 'expected "preview" in status, got: ' .. S.status)
-end)
-
 Test.it('ConvertPianoToProKeys preview: octave-shifts notes into C2-C4', function()
     reset()
     local base, n = LoadFixture('external_piano.mid')
@@ -115,23 +101,6 @@ end)
 -- Pro Keys - rb_pro_keys.mid (separate tracks per difficulty + animation)
 ----------------------------------------------------------------------
 Test.section('Pro Keys - rb_pro_keys.mid')
-
-Test.it('ConvertProKeys preview: copies Expert C2-C4 notes to animation track', function()
-    reset()
-    local base, n = LoadFixture('rb_pro_keys.mid')
-    Test.expect(n > 0, 'rb_pro_keys.mid created no tracks')
-    local x_idx   = FindFixtureTrack('REAL_KEYS_X', base)
-    Test.expect(x_idx ~= nil, 'no PART REAL_KEYS_X track found in rb_pro_keys.mid')
-    local anim_rh = FindFixtureTrack('ANIM_RH', base) or FindFixtureTrack('ANIM RH', base)
-                    or CreateEmptyFixtureTrack('KEYS_ANIM_RH')
-    S.mc_keys_pk_src_idx = x_idx
-    S.mc_keys_rh_tgt_idx = anim_rh
-    S.mc_keys_lh_tgt_idx = -1
-    S.mc_keys_preview    = true
-    ConvertProKeys()
-    CleanupFixture(base)
-    Test.expect(S.status:find('preview'), 'expected "preview" in status, got: ' .. S.status)
-end)
 
 Test.it('CopyProKeysDiff H: copies Expert notes onto the Hard track', function()
     reset()

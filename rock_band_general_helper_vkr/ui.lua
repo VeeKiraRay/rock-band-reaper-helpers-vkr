@@ -28,6 +28,7 @@ local function Loop()
         S.tm_fallback_idx    = -1
         S.key_audio_idx      = -1   -- Metadata > Song key audio tracks; re-defaulted below
         S.key_bass_idx       = -1
+        S.keys_anim_lh_idx   = -1   -- Animation > Keys left-hand source
         -- Metadata > Difficulty results describe the PREVIOUS project's charts. Leaving
         -- them on screen after a switch would attribute one song's ranks to another.
         S.diff_suggestions   = nil

@@ -38,17 +38,9 @@ Converts General MIDI drum notes to Rock Band 5-lane format and writes them to t
 <!-- TODO: screenshot of the Keys > WIP sub-tab -->
 ![Keys - WIP sub-tab](../assets/g_wip_keys.jpg)
 
-Contains four conversion tools for piano MIDI → Rock Band keys formats. Each tool has its own source and target track selectors.
+Contains two conversion tools for piano MIDI → Rock Band keys formats. Both read the one **Source** track at the top; each has its own target track selector.
 
-### Hand Split
-
-<!-- TODO: screenshot of Hand Split -->
-![Hand Split](../assets/g_wip_keys_handsplit.jpg)
-
-Splits a piano track into separate right-hand and left-hand MIDI tracks.
-
-- Split by **MIDI channel** (Guitar Pro: ch1 = RH, ch2 = LH) or by **pitch threshold**.
-- Set the right-hand target and left-hand target tracks independently — they can be different PART REAL_KEYS tracks.
+The keyboardist's hand animations (PART KEYS_ANIM_RH / _LH) are made in the [General Helper's Animation > Keys](../rock_band_general_helper_vkr/README.md#keys-sub-tab) sub-tab.
 
 ### Convert to Pro Keys
 
@@ -56,13 +48,6 @@ Splits a piano track into separate right-hand and left-hand MIDI tracks.
 ![Convert to Pro Keys](../assets/g_wip_keys_prokeys.jpg)
 
 Octave-shifts all notes into the C2–C4 range (MIDI 48–72) required for Pro Keys Expert authoring. Optionally inserts lane range shift markers where the pitch window moves.
-
-### Pro Keys Animation
-
-<!-- TODO: screenshot of Pro Keys Animation -->
-![Pro Keys Animation](../assets/g_wip_keys_animation.jpg)
-
-Copies notes in the C2–C4 range from a Pro Keys Expert source track to the animation target tracks. The animation tracks drive the on-screen keyboard highlight during gameplay.
 
 ### 5-Lane Keys
 

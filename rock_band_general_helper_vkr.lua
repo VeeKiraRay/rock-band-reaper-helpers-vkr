@@ -10,8 +10,9 @@
 --     Workflow   - per-project authoring workflow checklist
 --     Animation  - Beat: write the BEAT track (normal, half or double time);
 --                  Character: band member animation states per part;
---                  Drums: the drummer's hand and kick animation notes
---     Events     - list song sections, insert EVENTS track events at the
+--                  Drums: the drummer's hand and kick animation notes;
+--                  Keys: the keyboardist's hand animations, and a check
+--     Events    - list song sections, insert EVENTS track events at the
 --                  playhead, write the practice-mode metronome
 --     Venue      - list, validate, and generate VENUE track events
 --     Metadata   - genre converter (real-world genre to the supported major genre
@@ -31,6 +32,23 @@
 --   Full history: CHANGELOG.md in the repo.
 --
 --   v0.9.64
+--     - New Animation > Keys: writes the keyboardist's hand animations,
+--       PART KEYS_ANIM_RH and PART KEYS_ANIM_LH. The right hand is a copy of
+--       Pro Keys Expert, as in the official charts (Expert is the right
+--       hand's part). The left hand is optional: pick a track holding it -
+--       the whole track, its MIDI channel 2, or a piano part with both hands
+--       minus what Expert already has - and each phrase is moved by whole
+--       octaves into C2-C4, below the right hand. The left-hand track plays
+--       an octave lower than the right-hand one on the in-game keyboard, so
+--       the hands share its middle octave; notes that would meet the right
+--       hand are left out and listed by bar. Without a source the left hand
+--       is not touched (right hand only is fine in game; 290 of 352 official
+--       songs with Pro Keys animate both). Validate, beside Generate, checks
+--       hand-made animations too: notes outside 48-72, the hands meeting or
+--       crossing, a hand spanning more than an octave, left-hand chords of 4+
+--       notes, and Expert bars nothing animates - each with its bars. It
+--       replaces the Instrument Helper's WIP Keys > Pro Keys Animation, which
+--       copied Expert to both hands.
 --     - New Events > Metronome: writes the practice-mode metronome on the
 --       EVENTS track - the kick, snare and hi-hat clicks (notes 24, 25, 26) the
 --       game plays when someone practises any part except drums. Every
@@ -594,6 +612,7 @@ dofile(_mdir .. 'events_metronome.lua')     -- Events > Metronome (planner + act
 dofile(_mdir .. 'animation_beat.lua')       -- uses FindEventTime from venue_awareness.lua
 dofile(_mdir .. 'animation_character.lua')
 dofile(_mdir .. 'animation_drums.lua')
+dofile(_mdir .. 'animation_keys.lua')
 dofile(_mdir .. 'venue_camera_priority.lua')
 dofile(_mdir .. 'section_events.lua')
 dofile(_mdir .. 'venue_themes.lua')
