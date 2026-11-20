@@ -398,6 +398,25 @@ The check lists **lighting changes** and **post proc changes with no blend ancho
 
 The whole track is always read — deciding whether an event is a change, and whether an anchor precedes it, needs the events before it — but if a time selection is active only issues inside it are reported, so you can work through a song a section at a time.
 
+**Validate camera stacks** replays the game's shot pick at every camera spot, once per band lineup the project can produce (see [Band lineups and fallbacks](#band-lineups-and-fallbacks)), and also checks what plays after each directed cut. Like the lighting check it is read-only, reads the whole track and reports only inside a time selection.
+
+*After a directed cut.* How the game reads a custom song's camera events (checked in game):
+
+- Events on one spot play one shot. A directed cut outranks every normal shot, so a normal shot on the same spot is only the fallback for a lineup that cannot play the cut.
+- The camera event right after a directed cut plays **when that directed cut ends**, wherever it is placed: it never cuts the directed cut short, so its own position does not matter.
+- The event after that cuts the directed cut short at its own position if it is still running - and then the shot in between is never shown.
+- A directed cut right after a directed cut does not play: the game shows that spot's normal shot instead, or a generic band shot.
+
+So a directed cut runs until it ends or until the second camera event after it. How long a directed cut runs depends on which version the game picks: each venue has its own versions, and the game rotates between them, so a chart cannot choose one. The check therefore uses the range the game allows each directed cut (its own check on the venue files; [Directed Moves](#standalone-directed-moves) lists them) and reports only what holds anywhere in that range: a shot after a directed cut that is **never shown** (an issue), a **directed cut right after a directed cut** (an issue), and a shot after a directed cut that **shows early**, because the directed cut has ended even at the longest length allowed (listed, not counted). A directed cut is never held for its full length: the camera cannot change for 0.25 s after its event (some hold it longer, up to 5 s; Directed Moves lists them). Its length matters only for when the shot right after it appears. Examples with `[directed_drums_lt]`, which may run 6.2-16.7 s after its event, at 120 BPM (a bar is 2 s):
+
+| Camera events | What you see |
+|---|---|
+| bar 3 `drums_lt`, bar 4 coop A, bar 5 coop B | The drums directed cut until bar 5, then B. A is never shown: B comes 4 s after the cut, before the directed cut can end (6.2 s at the shortest). |
+| 3.1 `drums_lt`, 3.2 coop A, 3.3 coop B | The drums directed cut for two beats, then B at 3.3. A is never shown. |
+| bar 3 `drums_lt`, bar 4 coop A, bar 20 coop B | The drums directed cut plays to its end (somewhere in 6.2-16.7 s, by venue), then A, wherever it is placed, until B at bar 20. |
+
+To end a long directed cut at a chosen spot, put the shot you want next right after the directed cut, and a second camera event where the directed cut should end. Writing the **same** shot both times makes it come in no later than that spot whichever version plays: right after the directed cut if it ends first, at the spot if it is still running. If the directed cut ended first, the camera cuts again at the spot to another variant of the same shot. The game takes the next variant each time a shot repeats, and "List venue events" lists the pair as a repeat. The exception is a spot within about 1 s after the directed cut ends: the shot after a finished directed cut is held for at least 1 s, and a camera event during that second is dropped, not delayed. Any camera event is dropped there, not only a repeat.
+
 **Generate sing along** derives VENUE sing-along notes for the guitarist (pitch 87, from HARM2) and bassist (pitch 85, from HARM3) out of each harmony track's vocal phrases (HARM3 uses HARM2's phrase markers, as the game does), merging phrases less than a measure apart into one continuous note. Only the pitch of a harmony track that's present and unmuted is touched — a muted or missing source is left alone. Always processes the whole song. Fully undoable.
 
 **Sub VENUE tracks** splits VENUE's events across 6 category tracks for easier authoring once a song has accumulated a lot of keyframes, then merges them back:
@@ -476,9 +495,9 @@ Only four band members fit on stage, so a song that charts guitar, bass and keys
 
 - **Normal shot of one member** (e.g. Guitar (Near), a close-up): a generic full band shot, picked at random - All (far), All (near) or Front (near). A *behind* shot falls back to All (behind) or Front (behind).
 - **Normal shot of two members** (e.g. Bass + Keys): the single shot of the member who is still on stage.
-- **Directed cut**: no fallback. The game ignores the cut and the camera keeps the shot it is on.
+- **Directed cut**: the cut is dropped, and the spot gets a generic band shot picked at random - All (behind), All (far), All (near), Front (behind) or Front (near). Checked in game: a lone Keys directed cut with no keyboardist showed All (behind).
 
-Letting the game fall back is fine for normal shots - stack a shot for a lineup only where you want to choose it yourself. A directed cut that some lineup cannot play is lost for that lineup. These are the game's own lineup tables, read from its files; the RBN documentation lists All (behind), All (far) and All (near) as the generic shots.
+Letting the game fall back is fine for normal shots - stack a shot for a lineup only where you want to choose it yourself. A directed cut that some lineup cannot play is lost for that lineup; stack a normal shot with it to choose what that lineup sees. These are the game's own lineup tables, read from its files; the RBN documentation lists All (behind), All (far) and All (near) as the generic shots.
 
 ### Keyframes sub-tab
 
@@ -498,10 +517,18 @@ Bulk-regenerates the `[next]` keyframes for every manual lighting event already 
 
 Live readout of current, previous, and next venue events relative to the playhead (or edit cursor when stopped). Updates automatically when the VENUE track changes.
 
-- **Players** — select which two instruments are in the lineup (Bass + Guitar, Bass + Keys, Guitar + Keys). A camera shot requiring the absent instrument gives way to a shot stacked at the same position that fits. If none fits, the authored event's name stays, in amber and marked with `*` (not an error, but worth checking the fallback is fine there), and the picture shows what the game plays instead: the remaining member's single shot for a duo, or All (near) for a one-member shot - one of the generic band shots the game picks from at random (see [Band lineups and fallbacks](#band-lineups-and-fallbacks)). Hover the name for which case it is. A directed cut that cannot play is shown in red with its own picture: the game ignores it and the camera keeps the previous shot.
+- **Players** — select which two instruments are in the lineup (Bass + Guitar, Bass + Keys, Guitar + Keys). A camera shot requiring the absent instrument gives way to a shot stacked at the same position that fits. If none fits, the authored event's name stays, in amber and marked with `*` (not an error, but worth checking the fallback is fine there), and the picture shows what the game plays instead: the remaining member's single shot for a duo, or All (near) for a one-member shot - one of the generic band shots the game picks from at random (see [Band lineups and fallbacks](#band-lineups-and-fallbacks)). Hover the name for which case it is. A directed cut that cannot play is shown in red, pictured as All (near): the game drops the cut and shows a generic band shot, picked at random.
 - **Preview size** — inline sprite display scale: 1× (213×120 px) or 2× (426×240 px).
 - **Sprites** — Animated (plays through all frames) or Still (single middle frame).
 - **Show** — **Current only V** (the current event of each category, one category per row), **Current only H** (the same events side by side on one row: camera, lighting, post-process) or **Surrounding events** (Previous / Current / Next columns per category).
+
+- **Camera: Mark directed-cut timing** (on by default) — the camera row marks the game's handling of directed cuts, below. Turn it off for the events without the marks. Either way, every event stays at its own position and shots stacked on one spot follow the Players lineup.
+
+With **Mark directed-cut timing** on, every camera event stays at its own position and is marked where the game's handling of directed cuts differs (see [After a directed cut](#venue-actions) under Validate camera stacks), for the chosen Players lineup:
+
+- The shot right after a directed cut says **~ plays as soon as the directed ends**: in game it comes on screen when that directed cut ends, wherever it is placed. Hover for how long the directed cut can run and whether the next event could cut it short first.
+- When the next event cuts the directed cut short before it can end (even at the shortest length allowed), the shot in between is never shown: it says **-> never shown**, and the directed cut says **-> skips the next shot**.
+- A directed cut right after a directed cut is red, pictured as the shot the game plays instead.
 
 **Blends.** A blend is authored by re-stating the running lighting or post proc preset a beat or two before the change, so the game fades between the two instead of cutting. That re-stated copy is not a preset of its own, so the preview never shows it as an event — you'd otherwise see the same preset twice across two columns. Instead each lighting and post proc card gets a line saying how it hands over:
 
@@ -548,7 +575,7 @@ It lists what the game can actually show for each directed camera cut, read from
 - **Venue** — the kind of venue. The player's venue decides this, not the song; every venue has its own set of shots.
 - **Band** — which members are on stage. With guitar, bass and keys all charted, only two of the three fit on stage; the game then drops the left-out member's directed cuts and turns their normal shots into group or partner shots. Each section says what its event becomes.
 
-Each event shows how long its move runs after the event and how early it starts, then its moves: who moves (several members by letter, `V+G+B` = vocals, guitar, bass), for which styles and gender, in which kinds of venue (`All` = every venue, `*` = only some venues of that kind), how many variants one venue rotates through, and the lead-in. Moves that would not play for your choices are dimmed. If none of an event's moves plays, the game keeps the camera on the previous shot.
+Each event shows how long the move may run after the event (the range the game allows that cut; each venue's version is somewhere in it) and how long the camera cannot change after the event: 0.25 s for most cuts, up to 5 s for some versions of a few. Camera events during that time are dropped, not delayed. Six cuts, the game's free cuts, say their versions are not picked by song style or member gender: the game's style and gender filter skips them, so any of their versions can play in any song (they still differ by venue and still need their member on stage). An amber line warns when a cut is missing from some venues, or when the chosen Band changes it. Then its moves: who moves (several members by letter, `V+G+B` = vocals, guitar, bass), for which styles and gender, in which kinds of venue (`All` = every venue, `*` = only some venues of that kind), how many variants one venue rotates through, and the lead-in. A `#` after the lead-in marks the few moves (11 of about 700) with versions that hold the camera longer than 0.25 s; hover it for how long. Moves that would not play for your choices are dimmed. If none of an event's moves plays for the song's style and the member's gender, the game skips the cut and the camera event after it plays right away; a cut the band lineup drops gets a random generic band shot instead.
 
 **Click a move** to see what competes with it: the window switches to that camera event and sets each filter the move allows only one value for (e.g. Dramatic, Female, Arena). The moves left undimmed are the ones the game picks from for that band. Your keyword stays in the Keyword box.
 

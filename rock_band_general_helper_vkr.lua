@@ -49,6 +49,23 @@
 --       notes, and Expert bars nothing animates - each with its bars. It
 --       replaces the Instrument Helper's WIP Keys > Pro Keys Animation, which
 --       copied Expert to both hands.
+--     - Venue > Actions > Validate camera stacks also checks what plays after
+--       each directed cut, as the game reads a custom song (tested in game):
+--       the camera event right after a directed cut plays when the directed
+--       move ends, wherever it is placed, and the event after that cuts the
+--       move if it is still running. New findings: a shot after a directed
+--       cut that is never shown, a directed cut right after a directed cut
+--       (it does not play), and - not counted as issues - shots that show
+--       early because the move ends first. Move lengths vary by venue; only
+--       what holds for every venue is reported. A shot a few ticks after a
+--       directed cut is no longer called a botched stack. Venue > Preview's
+--       camera row marks the same rules on each event, at its own position:
+--       the shot after a directed cut says "~ plays as soon as the directed
+--       ends", one the game never shows says "-> never shown" (and its
+--       directed cut "-> skips the next shot"), and a directed cut right
+--       after a directed cut is red, pictured as what plays instead. A new
+--       Camera: Mark directed-cut timing checkbox (on by default) turns the
+--       marks off.
 --     - New Events > Metronome: writes the practice-mode metronome on the
 --       EVENTS track - the kick, snare and hi-hat clicks (notes 24, 25, 26) the
 --       game plays when someone practises any part except drums. Every
@@ -223,16 +240,16 @@
 --       "Standalone windows" section of Venue > Actions, which also opens the
 --       Venue Preview window.
 --     - Validate camera stacks: a directed cut that a band lineup cannot play
---       is now an issue of its own - directed cuts have no fallback, so the
---       game ignores them and the camera keeps its shot (it used to say a
---       band shot plays). Spots where a normal shot falls back for a lineup
---       are listed as advice, no longer counted as issues.
+--       is now an issue of its own - the game drops the cut and shows a
+--       generic band shot, picked at random, instead (checked in game), so
+--       the authored move is lost. Spots where a normal shot falls back for a
+--       lineup are listed as advice, no longer counted as issues.
 --     - Venue > Preview: when no stacked camera shot fits the chosen Players
 --       lineup, the event's name turns amber with a * and the picture shows
 --       what the game plays instead - the remaining member's shot for a duo,
 --       All (near) for a one-member shot (one of the band shots it picks at
---       random); hover for which. A directed cut that cannot play is red
---       (ignored, the previous shot stays). Replaces the red "No suitable
+--       random); hover for which. A directed cut that cannot play is red,
+--       pictured as All (near) (dropped, a random band shot plays). Replaces the red "No suitable
 --       event" card.
 --     - Venue > Preview: Show has a new Current only H option - the current
 --       camera, lighting and post-process event side by side on one row.
@@ -518,6 +535,7 @@ for _, _f in ipairs({
     _dir  .. 'lib/reaper_key_audio.lua',
     _dir  .. 'lib/reaper_score_sim.lua',
     _dir  .. 'lib/reaper_score_read.lua',
+    _dir  .. 'lib/reaper_venue_shots.lua',
     _mdir .. 'defaults.lua',
     _mdir .. 'settings.lua',
     _mdir .. 'helpers.lua',
@@ -541,6 +559,7 @@ for _, _f in ipairs({
     _mdir .. 'actions_venue_sing_along.lua',
     _mdir .. 'actions_venue_subtracks.lua',
     _mdir .. 'actions_venue_validate.lua',
+    _mdir .. 'venue_camera_timing.lua',
     _mdir .. 'actions_venue_validate_camera.lua',
     _mdir .. 'workflow.lua',
     _mdir .. 'actions_workflow.lua',
@@ -597,6 +616,7 @@ dofile(_dir  .. 'lib/reaper_key_profiles.lua')   -- generated; read by song_key.
 dofile(_dir  .. 'lib/reaper_key_audio.lua')      -- uses reaper_dsp.lua's YIN core
 dofile(_dir  .. 'lib/reaper_score_sim.lua')      -- Metadata > Score (pure)
 dofile(_dir  .. 'lib/reaper_score_read.lua')     -- uses reaper_difficulty_read.lua's readers
+dofile(_dir  .. 'lib/reaper_venue_shots.lua')    -- generated shot data: directed-cut lengths
 
 -- Window title with this script's own @version, read from the header above.
 -- ui.lua passes it to ImGui_Begin; the "###" id inside keeps saved window
@@ -627,6 +647,7 @@ dofile(_mdir .. 'actions_venue_keyframes.lua')
 dofile(_mdir .. 'actions_venue_sing_along.lua')
 dofile(_mdir .. 'actions_venue_subtracks.lua')
 dofile(_mdir .. 'actions_venue_validate.lua')
+dofile(_mdir .. 'venue_camera_timing.lua')            -- directed-cut timing (pure)
 dofile(_mdir .. 'actions_venue_validate_camera.lua')
 dofile(_mdir .. 'workflow.lua')
 dofile(_mdir .. 'actions_workflow.lua')

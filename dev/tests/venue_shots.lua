@@ -14,7 +14,7 @@ Test.it('has the five venue kinds, the directed cuts and only the coop remaps', 
     Test.expect(#VenueShotEvents('coop') == 0, 'coop shots are not listed')
     Test.expect(#VenueShotEvents() == #VenueShotEvents('directed'), 'every listed event is directed')
     Test.expect(RB_VENUE_SHOTS.coop_remap.coop_k_near ~= nil, 'coop remaps kept')
-    Test.expect(RB_VENUE_SHOTS_SCHEMA == 1, 'schema')
+    Test.expect(RB_VENUE_SHOTS_SCHEMA == 2, 'schema')
 end)
 
 Test.it('every move row is complete', function()
@@ -32,6 +32,20 @@ end)
 
 Test.it('directed events carry a length range', function()
     Test.expect(E.directed_drums.length[1] < E.directed_drums.length[2], 'drums length')
+end)
+
+Test.it('directed events carry a lock range with the 0.25 s floor', function()
+    local bad
+    for cat, ev in pairs(E) do
+        if not (ev.lock and ev.lock[1] >= 0.25 and ev.lock[1] <= ev.lock[2]) then bad = cat end
+        for _, row in ipairs(ev.moves or {}) do
+            -- A move only carries its own lock where it holds longer than the floor.
+            if row.lock and not (row.lock[2] > 0.25) then bad = cat .. ' / ' .. row.label end
+        end
+    end
+    Test.expect(not bad, 'bad lock: ' .. tostring(bad))
+    Test.expect(E.directed_vocals_cam_pt.lock[2] == 5, 'mic-stand shot holds 5 s')
+    Test.expect(E.directed_bass.lock[2] == 0.25, 'most cuts: the floor only')
 end)
 
 Test.it('coop remaps: singles go to band shots, duos to the partner, band shots never change', function()

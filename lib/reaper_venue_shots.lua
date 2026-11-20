@@ -5,22 +5,26 @@
 -- game's lineup remaps; no clip names, no per-shot data.
 --
 -- RB_VENUE_SHOTS.events[category] = {
---   free = true when the cut plays for every band (style / gender ignored),
---   length = { min, max } seconds the move runs after its event (directed only),
---   lead = { min, max } seconds the move starts before its event,
+--   free = true when the song's style and the member's gender do not matter (a free cut),
+--   length = { min, max } seconds the move may run after its event: the range the
+--            game's own asset check allows every venue's clip, not measured per shot,
+--   lead = { min, max } seconds the move starts before its event (its lead-in),
+--   lock = { min, max } seconds after its event the camera cannot change (the game
+--          holds a directed shot at least 0.25 s; camera events meanwhile are dropped),
 --   kinds = venue kinds that have it ("arena*" = only some arenas),
 --   variants = most shots one venue has for it,
 --   remap = { no_keys / no_guitar / no_bass = "dropped" or { targets } },
 --   moves = { { label, who (the member who moves, members joined with +, "crowd"
 --              or "band"), gender (M F B), styles (R D B S), kinds, variants,
---              lead = { min, max }, lineups (off-stage members it plays with),
+--              lead = { min, max }, lock = { min, max } (only where longer than
+--              0.25 s), lineups (off-stage members it plays with),
 --              keywords } } }
 -- Directed cuts only: normal (coop) shots have no moves, always play and exist in every
 -- venue, so only their lineup remaps are kept:
 -- RB_VENUE_SHOTS.coop_remap[category] = { no_keys / no_guitar / no_bass = { targets } }.
 -- Pure data. No r / ctx / S.
 
-RB_VENUE_SHOTS_SCHEMA = 1
+RB_VENUE_SHOTS_SCHEMA = 2
 
 RB_VENUE_SHOTS = {
     kinds = { "arena", "big_club", "festival", "small_club", "video" },
@@ -29,6 +33,7 @@ RB_VENUE_SHOTS = {
         ["directed_all"] = {
             length = { 0.25, 10 },
             lead = { 0.5, 3.07 },
+            lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
             variants = 17,
             moves = {
@@ -59,6 +64,7 @@ RB_VENUE_SHOTS = {
         ["directed_all_cam"] = {
             length = { 1.73, 11.33 },
             lead = { 0, 2.93 },
+            lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
             variants = 17,
             moves = {
@@ -82,6 +88,7 @@ RB_VENUE_SHOTS = {
             free = true,
             length = { 6.67, 18.33 },
             lead = { 0, 0 },
+            lock = { 0.25, 3.33 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
             variants = 13,
             moves = {
@@ -91,7 +98,7 @@ RB_VENUE_SHOTS = {
                 { label = "Crowd: center wedge", who = "crowd", gender = "B", styles = "RDBS", kinds = { "arena" }, variants = 8, lead = { 0, 0 }, lineups = "no_keys no_guitar no_bass", keywords = "crowd fans audience" },
                 { label = "Crowd: front", who = "crowd", gender = "B", styles = "RDBS", kinds = { "arena" }, variants = 1, lead = { 0, 0 }, lineups = "no_keys no_guitar no_bass", keywords = "crowd fans audience" },
                 { label = "Crowd: front row", who = "crowd", gender = "B", styles = "RDBS", kinds = { "big_club", "small_club" }, variants = 5, lead = { 0, 0 }, lineups = "no_keys no_guitar no_bass", keywords = "crowd fans audience" },
-                { label = "Crowd: full", who = "crowd", gender = "B", styles = "RDBS", kinds = { "arena", "big_club" }, variants = 8, lead = { 0, 0 }, lineups = "no_keys no_guitar no_bass", keywords = "crowd fans audience" },
+                { label = "Crowd: full", who = "crowd", gender = "B", styles = "RDBS", kinds = { "arena", "big_club" }, variants = 8, lead = { 0, 0 }, lock = { 0.25, 3.33 }, lineups = "no_keys no_guitar no_bass", keywords = "crowd fans audience" },
                 { label = "Crowd: large", who = "crowd", gender = "B", styles = "RDBS", kinds = { "festival" }, variants = 1, lead = { 0, 0 }, lineups = "no_keys no_guitar no_bass", keywords = "crowd fans audience" },
                 { label = "Crowd: right", who = "crowd", gender = "B", styles = "RDBS", kinds = { "big_club" }, variants = 4, lead = { 0, 0 }, lineups = "no_keys no_guitar no_bass", keywords = "crowd fans audience" },
                 { label = "Crowd: whole crowd", who = "crowd", gender = "B", styles = "RDBS", kinds = { "big_club*", "small_club" }, variants = 3, lead = { 0, 0 }, lineups = "no_keys no_guitar no_bass", keywords = "crowd fans audience" },
@@ -100,6 +107,7 @@ RB_VENUE_SHOTS = {
         ["directed_all_yeah"] = {
             length = { 2.7, 5.4 },
             lead = { 0.57, 2.43 },
+            lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
             variants = 5,
             moves = {
@@ -114,6 +122,7 @@ RB_VENUE_SHOTS = {
         ["directed_bass"] = {
             length = { 0.47, 6 },
             lead = { 0, 2.63 },
+            lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
             variants = 12,
             remap = { no_bass = "dropped" },
@@ -136,6 +145,7 @@ RB_VENUE_SHOTS = {
         ["directed_bass_cam"] = {
             length = { 0.3, 10 },
             lead = { 0, 3.33 },
+            lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
             variants = 27,
             remap = { no_bass = "dropped" },
@@ -173,6 +183,7 @@ RB_VENUE_SHOTS = {
             free = true,
             length = { 10, 10 },
             lead = { 0, 0 },
+            lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
             variants = 2,
             remap = { no_bass = "dropped" },
@@ -186,6 +197,7 @@ RB_VENUE_SHOTS = {
         ["directed_bass_np"] = {
             length = { 0.67, 4.33 },
             lead = { 0, 2.83 },
+            lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
             variants = 12,
             remap = { no_bass = "dropped" },
@@ -207,6 +219,7 @@ RB_VENUE_SHOTS = {
         ["directed_bre"] = {
             length = { 0.5, 3.8 },
             lead = { 3.2, 14.17 },
+            lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
             variants = 6,
             moves = {
@@ -222,6 +235,7 @@ RB_VENUE_SHOTS = {
         ["directed_brej"] = {
             length = { 0.93, 2.93 },
             lead = { 2.33, 4.53 },
+            lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
             variants = 16,
             moves = {
@@ -240,6 +254,7 @@ RB_VENUE_SHOTS = {
             free = true,
             length = { 0.6, 5.33 },
             lead = { 0, 0 },
+            lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
             variants = 6,
             moves = {
@@ -253,6 +268,7 @@ RB_VENUE_SHOTS = {
         ["directed_crowd_b"] = {
             length = { 0.6, 5.33 },
             lead = { 0, 3.17 },
+            lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
             variants = 5,
             remap = { no_bass = "dropped" },
@@ -264,17 +280,19 @@ RB_VENUE_SHOTS = {
         ["directed_crowd_g"] = {
             length = { 0.6, 4.93 },
             lead = { 0, 3.7 },
+            lock = { 0.25, 1.1 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
             variants = 9,
             remap = { no_guitar = "dropped" },
             moves = {
-                { label = "Crowd interaction", who = "guitar", gender = "B", styles = "RDBS", kinds = { "arena", "big_club", "festival", "video" }, variants = 9, lead = { 0, 3.7 }, lineups = "no_keys no_guitar no_bass" },
-                { label = "Crowd: front row", who = "crowd", gender = "B", styles = "RDBS", kinds = { "big_club*", "small_club" }, variants = 1, lead = { 0, 3.7 }, lineups = "no_keys no_guitar no_bass", keywords = "crowd fans audience" },
+                { label = "Crowd interaction", who = "guitar", gender = "B", styles = "RDBS", kinds = { "arena", "big_club", "festival", "video" }, variants = 9, lead = { 0, 3.7 }, lock = { 0.25, 1.1 }, lineups = "no_keys no_guitar no_bass" },
+                { label = "Crowd: front row", who = "crowd", gender = "B", styles = "RDBS", kinds = { "big_club*", "small_club" }, variants = 1, lead = { 0, 3.7 }, lock = { 0.25, 1.1 }, lineups = "no_keys no_guitar no_bass", keywords = "crowd fans audience" },
             },
         },
         ["directed_crowdsurf"] = {
             length = { 0.25, 4.2 },
             lead = { 0.9, 2.13 },
+            lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
             variants = 7,
             moves = {
@@ -291,6 +309,7 @@ RB_VENUE_SHOTS = {
         ["directed_drums"] = {
             length = { 0.25, 1.67 },
             lead = { 0, 2.67 },
+            lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
             variants = 9,
             moves = {
@@ -309,6 +328,7 @@ RB_VENUE_SHOTS = {
             free = true,
             length = { 10, 10 },
             lead = { 0, 0 },
+            lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
             variants = 2,
             moves = {
@@ -322,6 +342,7 @@ RB_VENUE_SHOTS = {
             free = true,
             length = { 6.2, 16.67 },
             lead = { 0, 0.47 },
+            lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
             variants = 9,
             moves = {
@@ -336,6 +357,7 @@ RB_VENUE_SHOTS = {
         ["directed_drums_np"] = {
             length = { 0.25, 7.43 },
             lead = { 0, 3.23 },
+            lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
             variants = 21,
             moves = {
@@ -372,6 +394,7 @@ RB_VENUE_SHOTS = {
         ["directed_drums_pnt"] = {
             length = { 0.25, 2.7 },
             lead = { 0, 2.23 },
+            lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
             variants = 15,
             moves = {
@@ -400,16 +423,17 @@ RB_VENUE_SHOTS = {
         ["directed_duo_bass"] = {
             length = { 1.43, 8.17 },
             lead = { 0, 2.33 },
+            lock = { 0.25, 2.33 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
             variants = 26,
             remap = { no_bass = "dropped" },
             moves = {
-                { label = "Duo moment", who = "bass", gender = "B", styles = "D", kinds = { "arena", "big_club", "festival", "small_club", "video" }, variants = 2, lead = { 0, 0.8 }, lineups = "no_keys no_guitar no_bass" },
+                { label = "Duo moment", who = "bass", gender = "B", styles = "D", kinds = { "arena", "big_club", "festival", "small_club", "video" }, variants = 2, lead = { 0, 0.8 }, lock = { 0.25, 1.67 }, lineups = "no_keys no_guitar no_bass" },
                 { label = "Duo moment", who = "bass", gender = "B", styles = "R", kinds = { "arena" }, variants = 1, lead = { 0.67, 0.67 }, lineups = "no_keys no_guitar no_bass" },
                 { label = "Duo moment", who = "bass", gender = "B", styles = "S", kinds = { "festival" }, variants = 2, lead = { 0.33, 1.53 }, lineups = "no_keys no_guitar no_bass" },
                 { label = "Duo moment", who = "vocals", gender = "B", styles = "B", kinds = { "arena", "big_club", "festival", "small_club", "video" }, variants = 6, lead = { 0, 1.17 }, lineups = "no_keys no_guitar no_bass" },
                 { label = "Duo moment", who = "vocals", gender = "B", styles = "D", kinds = { "arena", "big_club", "festival", "video" }, variants = 3, lead = { 0, 0.9 }, lineups = "no_keys no_guitar no_bass" },
-                { label = "Duo moment", who = "vocals", gender = "B", styles = "R", kinds = { "arena", "big_club", "festival", "small_club" }, variants = 2, lead = { 0, 1.17 }, lineups = "no_keys no_guitar no_bass" },
+                { label = "Duo moment", who = "vocals", gender = "B", styles = "R", kinds = { "arena", "big_club", "festival", "small_club" }, variants = 2, lead = { 0, 1.17 }, lock = { 0.25, 2.33 }, lineups = "no_keys no_guitar no_bass" },
                 { label = "Duo moment", who = "vocals", gender = "B", styles = "RDBS", kinds = { "arena", "big_club", "festival", "small_club", "video" }, variants = 9, lead = { 0, 2.33 }, lineups = "no_keys no_guitar no_bass" },
                 { label = "Duo moment", who = "vocals", gender = "B", styles = "S", kinds = { "arena", "big_club", "small_club", "video" }, variants = 3, lead = { 0, 0.8 }, lineups = "no_keys no_guitar no_bass" },
                 { label = "Duo moment", who = "vocals", gender = "M", styles = "D", kinds = { "arena" }, variants = 1, lead = { 0, 0 }, lineups = "no_keys no_guitar no_bass" },
@@ -422,6 +446,7 @@ RB_VENUE_SHOTS = {
         ["directed_duo_drums"] = {
             length = { 0.33, 5.17 },
             lead = { 0, 2.83 },
+            lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
             variants = 15,
             moves = {
@@ -449,6 +474,7 @@ RB_VENUE_SHOTS = {
         ["directed_duo_gb"] = {
             length = { 3.17, 7.83 },
             lead = { 0, 1.83 },
+            lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
             variants = 14,
             remap = { no_guitar = "dropped", no_bass = "dropped" },
@@ -465,6 +491,7 @@ RB_VENUE_SHOTS = {
         ["directed_duo_guitar"] = {
             length = { 1.07, 6.67 },
             lead = { 0, 2.4 },
+            lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
             variants = 38,
             remap = { no_guitar = "dropped" },
@@ -490,6 +517,7 @@ RB_VENUE_SHOTS = {
         ["directed_duo_kb"] = {
             length = { 1, 6.67 },
             lead = { 0, 2 },
+            lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
             variants = 4,
             remap = { no_keys = "dropped", no_bass = "dropped" },
@@ -503,6 +531,7 @@ RB_VENUE_SHOTS = {
         ["directed_duo_kg"] = {
             length = { 1, 6.67 },
             lead = { 0, 0.77 },
+            lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
             variants = 4,
             remap = { no_keys = "dropped", no_guitar = "dropped" },
@@ -515,6 +544,7 @@ RB_VENUE_SHOTS = {
         ["directed_duo_kv"] = {
             length = { 1, 6.67 },
             lead = { 0, 1.43 },
+            lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
             variants = 5,
             remap = { no_keys = "dropped" },
@@ -531,6 +561,7 @@ RB_VENUE_SHOTS = {
         ["directed_guitar"] = {
             length = { 0.5, 6 },
             lead = { 0, 3 },
+            lock = { 0.25, 1 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
             variants = 21,
             remap = { no_guitar = "dropped" },
@@ -547,7 +578,7 @@ RB_VENUE_SHOTS = {
                 { label = "Rhythm kick", who = "guitar", gender = "B", styles = "RDBS", kinds = { "arena", "big_club", "festival", "small_club", "video" }, variants = 2, lead = { 0.37, 3 }, lineups = "no_keys no_guitar no_bass" },
                 { label = "Rhythm kneel", who = "guitar", gender = "B", styles = "RDBS", kinds = { "arena", "big_club", "festival", "video" }, variants = 1, lead = { 1.33, 1.57 }, lineups = "no_keys no_guitar no_bass" },
                 { label = "Rhythm kneel", who = "guitar", gender = "M", styles = "RDBS", kinds = { "arena" }, variants = 1, lead = { 1.53, 1.53 }, lineups = "no_keys no_guitar no_bass" },
-                { label = "Rhythm walk forward", who = "guitar", gender = "M", styles = "RDBS", kinds = { "arena*" }, variants = 1, lead = { 0, 0 }, lineups = "no_keys no_guitar no_bass" },
+                { label = "Rhythm walk forward", who = "guitar", gender = "M", styles = "RDBS", kinds = { "arena*" }, variants = 1, lead = { 0, 0 }, lock = { 1, 1 }, lineups = "no_keys no_guitar no_bass" },
                 { label = "Rhythm walk kick", who = "guitar", gender = "B", styles = "RDBS", kinds = { "arena", "festival", "small_club" }, variants = 3, lead = { 0.6, 1 }, lineups = "no_keys no_guitar no_bass" },
                 { label = "Slow-motion: jump feet land apart", who = "guitar", gender = "B", styles = "RDBS", kinds = { "arena", "big_club", "video" }, variants = 2, lead = { 1.17, 1.8 }, lineups = "no_keys no_guitar no_bass" },
                 { label = "Solo start", who = "guitar", gender = "B", styles = "RDBS", kinds = { "arena", "big_club", "video" }, variants = 3, lead = { 0.67, 0.87 }, lineups = "no_keys no_guitar no_bass" },
@@ -558,11 +589,12 @@ RB_VENUE_SHOTS = {
         ["directed_guitar_cam_pr"] = {
             length = { 0.43, 9.63 },
             lead = { 0.33, 4.3 },
+            lock = { 0.25, 1 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
             variants = 21,
             remap = { no_guitar = "dropped" },
             moves = {
-                { label = "Dodge", who = "guitar", gender = "M", styles = "S", kinds = { "arena", "big_club", "small_club", "video" }, variants = 2, lead = { 1.03, 2.3 }, lineups = "no_keys no_guitar no_bass" },
+                { label = "Dodge", who = "guitar", gender = "M", styles = "S", kinds = { "arena", "big_club", "small_club", "video" }, variants = 2, lead = { 1.03, 2.3 }, lock = { 0.25, 1 }, lineups = "no_keys no_guitar no_bass" },
                 { label = "Fall down", who = "guitar", gender = "M", styles = "S", kinds = { "arena", "big_club", "festival", "video" }, variants = 2, lead = { 1.2, 3.67 }, lineups = "no_keys no_guitar no_bass" },
                 { label = "Kneel rhythm", who = "guitar", gender = "B", styles = "RDBS", kinds = { "arena" }, variants = 2, lead = { 1.53, 1.53 }, lineups = "no_keys no_guitar no_bass" },
                 { label = "Lean in", who = "guitar", gender = "F", styles = "D", kinds = { "arena" }, variants = 1, lead = { 2.27, 2.27 }, lineups = "no_keys no_guitar no_bass" },
@@ -588,6 +620,7 @@ RB_VENUE_SHOTS = {
         ["directed_guitar_cam_pt"] = {
             length = { 1.6, 12 },
             lead = { 0, 0.93 },
+            lock = { 0.25, 1.1 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
             variants = 29,
             remap = { no_guitar = "dropped" },
@@ -597,7 +630,7 @@ RB_VENUE_SHOTS = {
                 { label = "Crowd interaction", who = "guitar", gender = "M", styles = "B", kinds = { "arena", "festival" }, variants = 1, lead = { 0.6, 0.63 }, lineups = "no_keys no_guitar no_bass" },
                 { label = "Dodge", who = "guitar", gender = "M", styles = "S", kinds = { "festival" }, variants = 2, lead = { 0, 0 }, lineups = "no_keys no_guitar no_bass" },
                 { label = "Jump", who = "guitar", gender = "M", styles = "B", kinds = { "festival", "small_club" }, variants = 1, lead = { 0.5, 0.7 }, lineups = "no_keys no_guitar no_bass" },
-                { label = "Jump", who = "guitar", gender = "M", styles = "S", kinds = { "festival", "small_club" }, variants = 2, lead = { 0.63, 0.77 }, lineups = "no_keys no_guitar no_bass" },
+                { label = "Jump", who = "guitar", gender = "M", styles = "S", kinds = { "festival", "small_club" }, variants = 2, lead = { 0.63, 0.77 }, lock = { 0.25, 1 }, lineups = "no_keys no_guitar no_bass" },
                 { label = "Knee slide (power slide)", who = "guitar", gender = "M", styles = "S", kinds = { "festival" }, variants = 2, lead = { 0.4, 0.4 }, lineups = "no_keys no_guitar no_bass", keywords = "knee slide" },
                 { label = "Kneel rhythm", who = "guitar", gender = "B", styles = "RDBS", kinds = { "arena" }, variants = 1, lead = { 0.43, 0.43 }, lineups = "no_keys no_guitar no_bass" },
                 { label = "Kneeling", who = "guitar", gender = "B", styles = "RDBS", kinds = { "arena" }, variants = 2, lead = { 0, 0 }, lineups = "no_keys no_guitar no_bass" },
@@ -605,7 +638,7 @@ RB_VENUE_SHOTS = {
                 { label = "Playing to the rhythm", who = "guitar", gender = "B", styles = "RDBS", kinds = { "big_club", "festival", "video" }, variants = 5, lead = { 0, 0.47 }, lineups = "no_keys no_guitar no_bass" },
                 { label = "Playing to the rhythm", who = "guitar", gender = "F", styles = "D", kinds = { "arena", "big_club", "video" }, variants = 2, lead = { 0, 0 }, lineups = "no_keys no_guitar no_bass" },
                 { label = "Playing to the rhythm", who = "guitar", gender = "M", styles = "B", kinds = { "arena" }, variants = 1, lead = { 0.43, 0.43 }, lineups = "no_keys no_guitar no_bass" },
-                { label = "Playing to the rhythm", who = "guitar", gender = "M", styles = "S", kinds = { "arena", "big_club", "festival", "small_club", "video" }, variants = 8, lead = { 0, 0.87 }, lineups = "no_keys no_guitar no_bass" },
+                { label = "Playing to the rhythm", who = "guitar", gender = "M", styles = "S", kinds = { "arena", "big_club", "festival", "small_club", "video" }, variants = 8, lead = { 0, 0.87 }, lock = { 0.25, 1.1 }, lineups = "no_keys no_guitar no_bass" },
                 { label = "Punch forward", who = "guitar", gender = "M", styles = "R", kinds = { "big_club", "small_club", "video" }, variants = 2, lead = { 0.2, 0.83 }, lineups = "no_keys no_guitar no_bass" },
                 { label = "Rhythm kick", who = "guitar", gender = "B", styles = "RDBS", kinds = { "small_club" }, variants = 1, lead = { 0, 0 }, lineups = "no_keys no_guitar no_bass" },
                 { label = "Rhythm kneel", who = "guitar", gender = "B", styles = "RDBS", kinds = { "arena" }, variants = 1, lead = { 0, 0 }, lineups = "no_keys no_guitar no_bass" },
@@ -628,6 +661,7 @@ RB_VENUE_SHOTS = {
             free = true,
             length = { 3.33, 10 },
             lead = { 0, 0 },
+            lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
             variants = 7,
             remap = { no_guitar = "dropped" },
@@ -643,6 +677,7 @@ RB_VENUE_SHOTS = {
         ["directed_guitar_np"] = {
             length = { 0.25, 5.37 },
             lead = { 0, 3.03 },
+            lock = { 0.25, 1.1 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
             variants = 17,
             remap = { no_guitar = "dropped" },
@@ -654,7 +689,7 @@ RB_VENUE_SHOTS = {
                 { label = "Kiss to the camera", who = "guitar", gender = "F", styles = "D", kinds = { "arena" }, variants = 1, lead = { 0.53, 0.53 }, lineups = "no_keys no_guitar no_bass" },
                 { label = "Lean in", who = "guitar", gender = "F", styles = "D", kinds = { "festival", "small_club" }, variants = 1, lead = { 1, 1.07 }, lineups = "no_keys no_guitar no_bass" },
                 { label = "Peekaboo", who = "guitar", gender = "M", styles = "D", kinds = { "arena" }, variants = 1, lead = { 0, 0 }, lineups = "no_keys no_guitar no_bass" },
-                { label = "Playing to the rhythm", who = "guitar", gender = "M", styles = "B", kinds = { "arena", "big_club", "festival", "small_club", "video" }, variants = 2, lead = { 0.67, 3 }, lineups = "no_keys no_guitar no_bass" },
+                { label = "Playing to the rhythm", who = "guitar", gender = "M", styles = "B", kinds = { "arena", "big_club", "festival", "small_club", "video" }, variants = 2, lead = { 0.67, 3 }, lock = { 0.25, 1.1 }, lineups = "no_keys no_guitar no_bass" },
                 { label = "Point at", who = "guitar", gender = "M", styles = "D", kinds = { "big_club", "video" }, variants = 2, lead = { 2, 3 }, lineups = "no_keys no_guitar no_bass" },
                 { label = "Punch forward", who = "guitar", gender = "M", styles = "R", kinds = { "arena", "big_club", "small_club", "video" }, variants = 1, lead = { 0.5, 1.07 }, lineups = "no_keys no_guitar no_bass" },
                 { label = "Rhythm jump", who = "guitar", gender = "B", styles = "RDBS", kinds = { "big_club", "festival", "video" }, variants = 2, lead = { 0.77, 1.07 }, lineups = "no_keys no_guitar no_bass" },
@@ -674,6 +709,7 @@ RB_VENUE_SHOTS = {
         ["directed_keys"] = {
             length = { 0, 6.67 },
             lead = { 0, 1.5 },
+            lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
             variants = 12,
             remap = { no_keys = "dropped" },
@@ -703,6 +739,7 @@ RB_VENUE_SHOTS = {
         ["directed_keys_cam"] = {
             length = { 1.67, 6.67 },
             lead = { 0, 1.33 },
+            lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
             variants = 5,
             remap = { no_keys = "dropped" },
@@ -726,6 +763,7 @@ RB_VENUE_SHOTS = {
         ["directed_keys_np"] = {
             length = { 3.3, 6.67 },
             lead = { 0, 1 },
+            lock = { 0.25, 0.25 },
             kinds = { "big_club", "festival", "small_club", "video" },
             variants = 4,
             remap = { no_keys = "dropped" },
@@ -743,6 +781,7 @@ RB_VENUE_SHOTS = {
         ["directed_stagedive"] = {
             length = { 0.25, 5.77 },
             lead = { 0, 2.13 },
+            lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
             variants = 12,
             moves = {
@@ -758,6 +797,7 @@ RB_VENUE_SHOTS = {
         ["directed_vocals"] = {
             length = { 0.25, 6.27 },
             lead = { 0, 4.13 },
+            lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
             variants = 36,
             moves = {
@@ -808,6 +848,7 @@ RB_VENUE_SHOTS = {
         ["directed_vocals_cam_pr"] = {
             length = { 0.37, 9.7 },
             lead = { 0.53, 4.43 },
+            lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
             variants = 90,
             moves = {
@@ -895,6 +936,7 @@ RB_VENUE_SHOTS = {
         ["directed_vocals_cam_pt"] = {
             length = { 0.93, 10 },
             lead = { 0, 0.97 },
+            lock = { 0.25, 5 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
             variants = 122,
             moves = {
@@ -951,7 +993,7 @@ RB_VENUE_SHOTS = {
                 { label = "Mic stand: sing", who = "vocals", gender = "F", styles = "DB", kinds = { "big_club", "festival" }, variants = 2, lead = { 0, 0.87 }, lineups = "no_keys no_guitar no_bass" },
                 { label = "Mic stand: sing", who = "vocals", gender = "M", styles = "D", kinds = { "arena", "big_club", "small_club", "video" }, variants = 3, lead = { 0, 0.87 }, lineups = "no_keys no_guitar no_bass" },
                 { label = "Mic stand: sing on knees", who = "vocals", gender = "F", styles = "RD", kinds = { "arena", "festival" }, variants = 2, lead = { 0.37, 0.57 }, lineups = "no_keys no_guitar no_bass" },
-                { label = "Mic stand: sing toward camera", who = "vocals", gender = "M", styles = "R", kinds = { "arena" }, variants = 1, lead = { 0.87, 0.87 }, lineups = "no_keys no_guitar no_bass" },
+                { label = "Mic stand: sing toward camera", who = "vocals", gender = "M", styles = "R", kinds = { "arena" }, variants = 1, lead = { 0.87, 0.87 }, lock = { 5, 5 }, lineups = "no_keys no_guitar no_bass" },
                 { label = "Mic stand: slide", who = "vocals", gender = "M", styles = "RD", kinds = { "arena" }, variants = 2, lead = { 0.87, 0.87 }, lineups = "no_keys no_guitar no_bass" },
                 { label = "Mic stand: slide", who = "vocals", gender = "M", styles = "RDS", kinds = { "arena" }, variants = 1, lead = { 0.5, 0.5 }, lineups = "no_keys no_guitar no_bass" },
                 { label = "Mic stand: spin", who = "vocals", gender = "M", styles = "RD", kinds = { "big_club", "festival", "small_club" }, variants = 2, lead = { 0.67, 0.97 }, lineups = "no_keys no_guitar no_bass" },
@@ -1010,6 +1052,7 @@ RB_VENUE_SHOTS = {
         ["directed_vocals_cls"] = {
             length = { 1.3, 12.67 },
             lead = { 0, 2.43 },
+            lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
             variants = 59,
             moves = {
@@ -1058,6 +1101,7 @@ RB_VENUE_SHOTS = {
         ["directed_vocals_np"] = {
             length = { 0.25, 2.9 },
             lead = { 0.33, 2.27 },
+            lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
             variants = 18,
             moves = {

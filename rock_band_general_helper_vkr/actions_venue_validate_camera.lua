@@ -2,6 +2,7 @@
 -- Read-only - never writes to the track, never opens an undo block.
 -- Requires: FindNamedTrackMIDI, GetTakePPQPerQN, GetMutedInstruments,
 --           PickPriorityCameraEvent, CameraShotFitsBand, CameraFallback, INST_LETTER_NAMES,
+--           ValidateDirectedCutTiming, DirectedTimingReportLines (venue_camera_timing.lua),
 --           FormatTime, GetTimeSelection, r, S (globals)
 --
 -- Only 4 band members fit on stage, and keys physically replaces a guitarist or
@@ -19,9 +20,9 @@
 --   a lineup with NO VALID CAMERA SHOT. With a normal (coop) shot in the stack the
 --   author has handed that spot back to the game, which substitutes a generic full
 --   band shot (or, for a lone coop duo cut, a single shot of the remaining member) -
---   a legitimate choice, reported as an advisory. With only directed cuts there is
---   no fallback: the game's lineup tables drop the cut, so the camera keeps the shot
---   it is on - reported as an issue. Note this is about the camera having no shot to
+--   a legitimate choice, reported as an advisory. With only directed cuts the game's
+--   lineup tables drop the cut and a generic band shot, picked at random, plays
+--   instead - the authored move is lost, reported as an issue. Note this is about the camera having no shot to
 --   cut to, not about a player having nothing to perform - an instrument with
 --   nothing to play is an [idle] play state, handled elsewhere.
 --
@@ -102,7 +103,7 @@ function ValidateVenueCameraStacks(camera, lineups, near_ppq)
         -- (advisory); kind 'duo_single' (note = the remaining member) or 'generic'.
         fallbacks     = {},   -- { ppq=, shots={}, lineups={ {label=,kind=,note=} } }
         -- directed_lost: only directed cuts in the stack, none fits - the game
-        -- ignores them and the camera keeps the shot it is on (an issue).
+        -- drops them and plays a random generic band shot (an issue).
         directed_lost = {},   -- { ppq=, shots={}, lineups={ {label=} } }
         spots       = 0,    -- camera ticks
         stacked     = 0,    -- of those, ticks carrying more than one distinct shot
@@ -112,7 +113,7 @@ function ValidateVenueCameraStacks(camera, lineups, near_ppq)
 
     ---- Walk the track one PPQ group at a time ----
     local i = 1
-    local prev_group_ppq, prev_group_last
+    local prev_group_ppq, prev_group_last, prev_group_directed
     while i <= #camera do
         local ppq  = camera[i].ppq
         local last = i
@@ -141,7 +142,12 @@ function ValidateVenueCameraStacks(camera, lineups, near_ppq)
         if #group > 1 then out.stacked = out.stacked + 1 end
 
         ---- Check 2: two shots that were meant to be stacked, but are not ----
-        if prev_group_ppq and near_ppq > 0 and (ppq - prev_group_ppq) <= near_ppq then
+        -- Not after a directed cut: a shot just after one is its follow-up, which the
+        -- game plays when the directed move ends (venue_camera_timing.lua) - the
+        -- usual way to author it (official venues put one ~0.1 s after almost
+        -- every directed cut), not a botched stack.
+        if prev_group_ppq and near_ppq > 0 and (ppq - prev_group_ppq) <= near_ppq
+                and not prev_group_directed then
             out.near_stacks[#out.near_stacks + 1] = {
                 ppq      = ppq,            msg      = group[1].msg,
                 prev_ppq = prev_group_ppq, prev_msg = prev_group_last,
@@ -210,6 +216,10 @@ function ValidateVenueCameraStacks(camera, lineups, near_ppq)
 
         prev_group_ppq  = ppq
         prev_group_last = group[#group].msg
+        prev_group_directed = false
+        for _, ev in ipairs(group) do
+            if ev.msg:find('^%[directed_') then prev_group_directed = true end
+        end
         i = last + 1
     end
 
@@ -257,6 +267,8 @@ function ValidateVenueCamera()
     local near_ppq   = math.floor(ppq_per_qn * NEAR_STACK_QN)
 
     local f = ValidateVenueCameraStacks(camera, lineups, near_ppq)
+    local t = ValidateDirectedCutTiming(camera, lineups,
+        function(ppq) return r.MIDI_GetProjTimeFromPPQPos(take, ppq) end)
 
     -- Scope: report only findings whose own position falls inside the time selection.
     local sel_s, sel_e = GetTimeSelection()
@@ -277,6 +289,9 @@ function ValidateVenueCamera()
         f.unreachable   = Keep(f.unreachable)
         f.fallbacks     = Keep(f.fallbacks)
         f.directed_lost = Keep(f.directed_lost)
+        t.follow_skipped    = Keep(t.follow_skipped)
+        t.follow_early      = Keep(t.follow_early)
+        t.directed_replaced = Keep(t.directed_replaced)
     end
 
     local function At(ppq) return FormatTime(r.MIDI_GetProjTimeFromPPQPos(take, ppq)) end
@@ -284,6 +299,7 @@ function ValidateVenueCamera()
     -- Fallback spots are advisories: letting the game pick a normal shot is a valid
     -- choice, so they are listed but never counted as issues.
     local total = #f.duplicates + #f.near_stacks + #f.unreachable + #f.directed_lost
+                + #t.follow_skipped + #t.directed_replaced
     local nfall = #f.fallbacks
     local fall_txt = nfall > 0
         and (', %d fallback spot%s'):format(nfall, nfall == 1 and '' or 's') or ''
@@ -375,13 +391,13 @@ function ValidateVenueCamera()
             local names = {}
             for _, lu in ipairs(c.lineups) do names[#names + 1] = lu.label end
             lines[#lines + 1] = ('  %s   %s'):format(At(c.ppq), table.concat(c.shots, ', '))
-            lines[#lines + 1] = ('           - ignored for the %s lineup%s: the camera keeps the shot it is on')
+            lines[#lines + 1] = ('           - dropped for the %s lineup%s: a random generic band shot plays instead')
                                 :format(table.concat(names, ' and '), #names == 1 and '' or 's')
             lines[#lines + 1] = #names == 1
                 and '           - stack a normal shot for that lineup, or pick a directed cut it can play'
                 or  '           - stack a normal shot for those lineups, or pick a directed cut they can play'
         end
-        lines[#lines + 1] = '  Directed cuts have no fallback shot.'
+        lines[#lines + 1] = '  Directed cuts have no fallback of their own: the game picks any generic band shot.'
     end
     lines[#lines + 1] = ''
 
@@ -414,6 +430,11 @@ function ValidateVenueCamera()
         lines[#lines + 1] = '  where you want to choose it yourself.'
     end
     lines[#lines + 1] = ''
+
+    ---- Directed-cut timing (venue_camera_timing.lua) ----
+    for _, l in ipairs(DirectedTimingReportLines(t, At, #lineups, UNCOVERED_LIST_MAX)) do
+        lines[#lines + 1] = l
+    end
 
     ---- Summary ----
     -- Always the whole track, even when the report above is scoped: the counts

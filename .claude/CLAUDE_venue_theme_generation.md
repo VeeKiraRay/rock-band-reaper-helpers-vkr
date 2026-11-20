@@ -485,7 +485,9 @@ stacks shares).
 The game's own lineup tables (`COOP_*_REMAP` in its `macros.dta`) agree in shape with the doc
 below: a single-member shot goes to a band shot (they list All far / All near / Front near, or
 All behind / Front behind for behind shots), a duo to the partner's single shot, and **directed
-cuts are dropped** - no fallback, the camera keeps the shot it is on:
+cuts are dropped**. In a custom song (camera read from the VENUE track) the spot then gets a
+random generic band shot, as the next point describes (checked in game); "the camera keeps the
+shot it is on" holds only for venues built into the song files, as the official ones are:
 
 - **Generic shot fallback.** If no stacked shot can be matched, the game uses one of
   `[coop_all_behind]`, `[coop_all_far]` or `[coop_all_near]` (`CAM_GENERIC_FALLBACK`). A

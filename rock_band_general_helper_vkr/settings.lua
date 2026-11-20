@@ -70,6 +70,7 @@ local function SerializeSettings()
         'vpan='    .. (S.venue_preview_animate and '1' or '0'),
         'vpcombo=' .. S.venue_preview_combo,
         'vpshwm=' .. S.venue_preview_show_mode,
+        'vpgt='   .. (S.venue_preview_game_timing and '1' or '0'),
         'swip='   .. (S.show_wip_tabs and '1' or '0'),
         -- Workflow checklist
         'wffn=' .. S.workflow_file_name,
@@ -167,6 +168,7 @@ local function DeserializeSettings(str, project)
         elseif k == 'vpan'    then S.venue_preview_animate = (v == '1')
         elseif k == 'vpcombo' then S.venue_preview_combo     = tonumber(v) or 0
         elseif k == 'vpshwm' then S.venue_preview_show_mode = tonumber(v) or 0
+        elseif k == 'vpgt'   then S.venue_preview_game_timing = (v == '1')
         elseif k == 'swip'   then S.show_wip_tabs           = (v == '1')
         -- Workflow checklist
         elseif k == 'wffn'   then S.workflow_file_name      = v
@@ -247,6 +249,7 @@ local LABELS = {
     vpan    = { 'Venue preview: animated', bool = true },
     vpcombo = 'Venue preview: players',
     vpshwm  = 'Venue > Preview: show',
+    vpgt    = { 'Venue > Preview: mark directed-cut timing', bool = true },
     emp     = 'Events > Metronome: pulse (0 Auto, 1 8ths, 2 16ths)',
     emi     = 'Events > Metronome: intro (0 From COUNT IN, 1 Count in from chart, 2 Steady)',
     abhs    = 'Animation > Beat: half-time downbeat',

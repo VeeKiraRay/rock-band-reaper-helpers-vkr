@@ -175,6 +175,7 @@ S = {
     venue_preview_tab_scale = 1,    -- Preview sub-tab inline sprite scale (independent of tooltip scale)
     venue_preview_combo     = 0,    -- 0=Bass+Guitar, 1=Bass+Keys, 2=Guitar+Keys
     venue_preview_show_mode = 0,    -- 0=current only V, 1=surrounding events, 2=current only H
+    venue_preview_game_timing = true, -- camera row as the game plays directed cuts (false = as written)
     -- Manual gen (not persisted - session state only)
     venue_mg_coop        = '',   -- full event e.g. '[coop_all_behind]'
     venue_mg_directed    = '',   -- bare name e.g. 'directed_all'
@@ -500,12 +501,20 @@ TIPS = {
                       "  - shots that win under no lineup: they need an instrument that\n" ..
                       "    is never on stage, or a stacked sibling outranks them\n" ..
                       "    everywhere they would fit\n" ..
-                      "  - directed cuts a lineup cannot play: directed cuts have no\n" ..
-                      "    fallback, so the game ignores them and the camera keeps the\n" ..
-                      "    shot it is on\n" ..
+                      "  - directed cuts a lineup cannot play: the game drops them and\n" ..
+                      "    shows a generic band shot, picked at random, instead\n" ..
                       "  - the same shot written twice on one tick\n" ..
                       "  - shots a few ticks apart that were meant to be stacked: the\n" ..
-                      "    game reads those as two cuts, so the second replaces the first\n\n" ..
+                      "    game reads those as two cuts, so the second replaces the first\n" ..
+                      "    (a shot just after a directed cut is fine - see below)\n" ..
+                      "  - a shot after a directed cut that is never shown: the camera\n" ..
+                      "    event right after a directed cut plays when that directed cut\n" ..
+                      "    ends, so if the event after that comes first, it is skipped\n" ..
+                      "  - a directed cut right after a directed cut: it does not play\n\n" ..
+                      "Also listed: shots after a directed cut that show early, because the\n" ..
+                      "directed cut ends before their own position. How long a directed\n" ..
+                      "cut runs varies by venue; only what holds for every venue is\n" ..
+                      "reported.\n\n" ..
                       "Also listed, but not counted as issues: fallback spots, where a\n" ..
                       "lineup has no valid normal shot and the game picks one for you (a\n" ..
                       "generic full band shot, or a single shot of the remaining member\n" ..
@@ -703,7 +712,16 @@ TIPS = {
     venue_cs_col_6 = "How many shots of this move one venue has. The game rotates through them:\n" ..
                      "each use of the event takes the next one.",
     venue_cs_col_7 = "How early the move starts before its event (the event marks the moment\n" ..
-                     "the move lands).",
+                     "the move lands).\n\n" ..
+                     "# = some versions of this move hold the camera longer than the usual\n" ..
+                     "0.25 s after the event; hover the value for how long.",
+    venue_cs_lock_row = "Some versions of this move hold the camera for up to %s s after its\n" ..
+                        "event: camera events during that time are dropped, not delayed.",
+    venue_cs_length = "The range the game allows this cut's moves; each venue's version is\n" ..
+                      "somewhere in it. The next camera event can still cut the move earlier.",
+    venue_cs_free  = "One of the game's six free cuts: its style and gender filter skips them,\n" ..
+                     "so any of their versions can play in any song. They still differ by\n" ..
+                     "venue and still need their member on stage.",
     venue_mg_target = "Where this tab reads and writes events.\n\n" ..
                       "VENUE: the VENUE track.\n" ..
                       "Subtracks: the Sub VENUE tracks made by Venue > Actions > Copy all to\n" ..
@@ -1233,8 +1251,36 @@ TIPS = {
                            "In game this duo shot becomes a single shot of %s.\n" ..
                            "The picture shows that shot, %s.",
     venue_preview_fb_directed = "This directed cut cannot play with the %s band.\n" ..
-                           "Directed cuts have no fallback: the game ignores it and the camera\n" ..
-                           "keeps the previous shot. Stack a normal shot here to choose one.",
+                           "The game drops it and shows a generic full band shot, picked at\n" ..
+                           "random; the picture shows one of them, All (near). Stack a normal\n" ..
+                           "shot here to choose the shot yourself.",
+    venue_preview_fb_replaced = "This directed cut comes right after another directed cut (%s),\n" ..
+                           "so the game does not play it: it shows %s instead.\n" ..
+                           "Put a normal camera event between the two directed cuts.",
+    venue_preview_game_timing = "On: the Camera row marks what the game does around directed cuts\n" ..
+                           "for the chosen Players lineup. The shot right after a directed cut\n" ..
+                           "plays as soon as that directed cut ends, a shot the next event cuts\n" ..
+                           "out is never shown, and a directed cut right after a directed cut\n" ..
+                           "does not play.\n\n" ..
+                           "Off: no marks.\n\n" ..
+                           "Either way, every event stays at its own position and shots stacked\n" ..
+                           "on one spot follow the Players lineup.",
+    venue_preview_follow  = "This shot comes right after the directed cut %s, so the game\n" ..
+                           "plays it as soon as that directed cut ends - its own position does\n" ..
+                           "not matter. Shown here at its own position.",
+    venue_preview_follow_len = "\n\nThe game allows that directed cut to run %s after its event; each\n" ..
+                           "venue's version is somewhere in that range.",
+    venue_preview_follow_maybe = "\n\nThe next camera event comes before the directed cut's longest\n" ..
+                           "length, so this shot shows only if the venue's version is short\n" ..
+                           "enough. Otherwise that event cuts the directed cut short and this\n" ..
+                           "shot is never seen.",
+    venue_preview_never   = "Never shown: it would play when the directed cut %s ends, but\n" ..
+                           "the next camera event cuts that directed cut short first (the game\n" ..
+                           "allows it to run %s). Place that event later, or delete this one.",
+    venue_preview_skips   = "The next camera event, %s at %s, is never shown: the event after\n" ..
+                           "it cuts this directed cut short before it can end (even at the\n" ..
+                           "shortest length the game allows). That event comes on screen in\n" ..
+                           "its place.",
     venue_preview_show_mode = "Which events to display, and how.\n\n" ..
                            "Current only V     -  the active event of each category (started at or\n" ..
                            "                      before the playhead and not yet superseded), one\n" ..

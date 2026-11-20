@@ -93,7 +93,11 @@ local COLS = { 'Move', 'Focus', 'Styles', 'Gender', 'Venues', 'Variants', 'Lead-
 local function RowCells(row)
     return { row.label, VenueShotWhoShort(row.who), StylesText(row.styles),
              GENDER_NAMES[row.gender] or row.gender, VenueShotKindsText(row.kinds),
-             tostring(row.variants), Range(row.lead[1], row.lead[2]) }
+             tostring(row.variants),
+             -- " #": some of this move's versions hold the camera longer than the
+             -- 0.25 s floor (row.lock is only set on those rows). A plain Text cell,
+             -- so ImGui's "##" id syntax does not apply.
+             Range(row.lead[1], row.lead[2]) .. (row.lock and ' #' or '') }
 end
 
 -- The Move column gives way: the other columns keep their width, Move takes what is left of
@@ -157,23 +161,43 @@ local function DrawSection(cat, rows, filter)
     r.ImGui_SameLine(ctx)
     TextDim('[' .. cat .. ']')
 
-    -- One summary line: when the move runs, free cut, what the lineup does to it.
-    local facts = {}
-    if ev.length then facts[#facts + 1] = 'runs ' .. Range(ev.length[1], ev.length[2]) .. ' after its event' end
-    if ev.lead[2] > 0 then facts[#facts + 1] = 'starts up to ' .. ('%.1f s'):format(ev.lead[2]) .. ' before it' end
-    if ev.free then facts[#facts + 1] = 'plays for every band (style and gender do not matter)' end
+    -- Under the name, one fact per line. Timing (dim) always - the lead-in is not
+    -- repeated here, each move row has its own; the rest only where the cut is
+    -- unusual: one of the game's free cuts (dim), not in every venue (amber),
+    -- changed by the chosen band (amber). length is the range the game allows the
+    -- cut's clips (its own asset check), not a measured per-venue value - so the
+    -- wording says "may".
+    r.ImGui_PushTextWrapPos(ctx, 0)
+    if ev.length then
+        TextDimWrapped('The move may run ' .. Range(ev.length[1], ev.length[2]) .. ' after its event.')
+        Tooltip(TIPS.venue_cs_length)
+    end
+    if ev.lock then
+        TextDimWrapped(ev.lock[2] - ev.lock[1] < 0.005
+            and ('The camera cannot change for %.2g s after its event.'):format(ev.lock[1])
+            or  ('The camera cannot change for %.2g s after its event (some versions: up to %.2g s, '
+                 .. 'marked # below).'):format(ev.lock[1], ev.lock[2]))
+    end
+    if ev.free then
+        -- FREE_DIRCUTS (the game's macros.dta): skipped by its style / gender filter.
+        TextDimWrapped('Not picked by song style or member gender (a free cut).')
+        Tooltip(TIPS.venue_cs_free)
+    end
     local kinds = VenueShotKindsText(ev.kinds)
-    facts[#facts + 1] = kinds == 'All' and 'in every venue' or 'in ' .. kinds
+    if kinds ~= 'All' then
+        TextColoredWrapped(COL_WARN, 'Not in every venue: only in ' .. kinds
+            .. (kinds:find('%*') and ' (* = only some venues of that kind).' or '.'))
+    end
     local remap = VenueShotRemap(cat, filter.lineup)
     if remap == 'dropped' then
-        facts[#facts + 1] = VENUE_SHOT_LINEUP_LABELS[filter.lineup] .. ': dropped, the camera keeps the previous shot'
+        TextColoredWrapped(COL_WARN, VENUE_SHOT_LINEUP_LABELS[filter.lineup]
+            .. ': dropped, a random generic band shot plays instead.')
     elseif remap then
         local names = {}
         for _, t in ipairs(remap) do names[#names + 1] = EventLabel(t) end
-        facts[#facts + 1] = VENUE_SHOT_LINEUP_LABELS[filter.lineup] .. ': becomes ' .. table.concat(names, ' / ')
+        TextColoredWrapped(COL_WARN, VENUE_SHOT_LINEUP_LABELS[filter.lineup] .. ': becomes '
+            .. table.concat(names, ' / ') .. '.')
     end
-    r.ImGui_PushTextWrapPos(ctx, 0)
-    TextDim(table.concat(facts, '; ') .. '.')
     r.ImGui_PopTextWrapPos(ctx)
 
     if not rows or #rows == 0 then rows = ev.moves or {} end
@@ -182,10 +206,13 @@ local function DrawSection(cat, rows, filter)
     for _, row in ipairs(rows) do
         if VenueShotRowMatches(row, filter, ev) and remap ~= 'dropped' then playing = playing + 1 end
     end
-    if playing == 0 then
+    -- A lineup that drops the cut is already said in the summary line (a random
+    -- generic band shot plays). With no move for the song's style / the member's
+    -- gender the game has no shot for the cut at all.
+    if playing == 0 and remap ~= 'dropped' then
         r.ImGui_PushTextWrapPos(ctx, 0)
-        r.ImGui_TextWrapped(ctx, 'None of these moves plays for this choice - the camera keeps the '
-            .. 'previous shot.')
+        r.ImGui_TextWrapped(ctx, 'None of these moves plays for this choice - the game skips the cut, '
+            .. 'and the camera event after it plays right away.')
         r.ImGui_PopTextWrapPos(ctx)
     end
 
@@ -215,7 +242,10 @@ local function DrawSection(cat, rows, filter)
                 if on then r.ImGui_Text(ctx, cell) else TextDim(cell) end
                 if r.ImGui_IsItemHovered(ctx) then
                     if i == 2 and cell ~= row.who then r.ImGui_SetTooltip(ctx, row.who)
-                    elseif i == 5 and cell:find('*', 1, true) then r.ImGui_SetTooltip(ctx, TIPS.venue_cs_partial) end
+                    elseif i == 5 and cell:find('*', 1, true) then r.ImGui_SetTooltip(ctx, TIPS.venue_cs_partial)
+                    elseif i == 7 and row.lock then
+                        r.ImGui_SetTooltip(ctx, TIPS.venue_cs_lock_row:format(('%.2g'):format(row.lock[2])))
+                    end
                 end
             end
         end

@@ -19,8 +19,19 @@
 --       game plays instead - the remaining member's single shot for a duo,
 --       All (near) for a one-member shot (one of the band shots it picks at
 --       random); hover the name for which. A directed cut that cannot play is
---       red: directed cuts have no fallback, so the game ignores it and keeps
---       the previous shot. Replaces the red "No suitable event" card.
+--       red and pictured as All (near): the game drops it and shows a generic
+--       band shot, picked at random (checked in game). Replaces the red "No
+--       suitable event" card.
+--     - The camera row marks what the game does around directed cuts for the
+--       chosen lineup (tested in game), each event at its own position: the
+--       shot right after a directed cut says "~ plays as soon as the directed
+--       ends" (its own position does not matter in game); one the game never
+--       shows, because the next event cuts the move first, says "-> never
+--       shown" and its directed cut "-> skips the next shot"; and a directed
+--       cut right after a directed cut is red, pictured as what plays instead.
+--       Hover for the details. The new Camera: Mark directed-cut timing checkbox
+--       (on by default, saved from the General Helper's Settings) turns the
+--       marks off. (With General Helper v0.9.64.)
 --     - Show has a new Current only H option: the current camera, lighting
 --       and post-process event side by side on one row. The old Current only
 --       is now Current only V; a saved Show choice is kept.
@@ -121,12 +132,14 @@ SCRIPT_MDIR   = _mdir  -- global: module folder (general helper's)
 local _files = {
     _dir  .. 'lib/reaper_imgui_helpers.lua',
     _dir  .. 'lib/reaper_helper_common.lua',
+    _dir  .. 'lib/reaper_venue_shots.lua',        -- directed-cut move lengths
     _mdir .. 'defaults.lua',
     _mdir .. 'settings.lua',
     _mdir .. 'helpers.lua',
     _mdir .. 'venue.lua',
     _mdir .. 'venue_awareness.lua',
     _mdir .. 'venue_camera_priority.lua',
+    _mdir .. 'venue_camera_timing.lua',
     _mdir .. 'venue_sprites.lua',
     _mdir .. 'ui_venue_preview.lua',
     _mdir .. 'ui_venue_players.lua',

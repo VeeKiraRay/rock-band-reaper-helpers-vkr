@@ -26,8 +26,11 @@
 --   this only for normal (coop) two-character shots - the directed cuts
 --   section makes no equivalent claim for [directed_duo_*].
 --
---   Directed cuts have no fallback: the game's own lineup tables drop them,
---   so the camera keeps the shot it is on.
+--   Directed cuts have no fallback of their own: the game's lineup tables
+--   drop them, and in a custom song (camera read from the VENUE track) the
+--   spot then gets one of the generic band shots, picked at random (checked
+--   in game). The RBN documentation's "the camera keeps its shot" holds only
+--   for venues built into the song files, as the official ones are.
 --
 -- Both are game-side substitutions with more than one possible outcome, so
 -- PickPriorityCameraEvent just returns nil when nothing fits; CameraFallback
@@ -208,12 +211,12 @@ end
 --                   band shot. ev = the highest-ranked normal shot.
 --   'duo_single'    a lone coop duo cut (the doc's "no other stacked flags"): a
 --                   single shot of the member still on stage, named in note.
---   'directed_lost' only directed cuts: they have no fallback, the game ignores
---                   them and the camera keeps the shot it is on. ev = the
+--   'directed_lost' only directed cuts: the game drops them and plays a generic
+--                   band shot, picked at random, instead. ev = the
 --                   highest-ranked directed cut.
--- play = the shot to picture for a normal-shot fallback (nil for directed_lost):
--- the partner's single shot for a duo, else [coop_all_near] ([coop_all_behind]
--- for a behind shot) - one of the generic shots the game picks from at random.
+-- play = the shot to picture: the partner's single shot for a duo, else
+-- [coop_all_near] ([coop_all_behind] for a behind shot) - one of the generic
+-- shots the game picks from at random.
 -- Needs INST_LETTER_NAMES (venue_awareness.lua) at use time.
 function CameraFallback(group, muted)
     if not group or #group == 0 or PickPriorityCameraEvent(group, muted) then return nil end
@@ -229,7 +232,7 @@ function CameraFallback(group, muted)
         end
     end
     if not best_coop then
-        return { ev = best_dir or group[#group], kind = 'directed_lost' }
+        return { ev = best_dir or group[#group], kind = 'directed_lost', play = '[coop_all_near]' }
     end
     local behind = best_coop.msg:find('_behind%]$') ~= nil
     if #group == 1 and COOP_DUO[best_coop.msg] then

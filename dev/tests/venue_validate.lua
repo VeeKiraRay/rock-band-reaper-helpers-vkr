@@ -322,8 +322,9 @@ Test.it('a lone coop duo cut reports the duo-to-single fallback', function()
 end)
 
 Test.it('a lone directed cut a lineup cannot play is lost, not a fallback', function()
-    -- Directed cuts have no fallback: the game's lineup tables drop them and the
-    -- camera keeps its shot. A keys/bass duo needs BOTH, so only Bass + Keys plays it.
+    -- The game's lineup tables drop a directed cut and a random generic band shot
+    -- plays instead - the cut is lost. A keys/bass duo needs BOTH, so only Bass +
+    -- Keys plays it.
     local f = RunCam(Cam(4, '[directed_duo_kb]'))
     Test.expect(#f.fallbacks == 0, 'no fallback; got ' .. #f.fallbacks)
     Test.expect(#f.directed_lost == 1, 'one spot; got ' .. #f.directed_lost)
@@ -386,7 +387,8 @@ Test.it('a lone duo falls back to the partner, a single to a generic band shot',
     local gb = CameraFallback(Cam(4, '[coop_g_behind]'), NO_GUITAR)
     Test.expect(gb.play == '[coop_all_behind]', 'behind single: ' .. tostring(gb.play))
     local l = CameraFallback(Cam(4, '[directed_guitar]'), NO_GUITAR)
-    Test.expect(l.play == nil, 'a lost directed cut has no fallback picture')
+    Test.expect(l.play == '[coop_all_near]',
+        'a lost directed cut pictures the generic shot played instead: ' .. tostring(l.play))
 end)
 
 Test.it('only directed cuts that cannot play are lost; with a normal shot it falls back', function()
@@ -473,4 +475,188 @@ Test.it('counts describe the whole track', function()
     Test.expect(f.events == 5, 'five events; got ' .. f.events)
     Test.expect(f.spots == 3, 'three spots; got ' .. f.spots)
     Test.expect(f.stacked == 2, 'two of them stacked; got ' .. f.stacked)
+end)
+
+-- ---------------------------------------------------------------------------
+-- Directed-cut timing (venue_camera_timing.lua): what plays after a directed cut.
+-- Pure over the same camera arrays, plus a ppq -> seconds function (120 BPM here,
+-- so a beat is half a second) and, for exact cases, fixed move lengths.
+
+local function SecOf(ppq) return ppq / PPQ * 0.5 end
+
+local LENGTHS = {
+    ['[directed_guitar]']   = { 0.5, 2 },
+    ['[directed_drums_lt]'] = { 6, 16 },
+    ['[directed_vocals]']   = { 0.5, 3 },
+}
+local function LenOf(msg) return LENGTHS[msg] end
+
+local function RunTiming(camera, lineups)
+    return ValidateDirectedCutTiming(camera, lineups or NO_KEYS, SecOf, LenOf)
+end
+
+Test.section('Directed-cut timing')
+
+Test.it('the follow-up is never shown when the next event cuts the move first', function()
+    -- The bar-86 case: a long move, a follow-up 4 s after it, the next event 5.7 s
+    -- after it - the move (6 s or more) is still running, so the follow-up is skipped.
+    local f = RunTiming(Cams(Cam(0, '[directed_drums_lt]'),
+                             Cam(8, '[coop_d_behind]'),
+                             Cam(11.4, '[coop_d_closeup_hand]')))
+    Test.expect(#f.follow_skipped == 1, 'expected 1, got ' .. #f.follow_skipped)
+    local e = f.follow_skipped[1]
+    Test.expect(e.msg == '[coop_d_behind]' and e.next_msg == '[coop_d_closeup_hand]',
+        'got ' .. tostring(e.msg) .. ' / ' .. tostring(e.next_msg))
+    Test.expect(#f.follow_early == 0, 'a skipped follow-up is not also early')
+end)
+
+Test.it('a follow-up right after the cut is not reported when the next event ends the move', function()
+    -- The official way to let the next spot end a long move: the follow-up only says
+    -- what comes next, it has no time of its own to lose.
+    local f = RunTiming(Cams(Cam(0, '[directed_drums_lt]'),
+                             Cam(0.2, '[coop_all_far]'),
+                             Cam(8, '[coop_d_closeup_hand]')))
+    Test.expect(#f.follow_skipped == 0, 'expected none, got ' .. #f.follow_skipped)
+end)
+
+Test.it('the follow-up shows early when it sits after even the longest move', function()
+    -- directed_guitar runs at most 2 s; the follow-up is 4 s after it.
+    local f = RunTiming(Cams(Cam(0, '[directed_guitar]'), Cam(8, '[coop_b_near]'), Cam(16, '[coop_all_far]')))
+    Test.expect(#f.follow_early == 1 and f.follow_early[1].msg == '[coop_b_near]',
+        'expected the bass shot early; got ' .. #f.follow_early)
+    Test.expect(#f.follow_skipped == 0, 'nothing skipped')
+end)
+
+Test.it('a follow-up inside the move range is not reported either way', function()
+    -- 1.5 s after a 0.5-2 s move: depends on the variant, so no finding.
+    local f = RunTiming(Cams(Cam(0, '[directed_guitar]'), Cam(3, '[coop_b_near]'), Cam(16, '[coop_all_far]')))
+    Test.expect(#f.follow_early == 0 and #f.follow_skipped == 0, 'uncertain - nothing reported')
+end)
+
+Test.it('the usual follow-up right after the cut is clean', function()
+    -- Official venues put the next shot ~0.1 s after a directed cut.
+    local f = RunTiming(Cams(Cam(0, '[directed_guitar]'), Cam(0.2, '[coop_all_far]'), Cam(8, '[coop_g_near]')))
+    Test.expect(#f.follow_early == 0 and #f.follow_skipped == 0 and #f.directed_replaced == 0, 'clean')
+end)
+
+Test.it('a directed cut right after a directed cut is replaced', function()
+    local f = RunTiming(Cams(Cam(0, '[directed_guitar]'), Cam(8, '[directed_vocals]'), Cam(16, '[coop_all_far]')))
+    Test.expect(#f.directed_replaced == 1, 'expected 1, got ' .. #f.directed_replaced)
+    local e = f.directed_replaced[1]
+    Test.expect(e.msg == '[directed_vocals]' and e.prev_msg == '[directed_guitar]' and e.plays == nil,
+        'nothing stacked, so a generic shot; got ' .. tostring(e.plays))
+end)
+
+Test.it('a replaced directed cut names the stacked normal shot that plays instead', function()
+    local f = RunTiming(Cams(Cam(0, '[directed_guitar]'), Cam(8, '[directed_vocals]', '[coop_v_near]'),
+                             Cam(16, '[coop_all_far]')))
+    Test.expect(#f.directed_replaced == 1 and f.directed_replaced[1].plays == '[coop_v_near]',
+        'got ' .. tostring(f.directed_replaced[1] and f.directed_replaced[1].plays))
+end)
+
+Test.it('a replaced directed cut is not timed as a directed cut', function()
+    -- The replaced spot plays a normal shot, so the spot after it is an ordinary cut,
+    -- and a directed cut after that may play again.
+    local f = RunTiming(Cams(Cam(0, '[directed_guitar]'), Cam(8, '[directed_vocals]'),
+                             Cam(16, '[directed_guitar]'), Cam(16.2, '[coop_all_far]')))
+    Test.expect(#f.directed_replaced == 1, 'only the second cut; got ' .. #f.directed_replaced)
+end)
+
+Test.it('a stacked normal shot only matters for a lineup that cannot play the cut', function()
+    -- Guitar + Keys has no bass: directed_bass does not play there, the stacked
+    -- coop does, so only the two lineups with a bassist time the directed cut.
+    local f = RunTiming(Cams(Cam(0, '[directed_bass]', '[coop_all_near]'),
+                             Cam(8, '[coop_d_near]'), Cam(16, '[coop_all_far]')), FULL_BAND)
+    Test.expect(#f.follow_early == 0, 'no length data for directed_bass here - not timed')
+    LENGTHS['[directed_bass]'] = { 0.5, 2 }
+    f = RunTiming(Cams(Cam(0, '[directed_bass]', '[coop_all_near]'),
+                       Cam(8, '[coop_d_near]'), Cam(16, '[coop_all_far]')), FULL_BAND)
+    LENGTHS['[directed_bass]'] = nil
+    Test.expect(#f.follow_early == 1, 'one spot; got ' .. #f.follow_early)
+    Test.expect(table.concat(f.follow_early[1].lineups, ' | ') == 'Bass + Guitar | Bass + Keys',
+        'got ' .. table.concat(f.follow_early[1].lineups, ' | '))
+end)
+
+Test.it('move lengths come from the shot data', function()
+    local lt = DirectedCutLength('[directed_drums_lt]')
+    Test.expect(lt and lt[1] > 6 and lt[2] > lt[1], 'drums_lt runs over 6 s at least')
+    Test.expect(DirectedCutLength('[coop_all_far]') == nil, 'normal shots have no length')
+    Test.expect(DirectedCutLength('[directed_nonsense]') == nil, 'unknown cut: nil')
+end)
+
+Test.it('a shot just after a directed cut is a follow-up, not a botched stack', function()
+    local camera = Cams(Cam(4, '[directed_guitar]'),
+                        { { ppq = 4 * PPQ + 10, msg = '[coop_all_far]' } })
+    local f = RunCam(camera, NO_KEYS)
+    Test.expect(#f.near_stacks == 0, 'expected none, got ' .. #f.near_stacks)
+end)
+
+-- CameraGameTimeline: the Venue Preview's camera row, one lineup. Events carry t
+-- (seconds); 120 BPM again, so beat b is at b / 2 s.
+local function TL(...)
+    local camera = Cams(...)
+    for _, ev in ipairs(camera) do ev.t = SecOf(ev.ppq) end
+    return CameraGameTimeline(camera, NO_KEYS[1].muted, LenOf)
+end
+
+local function Shown(items)
+    local out = {}
+    for _, it in ipairs(items) do
+        out[#out + 1] = ('%s@%g'):format(it.ev and it.ev.msg or '?', it.t)
+    end
+    return table.concat(out, ' ')
+end
+
+Test.section('Camera timeline (Venue Preview)')
+
+Test.it('a follow-up the next event cuts out stays at its position, marked never shown', function()
+    -- README example 1: lt at bar 3, A at bar 4, B at bar 5 (4 s after the cut).
+    local items = TL(Cam(8, '[directed_drums_lt]'), Cam(12, '[coop_all_far]'), Cam(16, '[coop_d_near]'))
+    Test.expect(Shown(items) == '[directed_drums_lt]@4 [coop_all_far]@6 [coop_d_near]@8', 'got ' .. Shown(items))
+    Test.expect(items[2].follow and items[2].follow.skipped, 'A is marked never shown')
+    Test.expect(items[1].skips == items[2], 'the cut names what it skips')
+end)
+
+Test.it('a follow-up plays as soon as the move ends: marked, at its own position', function()
+    -- README example 3: B far away, so A shows when the move ends.
+    local items = TL(Cam(8, '[directed_drums_lt]'), Cam(12, '[coop_all_far]'), Cam(80, '[coop_d_near]'))
+    Test.expect(Shown(items) == '[directed_drums_lt]@4 [coop_all_far]@6 [coop_d_near]@40', 'got ' .. Shown(items))
+    local f = items[2].follow
+    Test.expect(f and f.dir.msg == '[directed_drums_lt]' and not f.skipped and not f.maybe_skipped,
+        'certain follow-up')
+end)
+
+Test.it('a next event inside the move range marks the follow-up as maybe skipped', function()
+    local items = TL(Cam(8, '[directed_drums_lt]'), Cam(8.2, '[coop_all_far]'), Cam(28, '[coop_d_near]'))
+    -- B is 10 s after the cut: past the 6 s shortest move, before the 16 s longest.
+    Test.expect(items[2].follow and items[2].follow.maybe_skipped and not items[2].follow.skipped,
+        'maybe skipped')
+    Test.expect(math.abs(items[2].t - 4.1) < 0.01, 'at its own position; got ' .. items[2].t)
+end)
+
+Test.it('a follow-up of a cut with no length data is still marked', function()
+    local items = TL(Cam(0, '[directed_crowd]'), Cam(4, '[coop_all_far]'), Cam(8, '[coop_d_near]'))
+    local f = items[2].follow
+    Test.expect(f and f.len == nil and not f.skipped, 'marked, nothing guessed')
+end)
+
+Test.it('a directed cut right after a directed cut shows as replaced', function()
+    local items = TL(Cam(0, '[directed_guitar]'), Cam(8, '[directed_vocals]', '[coop_v_near]'),
+                     Cam(16, '[coop_all_far]'))
+    local r2 = items[2].replaced
+    Test.expect(r2 and r2.by and r2.by.msg == '[coop_v_near]', 'the stacked normal shot plays')
+    Test.expect(r2.prev.msg == '[directed_guitar]', 'names the directed cut before it')
+end)
+
+Test.it('ordinary normal shots keep their own positions', function()
+    local items = TL(Cam(0, '[coop_all_far]'), Cam(4, '[coop_g_near]'), Cam(8, '[coop_d_near]'))
+    Test.expect(Shown(items) == '[coop_all_far]@0 [coop_g_near]@2 [coop_d_near]@4', 'got ' .. Shown(items))
+end)
+
+Test.it('as written: every spot at its own position, no directed-cut rules', function()
+    local camera = Cams(Cam(8, '[directed_drums_lt]'), Cam(12, '[coop_all_far]'), Cam(16, '[coop_d_near]'))
+    for _, ev in ipairs(camera) do ev.t = SecOf(ev.ppq) end
+    local items = CameraGameTimeline(camera, NO_KEYS[1].muted, LenOf, true)
+    Test.expect(Shown(items) == '[directed_drums_lt]@4 [coop_all_far]@6 [coop_d_near]@8', 'got ' .. Shown(items))
+    Test.expect(not items[1].skips and not items[2].follow, 'no timing notes')
 end)

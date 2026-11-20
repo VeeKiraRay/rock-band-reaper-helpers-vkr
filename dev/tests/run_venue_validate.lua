@@ -8,6 +8,8 @@
 --   actions_venue_validate_camera.lua: band lineup enumeration, and which stacked
 --   camera shots can actually play - unreachable shots, lineups with nothing to
 --   play, duplicates and botched stacks.
+--   venue_camera_timing.lua: what plays after a directed cut - follow-ups never
+--   shown or shown early, directed cuts right after a directed cut.
 --   All cases drive the pure ValidateVenueLightingBlends / ValidateVenueCameraStacks,
 --   so no project state is touched and no fixture cleanup is needed. Run from the
 --   REAPER Actions list for a fully isolated Lua context, or via the
@@ -47,7 +49,9 @@ dofile(_gdir .. 'venue_awareness.lua')            -- GetCoopRequiredInstruments,
 dofile(_gdir .. 'venue_camera_priority.lua')      -- CAM_PRIORITY_TIERS (read at load
                                                   -- time by the camera validator),
                                                   -- PickPriorityCameraEvent
+dofile(_root .. 'lib/reaper_venue_shots.lua')       -- directed-cut move lengths
 dofile(_gdir .. 'actions_venue_validate.lua')        -- code under test
+dofile(_gdir .. 'venue_camera_timing.lua')           -- code under test
 dofile(_gdir .. 'actions_venue_validate_camera.lua') -- code under test
 
 dofile(_tdir .. 'venue_validate.lua')

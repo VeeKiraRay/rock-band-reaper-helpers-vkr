@@ -11,9 +11,12 @@
 --   v0.1
 --     - First version. Search by camera event or by keyword ("kiss", "jump",
 --       "mic stand"); each event lists its moves - who moves, for which song
---       style and gender, in which kinds of venue, how many variants, how
---       early the move starts - plus how long it runs and what happens when a
---       band member is off stage. Filters for song style, focus member, venue
+--       style and gender, in which kinds of venue, how many variants, its
+--       lead-in (how early the move starts) - plus how long the move may run
+--       (the range the game allows), how long the camera cannot change after
+--       it, and amber notes for a cut missing from some venues or changed by
+--       the band lineup (a dropped cut gets a random generic band shot).
+--       Filters for song style, focus member, venue
 --       and band dim the moves that would not play; clicking a move shows its
 --       event with the filters it needs, so the moves left undimmed are the
 --       ones competing with it.

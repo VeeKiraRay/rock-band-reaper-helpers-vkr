@@ -3,9 +3,13 @@
 -- for each category (Camera, Lighting, Post-Process) with sprite animations.
 -- Requires globals: r, ctx, S, GetVenueEventsForPreview, DrawVenueInlineSprite, MakeProjectPoll,
 --                   VenueSpriteFoldersFound, SectionHeader, PickPriorityCameraEvent,
---                   CameraFallback, Tooltip, TIPS
+--                   CameraFallback, CameraGameTimeline, DirectedLengthText
+--                   (venue_camera_timing.lua), Tooltip, TIPS
 
 local _preview_cache       = nil   -- { camera, lighting, postproc } or nil
+-- The camera row as the game shows it for one Players lineup (CameraGameTimeline):
+-- rebuilt when the read or the lineup changes, not every frame.
+local _timeline = { src = nil, combo = nil, game = nil, items = nil }
 local _preview_error       = nil   -- error string or nil
 local _preview_animate     = true  -- false = show middle frame only (no animation)
 -- Re-read as soon as the project state count changes (min_secs 0), plus a
@@ -36,15 +40,15 @@ local _SHOW_CURRENT_H    = 2   -- "Current only H": the three categories side by
 -- Colours (COL_*, lib/reaper_imgui_helpers.lua): COL_WARN for the one transition
 -- line that reports live state ("blending now") and for a camera event the game
 -- swaps for a fallback (not an error, but worth a look - is the fallback shot fine
--- here?). COL_ERROR only for a lost directed cut: "nothing here can play", which a
--- blend in progress or a fallback is the opposite of.
+-- here?). COL_ERROR only for a lost directed cut: the move the author wrote does
+-- not happen at all (a generic band shot plays instead), which a blend in progress
+-- or a normal-shot fallback is the opposite of.
 
 -- When no stacked shot fits the selected lineup the column keeps the authored
 -- event's text, marked with " *", and pictures what the game plays instead
 -- (CameraFallback's `play`, venue_camera_priority.lua): the partner's single
--- shot for a duo, All (near) for a generic fallback - one of the shots the game
--- picks from at random. A lost directed cut keeps its own picture. The hover
--- says which case it is.
+-- shot for a duo, All (near) for a generic fallback or a lost directed cut - one
+-- of the shots the game picks from at random. The hover says which case it is.
 
 local _muted_cache = nil  -- GetMutedInstruments() result; mute toggles bump
                           -- the project state count, so refreshes catch them
@@ -119,6 +123,30 @@ local function _combo_muted(combo)
     return { [_COMBO_ABSENT[combo]] = true }
 end
 
+-- The camera spots as the game shows them for this lineup. A directed cut moves
+-- the spot after it (it comes on screen when the move ends) and can hide it, so
+-- the camera row walks this list rather than the authored events. With
+-- S.venue_preview_game_timing off, every spot stays at its own position.
+local function _camera_timeline(combo)
+    local game = S.venue_preview_game_timing
+    if _timeline.src ~= _preview_cache or _timeline.combo ~= combo or _timeline.game ~= game then
+        _timeline.src, _timeline.combo, _timeline.game = _preview_cache, combo, game
+        _timeline.items = CameraGameTimeline(_preview_cache.camera, _combo_muted(combo), nil, not game)
+    end
+    return _timeline.items
+end
+
+-- Previous / current / next of the camera timeline at `time` (items carry .t).
+local function _find_camera_items(items, time)
+    if not items or #items == 0 then return nil, nil, nil end
+    local cur
+    for i, it in ipairs(items) do
+        if it.t <= time then cur = i else break end
+    end
+    if not cur then return nil, nil, items[1] end
+    return items[cur - 1], items[cur], items[cur + 1]
+end
+
 -- Pick the event to display for one PPQ group.
 -- Returns: display_ev, fallback
 --   fallback=nil → display_ev is what the game would play here
@@ -138,12 +166,54 @@ end
 
 -- Hover text for a marked camera event: what the game does for this lineup.
 local function _fallback_tip(fb, combo_name)
-    if fb.kind == 'directed_lost' then
+    if fb.kind == 'directed_replaced' then
+        return TIPS.venue_preview_fb_replaced:format(fb.note or '?',
+            fb.by and ('the stacked ' .. fb.by) or 'a generic band shot, picked at random')
+    elseif fb.kind == 'directed_lost' then
         return TIPS.venue_preview_fb_directed:format(combo_name)
     elseif fb.kind == 'duo_single' then
         return TIPS.venue_preview_fb_duo:format(combo_name, fb.note, fb.play)
     end
     return TIPS.venue_preview_fb_generic:format(combo_name, fb.play)
+end
+
+-- One camera timeline item as a card: the event to name, its fallback marking (or
+-- nil), its time, and an optional note { line=, tip= } shown in the transition
+-- line's place - what the game does around a directed cut. Cards keep their own
+-- positions; the notes say where the game differs.
+local function _camera_display(item, muted)
+    if not item then return nil end
+    local ev, fb = item.ev, nil
+    if item.replaced then
+        local by = item.replaced.by
+        fb = { kind = 'directed_replaced', ev = item.ev,
+               by   = by and by.msg or nil,
+               play = by and by.msg or '[coop_all_near]',
+               note = item.replaced.prev and item.replaced.prev.msg or nil }
+    elseif not ev then
+        fb = CameraFallback(item.group, muted)
+        ev = fb.ev
+    end
+    local note
+    if item.follow then
+        local f = item.follow
+        local dir = f.dir and f.dir.msg or '?'
+        if f.skipped then
+            note = { line = '-> never shown',
+                     tip  = TIPS.venue_preview_never:format(dir, DirectedLengthText(f.len)) }
+        else
+            local tip = TIPS.venue_preview_follow:format(dir)
+            if f.len then tip = tip .. TIPS.venue_preview_follow_len:format(DirectedLengthText(f.len)) end
+            if f.maybe_skipped then tip = tip .. TIPS.venue_preview_follow_maybe end
+            note = { line = '~ plays as soon as the directed ends', tip = tip }
+        end
+    elseif item.skips then
+        local s = item.skips
+        note = { line = '-> skips the next shot',
+                 tip  = TIPS.venue_preview_skips:format(
+                            s.ev and s.ev.msg or s.group[1].msg, _fmt_event_time(s.t)) }
+    end
+    return ev, fb, item.t, note
 end
 
 -- How the event in a column hands over to whatever follows it, as one line under
@@ -174,7 +244,9 @@ end
 -- separator once outside all groups (in _draw_category_row).
 -- Dummy reserves the sprite footprint so all columns stay the same width
 -- even when there is no event or no spritesheet installed.
-local function _draw_column(header, ev, category, scale, fallback, combo_name, playhead)
+-- shown_t / note: a camera card's time and its directed-cut note (_camera_display).
+local function _draw_column(header, ev, category, scale, fallback, combo_name, playhead,
+                            shown_t, note)
     local sw = _SPRITE_W * scale
     local sh = _SPRITE_H * scale
     r.ImGui_BeginGroup(ctx)
@@ -185,25 +257,32 @@ local function _draw_column(header, ev, category, scale, fallback, combo_name, p
         r.ImGui_Dummy(ctx, sw, sh)
     else
         if fallback then
-            -- Red for a directed cut that is lost; amber for a normal shot, which
-            -- still cuts - to a fallback the author may want to check.
-            r.ImGui_TextColored(ctx, fallback.kind == 'directed_lost' and COL_ERROR or COL_WARN,
-                                ev.msg .. ' *')
+            -- Red for a directed cut that does not play (lost, or right after a
+            -- directed cut); amber for a normal shot, which still cuts - to a
+            -- fallback the author may want to check.
+            local lost = fallback.kind == 'directed_lost' or fallback.kind == 'directed_replaced'
+            r.ImGui_TextColored(ctx, lost and COL_ERROR or COL_WARN, ev.msg .. ' *')
             Tooltip(_fallback_tip(fallback, combo_name))
         else
             r.ImGui_Text(ctx, ev.msg)
         end
-        TextDim(_fmt_event_time(ev.t))
+        TextDim(_fmt_event_time(shown_t or ev.t))
         -- Always drawn, blank when there is nothing to say: a column one text line
-        -- shorter than its neighbours would push its sprite out of alignment.
-        local tline, tcol = _transition_line(ev, playhead)
-        if tcol then
-            r.ImGui_TextColored(ctx, tcol, tline)
+        -- shorter than its neighbours would push its sprite out of alignment. A
+        -- camera card's timing note takes this line (a camera cut never fades).
+        if note then
+            r.ImGui_TextColored(ctx, COL_WARN, note.line)
+            Tooltip(note.tip)
         else
-            TextDim(tline)
+            local tline, tcol = _transition_line(ev, playhead)
+            if tcol then
+                r.ImGui_TextColored(ctx, tcol, tline)
+            else
+                TextDim(tline)
+            end
+            if tline ~= ' ' then Tooltip(TIPS.venue_preview_blend) end
         end
-        if tline ~= ' ' then Tooltip(TIPS.venue_preview_blend) end
-        -- A normal-shot fallback pictures the shot the game plays instead.
+        -- A fallback pictures the shot the game plays instead.
         local pic = (fallback and fallback.play) and { msg = fallback.play } or ev
         local bare    = _get_bare_name(pic, category)
         local slot_id = category .. '_' .. header
@@ -215,16 +294,30 @@ local function _draw_column(header, ev, category, scale, fallback, combo_name, p
     r.ImGui_EndGroup(ctx)
 end
 
--- prev/curr/next are PPQ groups (arrays of events), not single events.
+-- One column's content: a camera timeline item (_camera_display), or a PPQ group
+-- of lighting / post-process events.
+local function _draw_entry(header, entry, category, scale, muted, combo_name, playhead)
+    if category == 'Camera' then
+        local ev, fallback, shown_t, note = _camera_display(entry, muted)
+        _draw_column(header, ev, category, scale, fallback, combo_name, playhead, shown_t, note)
+        return fallback ~= nil
+    end
+    local ev, fallback = _resolve_group(entry, muted)
+    _draw_column(header, ev, category, scale, fallback, combo_name, playhead)
+    return fallback ~= nil
+end
+
+-- prev/curr/next: camera timeline items for the Camera row, PPQ groups (arrays of
+-- events) for Lighting and Post-Process.
 local function _draw_category_row(label, prev_grp, curr_grp, next_grp, category, scale,
                                   muted, combo_name, playhead)
     SectionHeader(label)
     r.ImGui_Separator(ctx)  -- full-width separator drawn outside groups (safe here)
     local any_marked = false
-    local function col(header, group)
-        local ev, fallback = _resolve_group(group, muted)
-        if fallback then any_marked = true end
-        _draw_column(header, ev, category, scale, fallback, combo_name, playhead)
+    local function col(header, entry)
+        if _draw_entry(header, entry, category, scale, muted, combo_name, playhead) then
+            any_marked = true
+        end
     end
     if S.venue_preview_show_mode == _SHOW_CURRENT_ONLY then
         col('Current', curr_grp)
@@ -237,7 +330,7 @@ local function _draw_category_row(label, prev_grp, curr_grp, next_grp, category,
     end
     if any_marked then
         r.ImGui_Spacing(ctx)
-        TextDimWrapped('* No stacked shot fits this band: hover the event for what the game does.')
+        TextDimWrapped('* The game plays another shot here for this band: hover the event for which.')
     end
 end
 
@@ -256,13 +349,13 @@ local function _draw_current_row(curr, scale, muted, combo_name, playhead)
     local any_marked = false
     for i, c in ipairs(cols) do
         if i > 1 then r.ImGui_SameLine(ctx) end
-        local ev, fallback = _resolve_group(c[2], c[4])
-        if fallback then any_marked = true end
-        _draw_column(c[1], ev, c[3], scale, fallback, combo_name, playhead)
+        if _draw_entry(c[1], c[2], c[3], scale, c[4], combo_name, playhead) then
+            any_marked = true
+        end
     end
     if any_marked then
         r.ImGui_Spacing(ctx)
-        TextDimWrapped('* No stacked shot fits this band: hover the event for what the game does.')
+        TextDimWrapped('* The game plays another shot here for this band: hover the event for which.')
     end
 end
 
@@ -271,7 +364,7 @@ function DrawVenuePreviewTab()
         _refresh_preview()
     end
 
-    local lbl_col = LabelColWidth({ 'Players', 'Preview size', 'Sprites', 'Show' })
+    local lbl_col = LabelColWidth({ 'Players', 'Preview size', 'Sprites', 'Show', 'Camera' })
     local radio_w = RadioGroupWidth({
         'Bass + Guitar', 'Bass + Keys', 'Guitar + Keys', '1x', '2x',
         'Animated', 'Still', 'Current only V', 'Current only H', 'Surrounding events',
@@ -351,6 +444,12 @@ function DrawVenuePreviewTab()
     end
     Tooltip(_t_vpshw)
 
+    r.ImGui_Text(ctx, 'Camera')
+    r.ImGui_SameLine(ctx, lbl_col)
+    _, S.venue_preview_game_timing = r.ImGui_Checkbox(ctx, 'Mark directed-cut timing##vpgt',
+                                                      S.venue_preview_game_timing)
+    Tooltip(TIPS.venue_preview_game_timing)
+
     if not VenueSpriteFoldersFound() then
         TextDim('- no spritesheets installed')
     end
@@ -379,8 +478,9 @@ function DrawVenuePreviewTab()
     local playhead = playing and r.GetPlayPosition() or r.GetCursorPosition()
     local scale    = S.venue_preview_tab_scale
 
-    -- Each of these is a PPQ group (array of stacked events), not one event.
-    local cam_p, cam_c, cam_n = _find_prev_current_next(_preview_cache.camera,   playhead)
+    -- Camera: items of the game's camera timeline for the chosen lineup. Lighting
+    -- and post proc: PPQ groups (arrays of stacked events), not one event.
+    local cam_p, cam_c, cam_n = _find_camera_items(_camera_timeline(S.venue_preview_combo), playhead)
     local lt_p,  lt_c,  lt_n  = _find_prev_current_next(_preview_cache.lighting, playhead)
     local pp_p,  pp_c,  pp_n  = _find_prev_current_next(_preview_cache.postproc, playhead)
 
