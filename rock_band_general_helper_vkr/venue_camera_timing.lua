@@ -22,17 +22,18 @@
 -- So a directed shot runs until its move ends or until the second camera spot after
 -- it, whichever comes first. How long it runs after its event depends on the version
 -- the game picks (each venue has its own, rotated between), which a chart cannot
--- choose; RB_VENUE_SHOTS holds the range the game allows each directed cut (its own
--- asset check on the venue files), so every version lies inside it. The checks
--- below report only what holds anywhere in that range:
+-- choose; RB_VENUE_SHOTS holds, per directed cut, how long its versions run in every
+-- venue (measured: each shot's camera path with its chained shots), and the range the
+-- game allows them (its own asset check) as a fallback. The checks below report only
+-- what holds anywhere in that range:
 --
---   follow_skipped   the second spot comes before the shortest length allowed ends:
+--   follow_skipped   the second spot comes before the shortest version ends:
 --                    the follow-up is never shown (an issue). Only when the follow-up
 --                    was placed later than FOLLOW_AT_CUT_S after the cut: one right
 --                    after it has no time of its own (it only names what comes next),
 --                    and official venues often let the next spot end a long move that
 --                    way - a placed time is what gets lost.
---   follow_early     the follow-up sits after the longest length allowed ends: it
+--   follow_early     the follow-up sits after the longest version ends: it
 --                    shows when the move ends, before its own position (advisory).
 --   directed_replaced a directed cut right after a directed cut: it does not play
 --                    (an issue).
@@ -42,12 +43,13 @@
 -- "this comes next" (~0.1 s after the cut).
 local FOLLOW_AT_CUT_S = 0.25
 
--- Seconds a directed cut's move may run after its event, as { min, max }: the range
--- the game allows its clips, or nil when the shot data has no length for it.
+-- Seconds a directed cut runs after its event, as { min, max }: measured over the
+-- shots that can play in every venue (each one's camera path with its chained shots,
+-- minus its lead-in), else the range the game allows its clips, else nil.
 function DirectedCutLength(msg)
     local name = msg and msg:match('^%[(directed_[%w_]+)%]$')
     local ev   = name and RB_VENUE_SHOTS and RB_VENUE_SHOTS.events[name]
-    return ev and ev.length or nil
+    return ev and (ev.measured or ev.length) or nil
 end
 
 local function IsDirected(msg) return msg:find('^%[directed_') ~= nil end
@@ -189,7 +191,7 @@ end
 --     follow   = { dir = event, dir_t =, len = { min, max } or nil, maybe_skipped =,
 --                  skipped = }  the spot right after a directed cut: it plays as soon
 --                as the move ends, not at its own position. skipped: the next spot
---                cuts the move before the shortest length allowed ends, so it is
+--                cuts the move before the shortest version ends, so it is
 --                never shown; maybe_skipped: the next spot falls inside the move's
 --                range, so it shows only if the venue's move is short enough. len is
 --                nil when the shot data has no length for the cut,
@@ -264,9 +266,9 @@ function DirectedTimingReportLines(f, at, nlineups, list_max)
             lines[#lines + 1] = ('  %s   %s%s'):format(at(e.ppq), e.msg, ForLineups(e, nlineups))
             lines[#lines + 1] = ('           - it would show when the directed cut %s at %s ends,')
                                 :format(e.dir_msg, at(e.dir_ppq))
-            lines[#lines + 1] = ('             but %s at %s cuts that directed cut short first: the')
+            lines[#lines + 1] = ('             but %s at %s cuts that directed cut short first:')
                                 :format(e.next_msg, at(e.next_ppq))
-            lines[#lines + 1] = ('             game lets it run %s when nothing cuts it'):format(Range(e.len))
+            lines[#lines + 1] = ('             its versions run %s when nothing cuts it'):format(Range(e.len))
             lines[#lines + 1] = '           - place the next camera event later, or delete this one'
         end
     end
@@ -301,7 +303,7 @@ function DirectedTimingReportLines(f, at, nlineups, list_max)
                 break
             end
             lines[#lines + 1] = ('  %s   %s%s'):format(at(e.ppq), e.msg, ForLineups(e, nlineups))
-            lines[#lines + 1] = ('             - shows when the directed cut %s at %s ends (the game allows it %s)')
+            lines[#lines + 1] = ('             - shows when the directed cut %s at %s ends (its versions run %s)')
                                 :format(e.dir_msg, at(e.dir_ppq), Range(e.len))
         end
         lines[#lines + 1] = '  The camera event right after a directed cut plays when that directed cut ends;'

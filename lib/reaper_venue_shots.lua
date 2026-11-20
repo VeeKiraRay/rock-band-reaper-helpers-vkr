@@ -7,7 +7,11 @@
 -- RB_VENUE_SHOTS.events[category] = {
 --   free = true when the song's style and the member's gender do not matter (a free cut),
 --   length = { min, max } seconds the move may run after its event: the range the
---            game's own asset check allows every venue's clip, not measured per shot,
+--            game's own asset check allows every venue's clip (dircut_limits),
+--   measured = { min, max } seconds the shots that can play actually run after the
+--            event: each one's camera path with its chained shots, minus its
+--            lead-in, over every venue (which one plays depends on venue and rotation),
+--   measured_kind = { <venue kind> = { min, max } } the same per venue kind,
 --   lead = { min, max } seconds the move starts before its event (its lead-in),
 --   lock = { min, max } seconds after its event the camera cannot change (the game
 --          holds a directed shot at least 0.25 s; camera events meanwhile are dropped),
@@ -24,7 +28,7 @@
 -- RB_VENUE_SHOTS.coop_remap[category] = { no_keys / no_guitar / no_bass = { targets } }.
 -- Pure data. No r / ctx / S.
 
-RB_VENUE_SHOTS_SCHEMA = 2
+RB_VENUE_SHOTS_SCHEMA = 3
 
 RB_VENUE_SHOTS = {
     kinds = { "arena", "big_club", "festival", "small_club", "video" },
@@ -32,6 +36,8 @@ RB_VENUE_SHOTS = {
     events = {
         ["directed_all"] = {
             length = { 0.25, 10 },
+            measured = { 0.67, 6.03 },
+            measured_kind = { arena = { 0.67, 5.83 }, big_club = { 0.8, 6.03 }, festival = { 0.67, 4.57 }, small_club = { 0.7, 1.4 }, video = { 0.8, 6.03 } },
             lead = { 0.5, 3.07 },
             lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
@@ -63,6 +69,8 @@ RB_VENUE_SHOTS = {
         },
         ["directed_all_cam"] = {
             length = { 1.73, 11.33 },
+            measured = { 2.4, 11.33 },
+            measured_kind = { arena = { 2.8, 10 }, big_club = { 4.87, 6.63 }, festival = { 3.47, 9.9 }, small_club = { 2.4, 11.33 }, video = { 5.33, 6.63 } },
             lead = { 0, 2.93 },
             lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
@@ -87,6 +95,8 @@ RB_VENUE_SHOTS = {
         ["directed_all_lt"] = {
             free = true,
             length = { 6.67, 18.33 },
+            measured = { 6.67, 18.33 },
+            measured_kind = { arena = { 10, 16.67 }, big_club = { 6.67, 18.33 }, festival = { 10, 10 }, small_club = { 6.67, 16.67 }, video = { 8.67, 17.67 } },
             lead = { 0, 0 },
             lock = { 0.25, 3.33 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
@@ -106,6 +116,8 @@ RB_VENUE_SHOTS = {
         },
         ["directed_all_yeah"] = {
             length = { 2.7, 5.4 },
+            measured = { 2.7, 5.4 },
+            measured_kind = { arena = { 3.2, 4.87 }, big_club = { 5.4, 5.4 }, festival = { 2.7, 2.7 }, small_club = { 3.5, 3.5 }, video = { 5.4, 5.4 } },
             lead = { 0.57, 2.43 },
             lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
@@ -121,6 +133,8 @@ RB_VENUE_SHOTS = {
         },
         ["directed_bass"] = {
             length = { 0.47, 6 },
+            measured = { 0.47, 6 },
+            measured_kind = { arena = { 0.47, 6 }, big_club = { 0.47, 2.13 }, festival = { 0.83, 4.23 }, small_club = { 0.6, 3.53 }, video = { 0.47, 2.13 } },
             lead = { 0, 2.63 },
             lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
@@ -144,6 +158,8 @@ RB_VENUE_SHOTS = {
         },
         ["directed_bass_cam"] = {
             length = { 0.3, 10 },
+            measured = { 0.3, 10 },
+            measured_kind = { arena = { 0.37, 10 }, big_club = { 0.9, 5.33 }, festival = { 0.33, 6.67 }, small_club = { 0.3, 5.33 }, video = { 0.9, 5.33 } },
             lead = { 0, 3.33 },
             lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
@@ -182,6 +198,8 @@ RB_VENUE_SHOTS = {
         ["directed_bass_cls"] = {
             free = true,
             length = { 10, 10 },
+            measured = { 10, 10 },
+            measured_kind = { arena = { 10, 10 }, big_club = { 10, 10 }, festival = { 10, 10 }, small_club = { 10, 10 }, video = { 10, 10 } },
             lead = { 0, 0 },
             lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
@@ -196,6 +214,8 @@ RB_VENUE_SHOTS = {
         },
         ["directed_bass_np"] = {
             length = { 0.67, 4.33 },
+            measured = { 0.67, 4.33 },
+            measured_kind = { arena = { 0.67, 3.77 }, big_club = { 1.3, 4.33 }, festival = { 1.2, 3.3 }, small_club = { 0.67, 1.67 }, video = { 2.33, 4.33 } },
             lead = { 0, 2.83 },
             lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
@@ -218,6 +238,8 @@ RB_VENUE_SHOTS = {
         },
         ["directed_bre"] = {
             length = { 0.5, 3.8 },
+            measured = { 0.5, 3.8 },
+            measured_kind = { arena = { 1.2, 1.53 }, big_club = { 0.63, 3.8 }, festival = { 0.5, 1.73 }, small_club = { 1.37, 3.67 }, video = { 1.13, 3.8 } },
             lead = { 3.2, 14.17 },
             lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
@@ -234,6 +256,8 @@ RB_VENUE_SHOTS = {
         },
         ["directed_brej"] = {
             length = { 0.93, 2.93 },
+            measured = { 0.93, 2.93 },
+            measured_kind = { arena = { 0.93, 2.37 }, big_club = { 0.93, 2.8 }, festival = { 0.97, 2.93 }, small_club = { 1.3, 2.67 }, video = { 1.13, 2.8 } },
             lead = { 2.33, 4.53 },
             lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
@@ -253,6 +277,8 @@ RB_VENUE_SHOTS = {
         ["directed_crowd"] = {
             free = true,
             length = { 0.6, 5.33 },
+            measured = { 5.33, 5.33 },
+            measured_kind = { arena = { 5.33, 5.33 }, big_club = { 5.33, 5.33 }, festival = { 5.33, 5.33 }, small_club = { 5.33, 5.33 }, video = { 5.33, 5.33 } },
             lead = { 0, 0 },
             lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
@@ -267,6 +293,8 @@ RB_VENUE_SHOTS = {
         },
         ["directed_crowd_b"] = {
             length = { 0.6, 5.33 },
+            measured = { 0.6, 5.33 },
+            measured_kind = { arena = { 0.63, 3.67 }, big_club = { 0.97, 5.33 }, festival = { 0.6, 4.07 }, small_club = { 5, 5 }, video = { 5.33, 5.33 } },
             lead = { 0, 3.17 },
             lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
@@ -279,6 +307,8 @@ RB_VENUE_SHOTS = {
         },
         ["directed_crowd_g"] = {
             length = { 0.6, 4.93 },
+            measured = { 0.6, 4.93 },
+            measured_kind = { arena = { 1.57, 3.33 }, big_club = { 0.6, 4.93 }, festival = { 1.1, 3.3 }, small_club = { 4.93, 4.93 }, video = { 0.6, 4.93 } },
             lead = { 0, 3.7 },
             lock = { 0.25, 1.1 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
@@ -291,6 +321,8 @@ RB_VENUE_SHOTS = {
         },
         ["directed_crowdsurf"] = {
             length = { 0.25, 4.2 },
+            measured = { 0.27, 4.2 },
+            measured_kind = { arena = { 2.1, 4.2 }, big_club = { 3.2, 3.2 }, festival = { 0.5, 0.77 }, small_club = { 0.33, 3.43 }, video = { 0.27, 0.27 } },
             lead = { 0.9, 2.13 },
             lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
@@ -308,6 +340,8 @@ RB_VENUE_SHOTS = {
         },
         ["directed_drums"] = {
             length = { 0.25, 1.67 },
+            measured = { 0.27, 1.67 },
+            measured_kind = { arena = { 0.27, 1.27 }, big_club = { 0.27, 1.67 }, festival = { 0.27, 0.33 }, small_club = { 0.3, 0.5 }, video = { 0.27, 1.67 } },
             lead = { 0, 2.67 },
             lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
@@ -327,6 +361,8 @@ RB_VENUE_SHOTS = {
         ["directed_drums_kd"] = {
             free = true,
             length = { 10, 10 },
+            measured = { 10, 10 },
+            measured_kind = { arena = { 10, 10 }, big_club = { 10, 10 }, festival = { 10, 10 }, small_club = { 10, 10 }, video = { 10, 10 } },
             lead = { 0, 0 },
             lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
@@ -341,6 +377,8 @@ RB_VENUE_SHOTS = {
         ["directed_drums_lt"] = {
             free = true,
             length = { 6.2, 16.67 },
+            measured = { 6.2, 16.67 },
+            measured_kind = { arena = { 6.67, 16.67 }, big_club = { 10, 13.33 }, festival = { 13.33, 13.33 }, small_club = { 6.2, 16.2 }, video = { 10, 10 } },
             lead = { 0, 0.47 },
             lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
@@ -356,6 +394,8 @@ RB_VENUE_SHOTS = {
         },
         ["directed_drums_np"] = {
             length = { 0.25, 7.43 },
+            measured = { 0.27, 7.43 },
+            measured_kind = { arena = { 0.4, 7.43 }, big_club = { 0.43, 6.67 }, festival = { 0.27, 6.67 }, small_club = { 0.3, 2.87 }, video = { 0.4, 6.67 } },
             lead = { 0, 3.23 },
             lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
@@ -393,6 +433,8 @@ RB_VENUE_SHOTS = {
         },
         ["directed_drums_pnt"] = {
             length = { 0.25, 2.7 },
+            measured = { 0.27, 2.7 },
+            measured_kind = { arena = { 0.3, 2.7 }, big_club = { 0.33, 1.53 }, festival = { 0.27, 2 }, small_club = { 0.73, 1.1 }, video = { 0.33, 1.53 } },
             lead = { 0, 2.23 },
             lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
@@ -422,6 +464,8 @@ RB_VENUE_SHOTS = {
         },
         ["directed_duo_bass"] = {
             length = { 1.43, 8.17 },
+            measured = { 1.43, 8.17 },
+            measured_kind = { arena = { 2, 5.67 }, big_club = { 1.57, 6.67 }, festival = { 1.43, 8.17 }, small_club = { 1.57, 5.27 }, video = { 2, 6.67 } },
             lead = { 0, 2.33 },
             lock = { 0.25, 2.33 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
@@ -445,6 +489,8 @@ RB_VENUE_SHOTS = {
         },
         ["directed_duo_drums"] = {
             length = { 0.33, 5.17 },
+            measured = { 0.33, 5.17 },
+            measured_kind = { arena = { 1.4, 2.93 }, big_club = { 0.5, 5.17 }, festival = { 0.5, 2.77 }, small_club = { 0.33, 2.33 }, video = { 0.5, 5.17 } },
             lead = { 0, 2.83 },
             lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
@@ -473,6 +519,8 @@ RB_VENUE_SHOTS = {
         },
         ["directed_duo_gb"] = {
             length = { 3.17, 7.83 },
+            measured = { 3.17, 7.83 },
+            measured_kind = { arena = { 3.17, 7.83 }, big_club = { 3.27, 6.77 }, festival = { 4.37, 6.1 }, small_club = { 4.3, 5.47 }, video = { 5.33, 6.77 } },
             lead = { 0, 1.83 },
             lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
@@ -490,6 +538,8 @@ RB_VENUE_SHOTS = {
         },
         ["directed_duo_guitar"] = {
             length = { 1.07, 6.67 },
+            measured = { 1.07, 6.67 },
+            measured_kind = { arena = { 2, 6.27 }, big_club = { 1.17, 5.33 }, festival = { 1.07, 6.67 }, small_club = { 1.5, 6.67 }, video = { 1.17, 5.33 } },
             lead = { 0, 2.4 },
             lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
@@ -516,6 +566,8 @@ RB_VENUE_SHOTS = {
         },
         ["directed_duo_kb"] = {
             length = { 1, 6.67 },
+            measured = { 2.67, 6.67 },
+            measured_kind = { arena = { 4.67, 6.67 }, big_club = { 6.67, 6.67 }, festival = { 4.17, 5.33 }, small_club = { 2.67, 2.67 }, video = { 2.67, 2.67 } },
             lead = { 0, 2 },
             lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
@@ -530,6 +582,8 @@ RB_VENUE_SHOTS = {
         },
         ["directed_duo_kg"] = {
             length = { 1, 6.67 },
+            measured = { 3.23, 5 },
+            measured_kind = { arena = { 4.67, 5 }, big_club = { 4.33, 4.33 }, festival = { 4.57, 4.57 }, small_club = { 5, 5 }, video = { 3.23, 3.23 } },
             lead = { 0, 0.77 },
             lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
@@ -543,6 +597,8 @@ RB_VENUE_SHOTS = {
         },
         ["directed_duo_kv"] = {
             length = { 1, 6.67 },
+            measured = { 2.33, 5.43 },
+            measured_kind = { arena = { 3.43, 4.27 }, big_club = { 2.33, 5 }, festival = { 2.9, 5.43 }, small_club = { 2.67, 2.67 }, video = { 3.87, 3.87 } },
             lead = { 0, 1.43 },
             lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
@@ -560,6 +616,8 @@ RB_VENUE_SHOTS = {
         },
         ["directed_guitar"] = {
             length = { 0.5, 6 },
+            measured = { 0.5, 6 },
+            measured_kind = { arena = { 0.63, 6 }, big_club = { 1.07, 5.7 }, festival = { 0.63, 5.37 }, small_club = { 0.5, 3.9 }, video = { 1.07, 5.7 } },
             lead = { 0, 3 },
             lock = { 0.25, 1 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
@@ -588,6 +646,8 @@ RB_VENUE_SHOTS = {
         },
         ["directed_guitar_cam_pr"] = {
             length = { 0.43, 9.63 },
+            measured = { 0.43, 9.63 },
+            measured_kind = { arena = { 0.67, 6.8 }, big_club = { 1.8, 9.63 }, festival = { 0.57, 3.33 }, small_club = { 0.43, 6.53 }, video = { 1.8, 9.63 } },
             lead = { 0.33, 4.3 },
             lock = { 0.25, 1 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
@@ -619,6 +679,8 @@ RB_VENUE_SHOTS = {
         },
         ["directed_guitar_cam_pt"] = {
             length = { 1.6, 12 },
+            measured = { 1.6, 12 },
+            measured_kind = { arena = { 1.7, 9.07 }, big_club = { 2.33, 6.23 }, festival = { 1.6, 7.03 }, small_club = { 1.8, 12 }, video = { 2.33, 6.17 } },
             lead = { 0, 0.93 },
             lock = { 0.25, 1.1 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
@@ -660,6 +722,8 @@ RB_VENUE_SHOTS = {
         ["directed_guitar_cls"] = {
             free = true,
             length = { 3.33, 10 },
+            measured = { 3.33, 10 },
+            measured_kind = { arena = { 10, 10 }, big_club = { 3.33, 10 }, festival = { 10, 10 }, small_club = { 10, 10 }, video = { 3.33, 10 } },
             lead = { 0, 0 },
             lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
@@ -676,6 +740,8 @@ RB_VENUE_SHOTS = {
         },
         ["directed_guitar_np"] = {
             length = { 0.25, 5.37 },
+            measured = { 0.27, 5.37 },
+            measured_kind = { arena = { 0.27, 5.37 }, big_club = { 1.03, 4.23 }, festival = { 1.27, 4.67 }, small_club = { 0.27, 4.57 }, video = { 0.63, 4.23 } },
             lead = { 0, 3.03 },
             lock = { 0.25, 1.1 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
@@ -708,6 +774,8 @@ RB_VENUE_SHOTS = {
         },
         ["directed_keys"] = {
             length = { 0, 6.67 },
+            measured = { 0.17, 5.27 },
+            measured_kind = { arena = { 0.2, 5 }, big_club = { 0.17, 5.27 }, festival = { 0.5, 2.3 }, small_club = { 0.83, 0.97 }, video = { 1.2, 1.2 } },
             lead = { 0, 1.5 },
             lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
@@ -738,6 +806,8 @@ RB_VENUE_SHOTS = {
         },
         ["directed_keys_cam"] = {
             length = { 1.67, 6.67 },
+            measured = { 1.67, 6.67 },
+            measured_kind = { arena = { 2.27, 6.67 }, big_club = { 3.33, 6.67 }, festival = { 1.67, 5 }, small_club = { 2, 2.8 }, video = { 4.67, 4.67 } },
             lead = { 0, 1.33 },
             lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
@@ -762,6 +832,8 @@ RB_VENUE_SHOTS = {
         },
         ["directed_keys_np"] = {
             length = { 3.3, 6.67 },
+            measured = { 3.33, 5 },
+            measured_kind = { big_club = { 4, 5 }, festival = { 3.33, 4.47 }, small_club = { 5, 5 }, video = { 5, 5 } },
             lead = { 0, 1 },
             lock = { 0.25, 0.25 },
             kinds = { "big_club", "festival", "small_club", "video" },
@@ -780,6 +852,8 @@ RB_VENUE_SHOTS = {
         },
         ["directed_stagedive"] = {
             length = { 0.25, 5.77 },
+            measured = { 0.27, 5.77 },
+            measured_kind = { arena = { 0.27, 1.47 }, big_club = { 0.4, 1.07 }, festival = { 0.73, 0.73 }, small_club = { 0.87, 5.77 }, video = { 0.27, 1 } },
             lead = { 0, 2.13 },
             lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
@@ -796,6 +870,8 @@ RB_VENUE_SHOTS = {
         },
         ["directed_vocals"] = {
             length = { 0.25, 6.27 },
+            measured = { 0.27, 6.27 },
+            measured_kind = { arena = { 0.27, 4.6 }, big_club = { 0.33, 6.27 }, festival = { 0.33, 4.9 }, small_club = { 0.57, 5.13 }, video = { 0.33, 6.27 } },
             lead = { 0, 4.13 },
             lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
@@ -847,6 +923,8 @@ RB_VENUE_SHOTS = {
         },
         ["directed_vocals_cam_pr"] = {
             length = { 0.37, 9.7 },
+            measured = { 0.37, 9.7 },
+            measured_kind = { arena = { 0.77, 7.17 }, big_club = { 1.17, 9.7 }, festival = { 0.43, 6.67 }, small_club = { 0.93, 5.83 }, video = { 0.37, 9.7 } },
             lead = { 0.53, 4.43 },
             lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
@@ -935,6 +1013,8 @@ RB_VENUE_SHOTS = {
         },
         ["directed_vocals_cam_pt"] = {
             length = { 0.93, 10 },
+            measured = { 1.3, 10 },
+            measured_kind = { arena = { 1.8, 10 }, big_club = { 1.47, 9.33 }, festival = { 1.3, 10 }, small_club = { 1.5, 8.33 }, video = { 1.73, 9.33 } },
             lead = { 0, 0.97 },
             lock = { 0.25, 5 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
@@ -1051,6 +1131,8 @@ RB_VENUE_SHOTS = {
         },
         ["directed_vocals_cls"] = {
             length = { 1.3, 12.67 },
+            measured = { 1.3, 12.67 },
+            measured_kind = { arena = { 1.3, 5.27 }, big_club = { 1.73, 12.67 }, festival = { 1.33, 6.67 }, small_club = { 1.57, 8.77 }, video = { 1.73, 12.67 } },
             lead = { 0, 2.43 },
             lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },
@@ -1100,6 +1182,8 @@ RB_VENUE_SHOTS = {
         },
         ["directed_vocals_np"] = {
             length = { 0.25, 2.9 },
+            measured = { 0.33, 2.9 },
+            measured_kind = { arena = { 0.53, 2.33 }, big_club = { 0.33, 2.53 }, festival = { 0.73, 2.9 }, small_club = { 0.37, 2.73 }, video = { 0.33, 1.17 } },
             lead = { 0.33, 2.27 },
             lock = { 0.25, 0.25 },
             kinds = { "arena", "big_club", "festival", "small_club", "video" },

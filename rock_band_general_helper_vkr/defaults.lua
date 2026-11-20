@@ -717,11 +717,12 @@ TIPS = {
                      "0.25 s after the event; hover the value for how long.",
     venue_cs_lock_row = "Some versions of this move hold the camera for up to %s s after its\n" ..
                         "event: camera events during that time are dropped, not delayed.",
-    venue_cs_length = "The range the game allows this cut's moves; each venue's version is\n" ..
-                      "somewhere in it. The next camera event can still cut the move earlier.",
-    venue_cs_free  = "One of the game's six free cuts: its style and gender filter skips them,\n" ..
-                     "so any of their versions can play in any song. They still differ by\n" ..
-                     "venue and still need their member on stage.",
+    venue_cs_length = "How long this cut's versions run after its event, measured in every\n" ..
+                      "venue (the camera path, with any shots it chains into). Which version\n" ..
+                      "plays is up to the venue and the game's rotation. Pick a Venue above\n" ..
+                      "to see that kind's range (each venue kind has its own versions), with\n" ..
+                      "the all-venue range in brackets. The next camera event can still cut\n" ..
+                      "it short.",
     venue_mg_target = "Where this tab reads and writes events.\n\n" ..
                       "VENUE: the VENUE track.\n" ..
                       "Subtracks: the Sub VENUE tracks made by Venue > Actions > Copy all to\n" ..
@@ -1268,18 +1269,18 @@ TIPS = {
     venue_preview_follow  = "This shot comes right after the directed cut %s, so the game\n" ..
                            "plays it as soon as that directed cut ends - its own position does\n" ..
                            "not matter. Shown here at its own position.",
-    venue_preview_follow_len = "\n\nThe game allows that directed cut to run %s after its event; each\n" ..
-                           "venue's version is somewhere in that range.",
+    venue_preview_follow_len = "\n\nIts versions run %s after its event (each venue has its own;\n" ..
+                           "which one plays is up to the venue and the game's rotation).",
     venue_preview_follow_maybe = "\n\nThe next camera event comes before the directed cut's longest\n" ..
-                           "length, so this shot shows only if the venue's version is short\n" ..
-                           "enough. Otherwise that event cuts the directed cut short and this\n" ..
+                           "version ends, so this shot shows only if the venue's version is\n" ..
+                           "short enough. Otherwise that event cuts the directed cut short and this\n" ..
                            "shot is never seen.",
     venue_preview_never   = "Never shown: it would play when the directed cut %s ends, but\n" ..
-                           "the next camera event cuts that directed cut short first (the game\n" ..
-                           "allows it to run %s). Place that event later, or delete this one.",
+                           "the next camera event cuts that directed cut short first (its\n" ..
+                           "versions run %s). Place that event later, or delete this one.",
     venue_preview_skips   = "The next camera event, %s at %s, is never shown: the event after\n" ..
-                           "it cuts this directed cut short before it can end (even at the\n" ..
-                           "shortest length the game allows). That event comes on screen in\n" ..
+                           "it cuts this directed cut short before it can end (even its\n" ..
+                           "shortest version). That event comes on screen in\n" ..
                            "its place.",
     venue_preview_show_mode = "Which events to display, and how.\n\n" ..
                            "Current only V     -  the active event of each category (started at or\n" ..

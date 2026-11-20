@@ -56,9 +56,13 @@
 --       move if it is still running. New findings: a shot after a directed
 --       cut that is never shown, a directed cut right after a directed cut
 --       (it does not play), and - not counted as issues - shots that show
---       early because the move ends first. Move lengths vary by venue; only
---       what holds for every venue is reported. A shot a few ticks after a
---       directed cut is no longer called a botched stack. Venue > Preview's
+--       early because the move ends first. How long a directed cut runs is
+--       measured from the game's venue files and varies by venue; only what
+--       holds for every venue is reported. Venue > Manual gen's directed
+--       camera hover now shows the same timing: how long the cut runs, its
+--       lead-in, and a longer camera lock where some versions have one. A shot a few
+--       ticks after a directed cut is no longer called a botched stack.
+--       Venue > Preview's
 --       camera row marks the same rules on each event, at its own position:
 --       the shot after a directed cut says "~ plays as soon as the directed
 --       ends", one the game never shows says "-> never shown" (and its
@@ -536,6 +540,7 @@ for _, _f in ipairs({
     _dir  .. 'lib/reaper_score_sim.lua',
     _dir  .. 'lib/reaper_score_read.lua',
     _dir  .. 'lib/reaper_venue_shots.lua',
+    _dir  .. 'lib/reaper_venue_shots_query.lua',
     _mdir .. 'defaults.lua',
     _mdir .. 'settings.lua',
     _mdir .. 'helpers.lua',
@@ -617,6 +622,7 @@ dofile(_dir  .. 'lib/reaper_key_audio.lua')      -- uses reaper_dsp.lua's YIN co
 dofile(_dir  .. 'lib/reaper_score_sim.lua')      -- Metadata > Score (pure)
 dofile(_dir  .. 'lib/reaper_score_read.lua')     -- uses reaper_difficulty_read.lua's readers
 dofile(_dir  .. 'lib/reaper_venue_shots.lua')    -- generated shot data: directed-cut lengths
+dofile(_dir  .. 'lib/reaper_venue_shots_query.lua') -- VenueShotTimingFacts (Manual gen tooltips)
 
 -- Window title with this script's own @version, read from the header above.
 -- ui.lua passes it to ImGui_Begin; the "###" id inside keeps saved window

@@ -139,3 +139,62 @@ function VenueShotSearch(text, limit)
     end
     return out, total
 end
+
+-- ---------------------------------------------------------------------------
+-- A directed cut's timing facts as short lines, shared by Directed Moves (under each
+-- event name) and Manual gen's directed-cut tooltip, so both say the same thing.
+-- Strings live here, not in a TIPS table: this module serves two windows.
+--   cat   bare event name ('directed_drums')
+--   kind  venue kind for that kind's measured length, or nil for every venue
+--   opts.lead         true: add the lead-in line (Manual gen; Directed Moves has a column)
+--   opts.lock_suffix  text added to the longer-lock line (Directed Moves: ' (marked # below)')
+-- Returns an array of { text =, id = 'length' | 'lead' | 'lock' | 'venue',
+-- warn = true for an amber line }; empty for an unknown cut. Only what a user needs: the
+-- measured length (the game's allowed range only where nothing was measured), no line for
+-- the usual 0.25 s camera lock - Validate, Preview and the README cover it, and an event
+-- placed that close (under an 8th note at 120 BPM) is unlikely - but an amber one for the
+-- few cuts with versions that hold the camera longer. Free cuts (FREE_DIRCUTS) get no
+-- line: their style / gender freedom shows as Any / Both in Directed Moves' rows, and
+-- their other meaning - not using a member's directed-cut clip slot - matters only to a
+-- slot counter, which does not exist yet.
+
+local function Secs(x)
+    return (('%.2f'):format(x):gsub('0+$', ''):gsub('%.$', ''))
+end
+
+local function SecRange(r)
+    if math.abs(r[1] - r[2]) < 0.005 then return Secs(r[1]) .. ' s' end
+    return Secs(r[1]) .. '-' .. Secs(r[2]) .. ' s'
+end
+
+function VenueShotTimingFacts(cat, kind, opts)
+    opts = opts or {}
+    local ev, out = RB_VENUE_SHOTS.events[cat], {}
+    if not ev then return out end
+    local per_kind = kind and ev.measured_kind and ev.measured_kind[kind]
+    if per_kind then
+        out[#out + 1] = { id = 'length', text = (VENUE_SHOT_KIND_LABELS[kind] or kind)
+            .. ': its versions run ' .. SecRange(per_kind) .. ' after its event (all venues '
+            .. SecRange(ev.measured) .. ').' }
+    elseif ev.measured then
+        out[#out + 1] = { id = 'length', text = 'Its versions run ' .. SecRange(ev.measured)
+            .. ' after its event.' }
+    elseif ev.length then
+        out[#out + 1] = { id = 'length', text = 'The move may run ' .. SecRange(ev.length)
+            .. ' after its event.' }
+    end
+    if opts.lead and ev.lead and ev.lead[2] > 0 then
+        out[#out + 1] = { id = 'lead', text = 'Lead-in ' .. SecRange(ev.lead)
+            .. ': it starts that much before its event.' }
+    end
+    if ev.lock and ev.lock[2] > 0.255 then
+        out[#out + 1] = { id = 'lock', warn = true, text = 'Some versions stop the camera changing for up to '
+            .. Secs(ev.lock[2]) .. ' s after its event' .. (opts.lock_suffix or '') .. '.' }
+    end
+    local kinds = VenueShotKindsText(ev.kinds)
+    if kinds ~= 'All' then
+        out[#out + 1] = { id = 'venue', warn = true, text = 'Not in every venue: only in ' .. kinds
+            .. (kinds:find('%*') and ' (* = only some venues of that kind).' or '.') }
+    end
+    return out
+end

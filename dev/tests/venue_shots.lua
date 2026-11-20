@@ -14,7 +14,7 @@ Test.it('has the five venue kinds, the directed cuts and only the coop remaps', 
     Test.expect(#VenueShotEvents('coop') == 0, 'coop shots are not listed')
     Test.expect(#VenueShotEvents() == #VenueShotEvents('directed'), 'every listed event is directed')
     Test.expect(RB_VENUE_SHOTS.coop_remap.coop_k_near ~= nil, 'coop remaps kept')
-    Test.expect(RB_VENUE_SHOTS_SCHEMA == 2, 'schema')
+    Test.expect(RB_VENUE_SHOTS_SCHEMA == 3, 'schema')
 end)
 
 Test.it('every move row is complete', function()
@@ -32,6 +32,37 @@ end)
 
 Test.it('directed events carry a length range', function()
     Test.expect(E.directed_drums.length[1] < E.directed_drums.length[2], 'drums length')
+end)
+
+Test.it('measured lengths sit inside the range the game allows', function()
+    -- Measured = each playable shot's camera path with its chained shots, minus its
+    -- lead-in; the game's own asset check holds every clip to the allowed range.
+    local bad, n = nil, 0
+    for cat, ev in pairs(E) do
+        if ev.measured then
+            n = n + 1
+            local m, l = ev.measured, ev.length
+            if m[1] > m[2] or (l and (m[1] < l[1] - 0.02 or m[2] > l[2] + 0.02)) then bad = cat end
+        end
+    end
+    Test.expect(n >= 35, 'most directed cuts measured; got ' .. n)
+    Test.expect(not bad, 'outside the allowed range: ' .. tostring(bad))
+end)
+
+Test.it('per-kind lengths sit inside the all-venue range, for known kinds only', function()
+    local known, bad = {}, nil
+    for _, k in ipairs(RB_VENUE_SHOTS.kinds) do known[k] = true end
+    for cat, ev in pairs(E) do
+        for kind, r in pairs(ev.measured_kind or {}) do
+            if not known[kind] or r[1] > r[2] or r[1] < ev.measured[1] - 0.005
+                    or r[2] > ev.measured[2] + 0.005 then
+                bad = cat .. ' / ' .. kind
+            end
+        end
+    end
+    Test.expect(not bad, 'bad per-kind range: ' .. tostring(bad))
+    local sd = E.directed_stagedive.measured_kind
+    Test.expect(sd.arena[2] < 2 and sd.small_club[2] > 5, 'stagedive: short in arenas, long in small clubs')
 end)
 
 Test.it('directed events carry a lock range with the 0.25 s floor', function()
@@ -224,4 +255,48 @@ Test.it('kinds text says All only when every kind has it in all its venues', fun
     Test.expect(VenueShotKindsText(all) == 'All', 'all five: ' .. VenueShotKindsText(all))
     all[1] = all[1] .. '*'
     Test.expect(VenueShotKindsText(all) ~= 'All', 'one partial kind is listed')
+end)
+
+Test.section('Timing facts (Directed Moves summary, Manual gen tooltip)')
+
+local function Ids(facts)
+    local out = {}
+    for _, f in ipairs(facts) do out[#out + 1] = f.id .. (f.warn and '!' or '') end
+    return table.concat(out, ' ')
+end
+
+Test.it('a free cut: only its length - no free-cut line, no line for the usual 0.25 s lock', function()
+    local f = VenueShotTimingFacts('directed_guitar_cls')
+    Test.expect(Ids(f) == 'length', 'got ' .. Ids(f))
+    Test.expect(f[1].text == 'Its versions run 3.33-10 s after its event.', 'got ' .. f[1].text)
+end)
+
+Test.it('the lead-in line, as a range, comes only with opts.lead', function()
+    Test.expect(Ids(VenueShotTimingFacts('directed_drums')) == 'length', 'no lead-in by default')
+    local f = VenueShotTimingFacts('directed_drums', nil, { lead = true })
+    Test.expect(Ids(f) == 'length lead', 'got ' .. Ids(f))
+    Test.expect(f[2].text == 'Lead-in 0-2.67 s: it starts that much before its event.', 'got ' .. f[2].text)
+end)
+
+Test.it('a venue kind gives that kind\'s range, with the all-venue one beside it', function()
+    local f = VenueShotTimingFacts('directed_stagedive', 'arena')
+    Test.expect(f[1].text == 'Arena: its versions run 0.27-1.47 s after its event (all venues 0.27-5.77 s).',
+        'got ' .. f[1].text)
+end)
+
+Test.it('the game\'s allowed range is not shown next to a measured one', function()
+    local keys = VenueShotTimingFacts('directed_keys')[1].text
+    Test.expect(keys == 'Its versions run 0.17-5.27 s after its event.', 'keys: ' .. keys)
+end)
+
+Test.it('a longer lock is an amber line with the caller\'s suffix; so is a missing venue', function()
+    local f = VenueShotTimingFacts('directed_duo_bass', nil, { lock_suffix = ' (marked # below)' })
+    local lock
+    for _, x in ipairs(f) do if x.id == 'lock' then lock = x end end
+    Test.expect(lock and lock.warn and lock.text ==
+        'Some versions stop the camera changing for up to 2.33 s after its event (marked # below).',
+        'lock: ' .. tostring(lock and lock.text))
+    local k = VenueShotTimingFacts('directed_keys_np')
+    Test.expect(k[#k].id == 'venue' and k[#k].warn, 'keys_np: not in every venue, amber')
+    Test.expect(#VenueShotTimingFacts('directed_nonsense') == 0, 'unknown cut: no lines')
 end)

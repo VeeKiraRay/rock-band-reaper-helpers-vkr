@@ -14,6 +14,7 @@
 --                   LIGHTING_DISPLAY_GROUPS, LIGHTING_LABELS, LIGHTING_TIPS,
 --                   POSTPROC_DISPLAY, POSTPROC_LABELS, POSTPROC_TIPS,
 --                   KF_ALIGN_LABELS, VenueEventTooltip, RawVenueEventText,
+--                   VenueShotTimingFacts (lib/reaper_venue_shots_query.lua),
 --                   ComboGroupHeader, RadioGroupWidth, LabelColWidth,
 --                   VenueTargetName, VenueTargetUsesSubtracks, VENUE_SUBTRACKS,
 --                   FindTrackByName
@@ -37,6 +38,13 @@ local _kf_ctx       = nil   -- { lighting, keys } from ReadKeyframeContext (keyf
 local _lt_tol       = 0     -- match tolerance in ticks (see FindManualLightingAtPpq)
 local _force_rescan = false
 local _subtracks_missing = false
+
+-- A directed cut's tooltip extras: its timing facts (VenueShotTimingFacts, the same lines
+-- Directed Moves shows, plus the lead-in, which Directed Moves has as a column). A fresh
+-- table each call: the caller may add its own label.
+local function _DirectedTimingOpts(dn)
+    return { facts = VenueShotTimingFacts(dn, nil, { lead = true }) }
+end
 
 local function _ScanManualLighting(take)
     local out = {}
@@ -211,7 +219,7 @@ function DrawVenueManualTab()
             end
             if _dsel then r.ImGui_SetItemDefaultFocus(ctx) end
             if r.ImGui_IsItemHovered(ctx) then
-                VenueEventTooltip('Camera', _dn, DIRECTED_TIPS[_dn])
+                VenueEventTooltip('Camera', _dn, DIRECTED_TIPS[_dn], _DirectedTimingOpts(_dn))
             end
         end
         for _, _dn in ipairs(DIRECTED_DISPLAY) do _draw_dir_row(_dn) end
@@ -223,8 +231,9 @@ function DrawVenueManualTab()
         r.ImGui_EndCombo(ctx)
     end
     if r.ImGui_IsItemHovered(ctx) and S.venue_mg_directed ~= '' then
-        VenueEventTooltip('Camera', S.venue_mg_directed, DIRECTED_TIPS[S.venue_mg_directed],
-                          { label = DIRECTED_LABELS[S.venue_mg_directed] or S.venue_mg_directed })
+        local _dopts = _DirectedTimingOpts(S.venue_mg_directed)
+        _dopts.label = DIRECTED_LABELS[S.venue_mg_directed] or S.venue_mg_directed
+        VenueEventTooltip('Camera', S.venue_mg_directed, DIRECTED_TIPS[S.venue_mg_directed], _dopts)
     end
     r.ImGui_SameLine(ctx)
     local _mg_dir_dis = S.venue_mg_directed == ''

@@ -229,6 +229,7 @@ end
 --   opts.intro  text drawn above the description whether or not anything is selected
 --               (Section gen's combos explain themselves even when empty)
 --   opts.label  display label to head the description with ("Label:\ntip")
+--   opts.facts  timing fact lines, { { text =, warn = } } (VenueShotTimingFacts)
 -- Text is drawn with Text/TextDim, never TextWrapped: BeginVenueTooltip pins the
 -- wrap position to the sprite width, and TextWrapped would override it with the window
 -- width, widening every tooltip.
@@ -241,6 +242,14 @@ function VenueEventTooltip(category, bare, tip, opts)
     if has_sel and tip and tip ~= '' then
         if opts.intro then r.ImGui_Separator(ctx) end
         r.ImGui_Text(ctx, opts.label and (opts.label .. ':\n' .. tip) or tip)
+    end
+    -- Timing facts (VenueShotTimingFacts: { text, warn }), each its own line under a
+    -- separator. Manual gen's directed cuts pass them.
+    if has_sel and opts.facts and #opts.facts > 0 then
+        r.ImGui_Separator(ctx)
+        for _, fact in ipairs(opts.facts) do
+            if fact.warn then r.ImGui_TextColored(ctx, COL_WARN, fact.text) else TextDim(fact.text) end
+        end
     end
     local raw = RawVenueEventText(category, bare)
     if raw then

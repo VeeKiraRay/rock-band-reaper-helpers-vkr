@@ -37,9 +37,15 @@ local function StylesText(styles)
     return table.concat(out, ', ')
 end
 
+-- Seconds to two decimals, trailing zeros dropped (0.25, 6.2, 16.67): one decimal
+-- rounded a 0.25 s allowed minimum to 0.2 beside a 0.27 s measured one shown as 0.3.
+local function Secs(x)
+    return (('%.2f'):format(x):gsub('0+$', ''):gsub('%.$', ''))
+end
+
 local function Range(a, b)
-    if math.abs(a - b) < 0.005 then return ('%.1f s'):format(a) end
-    return ('%.1f-%.1f s'):format(a, b)
+    if math.abs(a - b) < 0.005 then return Secs(a) .. ' s' end
+    return Secs(a) .. '-' .. Secs(b) .. ' s'
 end
 
 -- A combo over { value, label } options writing S[field].
@@ -161,32 +167,17 @@ local function DrawSection(cat, rows, filter)
     r.ImGui_SameLine(ctx)
     TextDim('[' .. cat .. ']')
 
-    -- Under the name, one fact per line. Timing (dim) always - the lead-in is not
-    -- repeated here, each move row has its own; the rest only where the cut is
-    -- unusual: one of the game's free cuts (dim), not in every venue (amber),
-    -- changed by the chosen band (amber). length is the range the game allows the
-    -- cut's clips (its own asset check), not a measured per-venue value - so the
-    -- wording says "may".
+    -- Under the name, one fact per line (VenueShotTimingFacts, lib/reaper_venue_shots_query.lua -
+    -- Manual gen's directed-cut tooltip draws the same lines): how long its versions run (the
+    -- chosen venue kind's range when one is picked), a longer camera lock (amber, only the few
+    -- cuts that have one), not in every venue (amber). The lead-in is not
+    -- repeated here: each move row has its own. Then the band line below (amber), which
+    -- depends on this window's Band filter.
     r.ImGui_PushTextWrapPos(ctx, 0)
-    if ev.length then
-        TextDimWrapped('The move may run ' .. Range(ev.length[1], ev.length[2]) .. ' after its event.')
-        Tooltip(TIPS.venue_cs_length)
-    end
-    if ev.lock then
-        TextDimWrapped(ev.lock[2] - ev.lock[1] < 0.005
-            and ('The camera cannot change for %.2g s after its event.'):format(ev.lock[1])
-            or  ('The camera cannot change for %.2g s after its event (some versions: up to %.2g s, '
-                 .. 'marked # below).'):format(ev.lock[1], ev.lock[2]))
-    end
-    if ev.free then
-        -- FREE_DIRCUTS (the game's macros.dta): skipped by its style / gender filter.
-        TextDimWrapped('Not picked by song style or member gender (a free cut).')
-        Tooltip(TIPS.venue_cs_free)
-    end
-    local kinds = VenueShotKindsText(ev.kinds)
-    if kinds ~= 'All' then
-        TextColoredWrapped(COL_WARN, 'Not in every venue: only in ' .. kinds
-            .. (kinds:find('%*') and ' (* = only some venues of that kind).' or '.'))
+    local FACT_TIPS = { length = TIPS.venue_cs_length }
+    for _, fact in ipairs(VenueShotTimingFacts(cat, filter.kind, { lock_suffix = ' (marked # below)' })) do
+        if fact.warn then TextColoredWrapped(COL_WARN, fact.text) else TextDimWrapped(fact.text) end
+        if FACT_TIPS[fact.id] then Tooltip(FACT_TIPS[fact.id]) end
     end
     local remap = VenueShotRemap(cat, filter.lineup)
     if remap == 'dropped' then
