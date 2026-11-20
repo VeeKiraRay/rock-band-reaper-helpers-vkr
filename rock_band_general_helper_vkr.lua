@@ -70,6 +70,17 @@
 --       after a directed cut is red, pictured as what plays instead. A new
 --       Camera: Mark directed-cut timing checkbox (on by default) turns the
 --       marks off.
+--     - Venue > Actions > Sub VENUE tracks: new view-only "VENUE directed cut
+--       time" track (Copy all to subtracks makes it, or pick Directed cut time
+--       and press Copy to). For each directed cut, over all its versions:
+--       note 0 where the camera may be on it (lead-in included), note 1 where
+--       it is on it whichever version plays;
+--       a cut overlapping the previous one uses notes 2 and 3. Each cut (its
+--       hit) and the two camera events after it are copied beside them: the
+--       first plays when the directed shot ends, the second is the latest it
+--       can be cut. Open
+--       it beside VENUE in the MIDI editor while placing camera cuts. It never
+--       goes back to VENUE.
 --     - New Events > Metronome: writes the practice-mode metronome on the
 --       EVENTS track - the kick, snare and hi-hat clicks (notes 24, 25, 26) the
 --       game plays when someone practises any part except drums. Every
@@ -563,6 +574,7 @@ for _, _f in ipairs({
     _mdir .. 'actions_venue_keyframes.lua',
     _mdir .. 'actions_venue_sing_along.lua',
     _mdir .. 'actions_venue_subtracks.lua',
+    _mdir .. 'actions_venue_dircut_time.lua',
     _mdir .. 'actions_venue_validate.lua',
     _mdir .. 'venue_camera_timing.lua',
     _mdir .. 'actions_venue_validate_camera.lua',
@@ -652,6 +664,7 @@ dofile(_mdir .. 'actions_venue_events.lua')
 dofile(_mdir .. 'actions_venue_keyframes.lua')
 dofile(_mdir .. 'actions_venue_sing_along.lua')
 dofile(_mdir .. 'actions_venue_subtracks.lua')
+dofile(_mdir .. 'actions_venue_dircut_time.lua')       -- view-only Directed cut time track
 dofile(_mdir .. 'actions_venue_validate.lua')
 dofile(_mdir .. 'venue_camera_timing.lua')            -- directed-cut timing (pure)
 dofile(_mdir .. 'actions_venue_validate_camera.lua')

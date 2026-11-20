@@ -151,6 +151,44 @@ else
         end, 10)
     end)
 
+    Test.it('also draws the view-only Directed cut time track, never copied back', function()
+        WithVenueFixture(function(venue_track, venue_item, venue_take)
+            local venue_idx = select(2, FindTrackByName('VENUE'))
+            InsertEvt(venue_take, 1, '[coop_all_far]')
+            InsertEvt(venue_take, 3, '[directed_guitar]')
+            InsertEvt(venue_take, 4, '[coop_g_near]')
+            InsertEvt(venue_take, 9, '[coop_d_near]')
+
+            CopyVenueToSubtracks()
+
+            local tr, idx = FindTrackByName(VENUE_DIRCUT_TIME.track_name)
+            Test.expect(tr and idx == venue_idx + #VENUE_SUBTRACKS + 1, 'after the six subtracks')
+            Test.expect(r.GetMediaTrackInfo_Value(tr, 'B_MUTE') == 1, 'muted')
+            local _, _, take = FindNamedTrackMIDI(VENUE_DIRCUT_TIME.track_name)
+            local _, notes = r.MIDI_CountEvts(take)
+            Test.expect(notes == 2, 'longest + shortest notes; got ' .. notes)
+            local msgs = ReadMsgs(take)
+            table.sort(msgs)
+            Test.expect(#msgs == 3 and msgs[1] == '[coop_d_near]' and msgs[2] == '[coop_g_near]'
+                        and msgs[3] == '[directed_guitar]',
+                        'the cut and the two spots after it; got ' .. table.concat(msgs, ','))
+            Test.expect(r.GetTrackMIDINoteNameEx(0, tr, 0, -1) == DIRCUT_TIME_NOTE_NAMES[0], 'note names')
+
+            -- Copy from with it picked writes nothing.
+            local idx0 = S.venue_subtrack_idx
+            S.venue_subtrack_idx = #VENUE_SUBTRACKS
+            local before = #ReadMsgs(venue_take)
+            CopySelectedSubtrackFrom()
+            S.venue_subtrack_idx = idx0
+            Test.expect(#ReadMsgs(venue_take) == before, 'VENUE untouched by Copy from')
+            Test.expect(S.status:find('Nothing to write', 1, true), 'status: ' .. tostring(S.status))
+
+            -- Copy all to main track ignores it.
+            CopyAllSubtracksToMain(true)
+            Test.expect(#ReadMsgs(venue_take) == 4, 'merge back has only the 4 VENUE events')
+        end, 12)
+    end)
+
     Test.it('splits each category into its own subtrack', function()
         WithVenueFixture(function(venue_track, venue_item, venue_take)
             InsertEvt(venue_take, 1, '[coop_all_far]')

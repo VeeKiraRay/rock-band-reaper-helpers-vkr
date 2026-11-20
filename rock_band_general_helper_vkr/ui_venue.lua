@@ -202,9 +202,10 @@ function DrawVenueTab(ctx)
             r.ImGui_Text(ctx, 'Subtrack')
             r.ImGui_SameLine(ctx, lbl_col_st)
             r.ImGui_SetNextItemWidth(ctx, WIDTH_STD)
-            local _st_preview = VENUE_SUBTRACKS[S.venue_subtrack_idx + 1].label
+            local _st_opts = VenueSubtrackOptions()
+            local _st_preview = (_st_opts[S.venue_subtrack_idx + 1] or _st_opts[1]).label
             if r.ImGui_BeginCombo(ctx, '##venue_subtrack', _st_preview) then
-                for i, cat in ipairs(VENUE_SUBTRACKS) do
+                for i, cat in ipairs(_st_opts) do
                     local is_sel = (i - 1 == S.venue_subtrack_idx)
                     if r.ImGui_Selectable(ctx, cat.label, is_sel) then
                         S.venue_subtrack_idx = i - 1

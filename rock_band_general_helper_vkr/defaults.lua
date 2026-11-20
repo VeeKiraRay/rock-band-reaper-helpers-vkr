@@ -580,15 +580,36 @@ TIPS = {
                       "VENUE's own MIDI notes (e.g. the sing-cue notes at pitches 85-87) are\n" ..
                       "copied to \"VENUE special\" alongside its text events - the only category\n" ..
                       "that ever carries notes.\n\n" ..
+                      "Also draws the view-only \"VENUE directed cut time\" track (see\n" ..
+                      "Directed cut time in the Subtrack dropdown).\n\n" ..
                       "Always processes the whole song. Fully undoable.",
     venue_subtrack_copy_from_all = "Clear the VENUE track and replace its events with the\n" ..
                       "combined contents of all 6 subtracks (however many currently exist).\n" ..
+                      "\"VENUE directed cut time\" is view only and is never copied back.\n" ..
                       "Does nothing (with a status message) if none of the subtracks exist yet -\n" ..
                       "run \"Copy all to subtracks\" first.\n\n" ..
                       "Prompts for confirmation first, since this overwrites the VENUE track\n" ..
                       "that authoring actually reads from.\n\n" ..
                       "Always processes the whole song. Fully undoable.",
-    venue_subtrack_select = "Which of the 6 subtrack categories the Copy to/from buttons act on.",
+    venue_subtrack_select = "Which subtrack the Copy to/from buttons act on.\n\n" ..
+                      "Directed cut time is view only. Copy to draws, for every directed\n" ..
+                      "cut, how long it may play. Which version plays depends on the venue\n" ..
+                      "and the game's rotation, so the notes do not show any one version,\n" ..
+                      "only the bounds over all of them:\n" ..
+                      "  note 0 - longest lead-in before the event to the longest run after\n" ..
+                      "    it: the camera MAY be on this cut;\n" ..
+                      "  note 1 - shortest lead-in to the shortest run: the camera IS on this\n" ..
+                      "    cut whichever version plays (unless a camera event cuts it).\n" ..
+                      "A cut that would overlap the previous one uses notes 2 and 3.\n\n" ..
+                      "Each directed cut and the next two camera spots after it are copied\n" ..
+                      "beside the notes as text: the cut marks its hit (where the move lands),\n" ..
+                      "the first spot names what plays when the directed shot ends, the second\n" ..
+                      "(at its own position) is the latest it can be cut.\n" ..
+                      "Open it in the MIDI editor beside VENUE or a subtrack to see where\n" ..
+                      "each directed cut ends by itself while placing the next camera cut.\n\n" ..
+                      "Reads the camera cuts from the tracks Manual gen's Target names (VENUE,\n" ..
+                      "or \"VENUE directed camera\" + \"VENUE normal camera\"). Copy from does\n" ..
+                      "nothing for it: it never goes back to VENUE.",
     venue_subtrack_copy_to_one = "Clear just the selected subtrack and copy that category's\n" ..
                       "events from VENUE into it. Creates the subtrack (muted) if it doesn't\n" ..
                       "exist yet.\n\n" ..

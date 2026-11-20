@@ -53,6 +53,7 @@ dofile(_root .. 'lib/reaper_venue_shots.lua')       -- directed-cut move lengths
 dofile(_gdir .. 'actions_venue_validate.lua')        -- code under test
 dofile(_gdir .. 'venue_camera_timing.lua')           -- code under test
 dofile(_gdir .. 'actions_venue_validate_camera.lua') -- code under test
+dofile(_gdir .. 'actions_venue_dircut_time.lua')     -- code under test (planner)
 
 dofile(_tdir .. 'venue_validate.lua')
 Test.report()

@@ -38,6 +38,9 @@ dofile(_gdir .. 'venue.lua')                      -- IsBlendAnchor (ResolveBlend
 dofile(_gdir .. 'venue_lighting.lua')             -- MANUAL_LIGHTING_SET, GenerateKeyframesForSpan
 dofile(_gdir .. 'venue_generator.lua')            -- DeleteTextEventsInRange, ClearVenueTextEventsInRange
 dofile(_gdir .. 'actions_venue_subtracks.lua')    -- code under test
+dofile(_root .. 'lib/reaper_venue_shots.lua')      -- directed-cut lengths (Directed cut time)
+dofile(_gdir .. 'venue_camera_timing.lua')          -- DirectedCutLength
+dofile(_gdir .. 'actions_venue_dircut_time.lua')    -- code under test (view-only track)
 dofile(_gdir .. 'actions_venue_validate.lua')     -- KeyframeNoEffect (Manual gen's "does nothing here")
 dofile(_gdir .. 'actions_venue_manual.lua')       -- RemoveVenueEventsByType regression
 dofile(_gdir .. 'actions_venue_keyframes.lua')    -- RegenerateVenueKeyframes restatement rule

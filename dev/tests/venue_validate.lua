@@ -660,3 +660,120 @@ Test.it('as written: every spot at its own position, no directed-cut rules', fun
     Test.expect(Shown(items) == '[directed_drums_lt]@4 [coop_all_far]@6 [coop_d_near]@8', 'got ' .. Shown(items))
     Test.expect(not items[1].skips and not items[2].follow, 'no timing notes')
 end)
+
+-- ---------------------------------------------------------------------------
+Test.section('Directed cut time (actions_venue_dircut_time.lua)')
+
+local function Ev(name) return RB_VENUE_SHOTS.events[name] end
+local function Near(a, b) return math.abs(a - b) < 1e-6 end
+local function ByPitch(notes)
+    local out = {}
+    for _, n in ipairs(notes) do
+        out[n.pitch] = out[n.pitch] or {}
+        table.insert(out[n.pitch], n)
+    end
+    return out
+end
+
+Test.it('one cut: note 0 longest, note 1 shortest, from the shot table', function()
+    local ev = Ev('directed_guitar')
+    local notes, unknown, trimmed = DirectedCutTimeNotes({ { sec = 10, msg = '[directed_guitar]' } })
+    local p = ByPitch(notes)
+    Test.expect(#notes == 2 and p[0] and p[1], 'two notes on 0 and 1')
+    Test.expect(Near(p[0][1].s, 10 - ev.lead[2]) and Near(p[0][1].e, 10 + ev.measured[2]), 'longest')
+    Test.expect(Near(p[1][1].s, 10 - ev.lead[1]) and Near(p[1][1].e, 10 + ev.measured[1]), 'shortest')
+    Test.expect(next(unknown) == nil and trimmed == 0, 'nothing unknown or trimmed')
+end)
+
+Test.it('an overlapping cut uses notes 2 and 3, a free one goes back to 0 and 1', function()
+    -- drums_lt runs up to ~16.7 s: a guitar cut 5 s later overlaps it.
+    local notes = DirectedCutTimeNotes({
+        { sec = 10, msg = '[directed_drums_lt]' },
+        { sec = 15, msg = '[directed_guitar]' },
+        { sec = 60, msg = '[directed_guitar]' },
+    })
+    local p = ByPitch(notes)
+    Test.expect(#p[0] == 2 and #p[1] == 2, 'first and third on 0/1')
+    Test.expect(p[2] and #p[2] == 1 and p[3] and #p[3] == 1, 'second on 2/3')
+    Test.expect(p[2][1].msg == '[directed_guitar]' and Near(p[2][1].s, 15 - Ev('directed_guitar').lead[2]),
+        'the overlapping one')
+end)
+
+Test.it('three overlapping cuts: the lane that frees first is cut short', function()
+    local notes, _, trimmed = DirectedCutTimeNotes({
+        { sec = 10, msg = '[directed_drums_lt]' },
+        { sec = 12, msg = '[directed_drums_lt]' },
+        { sec = 14, msg = '[directed_drums_lt]' },
+    })
+    Test.expect(trimmed >= 1, 'trimmed ' .. trimmed)
+    -- No two notes on one pitch overlap.
+    local p = ByPitch(notes)
+    for pitch, list in pairs(p) do
+        table.sort(list, function(a, b) return a.s < b.s end)
+        for i = 2, #list do
+            Test.expect(list[i].s >= list[i - 1].e - 1e-6, ('pitch %d notes %d/%d overlap'):format(pitch, i - 1, i))
+        end
+    end
+end)
+
+Test.it('cuts on one tick draw one pair: widest longest, shortest shortest', function()
+    local a, b = Ev('directed_guitar'), Ev('directed_all')
+    local notes = DirectedCutTimeNotes({
+        { sec = 20, msg = '[directed_guitar]' },
+        { sec = 20, msg = '[directed_all]' },
+    })
+    local p = ByPitch(notes)
+    Test.expect(#notes == 2, 'one pair; got ' .. #notes)
+    Test.expect(Near(p[0][1].s, 20 - math.max(a.lead[2], b.lead[2])), 'earliest start')
+    Test.expect(Near(p[0][1].e, 20 + math.max(a.measured[2], b.measured[2])), 'latest end')
+    local short_a, short_b = a.measured[1] - (-a.lead[1]), b.measured[1] - (-b.lead[1])
+    local want = short_a <= short_b and a or b
+    Test.expect(Near(p[1][1].e, 20 + want.measured[1]), 'the shorter shortest')
+end)
+
+Test.it('an unknown directed cut is reported, not drawn', function()
+    local notes, unknown = DirectedCutTimeNotes({ { sec = 5, msg = '[directed_nobody]' } })
+    Test.expect(#notes == 0 and unknown['[directed_nobody]'] == 1, 'reported')
+end)
+
+Test.it('the dropdown lists the six subtracks, then the view-only track', function()
+    local opts = VenueSubtrackOptions()
+    Test.expect(#opts == #VENUE_SUBTRACKS + 1 and opts[#opts].view_only, 'view-only last')
+end)
+
+local function Msgs(evs)
+    local out = {}
+    for _, e in ipairs(evs) do out[#out + 1] = e.msg .. '@' .. e.sec end
+    return table.concat(out, ' ')
+end
+
+Test.it('copies each directed cut and the next two camera spots after it, whole stacks', function()
+    local evs = DirectedCutFollowEvents({
+        { sec = 0,  msg = '[coop_all_far]' },
+        { sec = 4,  msg = '[directed_guitar]' },
+        { sec = 4,  msg = '[coop_g_near]' },     -- same spot as the cut: not a follow-up
+        { sec = 6,  msg = '[coop_all_near]' },
+        { sec = 6,  msg = '[coop_v_near]' },
+        { sec = 10, msg = '[coop_d_near]' },
+        { sec = 14, msg = '[coop_b_near]' },
+    })
+    Test.expect(Msgs(evs) == '[directed_guitar]@4 [coop_all_near]@6 [coop_v_near]@6 [coop_d_near]@10',
+        'the cut (not its stacked fallback) and the next two spots; got ' .. Msgs(evs))
+end)
+
+Test.it('spots shared by two directed cuts are copied once', function()
+    local evs = DirectedCutFollowEvents({
+        { sec = 0, msg = '[directed_guitar]' },
+        { sec = 2, msg = '[directed_drums]' },
+        { sec = 4, msg = '[coop_all_far]' },
+        { sec = 8, msg = '[coop_d_near]' },
+    })
+    Test.expect(Msgs(evs) == '[directed_guitar]@0 [directed_drums]@2 [coop_all_far]@4 [coop_d_near]@8', 'got ' .. Msgs(evs))
+end)
+
+Test.it('a directed cut not in the shot table copies nothing', function()
+    local evs = DirectedCutFollowEvents({
+        { sec = 0, msg = '[directed_nobody]' }, { sec = 2, msg = '[coop_all_far]' },
+    })
+    Test.expect(#evs == 0, 'got ' .. Msgs(evs))
+end)

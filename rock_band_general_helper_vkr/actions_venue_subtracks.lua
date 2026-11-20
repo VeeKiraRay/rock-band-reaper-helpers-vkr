@@ -3,7 +3,9 @@
 -- of keyframes make the single VENUE track hard to read), then merges them back. Subtracks are
 -- a pure editing convenience with no meaning to the exported song.
 -- Requires: FindTrackByName, FindNamedTrackMIDI, DeleteTextEventsInRange,
---           ClearVenueTextEventsInRange, r, S (globals)
+--           ClearVenueTextEventsInRange, r, S (globals); at call time the view-only
+--           Directed cut time track (actions_venue_dircut_time.lua: VenueSubtrackOptions,
+--           FillDirectedCutTimeTrack, CopyDirectedCutTime)
 -- Globals exported: VENUE_SUBTRACKS, CategorizeVenueEvent, FindOrCreateSubtrack,
 --   EnsureMatchingItem, CopyVenueEvents, CopyVenueNotes (logic helpers, global per this
 --   repo's testability convention - explicit take/item args, no UI/S reads, so tests can
@@ -225,6 +227,8 @@ function CopyVenueToSubtracks()
             note_skipped_total = note_skipped_total + note_skipped
         end
     end
+    -- The view-only Directed cut time track, after the six (actions_venue_dircut_time.lua).
+    local dircut = FillDirectedCutTimeTrack({ venue_take }, venue_track, venue_item, anchor)
 
     r.Undo_EndBlock2(0, 'RB Copy VENUE to subtracks', -1)
     r.PreventUIRefresh(-1)
@@ -234,6 +238,9 @@ function CopyVenueToSubtracks()
     for _, cat in ipairs(VENUE_SUBTRACKS) do
         lines[#lines + 1] = ('  %-16s %d'):format(cat.label, counts[cat.key])
     end
+    lines[#lines + 1] = ''
+    lines[#lines + 1] = ('Directed cut time: %d directed cut(s) drawn (view only).'):format(dircut.cuts)
+    for _, l in ipairs(DirectedCutTimeLines(dircut)) do lines[#lines + 1] = l end
     if note_total > 0 then
         lines[#lines + 1] = ''
         lines[#lines + 1] = ('Notes copied to Special: %d'):format(note_total)
@@ -330,7 +337,8 @@ end
 
 -- "Copy to" (single, selected subtrack): auto-creates the subtrack if missing.
 function CopySelectedSubtrackTo()
-    local cat = VENUE_SUBTRACKS[S.venue_subtrack_idx + 1]
+    local cat = VenueSubtrackOptions()[S.venue_subtrack_idx + 1]
+    if not cat or cat.view_only then return CopyDirectedCutTime() end
     local venue_track, venue_item, venue_take = _find_venue_track_and_take()
     if not venue_track then return end
 
@@ -369,7 +377,12 @@ end
 -- instead, asymmetric from "Copy to" on purpose. Clears only that category's events from
 -- VENUE (not everything) before copying the subtrack's contents in.
 function CopySelectedSubtrackFrom()
-    local cat = VENUE_SUBTRACKS[S.venue_subtrack_idx + 1]
+    local cat = VenueSubtrackOptions()[S.venue_subtrack_idx + 1]
+    if not cat or cat.view_only then
+        S.status = 'Nothing to write: "' .. VENUE_DIRCUT_TIME.track_name ..
+                   '" is for viewing only and never goes back to VENUE.'
+        return
+    end
     local venue_track, venue_item, venue_take = _find_venue_track_and_take()
     if not venue_track then return end
 
