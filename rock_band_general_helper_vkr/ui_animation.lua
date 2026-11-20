@@ -309,7 +309,9 @@ local function DrawAnimationDrumsTab()
                              'and PART DRUMS_2X from the Expert gems: which drum or cymbal, and ' ..
                              'which hand - alternating only when the hits come fast, following ' ..
                              'the beat, and moving around the kit without crossing the arms. ' ..
-                             'The hi-hat pedal notes are not generated.')
+                             'Hi-hat pedal notes (25) are written only for open hi-hats (the ' ..
+                             'Hi-hat options below); the foot keeping time is not generated, so ' ..
+                             'pedal notes placed by hand for it stay.')
     r.ImGui_Spacing(ctx)
 
     -- Velocity options: a checkbox, and its thresholds under it while it is on.
