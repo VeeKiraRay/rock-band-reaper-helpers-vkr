@@ -20,7 +20,8 @@
 --     the official charts carry no state events there.
 --
 -- CharacterPlan is pure (no r); the rest touches REAPER.
--- Requires globals: r, S, FindTrackByName, FindFirstMIDIItem, GetTimeSelection
+-- Requires globals: r, S, FindTrackByName, FindFirstMIDIItem, GetTimeSelection,
+--   ClampToSongEnd
 
 local EPS  = 1e-6   -- QN
 local LEAD = 1      -- QN before a run: the active state
@@ -258,6 +259,10 @@ function GenerateCharacterAnimations()
     local sel_s, sel_e = GetTimeSelection()
     local sel_s_qn = sel_s and r.TimeMap2_timeToQN(0, sel_s)
     local sel_e_qn = sel_e and r.TimeMap2_timeToQN(0, sel_e)
+    -- [end] on EVENTS: states follow the chart, but the song-end [idle_realtime] (not
+    -- required by the game) is left out when it would land at or after [end].
+    local end_t  = ClampToSongEnd(nil)
+    local end_qn = end_t and r.TimeMap2_timeToQN(0, end_t)
 
     local jobs, lines, skipped = {}, {}, {}
     for _, p in ipairs(CHAR_PARTS) do
@@ -282,10 +287,19 @@ function GenerateCharacterAnimations()
                 local pos = r.GetMediaItemInfo_Value(item, 'D_POSITION')
                 local i_s = r.TimeMap2_timeToQN(0, pos)
                 local i_e = r.TimeMap2_timeToQN(0, pos + r.GetMediaItemInfo_Value(item, 'D_LENGTH'))
-                local keep, outside = {}, 0
+                local notes_past_end = 0
+                if end_qn then
+                    for _, n in ipairs(notes) do
+                        if n.s >= end_qn - EPS then notes_past_end = notes_past_end + 1 end
+                    end
+                end
+                local keep, outside, no_end_idle = {}, 0, false
                 for _, ev in ipairs(events) do
                     if not sel_s or (ev.qn >= sel_s_qn - EPS and ev.qn < sel_e_qn - EPS) then
-                        if ev.qn >= i_s - EPS and ev.qn < i_e - EPS then
+                        if end_qn and ev.msg == '[idle_realtime]' and ev.qn >= end_qn - EPS
+                           and notes_past_end == 0 then
+                            no_end_idle = true
+                        elseif ev.qn >= i_s - EPS and ev.qn < i_e - EPS then
                             keep[#keep + 1] = ev
                         else
                             outside = outside + 1
@@ -294,6 +308,7 @@ function GenerateCharacterAnimations()
                 end
                 jobs[#jobs + 1] = { part = p, track = track, item = item, take = take,
                                     events = keep, stats = stats, outside = outside,
+                                    no_end_idle = no_end_idle, notes_past_end = notes_past_end,
                                     active = active }
             end
         end
@@ -330,6 +345,17 @@ function GenerateCharacterAnimations()
             lines[#lines + 1] = string.format('  %d event%s outside the MIDI item - extend ' ..
                                               'the item and run again.', j.outside,
                                               j.outside == 1 and '' or 's')
+        end
+        if j.no_end_idle then
+            lines[#lines + 1] = '{warn}  No [idle_realtime] at the end: the last note ends less ' ..
+                                'than a beat before [end], no room for it. Fine for a sudden ending; move [end] ' ..
+                                'later if the band should go idle.'
+        end
+        if j.notes_past_end > 0 then
+            lines[#lines + 1] = string.format('{warn}  %d Expert note%s at or after [end] on EVENTS, ' ..
+                                              'animated as charted: Magma refuses notes there - move ' ..
+                                              '[end] or fix the chart.',
+                                              j.notes_past_end, j.notes_past_end == 1 and '' or 's')
         end
     end
     r.Undo_EndBlock2(0, string.format('Generate character animations (%d events)', total), -1)

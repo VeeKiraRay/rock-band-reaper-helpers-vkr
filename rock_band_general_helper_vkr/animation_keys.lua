@@ -4,7 +4,7 @@
 -- the two hands stay apart on the in-game keyboard. Also the Validate check, which
 -- runs on hand-made animations too.
 -- Requires globals: r, S, FindTrackByName, TrackAtIndex, FindFirstMIDIItem,
---                   GetTimeSelection, ReplaceNotesBulk
+--                   GetTimeSelection, ReplaceNotesBulk, ClampToSongEnd
 --
 -- How the game plays these tracks: only notes 48-72 are read, and the left-hand track
 -- sits an octave below the right-hand one on the in-game keyboard (the RH track's 48 is
@@ -384,8 +384,11 @@ local function Muted(track) return r.GetMediaTrackInfo_Value(track, 'B_MUTE') ==
 local function Notes(n) return n == 1 and '1 note' or (n .. ' notes') end
 
 -- Writes notes (QN) to a track's first MIDI item, replacing every note that starts in
--- range (the whole item without a time selection). Returns written, replaced, outside.
-local function WriteHand(track, notes, sel_s, sel_e)
+-- range (the whole item without a time selection). Notes follow the chart, also past
+-- [end] (end_qn); past_end counts those that start at or after it, for a warning
+-- (Magma refuses them - the chart needs the fix). Returns written, replaced, outside,
+-- past_end.
+local function WriteHand(track, notes, sel_s, sel_e, end_qn)
     local item, take = FindFirstMIDIItem(track)
     local pos = r.GetMediaItemInfo_Value(item, 'D_POSITION')
     local i_s = r.TimeMap2_timeToQN(0, pos)
@@ -399,9 +402,10 @@ local function WriteHand(track, notes, sel_s, sel_e)
         local ok, _, _, sppq = r.MIDI_GetNote(take, i)
         if ok and InRange(r.MIDI_GetProjQNFromPPQPos(take, sppq)) then replaced = replaced + 1 end
     end
-    local new, outside = {}, 0
+    local new, outside, past_end = {}, 0, 0
     for _, n in ipairs(notes) do
         if InRange(n.qn_s) then
+            if n.qn_s >= end_qn - EPS then past_end = past_end + 1 end
             if n.qn_s >= i_s - EPS and n.qn_e <= i_e + EPS then
                 new[#new + 1] = { s = r.TimeMap2_QNToTime(0, n.qn_s), e = r.TimeMap2_QNToTime(0, n.qn_e),
                                   pitch = n.pitch }
@@ -422,7 +426,7 @@ local function WriteHand(track, notes, sel_s, sel_e)
         end
     end
     r.MIDI_Sort(take)
-    return #new, replaced, outside
+    return #new, replaced, outside, past_end
 end
 
 -- The Expert source, or nil + a reason.
@@ -500,11 +504,13 @@ function GenerateKeysAnimations()
     end
 
     local sel_s, sel_e = GetTimeSelection()
+    local end_t  = ClampToSongEnd(nil)
+    local end_qn = end_t and r.TimeMap2_timeToQN(0, end_t) or math.huge
     r.PreventUIRefresh(1)
     r.Undo_BeginBlock2(0)
-    local rw, rr, ro = WriteHand(rh_track, rh, sel_s, sel_e)
-    local lw, lr, lo
-    if lh_track then lw, lr, lo = WriteHand(lh_track, lh, sel_s, sel_e) end
+    local rw, rr, ro, rp = WriteHand(rh_track, rh, sel_s, sel_e, end_qn)
+    local lw, lr, lo, lp
+    if lh_track then lw, lr, lo, lp = WriteHand(lh_track, lh, sel_s, sel_e, end_qn) end
     r.Undo_EndBlock2(0, string.format('Generate keys animations (%d notes)', rw + (lw or 0)), -1)
     r.PreventUIRefresh(-1)
     r.UpdateArrange()
@@ -516,6 +522,11 @@ function GenerateKeysAnimations()
                                       rr > 0 and string.format(' (replaced %s)', Notes(rr)) or '')
     if ro > 0 then
         lines[#lines + 1] = string.format('- %s outside the MIDI item - extend the item and run again', Notes(ro))
+    end
+    if rp > 0 then
+        lines[#lines + 1] = string.format('{warn}- %s at or after [end] on EVENTS, copied as charted ' ..
+                                          'in %s: Magma refuses notes there - move [end] or fix the chart',
+                                          Notes(rp), KEYS_ANIM_EXPERT)
     end
     lines[#lines + 1] = ''
     lines[#lines + 1] = KEYS_ANIM_TRACKS.lh
@@ -544,6 +555,11 @@ function GenerateKeysAnimations()
         end
         if lo > 0 then
             lines[#lines + 1] = string.format('- %s outside the MIDI item - extend the item and run again', Notes(lo))
+        end
+        if lp > 0 then
+            lines[#lines + 1] = string.format('{warn}- %s at or after [end] on EVENTS, placed as in the ' ..
+                                              'source: Magma refuses notes there - move [end] or fix the source',
+                                              Notes(lp))
         end
     end
 

@@ -6,7 +6,7 @@
 --           DeleteTextEventsInRange, ClearVenueKeyframesInRange, CategorizeVenueEvent,
 --           IsBlendAnchor, VENUE_SUBTRACKS (read at call time; loaded later),
 --           FindTrackByName, FindFirstMIDIItem, FormatTime, RB3_PHRASE_PITCH,
---           r, S (globals)
+--           ClampToSongEnd, r, S (globals)
 
 -- Reason shown wherever keyframe generation is refused, in the UI's blocked hover and in
 -- the action's own status line, so both read the same.
@@ -128,6 +128,12 @@ function InsertVenueEventAtPlayhead(text)
 
     local cursor  = r.GetCursorPosition()
     local abs_ppq = r.MIDI_GetPPQPosFromProjTime(take, cursor)
+    local _, past_end = ClampToSongEnd(cursor + 1e-9)
+    if past_end then
+        S.status = ('Not inserted: the playhead is at or after [end] (Magma refuses %s there).')
+            :format(text)
+        return
+    end
 
     -- Replace: the takes holding the family, grouped so one take is cleared once (in
     -- VENUE mode every category is the VENUE take). A missing subtrack on the clearing
@@ -431,7 +437,13 @@ function GenerateManualKeyframes()
 
     local item_start_sec = r.GetMediaItemInfo_Value(item, 'D_POSITION')
     local item_end_sec   = item_start_sec + r.GetMediaItemInfo_Value(item, 'D_LENGTH')
-    local end_ppq        = r.MIDI_GetPPQPosFromProjTime(take, item_end_sec)
+    -- Never past [end] on EVENTS: Magma refuses events at or after it.
+    local song_end_sec   = ClampToSongEnd(item_end_sec)
+    local end_ppq        = r.MIDI_GetPPQPosFromProjTime(take, song_end_sec)
+    if end_ppq <= start_ppq then
+        S.status = 'The playhead is at or after [end] - no keyframes are generated past the song end.'
+        return
+    end
 
     -- Clamp to time selection if active
     local sel_s, sel_e = r.GetSet_LoopTimeRange(false, false, 0, 0, false)

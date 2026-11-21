@@ -6,7 +6,7 @@
 -- Requires: FindVenueTarget, VenueTargetName, VenueTargetUsesSubtracks, VenuePpqBetween
 --           (actions_venue_manual.lua), GetTakePPQPerQN, GetTimeSelection,
 --           MANUAL_LIGHTING_SET, GenerateKeyframesForSpan, ClearVenueKeyframesInRange,
---           r, S (globals)
+--           ClampToSongEnd, r, S (globals)
 
 function RegenerateVenueKeyframes()
     -- Lighting is read from one take and the keyframes written to another; with Target =
@@ -24,8 +24,16 @@ function RegenerateVenueKeyframes()
 
     local sel_s, sel_e = GetTimeSelection()
     local has_sel       = sel_s ~= nil
+    -- Never past [end] (Magma refuses events at or after it), whatever the item or the
+    -- time selection covers; a lighting event at or after [end] starts no span.
+    local wanted_end_sec = has_sel and sel_e or item_end_sec
+    local range_end_sec, cut_at_end = ClampToSongEnd(wanted_end_sec)
     local range_start_ppq = r.MIDI_GetPPQPosFromProjTime(take, has_sel and sel_s or item_start_sec)
-    local range_end_ppq   = r.MIDI_GetPPQPosFromProjTime(take, has_sel and sel_e or item_end_sec)
+    local range_end_ppq   = r.MIDI_GetPPQPosFromProjTime(take, range_end_sec)
+    if range_end_ppq <= range_start_ppq then
+        S.status = 'The range starts at or after [end] - nothing to regenerate.'
+        return
+    end
 
     -- Read every [lighting (...)] event on the whole take (not range-limited) so a manual
     -- event near the range's end can still find its true next-lighting boundary even when
@@ -107,6 +115,20 @@ function RegenerateVenueKeyframes()
         end
     end
 
+    -- Keyframes at or after [end] inside the range asked for (left there by an earlier
+    -- run that went to the item's end) would fail Magma: remove them too.
+    local removed_past_end = 0
+    if cut_at_end then
+        local kf_end_sec = wanted_end_sec
+        if not has_sel then
+            kf_end_sec = r.GetMediaItemInfo_Value(kf_item, 'D_POSITION')
+                       + r.GetMediaItemInfo_Value(kf_item, 'D_LENGTH')
+        end
+        removed_past_end = ClearVenueKeyframesInRange(kf_take,
+            r.MIDI_GetPPQPosFromProjTime(kf_take, range_end_sec),
+            r.MIDI_GetPPQPosFromProjTime(kf_take, kf_end_sec) + 1)
+    end
+
     r.Undo_EndBlock2(0, 'RB Regenerate Venue Keyframes (' .. total .. ' events)', -1)
     r.PreventUIRefresh(-1)
     r.UpdateArrange()
@@ -117,4 +139,12 @@ function RegenerateVenueKeyframes()
         or ''
     S.status = ('Regenerated %d keyframe events across %d manual lighting section(s) (%s)%s.')
         :format(total, #spans, scope, where)
+    local last_span_cut = cut_at_end and spans[#spans].end_ppq >= range_end_ppq
+    if last_span_cut or removed_past_end > 0 then
+        local lines = { 'Stopped at [end] on the EVENTS track (Magma refuses events at or after it).' }
+        if removed_past_end > 0 then
+            lines[#lines + 1] = ('Removed %d keyframe event(s) at or after [end].'):format(removed_past_end)
+        end
+        S.last_result = table.concat(lines, '\n')
+    end
 end

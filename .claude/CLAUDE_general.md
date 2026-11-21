@@ -128,7 +128,7 @@ One WIP tab appears only when **Show WIPs? = Yes** in the General tab (persisted
 - **Special** — `[bonusfx]`, `[bonusfx_optional]`, `[next]`, `[first]`, `[prev]` (`[next]` leads the keyframe events: the official charts use only it; with two looks `[prev]` lands on the same look, and `[first]` is the one event whose result does not depend on the current look); **Add** inserts the chosen event anywhere. Each keyframe event has its own tooltip (`TIPS.venue_kf_next` / `_first` / `_prev`, with the looks-per-venue counts). Where a keyframe event would do nothing in game (`KeyframeNoEffect`, see Validate), the row shows `(does nothing here)` with the reason on hover, and the Add result repeats it - inserted anyway, the author asked for it. The note reads the cached `ReadKeyframeContext()` from the tab's poll.
 - **Camera pacing** — shared camera pacing override (same state as other gen tabs).
 - **Advance camera pacing** — moves the edit cursor forward by one jittered camera interval.
-- Keyframe align's **Add** button generates the `[next]` train from cursor to the next lighting event / time selection end / VENUE item end (delegating to the shared `GenerateKeyframesForSpan`). Clears existing keyframe events in the range first. Fully undoable.
+- Keyframe align's **Add** button generates the `[next]` train from cursor to the next lighting event / time selection end / `[end]` on EVENTS, else the VENUE item end (delegating to the shared `GenerateKeyframesForSpan`). Clears existing keyframe events in the range first. Fully undoable.
 - **Keyframe row gating** — the generated `[next]` train belongs to a manual lighting event, so the keyframe row requires one at the playhead (`FindManualLightingAtPpq`, tolerance ~1/128 note). Blocked state shows a `(blocked)` marker whose hover carries the shared `NO_LIGHTING_AT_PLAYHEAD_MSG`, the same string the refused action puts in `S.status` — the "(blocked)" affordance the Events tab already used. The gate reads the event **under the playhead**, not the Lighting dropdown, so an existing `[lighting (stomp)]` can be re-keyframed without re-picking it. The UI caches the manual lighting positions behind a `MakeProjectPoll` (as in `ui_venue_events.lua`) and only compares the playhead against that short list per frame — the cursor moves constantly while the event list doesn't, and a finished VENUE track carries thousands of text events. Both actions re-check the take for themselves, and a refusal returns before any `Undo_*` call so it leaves no undo point.
   - Since the keyframe row is disabled in the blocked state and a disabled ImGui widget reports no hover, the `(blocked)` label is drawn in a brief `EndDisabled`/`BeginDisabled` gap so its tooltip is reachable.
 - **Remove** — category dropdown (Camera / Lighting / Post proc / Special) + **Remove** button; removes matching events from time selection (if active) or full song. Fully undoable.
@@ -747,7 +747,7 @@ Walking events sorted by time: if the current event has a letter suffix AND the 
 }
 ```
 
-`song_end_t` passed to `ReadEventSections` defaults to the VENUE item end (from `FindNamedTrackMIDI('VENUE')`), falling back to `r.GetProjectLength(0)`.
+`song_end_t` passed to `ReadEventSections` is `[end]` on EVENTS (`ClampToSongEnd`), else the VENUE item end (from `FindNamedTrackMIDI('VENUE')`), falling back to `r.GetProjectLength(0)`.
 
 ### Display output (`ListEventSections`)
 

@@ -1,7 +1,8 @@
 -- Venue track awareness: instrument mute detection, pool filtering,
 -- and [prc_*] section detection from the EVENTS track.
 -- Requires: FindTrackByName, FindNamedTrackMIDI, r, S, FormatTime (globals)
--- Globals exported here also include: FindEventTime, FindMusicStartTime, INST_LETTER_NAMES
+-- Globals exported here also include: FindEventTime, ClampToSongEnd, FindMusicStartTime,
+-- INST_LETTER_NAMES
 
 local INST_TRACK_NAMES = {
     d = 'PART DRUMS',
@@ -316,6 +317,16 @@ function FindEventTime(msg)
     end
     if not best_ppq then return nil end
     return r.MIDI_GetProjTimeFromPPQPos(take, best_ppq)
+end
+
+-- [end] on the EVENTS track is the song end: Magma refuses events at or after it, so
+-- nothing a tool generates may reach it, whatever item or time selection it works in.
+-- Returns limit_t clamped to [end], and true when [end] cut it short. With no [end]
+-- (or [end] past limit_t) limit_t comes back unchanged; a nil limit_t returns [end].
+function ClampToSongEnd(limit_t)
+    local end_t = FindEventTime('[end]')
+    if end_t and (not limit_t or end_t < limit_t) then return end_t, true end
+    return limit_t, false
 end
 
 -- Returns the project time of the earliest "[music_start]" text event on the

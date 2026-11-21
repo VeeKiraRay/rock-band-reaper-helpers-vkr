@@ -37,7 +37,8 @@
 --
 -- DrumAnimPlan is pure (no r) - dev/tools/drum_anim_eval_offline.lua runs it
 -- over the official charts. The REAPER side is GenerateDrumAnimations.
--- Requires globals: r, S, FindTrackByName, FindFirstMIDIItem, ReplaceNotesBulk
+-- Requires globals: r, S, FindTrackByName, FindFirstMIDIItem, ReplaceNotesBulk,
+--   ClampToSongEnd
 -- (lib/reaper_midi_helpers.lua), GetTimeSelection
 
 DRUM_ANIM_PARAMS = {
@@ -631,6 +632,10 @@ function GenerateDrumAnimations()
     local sel_s, sel_e = GetTimeSelection()
     local sel_s_qn = sel_s and r.TimeMap2_timeToQN(0, sel_s)
     local sel_e_qn = sel_e and r.TimeMap2_timeToQN(0, sel_e)
+    -- Animations follow the chart, also past [end] on EVENTS; chart hits there are
+    -- listed instead, for the author to fix in the chart (Magma refuses them).
+    local end_t  = ClampToSongEnd(nil)
+    local end_qn = end_t and r.TimeMap2_timeToQN(0, end_t) or math.huge
 
     local jobs, skipped = {}, {}
     for i, name in ipairs(DRUM_ANIM_TRACKS) do
@@ -754,6 +759,15 @@ function GenerateDrumAnimations()
         end
         if outside > 0 then
             lines[#lines + 1] = string.format('- %d notes outside the MIDI item - extend the item and run again', outside)
+        end
+        local hits_past_end = 0
+        for _, o in ipairs(j.onsets) do
+            if InRange(o.qn) and o.qn >= end_qn - EPS then hits_past_end = hits_past_end + 1 end
+        end
+        if hits_past_end > 0 then
+            lines[#lines + 1] = string.format('{warn}- %d drum hit%s at or after [end] on EVENTS, animated as ' ..
+                                              'charted: Magma refuses notes there - move [end] or fix the chart',
+                                              hits_past_end, hits_past_end == 1 and '' or 's')
         end
     end
     r.Undo_EndBlock2(0, string.format('Generate drum animations (%d notes)', total), -1)

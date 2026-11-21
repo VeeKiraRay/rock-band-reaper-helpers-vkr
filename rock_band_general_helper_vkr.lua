@@ -132,6 +132,17 @@
 --       Calculate after changing the
 --       charts - it is meant to sit beside the Instrument Helper's Overdrive
 --       tab.
+--     - Fixed: nothing is generated at or after [end] on the EVENTS track any
+--       more (Magma refuses events there). Venue > Keyframes ran to the end
+--       of the VENUE item; it now stops before [end] and removes keyframes an
+--       earlier run left past it. Manual gen's keyframes stop at [end] too,
+--       and its inserts refuse a playhead at or after it. Venue > Section gen
+--       ends the last section at [end]. Animation > Character, Drums and Keys
+--       still follow the chart, but warn in amber about chart notes at or
+--       after [end] (move [end] or fix the chart). Character leaves out the
+--       closing [idle_realtime] when the last note ends less than a beat
+--       before [end] and says so - the game does not need it, and a sudden
+--       ending may not want it.
 --     - Venue: the lighting keyframe trigger is now written [prev], not
 --       [previous]. [prev] is what the game, the RBN documentation and the
 --       official charts use; [previous] is not a game event.

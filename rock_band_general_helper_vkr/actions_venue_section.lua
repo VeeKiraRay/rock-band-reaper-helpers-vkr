@@ -4,7 +4,8 @@
 --           venue_camera.lua (FindCompanion, …),
 --           venue_lighting.lua (GenerateThemedSectionEvents, FindNextMeasureStartPpq,
 --                               CollectVocalPhraseStarts, SnapPpqToHalfBeat),
---           venue_awareness.lua (ReadEventSections, ReadInstrumentPlayStates),
+--           venue_awareness.lua (ReadEventSections, ReadInstrumentPlayStates,
+--                                ClampToSongEnd),
 --           venue_themes.lua (GetSectionPreset, BuildLightingPool, BuildPostprocPool,
 --                             GetThemeCameraInterval),
 --           helpers.lua (FindTrackByName), r, S, TIPS (globals)
@@ -86,7 +87,7 @@ function LoadVenueSections()
         item_end = r.GetMediaItemInfo_Value(item, 'D_POSITION') +
                    r.GetMediaItemInfo_Value(item, 'D_LENGTH')
     end
-    local secs = ReadEventSections(item_end)
+    local secs = ReadEventSections(ClampToSongEnd(item_end))
     if not secs or #secs == 0 then
         S.venue_sections = {}
         S.status = 'No [prc_*] sections found on EVENTS track.'
@@ -131,8 +132,16 @@ function GenerateSectionEvent()
     local ppq = GetTakePPQPerQN(take)
     local sixteenth_ticks = ppq / 4
 
+    -- The last section runs to the VENUE item's end; never past [end] on EVENTS, which
+    -- Magma refuses events at or after (read now: [end] may have moved since Refresh).
+    local sec_end_t = ClampToSongEnd(sec.t_end)
+    if sec_end_t <= sec.t_start then
+        S.status     = 'This section starts at or after [end] - nothing generated.'
+        S.last_result = nil
+        return
+    end
     local sec_start_ppq = r.MIDI_GetPPQPosFromProjTime(take, sec.t_start)
-    local sec_end_ppq   = r.MIDI_GetPPQPosFromProjTime(take, sec.t_end)
+    local sec_end_ppq   = r.MIDI_GetPPQPosFromProjTime(take, sec_end_t)
     local item_start_ppq = r.MIDI_GetPPQPosFromProjTime(take, item_start_sec)
 
     -- Preset state going into this section, read BEFORE anything is cleared (the clear

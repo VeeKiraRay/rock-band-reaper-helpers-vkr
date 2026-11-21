@@ -650,6 +650,68 @@ else
         if not ok then error(err, 2) end
     end)
 
+    -- [end] on EVENTS bounds keyframe generation (Magma refuses events at or after it),
+    -- though the VENUE item runs past it. Needs its own EVENTS track.
+    if FindTrackByName('EVENTS') then
+        r.ShowConsoleMsg('  SKIP  [end] keyframe tests (this project already has an EVENTS track)\n')
+    else
+        local function WithEndAt(end_qn, fn)
+            local ev_idx  = CreateEmptyFixtureTrack('EVENTS')
+            local ev_item = r.CreateNewMIDIItemInProj(r.GetTrack(0, ev_idx), 0,
+                                                      r.TimeMap_QNToTime(end_qn + 4), false)
+            local ev_take = r.GetActiveTake(ev_item)
+            r.MIDI_InsertTextSysexEvt(ev_take, false, false,
+                r.MIDI_GetPPQPosFromProjQN(ev_take, end_qn), 1, '[end]', false)
+            local sel_s0, sel_e0 = r.GetSet_LoopTimeRange(false, false, 0, 0, false)
+            r.GetSet_LoopTimeRange(true, false, 0, 0, false)
+            local ok, err = pcall(fn)
+            r.GetSet_LoopTimeRange(true, false, sel_s0, sel_e0, false)
+            CleanupFixture(ev_idx)
+            if not ok then error(err, 2) end
+        end
+
+        Test.it('RegenerateVenueKeyframes stops before [end] and removes keyframes past it', function()
+            WithEndAt(16, function()
+                WithVenueFixture(function(_, _, take)
+                    local qn = function(n) return r.MIDI_GetPPQPosFromProjQN(take, n) end
+                    r.MIDI_InsertTextSysexEvt(take, false, false, qn(4), 1, '[lighting (stomp)]', false)
+                    r.MIDI_InsertTextSysexEvt(take, false, false, qn(20), 1, '[next]', false) -- stale
+                    local align0, rate0 = S.venue_keyframe_align, S.venue_kf_rate
+                    S.venue_keyframe_align, S.venue_kf_rate = 0, 4
+                    RegenerateVenueKeyframes()
+                    S.venue_keyframe_align, S.venue_kf_rate = align0, rate0
+                    local nexts, last = 0, -1
+                    local _, _, _, n = r.MIDI_CountEvts(take)
+                    for i = 0, n - 1 do
+                        local o, _, _, p, ty, msg = r.MIDI_GetTextSysexEvt(take, i)
+                        if o and ty == 1 and msg == '[next]' then
+                            nexts = nexts + 1
+                            if p > last then last = p end
+                        end
+                    end
+                    Test.expect(nexts == 2, 'expected [next] on QN 8 and 12 only, got ' .. nexts)
+                    Test.expect(last < qn(16), 'no keyframe at or after [end]')
+                    Test.expect(tostring(S.last_result):find('[end]', 1, true),
+                        'the result says it stopped at [end]: ' .. tostring(S.last_result))
+                end, 30, true)
+            end)
+        end)
+
+        Test.it('InsertVenueEventAtPlayhead refuses a spot at or after [end]', function()
+            WithEndAt(16, function()
+                WithVenueFixture(function(_, _, take)
+                    local cur0 = r.GetCursorPosition()
+                    r.SetEditCurPos(r.TimeMap_QNToTime(16), false, false)
+                    local ok, err = pcall(InsertVenueEventAtPlayhead, '[coop_all_far]')
+                    r.SetEditCurPos(cur0, false, false)
+                    if not ok then error(err, 0) end
+                    Test.expect(CountTextEvts(take) == 0, 'nothing inserted on [end]')
+                    Test.expect(tostring(S.status):find('[end]', 1, true), 'status: ' .. tostring(S.status))
+                end, 30, true)
+            end)
+        end)
+    end
+
     Test.it('BlendVenuePresetAtPlayhead copies the active preset, then refuses a second time', function()
         WithVenueFixture(function(_, _, take)
             local cur0 = r.GetCursorPosition()

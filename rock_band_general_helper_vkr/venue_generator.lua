@@ -68,9 +68,9 @@ end
 
 -- Deletes only [first]/[next]/[prev] text events in range (and the misspelling
 -- [previous], VENUE_KEYFRAME_TYPO, so a regenerate cleans it up). Leaves camera,
--- lighting, postproc, and bonusfx untouched.
+-- lighting, postproc, and bonusfx untouched. Returns how many were deleted.
 function ClearVenueKeyframesInRange(take, start_ppq, end_ppq)
-    DeleteTextEventsInRange(take, start_ppq, end_ppq, function(msg)
+    return DeleteTextEventsInRange(take, start_ppq, end_ppq, function(msg)
         return msg ~= '[first]' and msg ~= '[next]' and msg ~= '[prev]'
            and msg ~= VENUE_KEYFRAME_TYPO
     end)

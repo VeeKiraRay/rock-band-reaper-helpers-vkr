@@ -34,6 +34,7 @@ dofile(_root .. 'lib/reaper_imgui_helpers.lua')   -- GetTimeSelection, FormatTim
 dofile(_gdir .. 'defaults.lua')                   -- S
 dofile(_root .. 'lib/reaper_helper_common.lua')   -- FindTrackByName, GetTakePPQPerQN
 dofile(_gdir .. 'helpers.lua')                    -- FindTrackByName, FindNamedTrackMIDI, GetTakePPQPerQN
+dofile(_gdir .. 'venue_awareness.lua')            -- ClampToSongEnd ([end])
 dofile(_gdir .. 'venue.lua')                      -- IsBlendAnchor (ResolveBlendSource reads it)
 dofile(_gdir .. 'venue_lighting.lua')             -- MANUAL_LIGHTING_SET, GenerateKeyframesForSpan
 dofile(_gdir .. 'venue_generator.lua')            -- DeleteTextEventsInRange, ClearVenueTextEventsInRange

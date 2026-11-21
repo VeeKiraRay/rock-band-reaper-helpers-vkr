@@ -35,6 +35,8 @@ dofile(_root .. 'lib/reaper_imgui_helpers.lua')   -- GetTimeSelection
 dofile(_root .. 'lib/reaper_midi_helpers.lua')    -- FindFirstMIDIItem, ReplaceNotesBulk
 dofile(_gdir .. 'defaults.lua')                   -- S
 dofile(_root .. 'lib/reaper_helper_common.lua')   -- FindTrackByName, TrackAtIndex
+dofile(_gdir .. 'helpers.lua')                    -- FindNamedTrackMIDI
+dofile(_gdir .. 'venue_awareness.lua')            -- ClampToSongEnd ([end])
 dofile(_gdir .. 'animation_keys.lua')
 
 EnableFixtureAutoCleanup()  -- one aborted test must not leave tracks behind

@@ -669,7 +669,8 @@ TIPS = {
                         "one is already on the playhead, or when none precedes it.\n\n" ..
                         "Fully undoable.",
     venue_mg_kf_add = "Generate [next] keyframe events from the playhead to the next\n" ..
-                      "lighting event, the time selection end (if active), or the VENUE item end.\n\n" ..
+                      "lighting event, the time selection end (if active), or [end] on EVENTS\n" ..
+                      "(the VENUE item end without one).\n\n" ..
                       "The playhead must be on a manual lighting event\n" ..
                       "([lighting (verse|chorus|manual_cool|manual_warm|dischord|stomp)]) - the\n" ..
                       "[next] train belongs to it. The whole row is blocked anywhere else.\n" ..
